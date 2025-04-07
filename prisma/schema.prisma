@@ -1,0 +1,324 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Usuarios y Roles
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  name         String
+  roleId       String
+  role         Role      @relation(fields: [roleId], references: [id])
+  sucursalId   String?
+  sucursal     Ubicacion? @relation(fields: [sucursalId], references: [id])
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  
+  // Relaciones
+  producciones Production[]
+  ventas       Venta[]
+  envios       Envio[]
+  contingencias Contingencia[]
+  movimientosStock MovimientoStock[]
+}
+
+model Role {
+  id          String  @id @default(uuid())
+  name        String  @unique
+  permissions Json    // Array de permisos
+  users       User[]
+}
+
+// Productos e Insumos
+model Producto {
+  id             String      @id @default(uuid())
+  nombre         String
+  descripcion    String?
+  precio         Float
+  codigoBarras   String?     @unique
+  imagen         String?
+  categoriaId    String
+  categoria      Categoria   @relation(fields: [categoriaId], references: [id])
+  
+  // Para gestión de stock
+  stockMinimo    Int         @default(0)
+  activo         Boolean     @default(true)
+  
+  // Relaciones
+  stocks         Stock[]
+  productoRecetas ProductoReceta[]
+  itemsVenta     ItemVenta[]
+  itemsEnvio     ItemEnvio[]
+}
+
+model Insumo {
+  id             String      @id @default(uuid())
+  nombre         String
+  descripcion    String?
+  unidadMedida   String      // litro, kg, unidad, etc.
+  stockMinimo    Float       @default(0)
+  proveedorId    String?
+  proveedor      Proveedor?  @relation(fields: [proveedorId], references: [id])
+  activo         Boolean     @default(true)
+  
+  // Relaciones
+  stocks         Stock[]
+  recetaItems    RecetaItem[]
+}
+
+model Categoria {
+  id        String     @id @default(uuid())
+  nombre    String     @unique
+  productos Producto[]
+}
+
+model Proveedor {
+  id          String   @id @default(uuid())
+  nombre      String
+  contacto    String?
+  telefono    String?
+  email       String?
+  direccion   String?
+  activo      Boolean  @default(true)
+  insumos     Insumo[]
+}
+
+// Recetas y Producción
+model Receta {
+  id             String        @id @default(uuid())
+  nombre         String
+  descripcion    String?
+  rendimiento    Int           // Cuántos productos finales genera
+  
+  // Relaciones
+  items          RecetaItem[]
+  productoRecetas ProductoReceta[]
+  producciones   Production[]
+}
+
+model RecetaItem {
+  id        String  @id @default(uuid())
+  recetaId  String
+  receta    Receta  @relation(fields: [recetaId], references: [id])
+  insumoId  String
+  insumo    Insumo  @relation(fields: [insumoId], references: [id])
+  cantidad  Float   // Cantidad del insumo necesaria
+}
+
+model ProductoReceta {
+  id         String   @id @default(uuid())
+  productoId String
+  producto   Producto @relation(fields: [productoId], references: [id])
+  recetaId   String
+  receta     Receta   @relation(fields: [recetaId], references: [id])
+}
+
+model Production {
+  id          String    @id @default(uuid())
+  recetaId    String
+  receta      Receta    @relation(fields: [recetaId], references: [id])
+  cantidad    Int       // Cuántos productos se fabricaron
+  fechaInicio DateTime  @default(now())
+  fechaFin    DateTime?
+  usuarioId   String
+  usuario     User      @relation(fields: [usuarioId], references: [id])
+  observaciones String?
+  
+  // Estado de la producción
+  estado      String    // en_proceso, finalizada, con_contingencia
+  
+  // Relaciones
+  contingencias Contingencia[]
+}
+
+// Stock
+model Stock {
+  id             String    @id @default(uuid())
+  ubicacionId    String
+  ubicacion      Ubicacion @relation(fields: [ubicacionId], references: [id])
+  
+  // Puede ser producto o insumo (uno de los dos)
+  productoId     String?
+  producto       Producto? @relation(fields: [productoId], references: [id])
+  insumoId       String?
+  insumo         Insumo?   @relation(fields: [insumoId], references: [id])
+  
+  cantidad       Float
+  version        Int       @default(0) // Para control optimista
+  
+  // Para auditoría
+  ultimaActualizacion DateTime @default(now())
+  
+  // Relaciones con movimientos
+  movimientos    MovimientoStock[]
+}
+
+model MovimientoStock {
+  id            String    @id @default(uuid())
+  stockId       String
+  stock         Stock     @relation(fields: [stockId], references: [id])
+  tipoMovimiento String    // entrada, salida, ajuste
+  cantidad      Float     // siempre positivo, la dirección la define tipoMovimiento
+  motivo        String    // producción, venta, envío, ajuste manual, etc.
+  
+  // Referencias opcionales al origen del movimiento
+  ventaId       String?
+  envioId       String?
+  produccionId  String?
+  fecha         DateTime  @default(now())
+  
+  // Para auditoría
+  usuarioId     String?
+  usuario       User?     @relation(fields: [usuarioId], references: [id])
+}
+
+// Ubicaciones (Fábrica y Sucursales)
+model Ubicacion {
+  id        String  @id @default(uuid())
+  nombre    String
+  tipo      String  // fabrica, sucursal
+  direccion String?
+  telefono  String?
+  activo    Boolean @default(true)
+  
+  // Relaciones
+  stocks    Stock[]
+  enviosOrigen Envio[] @relation("envioOrigen")
+  enviosDestino Envio[] @relation("envioDestino")
+  usuarios  User[]
+  ventas    Venta[]
+}
+
+// Distribución
+model Envio {
+  id             String    @id @default(uuid())
+  origenId       String
+  origen         Ubicacion @relation("envioOrigen", fields: [origenId], references: [id])
+  destinoId      String
+  destino        Ubicacion @relation("envioDestino", fields: [destinoId], references: [id])
+  fechaCreacion  DateTime  @default(now())
+  fechaEnvio     DateTime?
+  fechaRecepcion DateTime?
+  estado         String    // pendiente, enviado, en_transito, recibido, con_contingencia, finalizado
+  usuarioId      String
+  usuario        User      @relation(fields: [usuarioId], references: [id])
+  
+  // Relaciones
+  items          ItemEnvio[]
+  contingencias  Contingencia[]
+}
+
+model ItemEnvio {
+  id          String   @id @default(uuid())
+  envioId     String
+  envio       Envio    @relation(fields: [envioId], references: [id])
+  productoId  String
+  producto    Producto @relation(fields: [productoId], references: [id])
+  cantidad    Int
+  cantidadRecibida Int?  // Se completa en la recepción
+}
+
+// Ventas y Punto de Venta
+model Venta {
+  id            String    @id @default(uuid())
+  sucursalId    String
+  sucursal      Ubicacion @relation(fields: [sucursalId], references: [id])
+  fecha         DateTime  @default(now())
+  total         Float
+  descuento     Float     @default(0)
+  codigoDescuento String?
+  usuarioId     String
+  usuario       User      @relation(fields: [usuarioId], references: [id])
+  
+  // Facturación
+  facturada     Boolean   @default(false)
+  numeroFactura String?
+  clienteNombre String?
+  clienteCuit   String?
+  
+  // Relaciones
+  items         ItemVenta[]
+  pagos         Pago[]
+}
+
+model ItemVenta {
+  id         String   @id @default(uuid())
+  ventaId    String
+  venta      Venta    @relation(fields: [ventaId], references: [id])
+  productoId String
+  producto   Producto @relation(fields: [productoId], references: [id])
+  cantidad   Int
+  precioUnitario Float
+  descuento  Float    @default(0)
+}
+
+model Pago {
+  id            String  @id @default(uuid())
+  ventaId       String
+  venta         Venta   @relation(fields: [ventaId], references: [id])
+  medioPago     String  // efectivo, tarjeta_credito, tarjeta_debito, transferencia, qr
+  monto         Float
+  referencia    String? // Número de transacción o referencia
+  datosPago     Json?   // Datos adicionales del pago
+  periodoAcreditacion Int? // Días para acreditación (para oficina)
+}
+
+model CierreCaja {
+  id           String   @id @default(uuid())
+  sucursalId   String
+  fechaApertura DateTime @default(now())
+  fechaCierre  DateTime?
+  usuarioApertura String
+  usuarioCierre String?
+  montoInicial Float
+  montoFinal   Float?
+  diferencia   Float?
+  estado       String   // abierto, cerrado, con_contingencia
+  observaciones String?
+}
+
+// Contingencias
+model Contingencia {
+  id              String    @id @default(uuid())
+  titulo          String
+  descripcion     String
+  
+  // Origen de la contingencia
+  origen          String    // fabrica, sucursal, oficina
+  
+  // Referencias opcionales según el origen
+  produccionId    String?
+  produccion      Production? @relation(fields: [produccionId], references: [id])
+  envioId         String?
+  envio           Envio?    @relation(fields: [envioId], references: [id])
+  
+  // Datos generales
+  fechaCreacion   DateTime  @default(now())
+  creadoPor       String
+  usuario         User      @relation(fields: [creadoPor], references: [id])
+  estado          String    // pendiente, en_revision, resuelto, rechazado
+  respuesta       String?
+  fechaRespuesta  DateTime?
+  resueltoPor     String?
+  ajusteRealizado Boolean   @default(false)
+}
+
+// Codigos de descuento
+model CodigoDescuento {
+  id            String    @id @default(uuid())
+  codigo        String    @unique
+  descripcion   String?
+  tipoDescuento String    // porcentaje, monto_fijo
+  valor         Float
+  fechaInicio   DateTime
+  fechaFin      DateTime?
+  usoMaximo     Int?
+  usosActuales  Int       @default(0)
+  activo        Boolean   @default(true)
+}
