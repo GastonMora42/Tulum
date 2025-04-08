@@ -5,7 +5,7 @@ import { authService } from '@/server/services/auth/authService';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { refreshToken } = body;
+    const { refreshToken, email } = body;
     
     if (!refreshToken) {
       return NextResponse.json(
@@ -14,8 +14,8 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    // Refrescar token
-    const result = await authService.refreshUserToken(refreshToken);
+    // Refrescar token, pasando el email si está disponible
+    const result = await authService.refreshUserToken(refreshToken, email);
     
     if (!result) {
       return NextResponse.json(
@@ -27,6 +27,7 @@ export async function POST(req: NextRequest) {
     // Retornar nuevos tokens
     return NextResponse.json({
       accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
       idToken: result.idToken
     });
   } catch (error: any) {

@@ -13,12 +13,16 @@ export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+// En src/app/(auth)/login/page.tsx
+const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
   
     try {
+      // Guardar el email para refresh token
+      localStorage.setItem('userEmail', email);
+      
       const response = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
@@ -33,34 +37,25 @@ export default function LoginPage() {
         throw new Error(data.error || 'Error en la autenticación');
       }
       
-      // Guardar datos de autenticación
+      console.log("Login exitoso, guardando tokens...");
+      
+      // Guardar datos en localStorage
       localStorage.setItem('accessToken', data.accessToken);
       localStorage.setItem('refreshToken', data.refreshToken);
       localStorage.setItem('idToken', data.idToken);
       
-      // Obtener URL de redirección de los parámetros de búsqueda
-      const searchParams = new URLSearchParams(window.location.search);
-      const redirectUrl = searchParams.get('redirect') || '/';
-      
-      // Redireccionar según el rol
-      const userRole = data.user.role?.name || data.user.roleName || 'user';
-      console.log('Usuario autenticado con rol:', userRole);
-      console.log('URL de redirección:', redirectUrl);
-      
-      // Lógica de redirección con manejo de rutas
-      switch (userRole) {
-        case 'admin':
-          router.push(redirectUrl.startsWith('/admin') ? redirectUrl : '/admin');
-          break;
-        case 'fabrica':
-          router.push(redirectUrl.startsWith('/fabrica') ? redirectUrl : '/fabrica');
-          break;
-        case 'vendedor':
-          router.push(redirectUrl.startsWith('/pdv') ? redirectUrl : '/pdv');
-          break;
-        default:
-          router.push(redirectUrl);
+      // Guardar usuario en el store
+      if (login) {
+        await login({ email, password });
       }
+      
+      console.log("Intentando establecer cookie y redireccionar...");
+      
+      // Establecer cookie para que el middleware pueda detectarla
+      document.cookie = `accessToken=${data.accessToken}; path=/; max-age=3600`;
+      
+      // Forzar redirección a la página de admin
+      window.location.href = '/admin';
     } catch (err: any) {
       setError(err.message || 'Error al iniciar sesión');
       console.error('Error de login:', err);

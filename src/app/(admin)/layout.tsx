@@ -1,3 +1,4 @@
+// src/app/(admin)/layout.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -14,29 +15,64 @@ export default function AdminLayout({
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
+  
+  // Usar setUser del store directamente, no definir nuestra propia función
+  const { setUser } = useAuthStore();
 
   // Verificar autenticación
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      router.push('/login');
-      return;
-    }
-
-    // Si está autenticado pero no tiene rol admin, redirigir
-    if (!isLoading && isAuthenticated && !hasRole('admin')) {
-      // Redirigir según el rol
-      if (hasRole('fabrica')) {
-        router.push('/fabrica');
-      } else if (hasRole('vendedor')) {
-        router.push('/pdv');
-      } else {
-        router.push('/');
+    const checkAuth = async () => {
+      try {
+        // Verificar si hay token
+        const token = localStorage.getItem('accessToken');
+        if (!token) {
+          console.log('No hay token, redireccionando a login');
+          router.push('/login');
+          return;
+        }
+        
+        // Si no hay usuario en el store, intentar obtenerlo
+        if (!user) {
+          try {
+            const response = await fetch('/api/auth/me', {
+              headers: {
+                'Authorization': `Bearer ${token}`
+              }
+            });
+            
+            if (!response.ok) {
+              throw new Error('Error al obtener información del usuario');
+            }
+            
+            const data = await response.json();
+            
+            if (data.user) {
+              // Usar el setUser del store
+              setUser(data.user);
+            }
+          } catch (error) {
+            console.error('Error al obtener usuario:', error);
+            router.push('/login');
+            return;
+          }
+        }
+        
+        // Si el usuario no tiene rol admin, redirigir
+        if (user && user.roleId !== 'role-admin' && !hasRole('admin')) {
+          console.log('Usuario no es admin, redirigiendo...');
+          router.push('/');
+          return;
+        }
+        
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error en verificación de autenticación:', error);
+        router.push('/login');
       }
-      return;
-    }
+    };
 
-    setIsLoading(false);
-  }, [isAuthenticated, hasRole, isLoading, router]);
+    checkAuth();
+  }, [router, user, hasRole, setUser]);
 
   if (isLoading) {
     return (
@@ -45,6 +81,7 @@ export default function AdminLayout({
       </div>
     );
   }
+
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -128,4 +165,8 @@ export default function AdminLayout({
       </footer>
     </div>
   );
+}
+
+function setUser(user: any) {
+    throw new Error('Function not implemented.');
 }

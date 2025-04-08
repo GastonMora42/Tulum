@@ -317,17 +317,30 @@ async logout(accessToken: string): Promise<void> {
   }
 }
 
-// Refrescar token
-async refreshToken(refreshToken: string): Promise<Omit<AuthResult, 'user'>> {
+async refreshToken(refreshToken: string, email?: string): Promise<Omit<AuthResult, 'user'>> {
   try {
-    // Para refresh token no se necesita username, así que no podemos calcular el SECRET_HASH
+    // Si tenemos email, usarlo; de lo contrario, intentar extraerlo del token
+    let username = email || '';
+    
+    // Si no tenemos username, no podemos generar SECRET_HASH
+    if (!username && this.clientSecret) {
+      throw new Error('Se requiere el email para el refresh token cuando se usa client secret');
+    }
+    
+    // Parámetros para el refresh token
+    const authParams: Record<string, string> = {
+      REFRESH_TOKEN: refreshToken
+    };
+    
+    // Añadir SECRET_HASH si tenemos username y clientSecret
+    if (username && this.clientSecret) {
+      authParams.SECRET_HASH = this.calculateSecretHash(username);
+    }
+    
     const command = new InitiateAuthCommand({
       AuthFlow: "REFRESH_TOKEN_AUTH",
       ClientId: this.clientId,
-      AuthParameters: {
-        REFRESH_TOKEN: refreshToken
-        // SECRET_HASH no se usa en este flujo
-      }
+      AuthParameters: authParams
     });
     
     const response = await this.client.send(command);

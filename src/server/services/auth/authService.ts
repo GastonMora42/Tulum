@@ -91,7 +91,13 @@ export class AuthService {
   // Refrescar token
   async refreshUserToken(refreshToken: string): Promise<Omit<AuthResult, 'user'> | null> {
     try {
-      return await cognitoService.refreshToken(refreshToken);
+      // Usar el email almacenado en localStorage para el SECRET_HASH
+      let email = '';
+      if (typeof localStorage !== 'undefined') {
+        email = localStorage.getItem('userEmail') || '';
+      }
+      
+      return await cognitoService.refreshToken(refreshToken, email);
     } catch (error) {
       console.error('Error al refrescar token:', error);
       return null;
