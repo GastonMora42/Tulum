@@ -2,6 +2,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authService } from '@/server/services/auth/authService';
 import { z } from 'zod';
+import { UserWithRole } from '@/types/user';
+
+export interface AuthResult {
+  user: UserWithRole;
+  accessToken: string;
+  refreshToken: string;
+  idToken: string;
+  expiresIn?: number;
+}
 
 // Esquema de validación
 const loginSchema = z.object({
@@ -42,7 +51,10 @@ export async function POST(req: NextRequest) {
       }
 
       return NextResponse.json({
-        user: result.user,
+        user: {
+          ...result.user,
+          roleName: result.user.roleId, // Usar roleId en lugar de role.name
+        },
         accessToken: result.accessToken,
         refreshToken: result.refreshToken,
         idToken: result.idToken

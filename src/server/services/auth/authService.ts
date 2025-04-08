@@ -21,6 +21,9 @@ export class AuthService {
         }
       });
       
+          console.log('Usuario encontrado:', user);
+    console.log('Rol del usuario:', user?.role);
+    
       // Si no existe el usuario, lo creamos
       if (!user) {
         console.log("Usuario no encontrado en BD local, creando...");

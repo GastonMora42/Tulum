@@ -17,7 +17,7 @@ export default function LoginPage() {
     e.preventDefault();
     setIsLoading(true);
     setError(null);
-
+  
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
@@ -38,19 +38,28 @@ export default function LoginPage() {
       localStorage.setItem('refreshToken', data.refreshToken);
       localStorage.setItem('idToken', data.idToken);
       
-      // Redireccionar según el rol
-      const userRole = data.user.role?.name || 'user';
-      console.log('Usuario autenticado con rol:', userRole);
+      // Obtener URL de redirección de los parámetros de búsqueda
+      const searchParams = new URLSearchParams(window.location.search);
+      const redirectUrl = searchParams.get('redirect') || '/';
       
-      if (userRole === 'admin') {
-        router.push('/admin');
-      } else if (userRole === 'fabrica') {
-        router.push('/fabrica');
-      } else if (userRole === 'vendedor') {
-        router.push('/pdv');
-      } else {
-        // Redirección por defecto
-        router.push('/');
+      // Redireccionar según el rol
+      const userRole = data.user.role?.name || data.user.roleName || 'user';
+      console.log('Usuario autenticado con rol:', userRole);
+      console.log('URL de redirección:', redirectUrl);
+      
+      // Lógica de redirección con manejo de rutas
+      switch (userRole) {
+        case 'admin':
+          router.push(redirectUrl.startsWith('/admin') ? redirectUrl : '/admin');
+          break;
+        case 'fabrica':
+          router.push(redirectUrl.startsWith('/fabrica') ? redirectUrl : '/fabrica');
+          break;
+        case 'vendedor':
+          router.push(redirectUrl.startsWith('/pdv') ? redirectUrl : '/pdv');
+          break;
+        default:
+          router.push(redirectUrl);
       }
     } catch (err: any) {
       setError(err.message || 'Error al iniciar sesión');
