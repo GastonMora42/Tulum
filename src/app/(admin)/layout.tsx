@@ -92,7 +92,6 @@ export default function AdminLayout({
               <div className="flex-shrink-0 flex items-center">
                 <span className="text-xl font-bold">Sistema de Aromaterapia</span>
               </div>
-              // En la sección de navegación
 <nav className="ml-6 flex space-x-4">
   <Link 
     href="/admin" 
