@@ -1,71 +1,139 @@
-// src/hooks/useAuth.ts
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import apiClient from '@/lib/api/client';
-import { refreshToken } from '@/server/services/auth/authService';
-
-interface User {
-  id: string;
-  email: string;
-  name: string;
-  roleId: string;
-  role?: {
-    name: string;
-    permissions: string[];
-  };
-  sucursalId?: string | null;
-}
+import { useAuthStore } from '@/stores/authStore';
+import { User } from '@prisma/client';
 
 interface LoginCredentials {
   email: string;
   password: string;
 }
 
+interface AuthResponse {
+  accessToken: string;
+  refreshToken: string;
+  idToken: string;
+  user: User;
+}
+
+interface RefreshResponse {
+  accessToken: string;
+  idToken: string;
+}
+
 interface UseAuthReturn {
-  user: User | null;
-  isLoading: boolean;
-  error: string | null;
   login: (credentials: LoginCredentials) => Promise<boolean>;
   logout: () => Promise<void>;
+  isLoading: boolean;
+  error: string | null;
+  user: User | null;
   isAuthenticated: boolean;
-  hasPermission: (permission: string) => boolean;
-  hasRole: (role: string) => boolean;
 }
 
 export function useAuth(): UseAuthReturn {
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  
+  const { 
+    user, 
+    setUser, 
+    setTokens, 
+    clearAuth, 
+    accessToken,
+    isAuthenticated
+  } = useAuthStore();
+  
+  // Logout (definido primero para evitar el error de referencia)
+  const logout = useCallback(async (): Promise<void> => {
+    try {
+      setIsLoading(true);
+      
+      if (accessToken) {
+        try {
+          await apiClient.post('/api/auth/logout', { token: accessToken });
+        } catch (logoutError) {
+          // Continuar con el proceso de logout incluso si la API falla
+          console.error('Error en API de logout:', logoutError);
+        }
+      }
+      
+      // Limpiar localStorage
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('idToken');
+      
+      // Limpiar store
+      clearAuth();
+    } catch (error) {
+      console.error('Error en logout:', error);
+    } finally {
+      setIsLoading(false);
+      
+      // Redireccionar a login
+      router.push('/login');
+    }
+  }, [accessToken, clearAuth, router]);
+  
+  // Función para refrescar el token
+  const refreshUserToken = useCallback(async (): Promise<boolean> => {
+    try {
+      const storedRefreshToken = localStorage.getItem('refreshToken');
+      if (!storedRefreshToken) return false;
+      
+      const response = await apiClient.post<RefreshResponse>('/api/auth/refresh', {
+        refreshToken: storedRefreshToken
+      });
+      
+      if (!response || !response.accessToken) return false;
+      
+      // Actualizar tokens en el store
+      setTokens({
+        accessToken: response.accessToken,
+        refreshToken: storedRefreshToken, // Mantener el mismo refresh token
+        idToken: response.idToken
+      });
+      
+      return true;
+    } catch (error) {
+      console.error('Error al refrescar token:', error);
+      return false;
+    }
+  }, [setTokens]);
   
   // Verificar autenticación al cargar
   useEffect(() => {
     const checkAuth = async () => {
+      if (!accessToken) return;
+      
       try {
-        const token = localStorage.getItem('accessToken');
-        if (!token) {
-          setIsLoading(false);
-          return;
-        }
+        setIsLoading(true);
         
-        // Obtener usuario actual
+        // Intentar obtener datos del usuario
         const response = await apiClient.get<{ user: User }>('/api/auth/me');
-        setUser(response.user);
+        
+        if (response && response.user) {
+          setUser(response.user);
+        }
       } catch (err) {
+        console.error('Error al verificar autenticación:', err);
+        
         // Intentar refresh token
-        const refreshed = await refreshToken();
+        const refreshed = await refreshUserToken();
+        
         if (!refreshed) {
-          // Si falla, limpiar datos de sesión
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-          localStorage.removeItem('idToken');
+          // Si el refresh falla, hacer logout
+          await logout();
         } else {
-          // Reintentar obtener usuario
+          // Si el refresh tuvo éxito, intentar obtener datos de usuario nuevamente
           try {
             const response = await apiClient.get<{ user: User }>('/api/auth/me');
-            setUser(response.user);
-          } catch (error) {
-            setError('Error al obtener información de usuario');
+            if (response && response.user) {
+              setUser(response.user);
+            }
+          } catch (secondErr) {
+            console.error('Error después de refrescar token:', secondErr);
+            await logout();
           }
         }
       } finally {
@@ -74,7 +142,7 @@ export function useAuth(): UseAuthReturn {
     };
     
     checkAuth();
-  }, []);
+  }, [accessToken, setUser, logout, refreshUserToken]);
   
   // Login
   const login = async (credentials: LoginCredentials): Promise<boolean> => {
@@ -82,70 +150,42 @@ export function useAuth(): UseAuthReturn {
     setError(null);
     
     try {
-      const response = await apiClient.post<{
-        user: User;
-        accessToken: string;
-        refreshToken: string;
-        idToken: string;
-      }>('/api/auth/login', credentials);
+      const response = await apiClient.post<AuthResponse>('/api/auth/login', credentials);
       
-      // Guardar tokens
+      if (!response) {
+        throw new Error('Respuesta vacía del servidor');
+      }
+      
+      // También guardar en localStorage para persistencia entre recargas
       localStorage.setItem('accessToken', response.accessToken);
       localStorage.setItem('refreshToken', response.refreshToken);
       localStorage.setItem('idToken', response.idToken);
       
-      // Establecer usuario
+      setTokens({
+        accessToken: response.accessToken,
+        refreshToken: response.refreshToken,
+        idToken: response.idToken
+      });
+      
       setUser(response.user);
+      
       return true;
     } catch (err: any) {
-      setError(err.message || 'Error al iniciar sesión');
+      const errorMessage = err.message || 'Error al iniciar sesión';
+      setError(errorMessage);
+      console.error('Error de login:', err);
       return false;
     } finally {
       setIsLoading(false);
     }
   };
   
-  // Logout
-  const logout = async (): Promise<void> => {
-    try {
-      const token = localStorage.getItem('accessToken');
-      if (token) {
-        await apiClient.post('/api/auth/logout', { token });
-      }
-    } catch (error) {
-      console.error('Error en logout:', error);
-    } finally {
-      // Limpiar datos de sesión
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('idToken');
-      setUser(null);
-      
-      // Redireccionar a login
-      router.push('/login');
-    }
-  };
-  
-  // Verificar permiso específico
-  const hasPermission = useCallback((permission: string): boolean => {
-    if (!user || !user.role || !user.role.permissions) return false;
-    return user.role.permissions.includes(permission);
-  }, [user]);
-  
-  // Verificar rol
-  const hasRole = useCallback((role: string): boolean => {
-    if (!user) return false;
-    return user.roleId === role;
-  }, [user]);
-  
   return {
-    user,
-    isLoading,
-    error,
     login,
     logout,
-    isAuthenticated: !!user,
-    hasPermission,
-    hasRole
+    isLoading,
+    error,
+    user,
+    isAuthenticated
   };
 }

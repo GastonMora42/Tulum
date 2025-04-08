@@ -5,9 +5,34 @@ import { NextRequest, NextResponse } from 'next/server';
 const routePermissions: Record<string, string[]> = {
   '/admin': ['admin'],
   '/admin/usuarios': ['admin'],
+  '/admin/productos': ['admin'],
+  '/admin/stock': ['admin'],
   '/fabrica': ['admin', 'fabrica'],
   '/pdv': ['admin', 'vendedor']
 };
+
+// APIs públicas que no requieren autenticación
+const publicApis = [
+  '/api/auth/login',
+  '/api/auth/refresh',
+  '/api/auth/register',
+  '/api/auth/confirm',
+  '/api/auth/resend-code'
+];
+
+// Rutas públicas de páginas
+const publicPages = [
+  '/login',
+  '/register'
+];
+
+// APIs de desarrollo para facilitar la creación inicial de usuarios
+// IMPORTANTE: Eliminar o proteger estas rutas en producción
+const devApis = process.env.NODE_ENV === 'development' ? [
+  '/api/admin/users',
+  '/api/admin/roles',
+  '/api/admin/ubicaciones'
+] : [];
 
 export async function middleware(request: NextRequest) {
   // Verificar si la ruta requiere autenticación
@@ -15,9 +40,9 @@ export async function middleware(request: NextRequest) {
   
   // Si es ruta pública, permitir acceso
   if (
-    path === '/login' || 
-    path === '/api/auth/login' || 
-    path === '/api/auth/refresh'
+    publicPages.includes(path) || 
+    publicApis.includes(path) ||
+    devApis.some(api => path.startsWith(api))
   ) {
     return NextResponse.next();
   }
@@ -39,7 +64,7 @@ export async function middleware(request: NextRequest) {
         // Decodificar token para obtener rol
         // En producción, deberíamos verificar la firma del token
         const payload = JSON.parse(atob(token.split('.')[1]));
-        const userRole = payload.role;
+        const userRole = payload.role?.name || 'user'; // Acceder al nombre del rol
         
         if (!allowedRoles.includes(userRole)) {
           // Usuario no autorizado, redireccionar a dashboard general
@@ -65,6 +90,7 @@ export const config = {
     '/fabrica/:path*',
     '/pdv/:path*',
     '/api/:path*',
-    '/login'
+    '/login',
+    '/register'
   ],
 };
