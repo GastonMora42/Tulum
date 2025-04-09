@@ -1,10 +1,11 @@
 {
-  "/_not-found/page": "app/_not-found/page.js",
   "/api/auth/me/route": "app/api/auth/me/route.js",
   "/api/auth/login/route": "app/api/auth/login/route.js",
+  "/page": "app/page.js",
   "/(auth)/login/page": "app/(auth)/login/page.js",
   "/(admin)/admin/page": "app/(admin)/admin/page.js",
+  "/(fabrica)/fabrica/page": "app/(fabrica)/fabrica/page.js",
   "/(admin)/admin/usuarios/nuevo/page": "app/(admin)/admin/usuarios/nuevo/page.js",
-  "/(admin)/admin/usuarios/page": "app/(admin)/admin/usuarios/page.js",
-  "/(fabrica)/fabrica/page": "app/(fabrica)/fabrica/page.js"
+  "/(admin)/admin/usuarios/confirmar/page": "app/(admin)/admin/usuarios/confirmar/page.js",
+  "/(pdv)/pdv/page": "app/(pdv)/pdv/page.js"
 }

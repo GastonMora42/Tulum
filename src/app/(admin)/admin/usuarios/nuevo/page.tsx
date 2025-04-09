@@ -77,7 +77,7 @@ export default function NuevoUsuarioPage() {
     fetchData();
   }, []);
   
-  const onSubmit = async (data: UserFormData) => {
+const onSubmit = async (data: UserFormData) => {
     try {
       setIsLoading(true);
       setError(null);
@@ -90,14 +90,20 @@ export default function NuevoUsuarioPage() {
         body: JSON.stringify(data)
       });
       
+      const result = await response.json();
+      
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al crear usuario');
+        throw new Error(result.error || 'Error al crear usuario');
       }
       
-      // Redirigir a la lista de usuarios
-      router.push('/admin/usuarios');
-      router.refresh();
+      // Verificar si requiere confirmación
+      if (result.requiresConfirmation) {
+        // Redirigir a la página de confirmación
+        router.push(`/admin/usuarios/confirmar?email=${encodeURIComponent(data.email)}`);
+      } else {
+        // Redirigir a la lista de usuarios
+        router.push('/admin/usuarios');
+      }
     } catch (err: any) {
       console.error('Error:', err);
       setError(err.message || 'Error al crear usuario');

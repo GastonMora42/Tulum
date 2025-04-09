@@ -24,30 +24,64 @@ export default function UsuariosPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [confirmingUserId, setConfirmingUserId] = useState<string | null>(null);
+  const [confirmSuccess, setConfirmSuccess] = useState<string | null>(null);
   const router = useRouter();
 
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        setIsLoading(true);
-        const response = await fetch('/api/admin/users');
-        
-        if (!response.ok) {
-          throw new Error('Error al cargar usuarios');
-        }
-        
-        const data = await response.json();
-        setUsers(data);
-      } catch (err) {
-        console.error('Error:', err);
-        setError('No se pudieron cargar los usuarios');
-      } finally {
-        setIsLoading(false);
+  const fetchUsers = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch('/api/admin/users');
+      
+      if (!response.ok) {
+        throw new Error('Error al cargar usuarios');
       }
-    };
+      
+      const data = await response.json();
+      setUsers(data);
+    } catch (err) {
+      console.error('Error:', err);
+      setError('No se pudieron cargar los usuarios');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchUsers();
   }, []);
+
+  const handleConfirmUser = async (email: string) => {
+    try {
+      setConfirmingUserId(email);
+      setError(null);
+      setConfirmSuccess(null);
+      
+      const response = await fetch('/api/admin/users/confirm', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ email })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Error al confirmar usuario');
+      }
+      
+      setConfirmSuccess(`Usuario ${email} confirmado correctamente`);
+      
+      // Opcionalmente recargar usuarios para reflejar cambios
+      fetchUsers();
+    } catch (err: any) {
+      console.error('Error al confirmar usuario:', err);
+      setError(err.message || 'Error al confirmar usuario');
+    } finally {
+      setConfirmingUserId(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -60,6 +94,18 @@ export default function UsuariosPage() {
           Nuevo Usuario
         </Link>
       </div>
+
+      {confirmSuccess && (
+        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative">
+          {confirmSuccess}
+          <button 
+            className="absolute top-0 bottom-0 right-0 px-4"
+            onClick={() => setConfirmSuccess(null)}
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* Tabla de usuarios */}
       <div className="bg-white shadow overflow-hidden sm:rounded-lg">
@@ -129,6 +175,13 @@ export default function UsuariosPage() {
                     >
                       Editar
                     </Link>
+                    <button
+                      onClick={() => handleConfirmUser(user.email)}
+                      disabled={confirmingUserId === user.email}
+                      className="text-green-600 hover:text-green-900"
+                    >
+                      {confirmingUserId === user.email ? 'Confirmando...' : 'Confirmar'}
+                    </button>
                   </td>
                 </tr>
               ))}

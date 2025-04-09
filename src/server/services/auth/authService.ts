@@ -21,8 +21,8 @@ export class AuthService {
         }
       });
       
-          console.log('Usuario encontrado:', user);
-    console.log('Rol del usuario:', user?.role);
+      console.log('Usuario encontrado:', user);
+      console.log('Rol del usuario:', user?.role);
     
       // Si no existe el usuario, lo creamos
       if (!user) {
@@ -89,15 +89,15 @@ export class AuthService {
   }
   
   // Refrescar token
-  async refreshUserToken(refreshToken: string): Promise<Omit<AuthResult, 'user'> | null> {
+  async refreshUserToken(refreshToken: string, emailParam?: string): Promise<Omit<AuthResult, 'user'> | null> {
     try {
-      // Usar el email almacenado en localStorage para el SECRET_HASH
-      let email = '';
-      if (typeof localStorage !== 'undefined') {
-        email = localStorage.getItem('userEmail') || '';
+      // Usar el email almacenado en localStorage para el SECRET_HASH o el parámetro proporcionado
+      let emailToUse = emailParam || '';
+      if (typeof localStorage !== 'undefined' && !emailToUse) {
+        emailToUse = localStorage.getItem('userEmail') || '';
       }
       
-      return await cognitoService.refreshToken(refreshToken, email);
+      return await cognitoService.refreshToken(refreshToken, emailToUse);
     } catch (error) {
       console.error('Error al refrescar token:', error);
       return null;
@@ -120,85 +120,99 @@ export class AuthService {
       return null;
     }
   }
-  
-  // Crear usuario (admin)
-  async createUser(userData: {
-    email: string;
-    name: string;
-    password: string;
-    roleId: string;
-    sucursalId?: string;
-  }): Promise<User | null> {
-    try {
-      // Verificar que el rol existe
-      const roleExists = await prisma.role.findUnique({
-        where: { id: userData.roleId }
-      });
-      
-      if (!roleExists) {
-        throw new Error(`El rol con ID ${userData.roleId} no existe`);
-      }
-      
-      // Si se proporciona sucursalId, verificar que existe
-      if (userData.sucursalId) {
-        const sucursalExists = await prisma.ubicacion.findUnique({
-          where: { id: userData.sucursalId }
-        });
-        
-        if (!sucursalExists) {
-          throw new Error(`La ubicación con ID ${userData.sucursalId} no existe`);
-        }
-      }
-      
-      // Crear usuario en Cognito
-      await cognitoService.createUser({
-        email: userData.email,
-        name: userData.name,
-        password: userData.password,
-        roleId: userData.roleId
-      });
-      
-      // Crear usuario en nuestra BD
-      const user = await prisma.user.create({
-        data: {
-          email: userData.email,
-          name: userData.name,
-          roleId: userData.roleId,
-          sucursalId: userData.sucursalId || null
-        }
-      });
-      
-      return user;
-    } catch (error) {
-      console.error('Error al crear usuario:', error);
-      throw error;
-    }
-  }
 
-  // Registrar un nuevo usuario
-  async registerUser(userData: {
-    email: string;
-    name: string;
-    password: string;
-  }): Promise<{ success: boolean; message: string; userId?: string }> {
-    try {
       // Registrar en Cognito
-      const cognitoResult = await cognitoService.registerUser({
-        email: userData.email,
-        name: userData.name,
-        password: userData.password
-      });
-      if (!cognitoResult.success) {
-        return {
-          success: false,
-          message: cognitoResult.message || 'Error al registrar usuario en Cognito',
-          userId: cognitoResult.userId
-        };
+      async registerUser(userData: {
+        email: string;
+        name: string;
+        password: string;
+        roleId?: string;
+        sucursalId?: string | null;
+        isAdminCreation?: boolean;
+        skipAutoConfirmation?: boolean; // Nuevo parámetro para controlar si queremos saltar la confirmación automática
+      }): Promise<{ success: boolean; message: string; userId?: string }> {
+        try {
+          // Verificación de rol para creación desde admin (código existente)
+          if (userData.isAdminCreation && !userData.roleId) {
+            return {
+              success: false,
+              message: 'Se requiere especificar un rol para la creación de usuarios desde administración'
+            };
+          }
+      
+          // Registrar en Cognito
+          const cognitoResult = await cognitoService.registerUser({
+            email: userData.email,
+            name: userData.name,
+            password: userData.password,
+            roleId: userData.roleId
+          });
+          
+          if (!cognitoResult.success) {
+            return {
+              success: false,
+              message: cognitoResult.message || 'Error al registrar usuario en Cognito',
+              userId: cognitoResult.userId
+            };
+          }
+          
+          console.log("Usuario registrado en Cognito con éxito, ID:", cognitoResult.userId);
+          
+          // Si es creación desde admin y queremos confirmación automática (no es nuestro caso ahora)
+          if (userData.isAdminCreation && cognitoResult.userId && !userData.skipAutoConfirmation) {
+            try {
+              console.log("Confirmando usuario automáticamente...");
+              await cognitoService.confirmRegistration(userData.email, '', true);
+            } catch (confirmError) {
+              console.error('Error en confirmación automática:', confirmError);
+            }
+        
+        // Crear usuario en la base de datos local
+        try {
+          // Asegurarnos de que existe el rol predeterminado si no se especifica uno
+          if (!userData.roleId) {
+            const defaultRole = await prisma.role.findFirst({
+              where: { name: 'vendedor' } // O el rol predeterminado que prefieras
+            });
+            
+            if (!defaultRole) {
+              return {
+                success: false,
+                message: 'No se encontró un rol predeterminado',
+                userId: cognitoResult.userId
+              };
+            }
+            
+            userData.roleId = defaultRole.id;
+          }
+          
+          // Crear el usuario en la base de datos
+          const user = await prisma.user.create({
+            data: {
+              id: cognitoResult.userId,
+              email: userData.email,
+              name: userData.name,
+              roleId: userData.roleId,
+              sucursalId: userData.sucursalId || null
+            }
+          });
+          
+          console.log(`Usuario ${user.id} creado en la base de datos local`);
+        } catch (dbError) {
+          console.error('Error al crear usuario en la base de datos:', dbError);
+          return {
+            success: false,
+            message: 'Error al crear usuario en la base de datos local',
+            userId: cognitoResult.userId
+          };
+        }
       }
       
       return {
         success: true,
-        message: cognitoResult.message || 'Usuario registrado exitosamente',
+        message: userData.isAdminCreation 
+          ? 'Usuario creado y confirmado correctamente'
+          : 'Usuario registrado correctamente. Por favor, verifique su correo electrónico para completar el registro.',
         userId: cognitoResult.userId
       };
     } catch (error) {
@@ -209,6 +223,157 @@ export class AuthService {
       };
     }
   }
+
+  // En authService.ts - Agregar función para confirmación administrativa
+
+async adminConfirmUser(email: string): Promise<{ success: boolean; message: string }> {
+  try {
+    console.log("Confirmando usuario administrativamente:", email);
+    
+    const result = await cognitoService.confirmRegistration(email, '', true);
+    
+    if (result.success) {
+      console.log("Usuario confirmado con éxito:", email);
+      return {
+        success: true,
+        message: 'Usuario confirmado correctamente'
+      };
+    } else {
+      return {
+        success: false,
+        message: result.message
+      };
+    }
+  } catch (error) {
+    console.error('Error al confirmar usuario administrativamente:', error);
+    return {
+      success: false,
+      message: 'Error al confirmar usuario'
+    };
+  }
+}
+
+// En authService.ts - Implementar método para creación y sincronización de usuarios
+
+async createOrSyncUser(userData: {
+  email: string;
+  name: string;
+  password: string;
+  roleId: string;
+  sucursalId?: string | null;
+}): Promise<{ success: boolean; message: string; user?: User; isNewUser?: boolean }> {
+  try {
+    // Verificar si el usuario existe en la BD local
+    const existingLocalUser = await prisma.user.findUnique({
+      where: { email: userData.email }
+    });
+    
+    // Verificar si el usuario existe en Cognito
+    let existingCognitoUser = null;
+    try {
+      existingCognitoUser = await cognitoService.getUserByUsername(userData.email);
+    } catch (cognitoError: unknown) {
+      // Ignorar error de usuario no encontrado
+      if (cognitoError instanceof Error && cognitoError.name !== 'UserNotFoundException') {
+        throw cognitoError;
+      }
+    }
+    // Caso 1: Usuario existe en ambos sistemas
+    if (existingLocalUser && existingCognitoUser) {
+      return {
+        success: false,
+        message: 'El usuario ya existe en el sistema',
+        user: existingLocalUser,
+        isNewUser: false
+      };
+    }
+    
+    // Caso 2: Usuario existe en Cognito pero no en BD local (desincronización)
+    if (!existingLocalUser && existingCognitoUser) {
+      console.log(`Usuario ${userData.email} existe en Cognito pero no en BD local. Sincronizando...`);
+      
+      // Crear usuario en BD local con el ID de Cognito
+      const userId = existingCognitoUser.Username || existingCognitoUser.User?.Username;
+      
+      const syncedUser = await prisma.user.create({
+        data: {
+          id: userId,
+          email: userData.email,
+          name: userData.name,
+          roleId: userData.roleId,
+          sucursalId: userData.sucursalId
+        }
+      });
+      
+      return {
+        success: true,
+        message: 'Usuario sincronizado con el sistema de autenticación',
+        user: syncedUser,
+        isNewUser: false
+      };
+    }
+    
+    // Caso 3: Usuario existe en BD local pero no en Cognito (muy raro, pero posible)
+    if (existingLocalUser && !existingCognitoUser) {
+      console.log(`Usuario ${userData.email} existe en BD local pero no en Cognito. Creando en Cognito...`);
+      
+      // Registrar en Cognito
+      const cognitoResult = await cognitoService.registerUser({
+        email: userData.email,
+        name: userData.name,
+        password: userData.password,
+        roleId: userData.roleId
+      });
+      
+      if (!cognitoResult.success) {
+        throw new Error(cognitoResult.message || 'Error al crear usuario en el sistema de autenticación');
+      }
+      
+      return {
+        success: true,
+        message: 'Usuario sincronizado con el sistema de autenticación',
+        user: existingLocalUser,
+        isNewUser: false
+      };
+    }
+    
+    // Caso 4: Usuario no existe en ningún sistema (caso normal de creación)
+    console.log(`Creando nuevo usuario ${userData.email} en ambos sistemas...`);
+    
+    // Registrar en Cognito
+    const cognitoResult = await cognitoService.registerUser({
+      email: userData.email,
+      name: userData.name,
+      password: userData.password,
+      roleId: userData.roleId
+    });
+    
+    if (!cognitoResult.success) {
+      throw new Error(cognitoResult.message || 'Error al crear usuario en el sistema de autenticación');
+    }
+    
+    // Crear en BD local
+    const newUser = await prisma.user.create({
+      data: {
+        id: cognitoResult.userId,
+        email: userData.email,
+        name: userData.name,
+        roleId: userData.roleId,
+        sucursalId: userData.sucursalId
+      }
+    });
+    
+    return {
+      success: true,
+      message: 'Usuario creado correctamente. Por favor, verifique el correo para activar la cuenta.',
+      user: newUser,
+      isNewUser: true
+    };
+  } catch (error) {
+    console.error('Error en creación/sincronización de usuario:', error);
+    throw error;
+  }
+}
 
   // Confirmar registro
   async confirmRegistration(email: string, code: string): Promise<{ success: boolean; message: string }> {

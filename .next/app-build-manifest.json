@@ -6,6 +6,11 @@
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
     ],
+    "/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/page.js"
+    ],
     "/(auth)/login/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
@@ -36,20 +41,40 @@
       "static/chunks/main-app.js",
       "static/chunks/app/(admin)/admin/usuarios/page.js"
     ],
-    "/page": [
+    "/api/admin/users/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/page.js"
+      "static/chunks/app/api/admin/users/route.js"
     ],
-    "/(pdv)/layout": [
+    "/(admin)/admin/usuarios/[id]/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(pdv)/layout.js"
+      "static/chunks/app/(admin)/admin/usuarios/[id]/page.js"
     ],
-    "/(pdv)/pdv/page": [
+    "/api/admin/users/[id]/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(pdv)/pdv/page.js"
+      "static/chunks/app/api/admin/users/[id]/route.js"
+    ],
+    "/api/admin/roles/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/roles/route.js"
+    ],
+    "/api/admin/ubicaciones/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/ubicaciones/route.js"
+    ],
+    "/(admin)/admin/usuarios/nuevo/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(admin)/admin/usuarios/nuevo/page.js"
+    ],
+    "/api/admin/users/confirm/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/users/confirm/route.js"
     ],
     "/(fabrica)/layout": [
       "static/chunks/webpack.js",
@@ -61,25 +86,25 @@
       "static/chunks/main-app.js",
       "static/chunks/app/(fabrica)/fabrica/page.js"
     ],
-    "/api/admin/users/route": [
+    "/(admin)/admin/usuarios/confirmar/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/admin/users/route.js"
+      "static/chunks/app/(admin)/admin/usuarios/confirmar/page.js"
     ],
-    "/(admin)/admin/usuarios/nuevo/page": [
+    "/api/auth/confirm/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(admin)/admin/usuarios/nuevo/page.js"
+      "static/chunks/app/api/auth/confirm/route.js"
     ],
-    "/api/admin/roles/route": [
+    "/(pdv)/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/admin/roles/route.js"
+      "static/chunks/app/(pdv)/layout.js"
     ],
-    "/api/admin/ubicaciones/route": [
+    "/(pdv)/pdv/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/admin/ubicaciones/route.js"
+      "static/chunks/app/(pdv)/pdv/page.js"
     ],
     "/_not-found/page": [
       "static/chunks/webpack.js",
