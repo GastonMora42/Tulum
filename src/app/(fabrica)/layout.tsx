@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/authStore';
 import Link from 'next/link';
+import { OfflineStatus } from '@/components/ui/OfflineStatus';
 
 export default function FabricaLayout({
   children,
@@ -130,6 +131,14 @@ export default function FabricaLayout({
                 >
                   Stock
                 </Link>
+                <Link 
+  href="/fabrica/contingencias" 
+  className={`${
+    pathname.startsWith('/fabrica/contingencias') ? 'bg-purple-700' : 'hover:bg-purple-500'
+  } px-3 py-2 rounded-md text-sm font-medium`}
+>
+  Contingencias
+</Link>
               </nav>
             </div>
             <div className="flex items-center">
@@ -167,6 +176,7 @@ export default function FabricaLayout({
           </p>
         </div>
       </footer>
+      <OfflineStatus />
     </div>
   );
 }

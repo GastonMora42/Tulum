@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/authStore';
 import Link from 'next/link';
+import { OfflineStatus } from '@/components/ui/OfflineStatus';
 
 export default function AdminLayout({
   children,
@@ -125,6 +126,22 @@ export default function AdminLayout({
   >
     Stock
   </Link>
+  <Link 
+    href="/admin/contingencias" 
+    className={`${
+      pathname.startsWith('/admin/contingencias') ? 'bg-indigo-700' : 'hover:bg-indigo-500'
+    } px-3 py-2 rounded-md text-sm font-medium`}
+  >
+    Contingencias
+  </Link>
+  <Link 
+    href="/admin/reportes" 
+    className={`${
+      pathname.startsWith('/admin/reportes') ? 'bg-indigo-700' : 'hover:bg-indigo-500'
+    } px-3 py-2 rounded-md text-sm font-medium`}
+  >
+    Reportes
+  </Link>
 </nav>
             </div>
             <div className="flex items-center">
@@ -152,6 +169,7 @@ export default function AdminLayout({
       <main className="flex-grow">
         <div className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           {children}
+          <OfflineStatus />
         </div>
       </main>
 

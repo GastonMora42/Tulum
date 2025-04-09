@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/authStore';
 import Link from 'next/link';
 import { useOffline } from '@/hooks/useOffline';
+import { OfflineStatus } from '@/components/ui/OfflineStatus';
 
 export default function PDVLayout({
   children,
@@ -124,6 +125,14 @@ export default function PDVLayout({
                 >
                   Historial
                 </Link>
+                <Link 
+  href="/pdv/contingencias" 
+  className={`${
+    pathname.startsWith('/pdv/contingencias') ? 'bg-blue-700' : 'hover:bg-blue-500'
+  } px-3 py-2 rounded-md text-sm font-medium`}
+>
+  Contingencias
+</Link>
               </nav>
             </div>
             <div className="flex items-center">
@@ -187,6 +196,7 @@ export default function PDVLayout({
           </p>
         </div>
       </footer>
+      <OfflineStatus />
     </div>
   );
 }

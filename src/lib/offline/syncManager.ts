@@ -380,6 +380,254 @@ private async procesarAjusteStock(op: IOperacionPendiente) {
       }
     }
   }
+
+  // src/lib/offline/syncManager.ts (mejoras adicionales)
+
+// Añadir estos métodos a la clase SyncManager
+
+// Método para obtener estadísticas de sincronización
+public async getSyncStats(): Promise<{
+  pendingVentas: number;
+  pendingOperations: number;
+  lastSyncAttempt: Date | null;
+  offlineItems: number;
+}> {
+  try {
+    const pendingVentas = await db.ventasPendientes
+      .where('estado')
+      .anyOf(['pendiente', 'sincronizando'])
+      .count();
+      
+    const pendingOperations = await db.operacionesPendientes
+      .where('estado')
+      .anyOf(['pendiente', 'procesando'])
+      .count();
+      
+    const productosCount = await db.productosCache.count();
+    
+    // Obtener última sincronización del localStorage
+    const lastSyncStr = localStorage.getItem('lastSyncAttempt');
+    const lastSyncAttempt = lastSyncStr ? new Date(lastSyncStr) : null;
+    
+    return {
+      pendingVentas,
+      pendingOperations,
+      lastSyncAttempt,
+      offlineItems: productosCount
+    };
+  } catch (error) {
+    console.error('Error al obtener estadísticas de sincronización:', error);
+    return {
+      pendingVentas: 0,
+      pendingOperations: 0,
+      lastSyncAttempt: null,
+      offlineItems: 0
+    };
+  }
+}
+
+// Método para exportar información de debug
+public async exportSyncDebugInfo(): Promise<string> {
+  try {
+    const stats = await this.getSyncStats();
+    
+    // Obtener algunas operaciones pendientes como muestra
+    const pendingVentas = await db.ventasPendientes
+      .where('estado')
+      .anyOf(['pendiente', 'sincronizando', 'error'])
+      .limit(5)
+      .toArray();
+      
+    const pendingOps = await db.operacionesPendientes
+      .where('estado')
+      .anyOf(['pendiente', 'procesando', 'error'])
+      .limit(5)
+      .toArray();
+      
+    const debugInfo = {
+      timestamp: new Date().toISOString(),
+      isOnline: this.isOnline,
+      syncInterval: this.syncInterval !== null,
+      stats,
+      sampleVentas: pendingVentas,
+      sampleOperations: pendingOps,
+      userInfo: {
+        sucursalId: localStorage.getItem('sucursalId'),
+        lastUpdate: localStorage.getItem('lastDataUpdate')
+      }
+    };
+    
+    return JSON.stringify(debugInfo, null, 2);
+  } catch (error) {
+    console.error('Error al exportar información de debug:', error);
+    return JSON.stringify({ error: 'Error al obtener datos de debug' });
+  }
+}
+
+// Método para forzar sincronización completa
+public async forceFullSync(): Promise<{
+  success: boolean;
+  syncedVentas: number;
+  syncedOps: number;
+  updatedItems: number;
+  errors: string[]
+}> {
+  if (!this.isOnline) {
+    return {
+      success: false,
+      syncedVentas: 0,
+      syncedOps: 0,
+      updatedItems: 0,
+      errors: ['Sin conexión a internet']
+    };
+  }
+  
+  const errors: string[] = [];
+  let syncedVentas = 0;
+  let syncedOps = 0;
+  let updatedItems = 0;
+  
+  try {
+    // Marcar timestamp de inicio
+    localStorage.setItem('lastSyncAttempt', new Date().toISOString());
+    
+    // 1. Sincronizar ventas pendientes
+    const ventas = await db.ventasPendientes
+      .where('estado')
+      .anyOf(['pendiente', 'error'])
+      .toArray();
+      
+    for (const venta of ventas) {
+      try {
+        await db.ventasPendientes.update(venta.id, {
+          estado: 'sincronizando',
+          intentos: (venta.intentos || 0) + 1
+        });
+        
+        // Enviar al servidor (simulado)
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        await db.ventasPendientes.update(venta.id, {
+          estado: 'completada'
+        });
+        
+        syncedVentas++;
+      } catch (e) {
+        const error = e instanceof Error ? e : new Error('Error desconocido');
+        errors.push(`Error en venta ${venta.id}: ${error.message}`);
+        
+        // Marcar como error si hay demasiados intentos
+        if ((venta.intentos || 0) >= 5) {
+          await db.ventasPendientes.update(venta.id, {
+            estado: 'error',
+            error: error.message
+          });
+        } else {
+          await db.ventasPendientes.update(venta.id, {
+            estado: 'pendiente',
+            intentos: (venta.intentos || 0) + 1,
+            error: error.message
+          });
+        }
+      }
+    }
+    
+    // 2. Sincronizar otras operaciones
+    const operaciones = await db.operacionesPendientes
+      .where('estado')
+      .anyOf(['pendiente', 'error'])
+      .toArray();
+      
+    for (const op of operaciones) {
+      try {
+        await db.operacionesPendientes.update(op.id, {
+          estado: 'procesando',
+          intentos: op.intentos + 1,
+          ultimoIntento: new Date()
+        });
+        
+        // Procesar según tipo
+        switch (op.tipo) {
+          case 'ajuste_stock':
+            await this.procesarAjusteStock(op);
+            break;
+          case 'recepcion_envio':
+            await this.procesarRecepcionEnvio(op);
+            break;
+        }
+        
+        await db.operacionesPendientes.update(op.id, {
+          estado: 'completada'
+        });
+        
+        syncedOps++;
+      } catch (e) {
+        const error = e instanceof Error ? e : new Error('Error desconocido');
+        errors.push(`Error en operación ${op.id}: ${error.message}`);
+        
+        // Marcar como error si hay demasiados intentos
+        if (op.intentos >= 5) {
+          await db.operacionesPendientes.update(op.id, {
+            estado: 'error',
+            error: error.message
+          });
+        } else {
+          await db.operacionesPendientes.update(op.id, {
+            estado: 'pendiente',
+            error: error.message
+          });
+        }
+      }
+    }
+    
+    // 3. Actualizar datos locales
+    try {
+      // Actualizar productos
+      const productosResponse = await fetch('/api/productos/cache');
+      if (productosResponse.ok) {
+        const productos = await productosResponse.json();
+        await db.productosCache.clear();
+        await db.productosCache.bulkAdd(productos);
+        updatedItems += productos.length;
+      }
+      
+      // Actualizar stock local
+      const sucursalId = localStorage.getItem('sucursalId');
+      if (sucursalId) {
+        const stockResponse = await fetch(`/api/sucursales/${sucursalId}/stock`);
+        if (stockResponse.ok) {
+          const stock = await stockResponse.json();
+          await db.stockLocal.clear();
+          await db.stockLocal.bulkAdd(stock);
+          updatedItems += stock.length;
+        }
+      }
+      
+      // Guardar timestamp
+      localStorage.setItem('lastDataUpdate', new Date().toISOString());
+    } catch (e) {
+      const error = e instanceof Error ? e : new Error('Error desconocido');
+      errors.push(`Error al actualizar datos locales: ${error.message}`);
+    }
+    
+    return {
+      success: true,
+      syncedVentas,
+      syncedOps,
+      updatedItems,
+      errors
+    };
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
+    return {
+      success: false,
+      syncedVentas,
+      syncedOps,
+      updatedItems,
+      errors: [...errors, `Error general: ${errorMsg}`]
+    };
+  }
+}
   
   // Limpiar datos antiguos
   public async limpiarDatosAntiguos(): Promise<void> {
