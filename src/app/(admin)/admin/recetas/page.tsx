@@ -235,7 +235,7 @@ export default function RecetasPage() {
                 disabled={paginationInfo.page === 1}
                 className="inline-flex items-center justify-center rounded-md border px-3 py-2 text-sm disabled:opacity-50 disabled:pointer-events-none hover:bg-muted"
               >
-                Anterior
+                Anteriores
               </button>
               <div className="text-sm">
                 Página {paginationInfo.page} de {paginationInfo.totalPages}
