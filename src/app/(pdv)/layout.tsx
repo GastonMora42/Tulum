@@ -115,7 +115,7 @@ export default function PDVLayout({
                     pathname.startsWith('/pdv/cierre') ? 'bg-blue-700' : 'hover:bg-blue-500'
                   } px-3 py-2 rounded-md text-sm font-medium`}
                 >
-                  Cierre de Caja
+                  Cierre de Cajas
                 </Link>
                 <Link 
                   href="/pdv/ventas" 
