@@ -125,14 +125,7 @@ export default function PDVLayout({
                 >
                   Historial
                 </Link>
-                <Link 
-  href="/pdv/contingencias" 
-  className={`${
-    pathname.startsWith('/pdv/contingencias') ? 'bg-blue-700' : 'hover:bg-blue-500'
-  } px-3 py-2 rounded-md text-sm font-medium`}
->
-  Contingencias
-</Link>
+                
               </nav>
             </div>
             <div className="flex items-center">
