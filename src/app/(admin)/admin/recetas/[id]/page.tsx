@@ -165,7 +165,7 @@ export default function DetalleRecetaPage({ params }: { params: { id: string } }
     }
   };
   
-  // Manejar eliminación de la receta
+  // Manejar eliminación de la recetas
   const handleDelete = async () => {
     if (!confirm('¿Está seguro de que desea eliminar esta receta? Esta acción no se puede deshacer.')) {
       return;
