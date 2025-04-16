@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Package, ChevronLeft, Save, Loader2 } from 'lucide-react';
+import { authenticatedFetch } from '@/hooks/useAuth';
 
 interface Proveedor {
   id: string;
@@ -111,7 +112,7 @@ export default function NuevoInsumoPage() {
       
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      const response = await fetch('/api/admin/insumos', {
+      const response = await authenticatedFetch('/api/admin/insumos', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

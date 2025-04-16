@@ -22,9 +22,6 @@ export async function authMiddleware(req: NextRequest) {
   
   try {
     // Verificar token con servicio de Cognito
-    // En una implementación real, deberíamos verificar el JWT
-    // con la clave pública del grupo de usuarios de Cognito
-    
     // Por ahora, simplemente obtenemos el payload del token
     const payload = JSON.parse(atob(token.split('.')[1]));
     const userId = payload.sub;
@@ -38,16 +35,41 @@ export async function authMiddleware(req: NextRequest) {
       );
     }
     
-    // Añadir usuario al request para uso posterior
-    const requestWithUser = new Request(req.url, {
+    // Enfoque mejorado: usar headers customizados para pasar información del usuario
+    const newHeaders = new Headers(req.headers);
+    newHeaders.set('x-user-id', user.id);
+    newHeaders.set('x-user-role', user.roleId);
+    
+    // Crear un objeto con los datos del usuario para pasar al contexto
+    const userData = JSON.stringify({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      roleId: user.roleId,
+      // Incluir role si existe y tiene permissions
+      role: user.roleId ? {
+        id: user.roleId,
+        name: user.roleId,
+        permissions: [] // Por ahora no incluimos permisos ya que no están disponibles en el tipo de usuario
+      } : undefined
+    });
+    
+    newHeaders.set('x-user-data', userData);
+    
+    // Crear nueva request con los headers modificados
+    const newRequest = new Request(req.url, {
       method: req.method,
-      headers: req.headers,
+      headers: newHeaders,
       body: req.body,
     });
-    (requestWithUser as any).user = user;
     
+    // Almacenar usuario directamente en la request para compatibilidad con el código existente
+    // Nota: esto puede no funcionar en todos los entornos/middlewares de Next.js
+    (newRequest as any).user = user;
+    
+    // Devolver nueva respuesta con la request modificada
     return NextResponse.next({
-      request: requestWithUser,
+      request: newRequest
     });
   } catch (error) {
     console.error('Error al verificar token:', error);

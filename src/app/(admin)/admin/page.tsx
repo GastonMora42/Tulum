@@ -1,7 +1,21 @@
+// src/app/(admin)/admin/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/stores/authStore';
+import Link from 'next/link';
+import { 
+  Package, 
+  Users, 
+  Archive, 
+  AlertTriangle, 
+  FileText, 
+  Beaker, 
+  Book,
+  BarChart2,
+  ArrowUpRight,
+  AlertCircle
+} from 'lucide-react';
 
 // Tipos para estadísticas
 interface DashboardStats {
@@ -61,137 +75,247 @@ export default function AdminDashboard() {
     fetchStats();
   }, []);
 
+  // Tarjetas de navegación rápida
+  const quickCards = [
+    { href: '/admin/productos', label: 'Productos', icon: <Package className="h-6 w-6" />, color: 'bg-blue-50 text-blue-600' },
+    { href: '/admin/insumos', label: 'Insumos', icon: <Beaker className="h-6 w-6" />, color: 'bg-purple-50 text-purple-600' },
+    { href: '/admin/recetas', label: 'Recetas', icon: <Book className="h-6 w-6" />, color: 'bg-indigo-50 text-indigo-600' },
+    { href: '/admin/usuarios', label: 'Usuarios', icon: <Users className="h-6 w-6" />, color: 'bg-emerald-50 text-emerald-600' },
+    { href: '/admin/stock', label: 'Stock', icon: <Archive className="h-6 w-6" />, color: 'bg-amber-50 text-amber-600' },
+    { href: '/admin/contingencias', label: 'Contingencias', icon: <AlertTriangle className="h-6 w-6" />, color: 'bg-rose-50 text-rose-600' },
+    { href: '/admin/reportes', label: 'Reportes', icon: <FileText className="h-6 w-6" />, color: 'bg-teal-50 text-teal-600' },
+  ];
+
   if (isLoading) {
     return (
-      <div className="text-center py-10">
-        <p className="text-lg">Cargando estadísticas...</p>
+      <div className="flex justify-center items-center h-96">
+        <div className="w-12 h-12 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="text-center py-10">
-        <p className="text-red-500">{error}</p>
+      <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative">
+        <span className="block sm:inline">{error}</span>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Dashboard de Administración</h1>
+    <div className="space-y-8">
+      <div className="flex justify-between items-center">
+        <h1 className="text-2xl font-bold text-gray-900">Dashboard de Administración</h1>
+        <span className="text-sm text-gray-500">Bienvenido, {user?.name}</span>
+      </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Tarjetas de resumen */}
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="px-4 py-5 sm:p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 bg-indigo-500 rounded-md p-3">
-                <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                </svg>
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Total de productos
-                  </dt>
-                  <dd>
-                    <div className="text-lg font-medium text-gray-900">
-                      {stats?.totalProductos}
-                    </div>
-                  </dd>
-                </dl>
-              </div>
+      {/* Tarjetas de navegación rápida */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        {quickCards.map((card) => (
+          <Link 
+            key={card.href} 
+            href={card.href}
+            className={`${card.color} flex flex-col justify-between p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow`}
+          >
+            <div className="mb-4">{card.icon}</div>
+            <div className="flex justify-between items-center">
+              <h3 className="font-semibold">{card.label}</h3>
+              <ArrowUpRight className="h-4 w-4" />
             </div>
+          </Link>
+        ))}
+      </div>
+      
+      {/* Resumen de métricas */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="p-5 flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-medium text-gray-900">Productos</h3>
+              <p className="text-3xl font-bold text-indigo-600 mt-2">{stats?.totalProductos}</p>
+            </div>
+            <Package className="h-12 w-12 text-indigo-200" />
+          </div>
+          <div className="bg-indigo-50 px-5 py-3">
+            <Link href="/admin/productos" className="text-sm text-indigo-600 font-medium flex items-center">
+              Ver detalles
+              <ArrowUpRight className="h-4 w-4 ml-1" />
+            </Link>
           </div>
         </div>
-
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="px-4 py-5 sm:p-6">
-            <div className="flex items-center">
-              <div className="flex-shrink-0 bg-green-500 rounded-md p-3">
-                <svg className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Total de ventas
-                  </dt>
-                  <dd>
-                    <div className="text-lg font-medium text-gray-900">
-                      {stats?.totalVentas}
-                    </div>
-                  </dd>
-                </dl>
-              </div>
+        
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="p-5 flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-medium text-gray-900">Ventas</h3>
+              <p className="text-3xl font-bold text-green-600 mt-2">{stats?.totalVentas}</p>
             </div>
+            <BarChart2 className="h-12 w-12 text-green-200" />
+          </div>
+          <div className="bg-green-50 px-5 py-3">
+            <Link href="/admin/reportes" className="text-sm text-green-600 font-medium flex items-center">
+              Ver reportes
+              <ArrowUpRight className="h-4 w-4 ml-1" />
+            </Link>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg shadow overflow-hidden">
+          <div className="p-5 flex items-center justify-between">
+            <div>
+              <h3 className="text-lg font-medium text-gray-900">Alertas</h3>
+              <p className="text-3xl font-bold text-red-600 mt-2">{stats?.productosAgotandose.length}</p>
+            </div>
+            <AlertCircle className="h-12 w-12 text-red-200" />
+          </div>
+          <div className="bg-red-50 px-5 py-3">
+            <Link href="/admin/stock" className="text-sm text-red-600 font-medium flex items-center">
+              Ver stock bajo
+              <ArrowUpRight className="h-4 w-4 ml-1" />
+            </Link>
           </div>
         </div>
       </div>
-
+      
       {/* Productos con stock bajo */}
-      <div className="bg-white shadow overflow-hidden sm:rounded-md">
-        <div className="px-4 py-5 sm:px-6">
-          <h3 className="text-lg leading-6 font-medium text-gray-900">
+      <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+        <div className="px-4 py-5 sm:px-6 bg-red-50">
+          <h3 className="text-lg leading-6 font-medium text-red-900 flex items-center">
+            <AlertTriangle className="h-5 w-5 mr-2" />
             Productos con stock bajo
           </h3>
         </div>
-        <ul className="divide-y divide-gray-200">
-          {stats?.productosAgotandose.map((producto) => (
-            <li key={producto.id}>
-              <div className="px-4 py-4 sm:px-6">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-indigo-600 truncate">
-                    {producto.nombre}
-                  </p>
-                  <div className="ml-2 flex-shrink-0 flex">
-                    <p className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
-                      Stock: {producto.stock} / Min: {producto.stockMinimo}
+        <div className="border-t border-gray-200">
+          <ul className="divide-y divide-gray-200">
+            {stats?.productosAgotandose.map((producto) => (
+              <li key={producto.id}>
+                <div className="px-4 py-4 sm:px-6 hover:bg-gray-50">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium text-indigo-600 truncate">
+                      {producto.nombre}
                     </p>
+                    <div className="ml-2 flex-shrink-0 flex">
+                      <p className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                        Stock: {producto.stock} / Min: {producto.stockMinimo}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </li>
-          ))}
-        </ul>
+              </li>
+            ))}
+            {stats?.productosAgotandose.length === 0 && (
+              <li>
+                <div className="px-4 py-4 sm:px-6 text-center text-gray-500">
+                  No hay productos con stock bajo
+                </div>
+              </li>
+            )}
+          </ul>
+        </div>
       </div>
 
       {/* Últimas ventas */}
-      <div className="bg-white shadow overflow-hidden sm:rounded-md">
-        <div className="px-4 py-5 sm:px-6">
+      <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+        <div className="px-4 py-5 sm:px-6 bg-gray-50">
           <h3 className="text-lg leading-6 font-medium text-gray-900">
             Últimas ventas
           </h3>
         </div>
-        <ul className="divide-y divide-gray-200">
-          {stats?.ultimasVentas.map((venta) => (
-            <li key={venta.id}>
-              <div className="px-4 py-4 sm:px-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <p className="text-sm font-medium text-indigo-600 truncate">
-                      Venta #{venta.id}
-                    </p>
-                    <p className="ml-4 text-sm text-gray-500">
-                      {venta.fecha}
-                    </p>
-                  </div>
-                  <div className="ml-2 flex-shrink-0 flex">
-                    <p className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                      ${venta.total}
-                    </p>
-                    <p className="ml-2 text-sm text-gray-500">
-                      {venta.sucursal}
-                    </p>
+        <div className="border-t border-gray-200">
+          <ul className="divide-y divide-gray-200">
+            {stats?.ultimasVentas.map((venta) => (
+              <li key={venta.id}>
+                <div className="px-4 py-4 sm:px-6 hover:bg-gray-50">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <p className="text-sm font-medium text-indigo-600 truncate">
+                        Venta #{venta.id}
+                      </p>
+                      <p className="ml-4 text-sm text-gray-500">
+                        {venta.fecha}
+                      </p>
+                    </div>
+                    <div className="ml-2 flex-shrink-0 flex items-center">
+                      <p className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                        ${venta.total.toLocaleString()}
+                      </p>
+                      <p className="ml-2 text-sm text-gray-500">
+                        {venta.sucursal}
+                      </p>
+                    </div>
                   </div>
                 </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+      
+      {/* Acciones adicionales */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Acciones rápidas</h3>
+          <div className="space-y-3">
+            <Link 
+              href="/admin/productos/nuevo" 
+              className="block w-full text-left px-4 py-3 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 items-center"
+            >
+              <div className="p-2 rounded-full bg-blue-50 mr-3">
+                <Package className="h-5 w-5 text-blue-600" />
               </div>
-            </li>
-          ))}
-        </ul>
+              Crear nuevo producto
+            </Link>
+            
+            <Link 
+              href="/admin/insumos/nuevo" 
+              className="block w-full text-left px-4 py-3 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 items-center"
+            >
+              <div className="p-2 rounded-full bg-purple-50 mr-3">
+                <Beaker className="h-5 w-5 text-purple-600" />
+              </div>
+              Registrar nuevo insumo
+            </Link>
+            
+            <Link 
+              href="/admin/recetas/nueva" 
+              className="block w-full text-left px-4 py-3 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 items-center"
+            >
+              <div className="p-2 rounded-full bg-indigo-50 mr-3">
+                <Book className="h-5 w-5 text-indigo-600" />
+              </div>
+              Crear nueva receta
+            </Link>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg shadow p-6">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Informes recientes</h3>
+          <div className="space-y-3">
+            <Link 
+              href="/admin/reportes?tipo=ventas" 
+              className="block w-full text-left px-4 py-3 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 justify-between items-center"
+            >
+              <span>Informe de ventas semanal</span>
+              <span className="text-xs text-gray-500">Hace 2 días</span>
+            </Link>
+            
+            <Link 
+              href="/admin/reportes?tipo=stock" 
+              className="block w-full text-left px-4 py-3 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 justify-between items-center"
+            >
+              <span>Informe de inventario</span>
+              <span className="text-xs text-gray-500">Hace 5 días</span>
+            </Link>
+            
+            <Link 
+              href="/admin/reportes?tipo=produccion" 
+              className="block w-full text-left px-4 py-3 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50 justify-between items-center"
+            >
+              <span>Informe de producción</span>
+              <span className="text-xs text-gray-500">Hace 1 semana</span>
+            </Link>
+          </div>
+        </div>
       </div>
     </div>
   );

@@ -7,6 +7,7 @@ import { useForm, SubmitHandler } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Package, ChevronLeft, Save, Loader2, Trash2 } from 'lucide-react';
+import { authenticatedFetch } from '@/hooks/useAuth';
 
 interface Insumo {
   id: string;
@@ -72,7 +73,7 @@ export default function EditarInsumoPage({ params }: { params: { id: string } })
         setIsFetchingData(true);
         
         // Cargar insumo
-        const insumoResponse = await fetch(`/api/admin/insumos/${params.id}`);
+        const insumoResponse = await authenticatedFetch(`/api/admin/insumos/${params.id}`);
         if (!insumoResponse.ok) {
           throw new Error('Error al cargar insumo');
         }
@@ -90,7 +91,7 @@ export default function EditarInsumoPage({ params }: { params: { id: string } })
         });
         
         // Cargar proveedores
-        const proveedoresResponse = await fetch('/api/admin/proveedores');
+        const proveedoresResponse = await authenticatedFetch('/api/admin/proveedores');
         if (!proveedoresResponse.ok) {
           throw new Error('Error al cargar proveedores');
         }
@@ -112,7 +113,7 @@ export default function EditarInsumoPage({ params }: { params: { id: string } })
       setIsLoading(true);
       setError(null);
       
-      const response = await fetch(`/api/admin/insumos/${params.id}`, {
+      const response = await authenticatedFetch(`/api/admin/insumos/${params.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
