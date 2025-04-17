@@ -7,6 +7,7 @@ import { authenticatedFetch } from '@/hooks/useAuth';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+import Link from 'next/link';
 
 interface Categoria {
   id: string;
@@ -31,16 +32,16 @@ interface Producto {
 
 // Esquema de validación
 const productoSchema = z.object({
-  nombre: z.string().min(3, { message: 'El nombre debe tener al menos 3 caracteres' }),
-  descripcion: z.string().nullable().optional(),
-  precio: z.number().positive({ message: 'El precio debe ser positivo' }),
-  codigoBarras: z.string().nullable().optional(),
-  categoriaId: z.string().min(1, { message: 'Debe seleccionar una categoría' }),
-  stockMinimo: z.number().int().nonnegative({ message: 'El stock mínimo debe ser un número positivo o cero' }),
-  activo: z.boolean().default(true)
-});
+    nombre: z.string().min(3, { message: 'El nombre debe tener al menos 3 caracteres' }),
+    descripcion: z.string().nullable(),
+    precio: z.number().positive({ message: 'El precio debe ser positivo' }),
+    codigoBarras: z.string().nullable(),
+    categoriaId: z.string().min(1, { message: 'Debe seleccionar una categoría' }),
+    stockMinimo: z.number().int().nonnegative({ message: 'El stock mínimo debe ser un número positivo o cero' }),
+    activo: z.boolean()
+  });  
 
-type ProductoFormData = z.infer<typeof productoSchema>;
+  type ProductoFormData = z.infer<typeof productoSchema>;
 
 export default function EditarProductoPage({ params }: { params: { id: string } }) {
   const [producto, setProducto] = useState<Producto | null>(null);
@@ -53,23 +54,24 @@ export default function EditarProductoPage({ params }: { params: { id: string } 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const router = useRouter();
 
-  const { 
-    register, 
-    handleSubmit, 
-    formState: { errors },
-    reset
-  } = useForm<ProductoFormData>({
-    resolver: zodResolver(productoSchema),
-    defaultValues: {
-      nombre: '',
-      descripcion: '',
-      precio: 0,
-      codigoBarras: '',
-      categoriaId: '',
-      stockMinimo: 0,
-      activo: true
-    }
-  });
+const { 
+  register, 
+  handleSubmit, 
+  formState: { errors },
+  reset
+} = useForm<ProductoFormData>({
+  resolver: zodResolver(productoSchema),
+  defaultValues: {
+    nombre: '',
+    descripcion: '',
+    precio: 0,
+    codigoBarras: '',
+    categoriaId: '',
+    stockMinimo: 0,
+    activo: true
+  }
+});
+
 
   // Cargar producto y categorías
   useEffect(() => {

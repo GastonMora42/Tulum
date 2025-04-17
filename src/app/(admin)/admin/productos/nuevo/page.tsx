@@ -16,14 +16,14 @@ interface Categoria {
 
 // Esquema de validación
 const productoSchema = z.object({
-  nombre: z.string().min(3, { message: 'El nombre debe tener al menos 3 caracteres' }),
-  descripcion: z.string().optional(),
-  precio: z.number().positive({ message: 'El precio debe ser positivo' }),
-  codigoBarras: z.string().optional(),
-  categoriaId: z.string().min(1, { message: 'Debe seleccionar una categoría' }),
-  stockMinimo: z.number().int().nonnegative({ message: 'El stock mínimo debe ser un número positivo o cero' }),
-  activo: z.boolean().default(true)
-});
+    nombre: z.string().min(3, { message: 'El nombre debe tener al menos 3 caracteres' }),
+    descripcion: z.string().nullable(),
+    precio: z.number().positive({ message: 'El precio debe ser positivo' }),
+    codigoBarras: z.string().nullable(),
+    categoriaId: z.string().min(1, { message: 'Debe seleccionar una categoría' }),
+    stockMinimo: z.number().int().nonnegative({ message: 'El stock mínimo debe ser un número positivo o cero' }),
+    activo: z.boolean()
+  });  
 
 type ProductoFormData = z.infer<typeof productoSchema>;
 
@@ -40,7 +40,7 @@ export default function NuevoProductoPage() {
     register, 
     handleSubmit, 
     formState: { errors },
-    watch
+    reset
   } = useForm<ProductoFormData>({
     resolver: zodResolver(productoSchema),
     defaultValues: {
@@ -53,6 +53,7 @@ export default function NuevoProductoPage() {
       activo: true
     }
   });
+  
 
   // Cargar categorías
   useEffect(() => {

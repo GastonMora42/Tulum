@@ -1,6 +1,10 @@
 {
-  "/(auth)/login/page": "app/(auth)/login/page.js",
+  "/api/admin/ubicaciones/route": "app/api/admin/ubicaciones/route.js",
+  "/api/stock/route": "app/api/stock/route.js",
+  "/api/admin/insumos/route": "app/api/admin/insumos/route.js",
+  "/(admin)/admin/insumos/page": "app/(admin)/admin/insumos/page.js",
   "/(admin)/admin/page": "app/(admin)/admin/page.js",
-  "/(admin)/admin/recetas/nueva/page": "app/(admin)/admin/recetas/nueva/page.js",
-  "/(admin)/admin/recetas/page": "app/(admin)/admin/recetas/page.js"
+  "/(admin)/admin/productos/page": "app/(admin)/admin/productos/page.js",
+  "/(admin)/admin/envios/page": "app/(admin)/admin/envios/page.js",
+  "/(admin)/admin/envios/nuevo/page": "app/(admin)/admin/envios/nuevo/page.js"
 }

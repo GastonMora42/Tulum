@@ -391,7 +391,7 @@ export default function RecibirEnvioPage({ params }: { params: { id: string } })
         <div className="flex items-center">
           <h1 className="text-2xl font-bold mr-3">Recibir Envío #{envio.id.slice(-6)}</h1>
           <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getEstadoBadge(envio.estado)}`}>
-            {envio.estado === 'pendiente' ? 'Pendiente' : 
+          if (envio.estado !== 'enviado' && envio.estado !== 'en_transito') {
              envio.estado === 'enviado' ? 'Enviado' : 
              envio.estado === 'en_transito' ? 'En tránsito' : 
              envio.estado === 'recibido' ? 'Recibido' : 
