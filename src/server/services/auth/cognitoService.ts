@@ -388,25 +388,31 @@ async registerUser(params: RegisterUserParams): Promise<{ success: boolean; user
       // Si tenemos email, usarlo; de lo contrario, intentar extraerlo del token
       let username = email || '';
       
-      // Si no tenemos username, no podemos generar SECRET_HASH
-      if (!username && this.clientSecret) {
-        throw new Error('Se requiere el email para el refresh token cuando se usa client secret');
-      }
-      
-      // Parámetros para el refresh token
+      // Construir los parámetros de renovación
       const authParams: Record<string, string> = {
         REFRESH_TOKEN: refreshToken
       };
       
-      // Añadir SECRET_HASH si tenemos username y clientSecret
+      // Añadir SECRET_HASH solo si tenemos username y clientSecret
       if (username && this.clientSecret) {
-        authParams.SECRET_HASH = this.calculateSecretHash(username);
+        try {
+          authParams.SECRET_HASH = this.calculateSecretHash(username);
+        } catch (error) {
+          console.error('Error calculando SECRET_HASH:', error);
+        }
       }
       
+      // Si no tenemos SECRET_HASH, intentar sin él
       const command = new InitiateAuthCommand({
         AuthFlow: "REFRESH_TOKEN_AUTH",
         ClientId: this.clientId,
         AuthParameters: authParams
+      });
+      
+      console.log("Intentando refrescar token con params:", {
+        hasUsername: !!username,
+        hasSecretHash: !!authParams.SECRET_HASH,
+        refreshTokenLength: refreshToken.length > 10 ? `${refreshToken.substring(0, 10)}...` : 'invalid'
       });
       
       const response = await this.client.send(command);

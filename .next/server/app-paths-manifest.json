@@ -1,10 +1,12 @@
 {
-  "/api/auth/login/route": "app/api/auth/login/route.js",
-  "/api/auth/refresh/route": "app/api/auth/refresh/route.js",
+  "/_not-found/page": "app/_not-found/page.js",
   "/api/auth/me/route": "app/api/auth/me/route.js",
-  "/api/admin/insumos/route": "app/api/admin/insumos/route.js",
-  "/(auth)/login/page": "app/(auth)/login/page.js",
+  "/api/admin/users/route": "app/api/admin/users/route.js",
+  "/api/contingencias/route": "app/api/contingencias/route.js",
   "/(admin)/admin/page": "app/(admin)/admin/page.js",
+  "/(admin)/admin/recetas/nueva/page": "app/(admin)/admin/recetas/nueva/page.js",
   "/(admin)/admin/insumos/page": "app/(admin)/admin/insumos/page.js",
-  "/(admin)/admin/insumos/nuevo/page": "app/(admin)/admin/insumos/nuevo/page.js"
+  "/(admin)/admin/contingencias/page": "app/(admin)/admin/contingencias/page.js",
+  "/(admin)/admin/contingencias/nueva/page": "app/(admin)/admin/contingencias/nueva/page.js",
+  "/(admin)/admin/usuarios/page": "app/(admin)/admin/usuarios/page.js"
 }

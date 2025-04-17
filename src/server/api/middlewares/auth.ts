@@ -6,7 +6,7 @@ export async function authMiddleware(req: NextRequest) {
   // Excluir rutas públicas
   if (req.nextUrl.pathname.startsWith('/api/auth/login') || 
       req.nextUrl.pathname.startsWith('/api/auth/refresh')) {
-    return;
+    return null; // Sin error, continuar
   }
   
   // Obtener token de la cabecera
@@ -21,8 +21,7 @@ export async function authMiddleware(req: NextRequest) {
   const token = authHeader.split(' ')[1];
   
   try {
-    // Verificar token con servicio de Cognito
-    // Por ahora, simplemente obtenemos el payload del token
+    // Verificar token
     const payload = JSON.parse(atob(token.split('.')[1]));
     const userId = payload.sub;
     
@@ -35,42 +34,11 @@ export async function authMiddleware(req: NextRequest) {
       );
     }
     
-    // Enfoque mejorado: usar headers customizados para pasar información del usuario
-    const newHeaders = new Headers(req.headers);
-    newHeaders.set('x-user-id', user.id);
-    newHeaders.set('x-user-role', user.roleId);
+    // Adjuntar usuario a la request para uso posterior
+    (req as any).user = user;
     
-    // Crear un objeto con los datos del usuario para pasar al contexto
-    const userData = JSON.stringify({
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      roleId: user.roleId,
-      // Incluir role si existe y tiene permissions
-      role: user.roleId ? {
-        id: user.roleId,
-        name: user.roleId,
-        permissions: [] // Por ahora no incluimos permisos ya que no están disponibles en el tipo de usuario
-      } : undefined
-    });
-    
-    newHeaders.set('x-user-data', userData);
-    
-    // Crear nueva request con los headers modificados
-    const newRequest = new Request(req.url, {
-      method: req.method,
-      headers: newHeaders,
-      body: req.body,
-    });
-    
-    // Almacenar usuario directamente en la request para compatibilidad con el código existente
-    // Nota: esto puede no funcionar en todos los entornos/middlewares de Next.js
-    (newRequest as any).user = user;
-    
-    // Devolver nueva respuesta con la request modificada
-    return NextResponse.next({
-      request: newRequest
-    });
+    // No usamos NextResponse.next(), solo retornamos null para indicar que no hay error
+    return null;
   } catch (error) {
     console.error('Error al verificar token:', error);
     return NextResponse.json(

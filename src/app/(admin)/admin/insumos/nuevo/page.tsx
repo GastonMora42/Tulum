@@ -85,8 +85,8 @@ export default function NuevoInsumoPage() {
     return isValid;
   };
   
-  // Función para manejar el envío del formulario
-  const handleSubmit = async (e: React.FormEvent) => {
+
+const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Validar formulario
@@ -109,8 +109,6 @@ export default function NuevoInsumoPage() {
       };
       
       console.log('Datos a enviar:', data);
-      
-      await new Promise(resolve => setTimeout(resolve, 1000));
       
       const response = await authenticatedFetch('/api/admin/insumos', {
         method: 'POST',

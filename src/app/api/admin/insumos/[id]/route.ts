@@ -21,8 +21,8 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   // Aplicar middleware de autenticación
-  const authResponse = await authMiddleware(req);
-  if (authResponse) return authResponse;
+  const authError = await authMiddleware(req);
+  if (authError) return authError;
 
   try {
     const insumo = await prisma.insumo.findUnique({
@@ -55,12 +55,12 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   // Aplicar middleware de autenticación
-  const authResponse = await authMiddleware(req);
-  if (authResponse) return authResponse;
+  const authError = await authMiddleware(req);
+  if (authError) return authError;
   
   // Verificar permiso
-  const permissionResponse = await checkPermission('insumo:editar')(req);
-  if (permissionResponse) return permissionResponse;
+  const permissionError = await checkPermission('insumo:editar')(req);
+  if (permissionError) return permissionError;
   
   try {
     const body = await req.json();
@@ -85,6 +85,10 @@ export async function PATCH(
         { status: 404 }
       );
     }
+    
+    // Obtener usuario de la request
+    const user = (req as any).user;
+    console.log(`Usuario ${user.name} está actualizando el insumo:`, existingInsumo.nombre);
     
     // Actualizar insumo
     const insumo = await prisma.insumo.update({
@@ -111,12 +115,12 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   // Aplicar middleware de autenticación
-  const authResponse = await authMiddleware(req);
-  if (authResponse) return authResponse;
+  const authError = await authMiddleware(req);
+  if (authError) return authError;
   
   // Verificar permiso
-  const permissionResponse = await checkPermission('insumo:eliminar')(req);
-  if (permissionResponse) return permissionResponse;
+  const permissionError = await checkPermission('insumo:eliminar')(req);
+  if (permissionError) return permissionError;
   
   try {
     // Verificar si el insumo existe
@@ -131,8 +135,12 @@ export async function DELETE(
       );
     }
     
+    // Obtener usuario de la request
+    const user = (req as any).user;
+    console.log(`Usuario ${user.name} está desactivando el insumo:`, existingInsumo.nombre);
+    
     // Desactivar insumo (no eliminar físicamente)
-    const insumo = await prisma.insumo.update({
+    await prisma.insumo.update({
       where: { id: params.id },
       data: { activo: false }
     });

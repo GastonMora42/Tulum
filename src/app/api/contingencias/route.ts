@@ -1,5 +1,4 @@
 // src/app/api/contingencias/route.ts
-
 import { NextRequest, NextResponse } from 'next/server';
 import { authMiddleware } from '@/server/api/middlewares/auth';
 import { contingenciaService } from '@/server/services/contingencia/contingenciaService';
@@ -54,6 +53,7 @@ export async function POST(req: NextRequest) {
   if (authResponse) return authResponse;
 
   try {
+    // Accedemos al usuario desde req.user
     const user = (req as any).user;
     const body = await req.json();
     

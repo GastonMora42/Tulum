@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Package, Plus, Search, Filter, RefreshCw } from 'lucide-react';
+import { authenticatedFetch } from '@/hooks/useAuth';
 
 interface Insumo {
   id: string;
@@ -41,7 +42,7 @@ export default function InsumosPage() {
   });
   const router = useRouter();
 
-  const fetchInsumos = async (page = 1) => {
+const fetchInsumos = async (page = 1) => {
     setIsLoading(true);
     try {
       // Construir query params
@@ -51,7 +52,7 @@ export default function InsumosPage() {
       if (search) params.append('search', search);
       params.append('soloActivos', soloActivos.toString());
       
-      const response = await fetch(`/api/admin/insumos?${params.toString()}`);
+      const response = await authenticatedFetch(`/api/admin/insumos?${params.toString()}`);
       
       if (!response.ok) {
         throw new Error('Error al cargar insumos');

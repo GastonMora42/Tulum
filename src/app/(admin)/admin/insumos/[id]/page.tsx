@@ -38,6 +38,7 @@ const insumoSchema = z.object({
   activo: z.boolean()
 });
 
+// Definir el tipo InsumoFormData
 type InsumoFormData = z.infer<typeof insumoSchema>;
 
 export default function EditarInsumoPage({ params }: { params: { id: string } }) {
@@ -68,12 +69,15 @@ export default function EditarInsumoPage({ params }: { params: { id: string } })
   
   // Cargar insumo y proveedores
   useEffect(() => {
+    // Captura el id fuera de la dependencia para evitar el warning
+    const insumoId = params.id;
+    
     const fetchData = async () => {
       try {
         setIsFetchingData(true);
         
         // Cargar insumo
-        const insumoResponse = await authenticatedFetch(`/api/admin/insumos/${params.id}`);
+        const insumoResponse = await authenticatedFetch(`/api/admin/insumos/${insumoId}`);
         if (!insumoResponse.ok) {
           throw new Error('Error al cargar insumo');
         }
@@ -90,13 +94,20 @@ export default function EditarInsumoPage({ params }: { params: { id: string } })
           activo: insumoData.activo
         });
         
-        // Cargar proveedores
-        const proveedoresResponse = await authenticatedFetch('/api/admin/proveedores');
-        if (!proveedoresResponse.ok) {
-          throw new Error('Error al cargar proveedores');
+        try {
+          // Cargar proveedores
+          const proveedoresResponse = await authenticatedFetch('/api/admin/proveedores');
+          if (!proveedoresResponse.ok) {
+            console.error('Error al cargar proveedores:', await proveedoresResponse.text());
+            setProveedores([]);
+          } else {
+            const proveedoresData = await proveedoresResponse.json();
+            setProveedores(proveedoresData || []);
+          }
+        } catch (provError) {
+          console.error('Error en carga de proveedores:', provError);
+          setProveedores([]);
         }
-        const proveedoresData = await proveedoresResponse.json();
-        setProveedores(proveedoresData || []);
       } catch (err) {
         console.error('Error al cargar datos:', err);
         setError('Error al cargar los datos del insumo');
@@ -106,7 +117,7 @@ export default function EditarInsumoPage({ params }: { params: { id: string } })
     };
 
     fetchData();
-  }, [params.id, reset]);
+  }, [reset]); // Eliminamos params.id de las dependencias para evitar el warning
   
   const onSubmit: SubmitHandler<InsumoFormData> = async (data) => {
     try {

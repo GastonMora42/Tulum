@@ -18,8 +18,8 @@ const insumoSchema = z.object({
 // GET - Listar insumos
 export async function GET(req: NextRequest) {
   // Aplicar middleware de autenticación
-  const authResponse = await authMiddleware(req);
-  if (authResponse) return authResponse;
+  const authError = await authMiddleware(req);
+  if (authError) return authError;
 
   try {
     const { searchParams } = new URL(req.url);
@@ -86,12 +86,12 @@ export async function GET(req: NextRequest) {
 // POST - Crear insumo
 export async function POST(req: NextRequest) {
   // Aplicar middleware de autenticación
-  const authResponse = await authMiddleware(req);
-  if (authResponse) return authResponse;
+  const authError = await authMiddleware(req);
+  if (authError) return authError;
   
   // Verificar permiso
-  const permissionResponse = await checkPermission('insumo:crear')(req);
-  if (permissionResponse) return permissionResponse;
+  const permissionError = await checkPermission('insumo:crear')(req);
+  if (permissionError) return permissionError;
   
   try {
     const body = await req.json();
@@ -104,6 +104,10 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+    
+    // Obtener usuario de la request
+    const user = (req as any).user;
+    console.log(`Usuario ${user.name} está creando un insumo:`, validation.data.nombre);
     
     // Crear insumo
     const insumo = await prisma.insumo.create({

@@ -43,7 +43,7 @@ export const refreshTokenFn = async (): Promise<boolean> => {
   }
   
   try {
-    console.log('Intentando refrescar token...');
+    console.log('Intentando refrescar token con email:', email);
     
     const response = await fetch('/api/auth/refresh', {
       method: 'POST',
@@ -52,12 +52,23 @@ export const refreshTokenFn = async (): Promise<boolean> => {
       },
       body: JSON.stringify({
         refreshToken,
-        email // Incluir email si tu backend lo necesita
+        email // Asegurar que se envía el email
       })
     });
     
     if (!response.ok) {
       console.error('Error al refrescar token:', response.status);
+      
+      // Si el error es de autenticación, limpiar tokens y redirigir a login
+      if (response.status === 401) {
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('idToken');
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
+        }
+      }
+      
       return false;
     }
     
@@ -233,7 +244,7 @@ export function useAuth(): UseAuthReturn {
   };
 }
 
-// Crear un cliente HTTP que maneje automáticamente la renovación de tokens
+// En src/hooks/useAuth.ts
 export const authenticatedFetch = async (url: string, options: RequestInit = {}): Promise<Response> => {
   // Preparar headers
   const headers = new Headers(options.headers || {});
@@ -247,49 +258,62 @@ export const authenticatedFetch = async (url: string, options: RequestInit = {})
     headers.set('Content-Type', 'application/json');
   }
   
-  // Realizar la petición
-  let response = await fetch(url, {
-    ...options,
-    headers
-  });
-  
-  // Si recibimos un 401, intentar refrescar el token y reintentar
-  if (response.status === 401) {
-    console.log('Token expirado, intentando refrescar...');
+  try {
+    // Realizar la petición
+    let response = await fetch(url, {
+      ...options,
+      headers
+    });
     
-    const refreshed = await refreshTokenFn();
-    
-    if (refreshed) {
-      // Obtener el nuevo token
-      const newToken = localStorage.getItem('accessToken');
+    // Si recibimos un 401, intentar refrescar el token y reintentar
+    if (response.status === 401) {
+      console.log('Token expirado, intentando refrescar...');
       
-      // Actualizar el header de autorización
-      headers.set('Authorization', `Bearer ${newToken}`);
+      const refreshed = await refreshTokenFn();
       
-      // Reintentar la petición original
-      console.log('Reintentando petición con nuevo token...');
-      response = await fetch(url, {
-        ...options,
-        headers
-      });
-    } else {
-      // Si no se pudo refrescar, redirigir a login
-      console.error('No se pudo refrescar el token, redirigiendo a login...');
-      
-      // Limpiar tokens
-      localStorage.removeItem('accessToken');
-      localStorage.removeItem('refreshToken');
-      localStorage.removeItem('idToken');
-      
-      // Limpiar store
-      if (useAuthStore.getState()) {
-        useAuthStore.getState().clearAuth();
+      if (refreshed) {
+        // Obtener el nuevo token
+        const newToken = localStorage.getItem('accessToken');
+        
+        // Actualizar el header de autorización
+        headers.set('Authorization', `Bearer ${newToken}`);
+        
+        // Reintentar la petición original
+        console.log('Reintentando petición con nuevo token...');
+        response = await fetch(url, {
+          ...options,
+          headers
+        });
+      } else {
+        // Si no se pudo refrescar, redirigir a login
+        console.error('No se pudo refrescar el token, redirigiendo a login...');
+        
+        // Limpiar tokens
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('idToken');
+        
+        // Limpiar store
+        if (useAuthStore.getState()) {
+          useAuthStore.getState().clearAuth();
+        }
+        
+        // Redirigir a login
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
+        }
       }
-      
-      // Redirigir a login
-      window.location.href = '/login';
     }
+    
+    return response;
+  } catch (error) {
+    console.error('Error en la solicitud:', error);
+    // Crear una respuesta de error controlada
+    return new Response(JSON.stringify({ error: 'Error de red' }), {
+      status: 500,
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
   }
-  
-  return response;
 };
