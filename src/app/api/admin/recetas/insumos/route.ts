@@ -5,8 +5,8 @@ import { authMiddleware } from '@/server/api/middlewares/auth';
 
 export async function GET(req: NextRequest) {
   // Aplicar middleware de autenticación
-  const authResponse = await authMiddleware(req);
-  if (authResponse) return authResponse;
+  const authError = await authMiddleware(req);
+  if (authError) return authError;
 
   try {
     const { searchParams } = new URL(req.url);

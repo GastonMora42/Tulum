@@ -70,6 +70,7 @@ model Insumo {
   // Relaciones
   stocks         Stock[]
   recetaItems    RecetaItem[]
+  itemsEnvio     ItemEnvio[]
 }
 
 model Categoria {
@@ -218,10 +219,17 @@ model ItemEnvio {
   id          String   @id @default(uuid())
   envioId     String
   envio       Envio    @relation(fields: [envioId], references: [id])
-  productoId  String
-  producto    Producto @relation(fields: [productoId], references: [id])
+  
+  // Campo opcional para producto
+  productoId  String?
+  producto    Producto? @relation(fields: [productoId], references: [id])
+  
+  // Campo opcional para insumo
+  insumoId    String?
+  insumo      Insumo?   @relation(fields: [insumoId], references: [id])
+  
   cantidad    Int
-  cantidadRecibida Int?  // Se completa en la recepción
+  cantidadRecibida Int?
 }
 
 // Ventas y Punto de Venta
