@@ -15,54 +15,65 @@ export default function LoginPage() {
 
 // En src/app/(auth)/login/page.tsx
 const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError(null);
-  
-    try {
-      // Guardar el email para refresh token
-      localStorage.setItem('userEmail', email);
-      
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password })
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Error en la autenticación');
-      }
-      
-      console.log("Login exitoso, guardando tokens...");
-      
-      // Guardar datos en localStorage
-      localStorage.setItem('accessToken', data.accessToken);
-      localStorage.setItem('refreshToken', data.refreshToken);
-      localStorage.setItem('idToken', data.idToken);
-      
-      // Guardar usuario en el store
-      if (login) {
-        await login({ email, password });
-      }
-      
-      console.log("Intentando establecer cookie y redireccionar...");
-      
-      // Establecer cookie para que el middleware pueda detectarla
-      document.cookie = `accessToken=${data.accessToken}; path=/; max-age=3600`;
-      
-      // Forzar redirección a la página de admin
-      window.location.href = '/admin';
-    } catch (err: any) {
-      setError(err.message || 'Error al iniciar sesión');
-      console.error('Error de login:', err);
-    } finally {
-      setIsLoading(false);
+  e.preventDefault();
+  setIsLoading(true);
+  setError(null);
+
+  try {
+    // Guardar el email para refresh token
+    localStorage.setItem('userEmail', email);
+    
+    const response = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, password })
+    });
+    
+    const data = await response.json();
+    
+    if (!response.ok) {
+      throw new Error(data.error || 'Error en la autenticación');
     }
-  };
+    
+    console.log("Login exitoso, guardando tokens...");
+    
+    // Guardar datos en localStorage
+    localStorage.setItem('accessToken', data.accessToken);
+    localStorage.setItem('refreshToken', data.refreshToken);
+    localStorage.setItem('idToken', data.idToken);
+    
+    // Guardar usuario en el store
+    if (login) {
+      await login({ email, password });
+    }
+    
+    console.log("Intentando establecer cookie y redireccionar...");
+    
+    // Establecer cookie para que el middleware pueda detectarla
+    document.cookie = `accessToken=${data.accessToken}; path=/; max-age=3600`;
+    
+    // Redirección según el rol del usuario
+    const role = data.user.roleId;
+    let redirectPath = '/admin'; // Por defecto
+
+    // Determinar la ruta según el rol (podría ser por roleId o por el nombre del rol)
+    if (role === 'role-fabrica' || (data.user.role && data.user.role.name === 'fabrica')) {
+      redirectPath = '/fabrica';
+    } else if (role === 'role-vendedor' || (data.user.role && data.user.role.name === 'vendedor')) {
+      redirectPath = '/pdv';
+    }
+    
+    // Forzar redirección a la página correspondiente
+    window.location.href = redirectPath;
+  } catch (err: any) {
+    setError(err.message || 'Error al iniciar sesión');
+    console.error('Error de login:', err);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">

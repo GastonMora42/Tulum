@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Book, Plus, Search, Filter, RefreshCw } from 'lucide-react';
+import { authenticatedFetch } from '@/hooks/useAuth';
 
 interface Receta {
   id: string;
@@ -58,7 +59,8 @@ export default function RecetasPage() {
       params.append('limit', '10');
       if (search) params.append('search', search);
       
-      const response = await fetch(`/api/admin/recetas?${params.toString()}`);
+      // Reemplaza fetch con authenticatedFetch
+      const response = await authenticatedFetch(`/api/admin/recetas?${params.toString()}`);
       
       if (!response.ok) {
         throw new Error('Error al cargar recetas');

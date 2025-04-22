@@ -65,82 +65,49 @@ export default function NuevaProduccionPage() {
   
   const recetaId = watch('recetaId');
   const cantidad = watch('cantidad');
-  
-  // Cargar recetas
-  useEffect(() => {
-    const fetchRecetas = async () => {
-      try {
-        setIsLoading(true);
-        
-        // Simulamos datos para desarrollo
-        await new Promise(resolve => setTimeout(resolve, 800));
-        
-        const mockRecetas: Receta[] = [
-          {
-            id: '1',
-            nombre: 'Aceite esencial de lavanda',
-            rendimiento: 10,
-            items: [
-              {
-                id: 'ri1',
-                insumoId: 'i1',
-                insumo: { nombre: 'Flores de lavanda', unidadMedida: 'kg' },
-                cantidad: 2
-              },
-              {
-                id: 'ri2',
-                insumoId: 'i2',
-                insumo: { nombre: 'Aceite base', unidadMedida: 'litro' },
-                cantidad: 0.5
-              }
-            ]
-          },
-          {
-            id: '2',
-            nombre: 'Vela aromática de vainilla',
-            rendimiento: 5,
-            items: [
-              {
-                id: 'ri3',
-                insumoId: 'i3',
-                insumo: { nombre: 'Cera de soja', unidadMedida: 'kg' },
-                cantidad: 1
-              },
-              {
-                id: 'ri4',
-                insumoId: 'i4',
-                insumo: { nombre: 'Esencia de vainilla', unidadMedida: 'ml' },
-                cantidad: 20
-              }
-            ]
-          }
-        ];
-        
-        setRecetas(mockRecetas);
-        
-        // Si hay recetaId en la URL, seleccionarla
-        const initialRecetaId = searchParams.get('recetaId');
-        if (initialRecetaId) {
-          const receta = mockRecetas.find(r => r.id === initialRecetaId);
-          if (receta) {
-            setSelectedReceta(receta);
-            setValue('recetaId', receta.id);
-            
-            // Cargar stock de insumos para esta receta
-            await fetchInsumosStock(receta.id);
+
+useEffect(() => {
+  const fetchData = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Usar la API de inicialización
+      const response = await fetch(`/api/fabrica/produccion/init${
+        searchParams.get('recetaId') ? `?recetaId=${searchParams.get('recetaId')}` : ''
+      }`);
+      
+      if (!response.ok) {
+        throw new Error('Error al cargar datos iniciales');
+      }
+      
+      const data = await response.json();
+      setRecetas(data.recetas || []);
+      
+      // Si hay recetaId y datos de stock
+      const initialRecetaId = searchParams.get('recetaId');
+      if (initialRecetaId) {
+        const receta = data.recetas.find((r: { id: string; }) => r.id === initialRecetaId);
+        if (receta) {
+          setSelectedReceta(receta);
+          setValue('recetaId', receta.id);
+          
+          // Usar los datos de stock ya incluidos en la respuesta
+          if (data.stockInsumos) {
+            setInsumosStock(data.stockInsumos);
           }
         }
-      } catch (err) {
-        console.error('Error al cargar recetas:', err);
-        setError('No se pudieron cargar las recetas');
-      } finally {
-        setIsLoading(false);
       }
-    };
+    } catch (err) {
+      console.error('Error:', err);
+      setError('Error al cargar datos iniciales');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    fetchRecetas();
-  }, [searchParams, setValue]);
-  
+  fetchData();
+}, [searchParams, setValue]);
+
   // Cargar stock de insumos cuando cambia la receta
   useEffect(() => {
     if (recetaId) {
@@ -156,22 +123,29 @@ export default function NuevaProduccionPage() {
   // Función para cargar stock de insumos
   const fetchInsumosStock = async (recetaId: string) => {
     try {
-      // Simulamos datos para desarrollo
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
       const receta = recetas.find(r => r.id === recetaId);
       if (!receta) return;
       
-      // Simular stock de insumos
-      const mockStock: InsumoStock[] = receta.items.map(item => ({
-        insumoId: item.insumoId,
-        nombre: item.insumo.nombre,
-        unidadMedida: item.insumo.unidadMedida,
-        // Simular valores aleatorios de stock
-        cantidad: Math.floor(Math.random() * 10) + 1
-      }));
+      // Obtener stock actual de cada insumo de la receta
+      const stockPromises = receta.items.map(async (item) => {
+        const response = await fetch(`/api/stock?insumoId=${item.insumoId}&ubicacionId=ubicacion-fabrica`);
+        if (!response.ok) {
+          throw new Error(`Error al obtener stock para insumo ${item.insumoId}`);
+        }
+        
+        const stockData = await response.json();
+        const stock = stockData[0] || { cantidad: 0 };
+        
+        return {
+          insumoId: item.insumoId,
+          nombre: item.insumo.nombre,
+          unidadMedida: item.insumo.unidadMedida,
+          cantidad: stock.cantidad
+        };
+      });
       
-      setInsumosStock(mockStock);
+      const stockResults = await Promise.all(stockPromises);
+      setInsumosStock(stockResults);
     } catch (err) {
       console.error('Error al cargar stock de insumos:', err);
     }
@@ -195,32 +169,49 @@ export default function NuevaProduccionPage() {
     return true;
   };
   
-  const onSubmit = async (data: ProduccionFormData) => {
-    // Verificar stock suficiente
-    if (!verificarStock()) {
-      setError('No hay suficiente stock de insumos para esta producción');
-      return;
+// src/app/(fabrica)/produccion/nueva/page.tsx (Modificaciones)
+
+// En la función onSubmit, reemplazar con:
+const onSubmit = async (data: ProduccionFormData) => {
+  // Verificar stock suficiente
+  if (!verificarStock()) {
+    setError('No hay suficiente stock de insumos para esta producción');
+    return;
+  }
+  
+  try {
+    setIsSaving(true);
+    setError(null);
+    
+    // Enviar datos a la API real
+    const response = await fetch('/api/fabrica/produccion', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        recetaId: data.recetaId,
+        cantidad: data.cantidad,
+        ubicacionId: 'ubicacion-fabrica', // En un caso real, obtener del contexto o selección
+        observaciones: data.observaciones
+      })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Error al crear producción');
     }
     
-    try {
-      setIsSaving(true);
-      setError(null);
-      
-      console.log('Datos de producción:', data);
-      
-      // Simular guardado exitoso
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Redireccionar a lista de producciones
-      router.push('/fabrica/produccion');
-    } catch (err) {
-      console.error('Error al crear producción:', err);
-      setError('Error al crear la producción');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-  
+    // Redireccionar a lista de producciones
+    router.push('/fabrica/produccion');
+  } catch (err: any) {
+    console.error('Error al crear producción:', err);
+    setError(err.message || 'Error al crear la producción');
+  } finally {
+    setIsSaving(false);
+  }
+};
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">

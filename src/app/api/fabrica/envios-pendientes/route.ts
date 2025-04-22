@@ -9,8 +9,8 @@ export async function GET(req: NextRequest) {
   const authError = await authMiddleware(req);
   if (authError) return authError;
   
-  // Verificar permiso
-  const permissionError = await checkPermission('fabrica:ver-envios')(req);
+  // Cambiar el permiso requerido a uno que tengan los usuarios de fábrica
+  const permissionError = await checkPermission('stock:ver')(req);
   if (permissionError) return permissionError;
   
   try {

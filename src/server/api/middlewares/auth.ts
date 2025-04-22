@@ -1,49 +1,72 @@
 // src/server/api/middlewares/auth.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { authService } from '@/server/services/auth/authService';
+import prisma, { reconnectPrisma } from '@/server/db/client';
 
 export async function authMiddleware(req: NextRequest) {
-  // Excluir rutas públicas
-  if (req.nextUrl.pathname.startsWith('/api/auth/login') || 
-      req.nextUrl.pathname.startsWith('/api/auth/refresh')) {
-    return null; // Sin error, continuar
-  }
-  
-  // Obtener token de la cabecera
-  const authHeader = req.headers.get('authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return NextResponse.json(
-      { error: 'Token no proporcionado' },
-      { status: 401 }
-    );
-  }
-  
-  const token = authHeader.split(' ')[1];
-  
   try {
-    // Verificar token
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    const userId = payload.sub;
+    // Excluir rutas públicas
+    if (req.nextUrl.pathname.startsWith('/api/auth/login') || 
+        req.nextUrl.pathname.startsWith('/api/auth/refresh')) {
+      return null; // Sin error, continuar
+    }
     
-    // Obtener usuario de nuestra BD
-    const user = await authService.getUserById(userId);
-    if (!user) {
+    // Obtener token de la cabecera
+    const authHeader = req.headers.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return NextResponse.json(
-        { error: 'Usuario no encontrado' },
+        { error: 'Token no proporcionado' },
         { status: 401 }
       );
     }
     
-    // Adjuntar usuario a la request para uso posterior
-    (req as any).user = user;
+    const token = authHeader.split(' ')[1];
     
-    // No usamos NextResponse.next(), solo retornamos null para indicar que no hay error
-    return null;
+    try {
+      // Verificar token
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const userId = payload.sub;
+      
+      // Intentar obtener usuario
+      let user;
+      try {
+        // Obtener usuario de nuestra BD
+        user = await authService.getUserById(userId);
+      } catch (dbError) {
+        console.error('Error en base de datos:', dbError);
+        
+        // Intentar reconectar y volver a intentar una vez
+        if (await reconnectPrisma()) {
+          // Reintentar obtener el usuario
+          user = await authService.getUserById(userId);
+        } else {
+          throw new Error('Error de conexión a base de datos persistente');
+        }
+      }
+      
+      if (!user) {
+        return NextResponse.json(
+          { error: 'Usuario no encontrado' },
+          { status: 401 }
+        );
+      }
+      
+      // Adjuntar usuario a la request para uso posterior
+      (req as any).user = user;
+      
+      return null;
+    } catch (error) {
+      console.error('Error al verificar token:', error);
+      return NextResponse.json(
+        { error: 'Token inválido o error en base de datos' },
+        { status: 401 }
+      );
+    }
   } catch (error) {
-    console.error('Error al verificar token:', error);
+    console.error('Error general en middleware de autenticación:', error);
     return NextResponse.json(
-      { error: 'Token inválido' },
-      { status: 401 }
+      { error: 'Error interno del servidor' },
+      { status: 500 }
     );
   }
 }
