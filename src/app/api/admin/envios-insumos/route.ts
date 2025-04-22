@@ -5,8 +5,8 @@ import { authMiddleware } from '@/server/api/middlewares/auth';
 import { checkPermission } from '@/server/api/middlewares/authorization';
 import { z } from 'zod';
 
-// Esquema de validación para crear envío
-const envioInsumoSchema = z.object({
+// Esquema de validación para crear envío de insumos
+const solicitudSchema = z.object({
   origenId: z.string({ required_error: 'El origen es requerido' }),
   destinoId: z.string({ required_error: 'El destino es requerido' }),
   observaciones: z.string().optional(),
@@ -22,7 +22,11 @@ export async function GET(req: NextRequest) {
   // Aplicar middleware de autenticación
   const authError = await authMiddleware(req);
   if (authError) return authError;
-
+  
+  // Verificar permiso
+  const permissionError = await checkPermission('stock:ver')(req);
+  if (permissionError) return permissionError;
+  
   try {
     const { searchParams } = new URL(req.url);
     
@@ -32,14 +36,7 @@ export async function GET(req: NextRequest) {
     const destinoId = searchParams.get('destinoId');
     
     // Construir filtro
-    const where: any = {
-      // Filtramos solo los envíos de tipo insumo
-      items: {
-        some: {
-          insumoId: { not: null }
-        }
-      }
-    };
+    const where: any = {};
     
     if (estado) {
       where.estado = estado;
@@ -52,6 +49,14 @@ export async function GET(req: NextRequest) {
     if (destinoId) {
       where.destinoId = destinoId;
     }
+    
+    // Filtrar para solo obtener envíos de insumos
+    where.items = {
+      some: {
+        insumoId: { not: null },
+        productoId: null
+      }
+    };
     
     // Obtener envíos
     const envios = await prisma.envio.findMany({
@@ -93,14 +98,14 @@ export async function POST(req: NextRequest) {
   if (authError) return authError;
   
   // Verificar permiso
-  const permissionError = await checkPermission('envio:crear')(req);
+  const permissionError = await checkPermission('fabrica:solicitar-insumos')(req);
   if (permissionError) return permissionError;
   
   try {
     const body = await req.json();
     
     // Validar datos de entrada
-    const validation = envioInsumoSchema.safeParse(body);
+    const validation = solicitudSchema.safeParse(body);
     if (!validation.success) {
       return NextResponse.json(
         { error: 'Datos de entrada inválidos', details: validation.error.errors },
@@ -133,45 +138,10 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    // Verificar que el destino sea de tipo fábrica
-    if (destino.tipo !== 'fabrica') {
-      return NextResponse.json(
-        { error: 'El destino debe ser una fábrica' },
-        { status: 400 }
-      );
-    }
-    
     // Obtener usuario de la request
     const user = (req as any).user;
     
-    // Verificar stock disponible en origen para cada insumo
-    for (const item of items) {
-      const stockInsumo = await prisma.stock.findFirst({
-        where: {
-          insumoId: item.insumoId,
-          ubicacionId: origenId
-        }
-      });
-      
-      // Si no hay stock o es insuficiente
-      if (!stockInsumo || stockInsumo.cantidad < item.cantidad) {
-        const insumo = await prisma.insumo.findUnique({
-          where: { id: item.insumoId }
-        });
-        
-        const nombreInsumo = insumo ? insumo.nombre : item.insumoId;
-        const stockActual = stockInsumo ? stockInsumo.cantidad : 0;
-        
-        return NextResponse.json(
-          { 
-            error: `Stock insuficiente para ${nombreInsumo}. Disponible: ${stockActual}, Solicitado: ${item.cantidad}` 
-          },
-          { status: 400 }
-        );
-      }
-    }
-    
-    // Crear envío y actualizar stock en una transacción
+    // Crear envío en transacción
     const resultado = await prisma.$transaction(async (tx) => {
       // 1. Crear el envío
       const envio = await tx.envio.create({
@@ -180,8 +150,7 @@ export async function POST(req: NextRequest) {
           destinoId,
           estado: 'pendiente',
           fechaCreacion: new Date(),
-          usuarioId: user.id,
-          // Aquí podríamos agregar un campo tipo para diferenciar envíos de productos e insumos
+          usuarioId: user.id
         }
       });
       
@@ -192,45 +161,12 @@ export async function POST(req: NextRequest) {
           data: {
             envioId: envio.id,
             cantidad: item.cantidad,
-            insumoId: item.insumoId, // Agregamos esta relación al modelo
-            // El campo productoId quedará null
+            insumoId: item.insumoId
           }
         });
-        
-        // 3. Descontar del stock de origen
-        const stockOrigen = await tx.stock.findFirst({
-          where: {
-            insumoId: item.insumoId,
-            ubicacionId: origenId
-          }
-        });
-        
-        if (stockOrigen) {
-          await tx.stock.update({
-            where: { id: stockOrigen.id },
-            data: {
-              cantidad: stockOrigen.cantidad - item.cantidad,
-              ultimaActualizacion: new Date(),
-              version: { increment: 1 }
-            }
-          });
-          
-          // 4. Registrar el movimiento de stock
-          await tx.movimientoStock.create({
-            data: {
-              stockId: stockOrigen.id,
-              tipoMovimiento: 'salida',
-              cantidad: item.cantidad,
-              motivo: `Envío #${envio.id} a ${destino.nombre}`,
-              usuarioId: user.id,
-              envioId: envio.id,
-              fecha: new Date()
-            }
-          });
-        }
       }
       
-      // 5. Retornar el envío creado con sus relaciones
+      // 3. Retornar el envío creado con sus relaciones
       return tx.envio.findUnique({
         where: { id: envio.id },
         include: {
@@ -248,9 +184,9 @@ export async function POST(req: NextRequest) {
     
     return NextResponse.json(resultado, { status: 201 });
   } catch (error: any) {
-    console.error('Error al crear envío de insumos:', error);
+    console.error('Error al crear solicitud de insumos:', error);
     return NextResponse.json(
-      { error: error.message || 'Error al crear envío de insumos' },
+      { error: error.message || 'Error al crear solicitud de insumos' },
       { status: 500 }
     );
   }

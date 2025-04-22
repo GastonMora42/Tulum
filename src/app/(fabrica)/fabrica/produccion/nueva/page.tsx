@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { authenticatedFetch } from '@/hooks/useAuth';
 
 interface Receta {
   id: string;
@@ -71,8 +72,8 @@ useEffect(() => {
     try {
       setIsLoading(true);
       
-      // Usar la API de inicialización
-      const response = await fetch(`/api/fabrica/produccion/init${
+      // Reemplazar fetch con authenticatedFetch
+      const response = await authenticatedFetch(`/api/fabrica/produccion/init${
         searchParams.get('recetaId') ? `?recetaId=${searchParams.get('recetaId')}` : ''
       }`);
       
@@ -126,9 +127,10 @@ useEffect(() => {
       const receta = recetas.find(r => r.id === recetaId);
       if (!receta) return;
       
-      // Obtener stock actual de cada insumo de la receta
-      const stockPromises = receta.items.map(async (item) => {
-        const response = await fetch(`/api/stock?insumoId=${item.insumoId}&ubicacionId=ubicacion-fabrica`);
+    const stockPromises = receta.items.map(async (item) => {
+        // Reemplazar fetch con authenticatedFetch
+        const response = await authenticatedFetch(`/api/stock?insumoId=${item.insumoId}&ubicacionId=ubicacion-fabrica`);
+        
         if (!response.ok) {
           throw new Error(`Error al obtener stock para insumo ${item.insumoId}`);
         }
@@ -169,8 +171,6 @@ useEffect(() => {
     return true;
   };
   
-// src/app/(fabrica)/produccion/nueva/page.tsx (Modificaciones)
-
 // En la función onSubmit, reemplazar con:
 const onSubmit = async (data: ProduccionFormData) => {
   // Verificar stock suficiente
@@ -183,19 +183,15 @@ const onSubmit = async (data: ProduccionFormData) => {
     setIsSaving(true);
     setError(null);
     
-    // Enviar datos a la API real
-    const response = await fetch('/api/fabrica/produccion', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        recetaId: data.recetaId,
-        cantidad: data.cantidad,
-        ubicacionId: 'ubicacion-fabrica', // En un caso real, obtener del contexto o selección
-        observaciones: data.observaciones
-      })
-    });
+    const response = await authenticatedFetch('/api/fabrica/produccion', {
+        method: 'POST',
+        body: JSON.stringify({
+          recetaId: data.recetaId,
+          cantidad: data.cantidad,
+          ubicacionId: 'ubicacion-fabrica',
+          observaciones: data.observaciones
+        })
+      });
     
     if (!response.ok) {
       const errorData = await response.json();

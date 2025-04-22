@@ -1,10 +1,14 @@
 {
-  "/api/auth/login/route": "app/api/auth/login/route.js",
-  "/api/auth/me/route": "app/api/auth/me/route.js",
+  "/api/admin/insumos/route": "app/api/admin/insumos/route.js",
+  "/api/productos/route": "app/api/productos/route.js",
+  "/api/stock/route": "app/api/stock/route.js",
+  "/api/admin/envios-insumos/route": "app/api/admin/envios-insumos/route.js",
   "/api/fabrica/produccion/route": "app/api/fabrica/produccion/route.js",
   "/api/fabrica/produccion/init/route": "app/api/fabrica/produccion/init/route.js",
-  "/(auth)/login/page": "app/(auth)/login/page.js",
   "/(fabrica)/fabrica/page": "app/(fabrica)/fabrica/page.js",
   "/(fabrica)/fabrica/produccion/page": "app/(fabrica)/fabrica/produccion/page.js",
-  "/(fabrica)/fabrica/produccion/nueva/page": "app/(fabrica)/fabrica/produccion/nueva/page.js"
+  "/(fabrica)/fabrica/produccion/nueva/page": "app/(fabrica)/fabrica/produccion/nueva/page.js",
+  "/(fabrica)/fabrica/stock/ajuste/page": "app/(fabrica)/fabrica/stock/ajuste/page.js",
+  "/(fabrica)/fabrica/stock/page": "app/(fabrica)/fabrica/stock/page.js",
+  "/(fabrica)/fabrica/stock/solicitud/page": "app/(fabrica)/fabrica/stock/solicitud/page.js"
 }
