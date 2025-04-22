@@ -12,9 +12,9 @@ const updateProduccionSchema = z.object({
 });
 
 export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: Promise<string> } }
-) {
+    request: NextRequest,
+    { params }: { params: { id: string } }
+  ) {
   // Primero realizar la autenticación antes de usar params
   const authError = await authMiddleware(request);
   if (authError) return authError;
@@ -24,8 +24,7 @@ export async function GET(
   if (permissionError) return permissionError;
   
   // Esperar a que el ID se resuelva
-  const id = await params.id;
-  
+  const id = params.id;
   try {
     // Verificar si el ID es válido (evitar problemas con "nueva" o "init")
     if (id === 'nueva' || id === 'init') {
@@ -79,9 +78,9 @@ export async function GET(
 }
 
 export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { id: Promise<string> } }
-) {
+    request: NextRequest,
+    { params }: { params: { id: string } }
+  ) {
   // Primero realizar la autenticación antes de usar params
   const authError = await authMiddleware(request);
   if (authError) return authError;
@@ -91,8 +90,7 @@ export async function PATCH(
   if (permissionError) return permissionError;
   
   // Esperar a que el ID se resuelva
-  const id = await params.id;
-  
+  const id = params.id;
   try {
     // Obtener el cuerpo de la solicitud
     const body = await request.json();
@@ -156,9 +154,9 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: Promise<string> } }
-) {
+    request: NextRequest,
+    { params }: { params: { id: string } }
+  ) {
   // Primero realizar la autenticación antes de usar params
   const authError = await authMiddleware(request);
   if (authError) return authError;
@@ -168,8 +166,7 @@ export async function DELETE(
   if (permissionError) return permissionError;
   
   // Esperar a que el ID se resuelva
-  const id = await params.id;
-  
+  const id = params.id;
   try {
     // Verificar que la producción existe
     const existingProduccion = await prisma.production.findUnique({

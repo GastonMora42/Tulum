@@ -1,7 +1,10 @@
 {
-  "/api/fabrica/produccion/[id]/route": "app/api/fabrica/produccion/[id]/route.js",
+  "/api/auth/login/route": "app/api/auth/login/route.js",
+  "/api/auth/me/route": "app/api/auth/me/route.js",
+  "/api/fabrica/produccion/route": "app/api/fabrica/produccion/route.js",
+  "/api/fabrica/produccion/init/route": "app/api/fabrica/produccion/init/route.js",
   "/(auth)/login/page": "app/(auth)/login/page.js",
   "/(fabrica)/fabrica/page": "app/(fabrica)/fabrica/page.js",
   "/(fabrica)/fabrica/produccion/page": "app/(fabrica)/fabrica/produccion/page.js",
-  "/(fabrica)/fabrica/produccion/[id]/page": "app/(fabrica)/fabrica/produccion/[id]/page.js"
+  "/(fabrica)/fabrica/produccion/nueva/page": "app/(fabrica)/fabrica/produccion/nueva/page.js"
 }

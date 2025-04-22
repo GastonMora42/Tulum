@@ -6,6 +6,11 @@
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
     ],
+    "/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/page.js"
+    ],
     "/(auth)/login/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
@@ -46,15 +51,15 @@
       "static/chunks/main-app.js",
       "static/chunks/app/api/fabrica/produccion/route.js"
     ],
-    "/(fabrica)/fabrica/produccion/[id]/page": [
+    "/(fabrica)/fabrica/produccion/nueva/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(fabrica)/fabrica/produccion/[id]/page.js"
+      "static/chunks/app/(fabrica)/fabrica/produccion/nueva/page.js"
     ],
-    "/api/fabrica/produccion/[id]/route": [
+    "/api/fabrica/produccion/init/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/fabrica/produccion/[id]/route.js"
+      "static/chunks/app/api/fabrica/produccion/init/route.js"
     ]
   }
 }
