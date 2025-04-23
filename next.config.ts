@@ -1,21 +1,26 @@
-import { withPWA } from 'next-pwa'
+import pwa from 'next-pwa'
 import type { NextConfig } from 'next'
 
+// Configuración de next-pwa (>= v5.6.0)
+const withPWA = pwa({
+  dest: 'public',
+  // auto disable en desarrollo
+  disable: process.env.NODE_ENV === 'development',
+  register: true,
+  skipWaiting: true,
+})
+
 const nextConfig: NextConfig = {
-  // Disable build errors from ESLint and TypeScript to allow production deploy
+  // Ignorar errores de ESLint en build
   eslint: {
     ignoreDuringBuilds: true,
   },
+  // Ignorar errores de TypeScript en build
   typescript: {
     ignoreBuildErrors: true,
   },
-  // If you need PWA support, configure here
-  pwa: {
-    dest: 'public',
-    // disable for development
-    disable: process.env.NODE_ENV === 'development',
-  },
+  // aquí van otras opciones de Next.js si las necesitas...
 }
 
-// Wrap with PWA plugin if used
+// @ts-ignore
 export default withPWA(nextConfig)
