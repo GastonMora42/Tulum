@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { authenticatedFetch } from '@/hooks/useAuth';
 
 // Interfaces
 interface Produccion {
@@ -67,81 +68,82 @@ export default function NuevaContingenciaFabricaPage() {
         setIsFetchingData(true);
         
         // Cargar producciones recientes
-        const prodResponse = await fetch('/api/fabrica/produccion?estados=en_proceso,con_contingencia&limit=10');
+        const prodResponse = await authenticatedFetch('/api/fabrica/produccion?estados=en_proceso,con_contingencia&limit=10');
         if (!prodResponse.ok) throw new Error('Error al cargar producciones');
         const prodData = await prodResponse.json();
-        setProducciones(prodData);
+        
+        console.log('Producciones cargadas:', prodData);
+        setProducciones(prodData.filter((p: { id: any; }) => p && p.id) || []);
         
         // Cargar envíos recientes
-        const enviosResponse = await fetch('/api/fabrica/envios?estados=pendiente,en_transito,con_contingencia&limit=10');
+        const enviosResponse = await authenticatedFetch('/api/fabrica/envios?estados=pendiente,en_transito,con_contingencia&limit=10');
         if (!enviosResponse.ok) throw new Error('Error al cargar envíos');
         const enviosData = await enviosResponse.json();
-        setEnvios(enviosData);
+        
+        console.log('Envíos cargados:', enviosData);
+        setEnvios(enviosData.filter((e: { id: any; }) => e && e.id) || []);
       } catch (err) {
         console.error('Error:', err);
       } finally {
         setIsFetchingData(false);
       }
     };
-
+  
     fetchData();
   }, []);
   
-  const onSubmit = async (data: ContingenciaFormData) => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      // Añadir origen 'fabrica' automáticamente
-      const payload = {
-        ...data,
-        origen: 'fabrica'
-      };
-      
-      const response = await fetch('/api/contingencias', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al crear contingencia');
-      }
-      
-      // Si hay producción o envío relacionado, actualizar su estado
-      if (data.produccionId) {
-        await fetch(`/api/fabrica/produccion/${data.produccionId}/estado`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ estado: 'con_contingencia' })
-        });
-      }
-      
-      if (data.envioId) {
-        await fetch(`/api/fabrica/envios/${data.envioId}/estado`, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ estado: 'con_contingencia' })
-        });
-      }
-      
-      // Redirigir a la lista de contingencias
-      router.push('/fabrica/contingencias');
-      router.refresh();
-    } catch (err: any) {
-      console.error('Error:', err);
-      setError(err.message || 'Error al crear contingencia');
-    } finally {
-      setIsLoading(false);
+
+const onSubmit = async (data: ContingenciaFormData) => {
+  try {
+    setIsLoading(true);
+    setError(null);
+    
+    // Limpiar datos vacíos para evitar errores de clave foránea
+    const payload = {
+      ...data,
+      origen: 'fabrica',
+      // Asegurarse de que los valores vacíos sean null, no strings vacíos
+      produccionId: data.produccionId || null,
+      envioId: data.envioId || null
+    };
+    
+    console.log('Enviando contingencia:', payload);
+    
+    const response = await authenticatedFetch('/api/contingencias', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Error al crear contingencia');
     }
-  };
+    
+    // Si hay producción o envío relacionado, actualizar su estado
+    if (data.produccionId) {
+      await authenticatedFetch(`/api/fabrica/produccion/${data.produccionId}/estado`, {
+        method: 'PATCH',
+        body: JSON.stringify({ estado: 'con_contingencia' })
+      });
+    }
+    
+    if (data.envioId) {
+      await authenticatedFetch(`/api/fabrica/envios/${data.envioId}/estado`, {
+        method: 'PATCH',
+        body: JSON.stringify({ estado: 'con_contingencia' })
+      });
+    }
+    
+    // Redirigir a la lista de contingencias
+    router.push('/fabrica/contingencias');
+    router.refresh();
+  } catch (err: any) {
+    console.error('Error:', err);
+    setError(err.message || 'Error al crear contingencia');
+  } finally {
+    setIsLoading(false);
+  }
+};
   
   return (
     <div className="space-y-6">

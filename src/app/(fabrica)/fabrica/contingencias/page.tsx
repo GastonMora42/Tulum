@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { useAuthStore } from '@/stores/authStore';
+import { authenticatedFetch } from '@/hooks/useAuth';
 
 interface Contingencia {
   id: string;
@@ -30,14 +31,15 @@ export default function ContingenciasFabricaPage() {
       try {
         setIsLoading(true);
         
-        // Obtener contingencias de fábrica o creadas por el usuario actual
-        const response = await fetch(`/api/contingencias?origen=fabrica&creadoPor=${user?.id || ''}`);
+        // Obtener contingencias con origen 'fabrica'
+        const response = await authenticatedFetch(`/api/contingencias?origen=fabrica`);
         
         if (!response.ok) {
           throw new Error('Error al cargar contingencias');
         }
         
         const data = await response.json();
+        console.log("Contingencias cargadas:", data.length);
         setContingencias(data);
       } catch (err) {
         console.error('Error:', err);
@@ -46,9 +48,9 @@ export default function ContingenciasFabricaPage() {
         setIsLoading(false);
       }
     };
-
+  
     fetchContingencias();
-  }, [user]);
+  }, []);
 
   const getEstadoBadge = (estado: string) => {
     switch (estado) {
@@ -100,44 +102,29 @@ export default function ContingenciasFabricaPage() {
               <p className="text-lg text-gray-500">No hay contingencias que mostrar</p>
             </div>
           ) : (
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                  >
-                    Título
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                  >
-                    Estado
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                  >
-                    Fecha
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                  >
-                    Relacionado
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"
-                  >
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {contingencias.map((contingencia) => (
-                  <tr key={contingencia.id}>
+<table className="min-w-full divide-y divide-gray-200">
+  <thead className="bg-gray-50">
+    <tr>
+      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+        Título
+      </th>
+      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+        Estado
+      </th>
+      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+        Fecha
+      </th>
+      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+        Relacionado
+      </th>
+      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+        Ver
+      </th>
+    </tr>
+  </thead>
+  <tbody className="bg-white divide-y divide-gray-200">
+    {contingencias.map((contingencia) => (
+      <tr key={contingencia.id}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{contingencia.titulo}</div>
                     </td>
@@ -165,17 +152,17 @@ export default function ContingenciasFabricaPage() {
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <Link 
-                        href={`/fabrica/contingencias/${contingencia.id}`}
-                        className="text-purple-600 hover:text-purple-900"
-                      >
-                        Ver detalles
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <Link 
+            href={`/fabrica/contingencias/${contingencia.id}`}
+            className="text-purple-600 hover:text-purple-900"
+          >
+            Ver detalles
+          </Link>
+        </td>
+      </tr>
+    ))}
+  </tbody>
+</table>
           )}
         </div>
       </div>

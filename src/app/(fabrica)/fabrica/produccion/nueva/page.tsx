@@ -1,4 +1,4 @@
-// src/app/(fabrica)/produccion/nueva/page.tsx
+// src/app/(fabrica)/fabrica/produccion/nueva/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -121,37 +121,41 @@ useEffect(() => {
     }
   }, [recetaId, recetas]);
   
-  // Función para cargar stock de insumos
-  const fetchInsumosStock = async (recetaId: string) => {
-    try {
-      const receta = recetas.find(r => r.id === recetaId);
-      if (!receta) return;
-      
+
+const fetchInsumosStock = async (recetaId: string) => {
+  try {
+    const receta = recetas.find(r => r.id === recetaId);
+    if (!receta) return;
+    
     const stockPromises = receta.items.map(async (item) => {
-        // Reemplazar fetch con authenticatedFetch
-        const response = await authenticatedFetch(`/api/stock?insumoId=${item.insumoId}&ubicacionId=ubicacion-fabrica`);
-        
-        if (!response.ok) {
-          throw new Error(`Error al obtener stock para insumo ${item.insumoId}`);
-        }
-        
-        const stockData = await response.json();
-        const stock = stockData[0] || { cantidad: 0 };
-        
-        return {
-          insumoId: item.insumoId,
-          nombre: item.insumo.nombre,
-          unidadMedida: item.insumo.unidadMedida,
-          cantidad: stock.cantidad
-        };
-      });
+      console.log(`Consultando stock para insumo: ${item.insumoId}`);
+      const response = await authenticatedFetch(`/api/stock?insumoId=${item.insumoId}&ubicacionId=ubicacion-fabrica`);
       
-      const stockResults = await Promise.all(stockPromises);
-      setInsumosStock(stockResults);
-    } catch (err) {
-      console.error('Error al cargar stock de insumos:', err);
-    }
-  };
+      if (!response.ok) {
+        throw new Error(`Error al obtener stock para insumo ${item.insumoId}`);
+      }
+      
+      const stockData = await response.json();
+      console.log(`Respuesta de stock para ${item.insumoId}:`, stockData);
+      
+      // Asegurar que tomamos el stock real
+      const stock = stockData[0] || { cantidad: 0 };
+      
+      return {
+        insumoId: item.insumoId,
+        nombre: item.insumo.nombre,
+        unidadMedida: item.insumo.unidadMedida,
+        cantidad: stock.cantidad
+      };
+    });
+    
+    const stockResults = await Promise.all(stockPromises);
+    console.log("Stock de insumos obtenido:", stockResults);
+    setInsumosStock(stockResults);
+  } catch (err) {
+    console.error('Error al cargar stock de insumos:', err);
+  }
+};
   
   // Verificar si hay suficiente stock para producir
   const verificarStock = () => {

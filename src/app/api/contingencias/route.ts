@@ -9,8 +9,8 @@ const crearContingenciaSchema = z.object({
   titulo: z.string().min(5, { message: 'El título debe tener al menos 5 caracteres' }),
   descripcion: z.string().min(10, { message: 'La descripción debe tener al menos 10 caracteres' }),
   origen: z.enum(['fabrica', 'sucursal', 'oficina']),
-  produccionId: z.string().optional(),
-  envioId: z.string().optional()
+  produccionId: z.string().nullable().optional(),
+  envioId: z.string().nullable().optional()
 });
 
 export async function GET(req: NextRequest) {
@@ -57,8 +57,17 @@ export async function POST(req: NextRequest) {
     const user = (req as any).user;
     const body = await req.json();
     
+    // Limpiar datos
+    const datosLimpios = {
+      ...body,
+      produccionId: body.produccionId || null,
+      envioId: body.envioId || null
+    };
+    
+    console.log("Datos recibidos en API para crear contingencia:", datosLimpios);
+    
     // Validar datos
-    const validation = crearContingenciaSchema.safeParse(body);
+    const validation = crearContingenciaSchema.safeParse(datosLimpios);
     if (!validation.success) {
       return NextResponse.json(
         { error: 'Datos inválidos', details: validation.error.errors },
@@ -66,12 +75,21 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    const contingencia = await contingenciaService.crearContingencia({
-      ...validation.data,
-      creadoPor: user.id
-    });
-    
-    return NextResponse.json(contingencia, { status: 201 });
+    try {
+      const contingencia = await contingenciaService.crearContingencia({
+        ...validation.data,
+        creadoPor: user.id
+      });
+      
+      return NextResponse.json(contingencia, { status: 201 });
+    } catch (serviceError: any) {
+      console.error('Error específico del servicio:', serviceError);
+      
+      return NextResponse.json(
+        { error: serviceError.message || 'Error al procesar la contingencia' },
+        { status: 400 }
+      );
+    }
   } catch (error) {
     console.error('Error al crear contingencia:', error);
     return NextResponse.json(

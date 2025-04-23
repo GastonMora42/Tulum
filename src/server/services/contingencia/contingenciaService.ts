@@ -4,23 +4,56 @@ import prisma from '@/server/db/client';
 import { Contingencia } from '@prisma/client';
 
 export class ContingenciaService {
-  async crearContingencia(datos: {
-    titulo: string;
-    descripcion: string;
-    origen: string;
-    produccionId?: string;
-    envioId?: string;
-    creadoPor: string;
-  }): Promise<Contingencia> {
-    return prisma.contingencia.create({
-      data: {
-        ...datos,
-        estado: 'pendiente',
-        fechaCreacion: new Date(),
-        ajusteRealizado: false
-      }
+async crearContingencia(datos: {
+  titulo: string;
+  descripcion: string;
+  origen: string;
+  produccionId?: string;
+  envioId?: string;
+  creadoPor: string;
+}): Promise<Contingencia> {
+  console.log('[ContingenciaService] Creando contingencia:', datos);
+  
+  // Validar que los IDs de relaciones existan si no son nulos o vacíos
+  if (datos.envioId) {
+    const envioExiste = await prisma.envio.findUnique({
+      where: { id: datos.envioId }
     });
+    
+    if (!envioExiste) {
+      console.error(`[ContingenciaService] Error: El envío con ID ${datos.envioId} no existe`);
+      throw new Error(`El envío con ID ${datos.envioId} no existe`);
+    }
   }
+  
+  if (datos.produccionId) {
+    const produccionExiste = await prisma.production.findUnique({
+      where: { id: datos.produccionId }
+    });
+    
+    if (!produccionExiste) {
+      console.error(`[ContingenciaService] Error: La producción con ID ${datos.produccionId} no existe`);
+      throw new Error(`La producción con ID ${datos.produccionId} no existe`);
+    }
+  }
+  
+  // Para evitar errores de clave foránea, asegurarnos de que valores vacíos sean null
+  const datosLimpios = {
+    ...datos,
+    envioId: datos.envioId || null,
+    produccionId: datos.produccionId || null
+  };
+  
+  // Crear la contingencia si las validaciones pasan
+  return prisma.contingencia.create({
+    data: {
+      ...datosLimpios,
+      estado: 'pendiente',
+      fechaCreacion: new Date(),
+      ajusteRealizado: false
+    }
+  });
+}
 
   async listarContingencias(filtros?: {
     estado?: string;

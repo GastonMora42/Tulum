@@ -39,7 +39,7 @@ export default function StockPage() {
       try {
         setIsLoading(true);
         
-        // Cargar stock de insumos
+        // Cargar stock de insumos con authenticatedFetch
         const insumosResponse = await authenticatedFetch('/api/stock?ubicacionId=ubicacion-fabrica&tipo=insumo');
         
         if (!insumosResponse.ok) {
@@ -47,9 +47,10 @@ export default function StockPage() {
         }
         
         const insumosData = await insumosResponse.json();
+        console.log("Stock de insumos cargado:", insumosData);
         setStockInsumos(insumosData);
         
-        // Cargar stock de productos
+        // Cargar stock de productos con authenticatedFetch
         const productosResponse = await authenticatedFetch('/api/stock?ubicacionId=ubicacion-fabrica&tipo=producto');
         
         if (!productosResponse.ok) {
@@ -57,6 +58,7 @@ export default function StockPage() {
         }
         
         const productosData = await productosResponse.json();
+        console.log("Stock de productos cargado:", productosData);
         setStockProductos(productosData);
       } catch (err) {
         console.error('Error:', err);
@@ -65,10 +67,15 @@ export default function StockPage() {
         setIsLoading(false);
       }
     };
-
+  
     fetchStock();
+    
+    // Agregar un intervalo para actualizar periódicamente el stock
+    const intervalId = setInterval(fetchStock, 30000); // Actualizar cada 30 segundos
+    
+    return () => clearInterval(intervalId); // Limpiar al desmontar
   }, []);
-
+  
   useEffect(() => {
     const verificarConsistencia = async () => {
       try {

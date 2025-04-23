@@ -20,12 +20,14 @@ interface AjusteStockParams {
   ventaId?: string;
   envioId?: string;
   produccionId?: string;
-  allowNegative?: boolean; // Nuevo parámetro para permitir stock negativo
+  allowNegative?: boolean;
 }
 
 class StockService {
   // Obtener stock con filtros
   async getStock(filter: StockFilter) {
+    console.log(`[StockService] Consultando stock con filtros:`, filter);
+    
     const where: Prisma.StockWhereInput = {};
     
     if (filter.ubicacionId) {
@@ -40,62 +42,102 @@ class StockService {
       where.insumoId = filter.insumoId;
     }
     
-    return prisma.stock.findMany({
-      where,
-      include: {
-        producto: filter.includeProducto || false,
-        insumo: filter.includeInsumo || false,
-        ubicacion: true
-      }
-    });
+    try {
+      const resultado = await prisma.stock.findMany({
+        where,
+        include: {
+          producto: filter.includeProducto || false,
+          insumo: filter.includeInsumo || false,
+          ubicacion: true
+        }
+      });
+      
+      console.log(`[StockService] Se encontraron ${resultado.length} registros de stock`);
+      return resultado;
+    } catch (error) {
+      console.error(`[StockService] Error al consultar stock:`, error);
+      throw error;
+    }
   }
   
   // Obtener productos con stock bajo
   async getProductosStockBajo(ubicacionId?: string) {
-    const stocks = await prisma.stock.findMany({
-      where: {
-        ...(ubicacionId ? { ubicacionId } : {}),
-        productoId: { not: null },
-        producto: {
-          activo: true
-        }
-      },
-      include: {
-        producto: true,
-        ubicacion: true
-      }
-    });
+    console.log(`[StockService] Consultando productos con stock bajo en ubicación: ${ubicacionId || 'todas'}`);
     
-    return stocks.filter(stock => {
-      if (!stock.producto) return false;
-      return stock.cantidad <= stock.producto.stockMinimo;
-    });
+    try {
+      const stocks = await prisma.stock.findMany({
+        where: {
+          ...(ubicacionId ? { ubicacionId } : {}),
+          productoId: { not: null },
+          producto: {
+            activo: true
+          }
+        },
+        include: {
+          producto: true,
+          ubicacion: true
+        }
+      });
+      
+      const bajosStock = stocks.filter(stock => {
+        if (!stock.producto) return false;
+        return stock.cantidad <= stock.producto.stockMinimo;
+      });
+      
+      console.log(`[StockService] Se encontraron ${bajosStock.length} productos con stock bajo`);
+      return bajosStock;
+    } catch (error) {
+      console.error(`[StockService] Error al consultar productos con stock bajo:`, error);
+      throw error;
+    }
   }
   
   // Obtener insumos con stock bajo
   async getInsumosStockBajo(ubicacionId?: string) {
-    const stocks = await prisma.stock.findMany({
-      where: {
-        ...(ubicacionId ? { ubicacionId } : {}),
-        insumoId: { not: null },
-        insumo: {
-          activo: true
-        }
-      },
-      include: {
-        insumo: true,
-        ubicacion: true
-      }
-    });
+    console.log(`[StockService] Consultando insumos con stock bajo en ubicación: ${ubicacionId || 'todas'}`);
     
-    return stocks.filter(stock => {
-      if (!stock.insumo) return false;
-      return stock.cantidad <= stock.insumo.stockMinimo;
-    });
+    try {
+      const stocks = await prisma.stock.findMany({
+        where: {
+          ...(ubicacionId ? { ubicacionId } : {}),
+          insumoId: { not: null },
+          insumo: {
+            activo: true
+          }
+        },
+        include: {
+          insumo: true,
+          ubicacion: true
+        }
+      });
+      
+      const bajosStock = stocks.filter(stock => {
+        if (!stock.insumo) return false;
+        return stock.cantidad <= stock.insumo.stockMinimo;
+      });
+      
+      console.log(`[StockService] Se encontraron ${bajosStock.length} insumos con stock bajo`);
+      return bajosStock;
+    } catch (error) {
+      console.error(`[StockService] Error al consultar insumos con stock bajo:`, error);
+      throw error;
+    }
   }
   
   // Ajustar stock (incrementar o decrementar)
   async ajustarStock(params: AjusteStockParams) {
+    // Agregar log detallado para facilitar depuración
+    console.log(`[StockService] Ajustando stock:`, {
+      productoId: params.productoId,
+      insumoId: params.insumoId,
+      ubicacionId: params.ubicacionId,
+      cantidad: params.cantidad,
+      motivo: params.motivo,
+      produccionId: params.produccionId,
+      ventaId: params.ventaId,
+      envioId: params.envioId
+    });
+    
     const { 
       productoId, 
       insumoId, 
@@ -125,8 +167,9 @@ class StockService {
         
         // Considerar admin si es role-admin o tiene el permiso explícito
         isAdmin = usuario?.roleId === 'role-admin' || allowNegative;
+        console.log(`[StockService] Usuario ${usuarioId} es admin o tiene permiso de stock negativo: ${isAdmin}`);
       } catch (error) {
-        console.error('Error al verificar rol de usuario:', error);
+        console.error('[StockService] Error al verificar rol de usuario:', error);
         // Si no podemos verificar, asumimos que no es admin a menos que allowNegative sea true
         isAdmin = allowNegative;
       }
@@ -139,6 +182,8 @@ class StockService {
           ubicacionId
         }
       });
+      
+      console.log(`[StockService] Stock actual: ${stock ? stock.cantidad : 'no existe'}`);
       
       // Manejar caso de stock no existente
       if (!stock) {
@@ -154,6 +199,8 @@ class StockService {
             }
           });
           
+          console.log(`[StockService] Stock creado con cantidad inicial: ${stock.cantidad}`);
+          
           // Si creamos con 0 para admin y queremos decrementar
           if (isAdmin && cantidad < 0 && stock.cantidad === 0) {
             stock = await tx.stock.update({
@@ -164,18 +211,24 @@ class StockService {
                 ultimaActualizacion: new Date()
               }
             });
+            
+            console.log(`[StockService] Stock actualizado a valor negativo: ${stock.cantidad}`);
           }
         } else {
           // No es admin y estamos decrementando, error
+          console.error(`[StockService] Error: No se puede reducir stock inexistente`);
           throw new Error('No se puede reducir stock inexistente');
         }
       } else {
         // Stock existe, pero verificar que no quede negativo (excepto para admin)
         if (stock.cantidad + cantidad < 0 && !isAdmin) {
-          throw new Error(`El ajuste dejaría el stock en negativo. Disponible: ${stock.cantidad}, Requerido: ${-cantidad}`);
+          const errorMsg = `El ajuste dejaría el stock en negativo. Disponible: ${stock.cantidad}, Requerido: ${-cantidad}`;
+          console.error(`[StockService] Error: ${errorMsg}`);
+          throw new Error(errorMsg);
         }
         
         // Actualizar stock
+        const cantidadAnterior = stock.cantidad;
         stock = await tx.stock.update({
           where: { id: stock.id },
           data: {
@@ -184,6 +237,8 @@ class StockService {
             ultimaActualizacion: new Date()
           }
         });
+        
+        console.log(`[StockService] Stock actualizado de ${cantidadAnterior} a ${stock.cantidad}`);
       }
       
       // Registrar movimiento
@@ -201,32 +256,50 @@ class StockService {
         }
       });
       
+      console.log(`[StockService] Movimiento registrado: ${movimiento.id}, tipo: ${movimiento.tipoMovimiento}, cantidad: ${movimiento.cantidad}`);
+      
       return { stock, movimiento };
     });
   }
   
   // Verificar stock disponible
   async verificarStockDisponible(productoId: string, ubicacionId: string, cantidadRequerida: number) {
-    const stock = await prisma.stock.findFirst({
-      where: {
-        productoId,
-        ubicacionId
+    console.log(`[StockService] Verificando stock disponible para producto ${productoId} en ubicación ${ubicacionId}, cantidad: ${cantidadRequerida}`);
+    
+    try {
+      const stock = await prisma.stock.findFirst({
+        where: {
+          productoId,
+          ubicacionId
+        },
+        include: {
+          producto: true
+        }
+      });
+      
+      if (!stock) {
+        console.log(`[StockService] No hay stock registrado para producto ${productoId}`);
+        return { disponible: false, stockActual: 0, stockRequerido: cantidadRequerida };
       }
-    });
-    
-    if (!stock) {
-      return { disponible: false, stockActual: 0, stockRequerido: cantidadRequerida };
+      
+      const disponible = stock.cantidad >= cantidadRequerida;
+      console.log(`[StockService] Stock disponible: ${stock.cantidad}, suficiente: ${disponible}`);
+      
+      return {
+        disponible,
+        stockActual: stock.cantidad,
+        stockRequerido: cantidadRequerida,
+        producto: stock.producto
+      };
+    } catch (error) {
+      console.error(`[StockService] Error al verificar stock disponible:`, error);
+      throw error;
     }
-    
-    return {
-      disponible: stock.cantidad >= cantidadRequerida,
-      stockActual: stock.cantidad,
-      stockRequerido: cantidadRequerida
-    };
   }
   
   // Verificar inconsistencias en el stock
   async verificarConsistencia() {
+    console.log(`[StockService] Verificando consistencia de stock`);
     try {
       const inconsistencias = [];
       
@@ -294,143 +367,142 @@ class StockService {
         }
       }
       
+      console.log(`[StockService] Se encontraron ${inconsistencias.length} inconsistencias`);
       return inconsistencias;
     } catch (error) {
-      console.error('Error al verificar consistencia:', error);
+      console.error(`[StockService] Error al verificar consistencia:`, error);
       throw error;
     }
   }
   
-  // Corregir inconsistencias detectadas
-  async corregirInconsistencias() {
-    try {
-      const inconsistencias = await this.verificarConsistencia();
-      const resultados = [];
-      
-      // Procesar cada inconsistencia en una transacción
-      for (const inconsistencia of inconsistencias) {
-        try {
-          await prisma.$transaction(async (tx) => {
-            if (inconsistencia.problema === 'Stock negativo') {
-              // Corregir stock negativo
-              await tx.stock.update({
-                where: {
-                  id: inconsistencia.id
-                },
-                data: {
-                  cantidad: 0,
-                  ultimaActualizacion: new Date()
-                }
-              });
-              
-              // Registrar movimiento de ajuste
-              await tx.movimientoStock.create({
-                data: {
-                  stockId: inconsistencia.id,
-                  tipoMovimiento: 'entrada',
-                  cantidad: Math.abs(inconsistencia.valor || 0), // Añade || 0
-                  motivo: 'Corrección automática de stock negativo',
-                  fecha: new Date(),
-                  // Usa un ID válido en vez de 'sistema-auto'
-                  usuarioId: process.env.SYSTEM_USER_ID || 'sistema-auto', 
-                }
-              });
-
-              resultados.push({
-                ...inconsistencia,
-                corregido: true,
-                accion: 'Stock actualizado a 0'
-              });
-            } 
-            else if (inconsistencia.problema === 'Discrepancia entre movimientos y stock') {
-              // Corregir discrepancia
-              await tx.stock.update({
-                where: {
-                  id: inconsistencia.id
-                },
-                data: {
-                  cantidad: inconsistencia.valorCalculado,
-                  ultimaActualizacion: new Date()
-                }
-              });
-              
-              // Registrar movimiento de ajuste
-              await tx.movimientoStock.create({
-                data: {
-                  stockId: inconsistencia.id,
-                  tipoMovimiento: inconsistencia.diferencia && inconsistencia.diferencia > 0 ? 'salida' : 'entrada',
-                  cantidad: Math.abs(inconsistencia.diferencia || 0),
-                  motivo: 'Corrección automática de discrepancia',
-                  fecha: new Date(),
-                  usuarioId: process.env.SYSTEM_USER_ID || 'sistema-auto',
-                }
-              });
-            
-              resultados.push({
-                ...inconsistencia,
-                corregido: true,
-                accion: `Stock actualizado de ${inconsistencia.valorActual} a ${inconsistencia.valorCalculado}`
-              });
-            }
-          });
-        } catch (txError) {
-          console.error('Error al corregir inconsistencia:', txError);
-          resultados.push({
-            ...inconsistencia,
-            corregido: false,
-            error: txError instanceof Error ? txError.message : 'Error desconocido'
-          });
-        }
-      }
-      const totalInconsistencias = Array.isArray(inconsistencias) ? inconsistencias.length : 0;
-      return {
-        totalInconsistencias,
-        corregidas: resultados.filter(r => r.corregido).length,
-        fallidas: resultados.filter(r => !r.corregido).length,
-        detalles: resultados
-      };
-    } catch (error) {
-      console.error('Error al corregir inconsistencias:', error);
-      throw error;
-    }
-  }
-  
-  // Verificar stock de insumos para producción
+  // Verificar stock de insumos para producción - MEJORADO SIGNIFICATIVAMENTE
   async verificarStockInsumosParaProduccion(recetaId: string, cantidadProduccion: number, ubicacionId: string) {
-    // Obtener items de la receta
-    const recetaItems = await prisma.recetaItem.findMany({
-      where: { recetaId },
-      include: { insumo: true }
-    });
+    console.log(`[StockService] Verificando stock para producción - Receta: ${recetaId}, Cantidad: ${cantidadProduccion}, Ubicación: ${ubicacionId}`);
     
-    const resultados = [];
-    
-    for (const item of recetaItems) {
-      // Calcular cantidad necesaria para esta producción
-      const cantidadNecesaria = item.cantidad * cantidadProduccion;
+    try {
+      // Obtener receta completa con sus items e insumos
+      const receta = await prisma.receta.findUnique({
+        where: { id: recetaId },
+        include: {
+          items: {
+            include: { insumo: true }
+          }
+        }
+      });
       
-      // Verificar stock disponible
-      const stock = await prisma.stock.findFirst({
+      if (!receta) {
+        throw new Error(`No se encontró la receta con ID ${recetaId}`);
+      }
+      
+      console.log(`[StockService] Receta encontrada: ${receta.nombre} con ${receta.items.length} items`);
+      
+      // Extraer IDs de insumos para consultar stock en una sola operación
+      const insumoIds = receta.items.map(item => item.insumoId);
+      
+      // Obtener stock actual de todos los insumos en una sola consulta
+      const stocks = await prisma.stock.findMany({
         where: {
-          insumoId: item.insumoId,
+          insumoId: { in: insumoIds },
           ubicacionId
         }
       });
       
-      resultados.push({
-        insumoId: item.insumoId,
-        nombre: item.insumo.nombre,
-        cantidadNecesaria,
-        stockDisponible: stock?.cantidad || 0,
-        suficiente: (stock?.cantidad || 0) >= cantidadNecesaria,
-        unidadMedida: item.insumo.unidadMedida
+      console.log(`[StockService] Se encontraron ${stocks.length} registros de stock para los insumos de la receta`);
+      
+      // Crear un mapa para acceso rápido
+      const stockMap = new Map();
+      stocks.forEach(stock => {
+        stockMap.set(stock.insumoId, stock.cantidad);
       });
+      
+      // Analizar cada item para ver si hay suficiente stock
+      const resultados = receta.items.map(item => {
+        // Calcular cantidad necesaria según la cantidad a producir
+        const cantidadNecesaria = item.cantidad * cantidadProduccion;
+        // Obtener stock disponible actual (0 si no existe)
+        const stockDisponible = stockMap.get(item.insumoId) || 0;
+        // Verificar si hay suficiente stock
+        const suficiente = stockDisponible >= cantidadNecesaria;
+        
+        return {
+          insumoId: item.insumoId,
+          nombre: item.insumo.nombre,
+          cantidadNecesaria,
+          stockDisponible,
+          suficiente,
+          unidadMedida: item.insumo.unidadMedida,
+          faltante: suficiente ? 0 : cantidadNecesaria - stockDisponible
+        };
+      });
+      
+      // Determinar si hay suficiente stock para toda la producción
+      const suficienteParaProduccion = resultados.every(r => r.suficiente);
+      
+      console.log(`[StockService] ¿Hay suficiente stock para producción? ${suficienteParaProduccion ? 'SI' : 'NO'}`);
+      if (!suficienteParaProduccion) {
+        const faltantes = resultados.filter(r => !r.suficiente);
+        console.log(`[StockService] Insumos con stock insuficiente:`, faltantes);
+      }
+      
+      return {
+        suficienteParaProduccion,
+        detalleInsumos: resultados,
+        receta: {
+          id: receta.id,
+          nombre: receta.nombre,
+          rendimiento: receta.rendimiento
+        }
+      };
+    } catch (error) {
+      console.error(`[StockService] Error al verificar stock para producción:`, error);
+      throw error;
     }
+  }
+
+  // Método para el dashboard que muestra estadísticas de stock
+  async getDashboardStock(ubicacionId: string) {
+    console.log(`[StockService] Obteniendo estadísticas de stock para ubicación ${ubicacionId}`);
     
-    return {
-      suficienteParaProduccion: resultados.every(r => r.suficiente),
-      detalleInsumos: resultados
-    };
+    try {
+      // Obtener conteos y listas de productos e insumos con stock bajo
+      const [productosStockBajo, insumosStockBajo] = await Promise.all([
+        this.getProductosStockBajo(ubicacionId),
+        this.getInsumosStockBajo(ubicacionId)
+      ]);
+      
+      // Obtener totales generales
+      const [productosStats, insumosStats] = await Promise.all([
+        prisma.stock.count({
+          where: {
+            ubicacionId,
+            productoId: { not: null }
+          }
+        }),
+        prisma.stock.count({
+          where: {
+            ubicacionId,
+            insumoId: { not: null }
+          }
+        })
+      ]);
+      
+      return {
+        productos: {
+          total: productosStats,
+          bajoMinimo: productosStockBajo.length,
+          listaBajoMinimo: productosStockBajo
+        },
+        insumos: {
+          total: insumosStats,
+          bajoMinimo: insumosStockBajo.length,
+          listaBajoMinimo: insumosStockBajo
+        },
+        ultimaActualizacion: new Date()
+      };
+    } catch (error) {
+      console.error(`[StockService] Error al obtener estadísticas de stock:`, error);
+      throw error;
+    }
   }
 }
 
