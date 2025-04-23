@@ -1,7 +1,8 @@
+import { withPWA } from 'next-pwa'
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
-  // Deshabilitar errores de compilación de ESLint y TypeScript para permitir el despliegue en producción
+  // Disable build errors from ESLint and TypeScript to allow production deploy
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -18,7 +19,3 @@ const nextConfig: NextConfig = {
 
 // Wrap with PWA plugin if used
 export default withPWA(nextConfig)
-function withPWA(nextConfig: NextConfig) {
-  throw new Error('Function not implemented.')
-}
-
