@@ -13,10 +13,11 @@ interface IniciarProduccionParams {
 interface FinalizarProduccionParams {
   produccionId: string;
   usuarioId: string;
-  productoId: string;
   ubicacionId: string;
-  cantidadProducida: number;
   observaciones?: string;
+  // Hacemos opcional el productoId y cantidadProducida
+  productoId?: string;
+  cantidadProducida?: number;
 }
 
 class ProduccionService {
@@ -91,13 +92,24 @@ class ProduccionService {
   
   // Finalizar producción
   async finalizarProduccion(params: FinalizarProduccionParams) {
-    const { produccionId, usuarioId, productoId, ubicacionId, cantidadProducida, observaciones } = params;
+    const { produccionId, usuarioId, ubicacionId, observaciones, productoId, cantidadProducida } = params;
     
     // Verificar que la producción existe y está en proceso
     const produccion = await prisma.production.findUnique({
-      where: { id: produccionId }
+      where: { id: produccionId },
+      include: {
+        receta: {
+          include: {
+            productoRecetas: {
+              include: {
+                producto: true
+              }
+            }
+          }
+        }
+      }
     });
-    
+  
     if (!produccion) {
       throw new Error('La producción no existe');
     }
@@ -117,9 +129,10 @@ class ProduccionService {
             ? `${produccion.observaciones || ''}\n${observaciones}`
             : produccion.observaciones
         }
-      });
+      });  
       
-      // Incrementar stock del producto
+    // Si se proporcionó un productoId específico, usarlo
+    if (productoId && cantidadProducida) {
       await stockService.ajustarStock({
         productoId,
         ubicacionId,
@@ -128,11 +141,30 @@ class ProduccionService {
         usuarioId,
         produccionId
       });
+    } 
+    // De lo contrario, usar los productos asociados a la receta
+    else if (produccion.receta.productoRecetas && produccion.receta.productoRecetas.length > 0) {
+      // La cantidad producida será: rendimiento de la receta * cantidad de la producción
+      const cantidadTotal = produccion.receta.rendimiento * produccion.cantidad;
       
-      return produccionActualizada;
-    });
-  }
-  
+      // Para cada producto asociado a la receta, aumentar el stock
+      for (const productoReceta of produccion.receta.productoRecetas) {
+        await stockService.ajustarStock({
+          productoId: productoReceta.productoId,
+          ubicacionId,
+          cantidad: cantidadTotal,
+          motivo: `Producción finalizada #${produccionId} (receta: ${produccion.receta.nombre})`,
+          usuarioId,
+          produccionId
+        });
+      }
+    } else {
+      throw new Error('No hay productos asociados a la receta y no se especificó un producto manualmente');
+    }
+    
+    return produccionActualizada;
+  });
+}
   // Registrar contingencia en producción
   async registrarContingencia(
     produccionId: string, 

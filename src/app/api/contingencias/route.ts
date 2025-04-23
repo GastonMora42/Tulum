@@ -78,6 +78,8 @@ export async function POST(req: NextRequest) {
     try {
       const contingencia = await contingenciaService.crearContingencia({
         ...validation.data,
+        produccionId: validation.data.produccionId || undefined,
+        envioId: validation.data.envioId || undefined,
         creadoPor: user.id
       });
       

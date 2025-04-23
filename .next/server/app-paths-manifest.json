@@ -1,12 +1,11 @@
 {
-  "/_not-found/page": "app/_not-found/page.js",
-  "/api/auth/login/route": "app/api/auth/login/route.js",
-  "/api/auth/me/route": "app/api/auth/me/route.js",
-  "/api/fabrica/produccion/route": "app/api/fabrica/produccion/route.js",
+  "/api/admin/recetas/route": "app/api/admin/recetas/route.js",
+  "/api/admin/productos/route": "app/api/admin/productos/route.js",
+  "/api/admin/recetas/[id]/route": "app/api/admin/recetas/[id]/route.js",
   "/(auth)/login/page": "app/(auth)/login/page.js",
-  "/(fabrica)/fabrica/produccion/[id]/page": "app/(fabrica)/fabrica/produccion/[id]/page.js",
-  "/(fabrica)/fabrica/produccion/page": "app/(fabrica)/fabrica/produccion/page.js",
-  "/(fabrica)/fabrica/contingencias/page": "app/(fabrica)/fabrica/contingencias/page.js",
-  "/(admin)/admin/page": "app/(admin)/admin/page.js",
-  "/(fabrica)/fabrica/contingencias/nueva/page": "app/(fabrica)/fabrica/contingencias/nueva/page.js"
+  "/(admin)/admin/recetas/nueva/page": "app/(admin)/admin/recetas/nueva/page.js",
+  "/(admin)/admin/recetas/[id]/page": "app/(admin)/admin/recetas/[id]/page.js",
+  "/(admin)/admin/insumos/page": "app/(admin)/admin/insumos/page.js",
+  "/(admin)/admin/recetas/page": "app/(admin)/admin/recetas/page.js",
+  "/(admin)/admin/productos/page": "app/(admin)/admin/productos/page.js"
 }

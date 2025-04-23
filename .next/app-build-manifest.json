@@ -6,76 +6,6 @@
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
     ],
-    "/(fabrica)/layout": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(fabrica)/layout.js"
-    ],
-    "/(fabrica)/fabrica/envios/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(fabrica)/fabrica/envios/page.js"
-    ],
-    "/api/fabrica/envios-pendientes/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/fabrica/envios-pendientes/route.js"
-    ],
-    "/(fabrica)/fabrica/produccion/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(fabrica)/fabrica/produccion/page.js"
-    ],
-    "/api/fabrica/produccion/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/fabrica/produccion/route.js"
-    ],
-    "/(fabrica)/fabrica/produccion/[id]/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(fabrica)/fabrica/produccion/[id]/page.js"
-    ],
-    "/api/fabrica/produccion/[id]/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/fabrica/produccion/[id]/route.js"
-    ],
-    "/(fabrica)/fabrica/stock/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(fabrica)/fabrica/stock/page.js"
-    ],
-    "/api/stock/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/stock/route.js"
-    ],
-    "/(fabrica)/fabrica/contingencias/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(fabrica)/fabrica/contingencias/page.js"
-    ],
-    "/api/contingencias/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/contingencias/route.js"
-    ],
-    "/api/auth/me/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/auth/me/route.js"
-    ],
-    "/(fabrica)/fabrica/contingencias/nueva/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(fabrica)/fabrica/contingencias/nueva/page.js"
-    ],
-    "/api/fabrica/produccion/[id]/estado/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/fabrica/produccion/[id]/estado/route.js"
-    ],
     "/(auth)/login/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
@@ -96,10 +26,55 @@
       "static/chunks/main-app.js",
       "static/chunks/app/(admin)/admin/page.js"
     ],
-    "/_not-found/page": [
+    "/api/auth/me/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/_not-found/page.js"
+      "static/chunks/app/api/auth/me/route.js"
+    ],
+    "/(admin)/admin/recetas/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(admin)/admin/recetas/page.js"
+    ],
+    "/api/admin/recetas/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/recetas/route.js"
+    ],
+    "/(admin)/admin/recetas/nueva/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(admin)/admin/recetas/nueva/page.js"
+    ],
+    "/api/admin/productos/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/productos/route.js"
+    ],
+    "/api/admin/recetas/insumos/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/recetas/insumos/route.js"
+    ],
+    "/(admin)/admin/recetas/[id]/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(admin)/admin/recetas/[id]/page.js"
+    ],
+    "/api/admin/recetas/[id]/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/recetas/[id]/route.js"
+    ],
+    "/(admin)/admin/insumos/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(admin)/admin/insumos/page.js"
+    ],
+    "/(admin)/admin/productos/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(admin)/admin/productos/page.js"
     ]
   }
 }

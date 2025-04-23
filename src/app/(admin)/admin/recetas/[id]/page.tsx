@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Book, ChevronLeft, Plus, Trash, Save, Loader2, Trash2 } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
+import { Producto } from '@prisma/client';
 
 // Interfaces
 interface Insumo {
@@ -64,6 +65,8 @@ export default function DetalleRecetaPage({ params }: { params: { id: string } }
   const [isDeleting, setIsDeleting] = useState(false);
   const [isFetchingData, setIsFetchingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [productos, setProductos] = useState<Producto[]>([]);
+  const [selectedProductos, setSelectedProductos] = useState<string[]>([]);
   const router = useRouter();
   
   const { 
@@ -88,13 +91,12 @@ export default function DetalleRecetaPage({ params }: { params: { id: string } }
     name: 'items'
   });
   
-  // Cargar receta e insumos
   useEffect(() => {
     const fetchData = async () => {
       try {
         setIsFetchingData(true);
         
-        // Cargar receta
+        // Cargar receta (código existente)
         const recetaResponse = await authenticatedFetch(`/api/admin/recetas/${params.id}`);
         if (!recetaResponse.ok) {
           throw new Error('Error al cargar receta');
@@ -102,13 +104,17 @@ export default function DetalleRecetaPage({ params }: { params: { id: string } }
         const recetaData = await recetaResponse.json();
         setReceta(recetaData);
         
-        // Cargar insumos disponibles
-        const insumosResponse = await authenticatedFetch('/api/admin/recetas/insumos');
-        if (!insumosResponse.ok) {
-          throw new Error('Error al cargar insumos');
+        // Establecer productos seleccionados
+        if (recetaData.productoRecetas && recetaData.productoRecetas.length > 0) {
+          setSelectedProductos(recetaData.productoRecetas.map((pr: any) => pr.productoId));
         }
-        const insumosData = await insumosResponse.json();
-        setInsumos(insumosData);
+        
+        // Cargar productos disponibles
+        const productosResponse = await authenticatedFetch('/api/admin/productos?soloActivos=true');
+        if (productosResponse.ok) {
+          const productosData = await productosResponse.json();
+          setProductos(productosData.data || []);
+        }
         
         // Establecer valores del formulario
         reset({
@@ -138,12 +144,17 @@ export default function DetalleRecetaPage({ params }: { params: { id: string } }
       setIsLoading(true);
       setError(null);
       
+      const requestData = {
+        ...data,
+        productos: selectedProductos
+      };
+      
       const response = await authenticatedFetch(`/api/admin/recetas/${params.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(data)
+        body: JSON.stringify(requestData)
       });
       
       if (!response.ok) {
@@ -327,6 +338,48 @@ export default function DetalleRecetaPage({ params }: { params: { id: string } }
                 Agregar insumo
               </button>
             </div>
+
+            <div className="space-y-4 mt-6">
+  <div className="flex items-center justify-between">
+    <h3 className="text-md font-medium">Productos asociados</h3>
+    <p className="text-sm text-gray-500">Seleccione los productos finales que se generan con esta receta</p>
+  </div>
+  
+  <div className="bg-gray-50 p-4 rounded-md">
+    {productos.length === 0 ? (
+      <p className="text-sm text-gray-500">Cargando productos disponibles...</p>
+    ) : (
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+        {productos.map(producto => (
+          <div key={producto.id} className="flex items-center space-x-2 p-2 border rounded hover:bg-gray-100">
+            <input
+              type="checkbox"
+              id={`producto-${producto.id}`}
+              value={producto.id}
+              checked={selectedProductos.includes(producto.id)}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  setSelectedProductos([...selectedProductos, producto.id]);
+                } else {
+                  setSelectedProductos(selectedProductos.filter(id => id !== producto.id));
+                }
+              }}
+              className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+            />
+            <label htmlFor={`producto-${producto.id}`} className="text-sm text-gray-700 flex-1">
+              {producto.nombre}
+            </label>
+          </div>
+        ))}
+      </div>
+    )}
+    {selectedProductos.length > 0 && (
+      <div className="mt-3 text-sm text-indigo-600">
+        {selectedProductos.length} producto(s) seleccionado(s)
+      </div>
+    )}
+  </div>
+</div>
             
             {errors.items && !Array.isArray(errors.items) && (
               <p className="text-sm text-destructive">{errors.items.message}</p>

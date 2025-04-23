@@ -12,7 +12,8 @@ const recetaSchema = z.object({
   items: z.array(z.object({
     insumoId: z.string({ required_error: 'El insumo es requerido' }),
     cantidad: z.number().positive({ message: 'La cantidad debe ser mayor a 0' })
-  }))
+  })),
+  productos: z.array(z.string()).optional()
 });
 
 export async function GET(req: NextRequest) {
@@ -98,11 +99,11 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    const { nombre, descripcion, rendimiento, items } = validation.data;
+    const { nombre, descripcion, rendimiento, items, productos } = validation.data;
     
     // Crear receta en una transacción
     const receta = await prisma.$transaction(async (tx) => {
-      // Crear la receta
+      // Crear la receta (código existente)
       const nuevaReceta = await tx.receta.create({
         data: {
           nombre,
@@ -111,7 +112,7 @@ export async function POST(req: NextRequest) {
         }
       });
       
-      // Crear los items de la receta
+      // Crear los items de la receta (código existente)
       for (const item of items) {
         await tx.recetaItem.create({
           data: {
@@ -122,6 +123,18 @@ export async function POST(req: NextRequest) {
         });
       }
       
+      // Asociar productos si se proporcionaron
+      if (productos && productos.length > 0) {
+        for (const productoId of productos) {
+          await tx.productoReceta.create({
+            data: {
+              recetaId: nuevaReceta.id,
+              productoId
+            }
+          });
+        }
+      }
+      
       // Retornar la receta completa
       return tx.receta.findUnique({
         where: { id: nuevaReceta.id },
@@ -129,6 +142,11 @@ export async function POST(req: NextRequest) {
           items: {
             include: {
               insumo: true
+            }
+          },
+          productoRecetas: {
+            include: {
+              producto: true
             }
           }
         }
