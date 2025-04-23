@@ -1,8 +1,9 @@
 {
-  "/(admin)/admin/envios-insumos/page": "app/(admin)/admin/envios-insumos/page.js",
-  "/(admin)/admin/insumos/page": "app/(admin)/admin/insumos/page.js",
-  "/(admin)/admin/categorias/page": "app/(admin)/admin/categorias/page.js",
-  "/(admin)/admin/insumos/nuevo/page": "app/(admin)/admin/insumos/nuevo/page.js",
-  "/(admin)/admin/envios/nuevo/page": "app/(admin)/admin/envios/nuevo/page.js",
-  "/(admin)/admin/page": "app/(admin)/admin/page.js"
+  "/api/fabrica/produccion/route": "app/api/fabrica/produccion/route.js",
+  "/(admin)/admin/envios-insumos/[id]/page": "app/(admin)/admin/envios-insumos/[id]/page.js",
+  "/(fabrica)/fabrica/page": "app/(fabrica)/fabrica/page.js",
+  "/(fabrica)/fabrica/stock/page": "app/(fabrica)/fabrica/stock/page.js",
+  "/(admin)/admin/envios/page": "app/(admin)/admin/envios/page.js",
+  "/(fabrica)/fabrica/produccion/page": "app/(fabrica)/fabrica/produccion/page.js",
+  "/(fabrica)/fabrica/stock/ajuste/page": "app/(fabrica)/fabrica/stock/ajuste/page.js"
 }

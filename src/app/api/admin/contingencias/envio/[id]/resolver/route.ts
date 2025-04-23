@@ -5,6 +5,11 @@ import { authMiddleware } from '@/server/api/middlewares/auth';
 import { checkPermission } from '@/server/api/middlewares/authorization';
 import { z } from 'zod';
 
+interface ItemAjuste {
+  itemEnvioId: string;
+  cantidadFinal: number;
+}
+
 // Esquema de validación para resolver contingencia
 const resolucionSchema = z.object({
   accion: z.enum(['aceptar_recibido', 'ajustar_stock']),
@@ -109,6 +114,7 @@ export async function POST(
         
         // Actualizar stock con las cantidades recibidas
         for (const item of envio.items) {
+          const itemAjuste = item;
           if (item.insumoId && item.cantidadRecibida !== null) {
             // Buscar o crear stock en destino
             let stockDestino = await tx.stock.findFirst({
@@ -140,13 +146,12 @@ export async function POST(
               });
             }
             
-            // Registrar movimiento de stock
             await tx.movimientoStock.create({
               data: {
                 stockId: stockDestino.id,
                 tipoMovimiento: 'entrada',
-                cantidad: item.cantidadRecibida,
-                motivo: `Recepción ajustada de envío #${envio.id}`,
+                cantidad: itemAjuste.cantidadRecibida || itemAjuste.cantidad || 0,
+                motivo: `Ajuste por resolución de contingencia en envío #${envio.id}`,
                 usuarioId: user.id,
                 envioId: envio.id,
                 fecha: new Date()

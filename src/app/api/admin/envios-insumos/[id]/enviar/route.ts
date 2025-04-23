@@ -89,22 +89,44 @@ export async function POST(
           fechaEnvio: new Date()
         }
       });
-      
-      // 2. Para cada insumo, usar stockService para ajustar
-      for (const item of envio.items) {
-        if (item.insumoId) {
-          await stockService.ajustarStock({
-            insumoId: item.insumoId,
-            ubicacionId: envio.origenId,
-            cantidad: -item.cantidad, // Cantidad negativa porque sale del origen
-            motivo: `Envío de insumos #${id}`,
-            usuarioId: user.id,
-            envioId: id,
-            allowNegative: isAdmin // Permitir stock negativo si es admin
-          });
-        }
+
+for (const item of envio.items) {
+  if (item && item.insumoId) {
+    // Obtener stock actual
+    const stockActual = await stockService.getStock({
+      insumoId: item.insumoId,
+      ubicacionId: envio.origenId
+    });
+    
+    // Verificar si hay suficiente stock
+    if (!stockActual || stockActual.length === 0 || stockActual[0]?.cantidad < (item.cantidad || 0)) {
+      // Si es admin, advertir pero permitir
+      if (isAdmin) {
+        console.warn(`Stock insuficiente para insumo ${item.insumoId}. Disponible: ${stockActual?.[0]?.cantidad || 0}, Requerido: ${item.cantidad || 0}`);
+      } else {
+        return NextResponse.json(
+          { error: `Stock insuficiente para insumo ${item.insumoId}` },
+          { status: 400 }
+        );
       }
-      
+    }
+  }
+}
+
+// Una vez verificado, proceder con el ajuste de stock
+for (const item of envio.items) {
+  if (item && item.insumoId) {
+    await stockService.ajustarStock({
+      insumoId: item.insumoId,
+      ubicacionId: envio.origenId || '',
+      cantidad: -(item.cantidad || 0), // Cantidad negativa porque sale del origen
+      motivo: `Envío de insumos #${id}`,
+      usuarioId: user.id,
+      envioId: id,
+      allowNegative: isAdmin // Permitir stock negativo si es admin
+    });
+  }
+}
       // 3. Retornar envío actualizado
       return tx.envio.findUnique({
         where: { id },
