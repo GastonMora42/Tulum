@@ -4,6 +4,7 @@ import prisma from '@/server/db/client';
 import { authMiddleware } from '@/server/api/middlewares/auth';
 import { checkPermission } from '@/server/api/middlewares/authorization';
 import { z } from 'zod';
+import { stockService } from '@/server/services/stock/stockService';
 
 // Esquema de validación
 const enviarInsumoSchema = z.object({
@@ -16,39 +17,45 @@ const enviarInsumoSchema = z.object({
   observaciones: z.string().optional()
 });
 
+// src/app/api/admin/envios-insumos/[id]/enviar/route.ts
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   // Aplicar middleware de autenticación
   const authError = await authMiddleware(req);
   if (authError) return authError;
   
-  // Verificar permiso - usando un permiso más genérico para evitar errores
+  // Verificar permiso
   const permissionError = await checkPermission('stock:ajustar')(req);
   if (permissionError) return permissionError;
   
   try {
-    // Obtener datos del body
-    const body = await req.json();
+    // Obtener ID correctamente
+    const id = context.params.id;
     
-    // Validar datos de entrada
-    const validation = enviarInsumoSchema.safeParse(body);
-    if (!validation.success) {
+    // Obtener datos del body
+    let body;
+    try {
+      body = await req.json();
+      console.log('Datos recibidos:', body);
+    } catch (error) {
+      console.error('Error al procesar JSON:', error);
       return NextResponse.json(
-        { error: 'Datos de entrada inválidos', details: validation.error.errors },
+        { error: 'Error en formato de datos enviados' },
         { status: 400 }
       );
     }
     
-    const { items, observaciones } = validation.data;
-    
     // Obtener usuario
     const user = (req as any).user;
+    const isAdmin = user.roleId === 'role-admin';
+    
+    console.log(`Usuario ${user.name} (${isAdmin ? 'admin' : 'no admin'}) está procesando envío ${id}`);
     
     // Verificar que el envío existe y está en estado pendiente
     const envio = await prisma.envio.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         items: {
           include: {
@@ -72,96 +79,35 @@ export async function POST(
       );
     }
     
-    // Crear un mapa de ItemEnvio por ID para acceso rápido
-    const itemsMap = new Map();
-    envio.items.forEach(item => {
-      itemsMap.set(item.id, item);
-    });
-    
-    // Verificar que todos los items están en el envío
-    for (const item of items) {
-      if (!itemsMap.has(item.id)) {
-        return NextResponse.json(
-          { error: `El item con ID ${item.id} no pertenece a este envío` },
-          { status: 400 }
-        );
-      }
-    }
-    
     // Actualizar estado del envío y procesar en una transacción
     const envioActualizado = await prisma.$transaction(async (tx) => {
       // 1. Actualizar envío
       const updatedEnvio = await tx.envio.update({
-        where: { id: params.id },
+        where: { id },
         data: {
           estado: 'enviado',
           fechaEnvio: new Date()
         }
       });
       
-      // 2. Actualizar cantidades de los items si difieren de las solicitadas
-      for (const item of items) {
-        const itemEnvio = itemsMap.get(item.id);
-        
-        // Solo actualizar si la cantidad cambia
-        if (itemEnvio && itemEnvio.cantidad !== item.cantidad) {
-          await tx.itemEnvio.update({
-            where: { id: item.id },
-            data: { cantidad: item.cantidad }
+      // 2. Para cada insumo, usar stockService para ajustar
+      for (const item of envio.items) {
+        if (item.insumoId) {
+          await stockService.ajustarStock({
+            insumoId: item.insumoId,
+            ubicacionId: envio.origenId,
+            cantidad: -item.cantidad, // Cantidad negativa porque sale del origen
+            motivo: `Envío de insumos #${id}`,
+            usuarioId: user.id,
+            envioId: id,
+            allowNegative: isAdmin // Permitir stock negativo si es admin
           });
         }
       }
       
-      // 3. Para cada insumo, actualizar stock en origen (descontar)
-      for (const item of items) {
-        const itemEnvio = itemsMap.get(item.id);
-        
-        if (itemEnvio && itemEnvio.insumoId && item.cantidad > 0) {
-          // Buscar stock en origen
-          const stockOrigen = await tx.stock.findFirst({
-            where: {
-              insumoId: itemEnvio.insumoId,
-              ubicacionId: envio.origenId
-            }
-          });
-          
-          if (stockOrigen) {
-            // Verificar stock suficiente
-            if (stockOrigen.cantidad < item.cantidad) {
-              throw new Error(`No hay suficiente stock de ${itemEnvio.insumo.nombre}`);
-            }
-            
-            // Actualizar stock
-            await tx.stock.update({
-              where: { id: stockOrigen.id },
-              data: {
-                cantidad: { decrement: item.cantidad },
-                ultimaActualizacion: new Date(),
-                version: { increment: 1 }
-              }
-            });
-            
-            // Registrar movimiento
-            await tx.movimientoStock.create({
-              data: {
-                stockId: stockOrigen.id,
-                tipoMovimiento: 'salida',
-                cantidad: item.cantidad,
-                motivo: `Envío de insumos #${envio.id}`,
-                usuarioId: user.id,
-                envioId: params.id,
-                fecha: new Date()
-              }
-            });
-          } else {
-            throw new Error(`No existe stock del insumo ${itemEnvio.insumo.nombre} en el origen`);
-          }
-        }
-      }
-      
-      // 4. Retornar envío actualizado con sus relaciones
+      // 3. Retornar envío actualizado
       return tx.envio.findUnique({
-        where: { id: params.id },
+        where: { id },
         include: {
           origen: true,
           destino: true,

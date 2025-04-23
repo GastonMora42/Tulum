@@ -5,15 +5,15 @@ import { authMiddleware } from '@/server/api/middlewares/auth';
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   // Aplicar middleware de autenticación
   const authError = await authMiddleware(req);
   if (authError) return authError;
   
   try {
-    // Extraer y esperar el ID antes de usarlo
-    const id = params.id;
+    // Extraer el ID correctamente - IMPORTANTE: usar context.params en lugar de params directo
+    const id = context.params.id;
     
     const envio = await prisma.envio.findUnique({
       where: { id },

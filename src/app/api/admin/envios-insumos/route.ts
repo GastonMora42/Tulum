@@ -23,12 +23,11 @@ export async function GET(req: NextRequest) {
   const authError = await authMiddleware(req);
   if (authError) return authError;
   
-  // Verificar permiso
-  const permissionError = await checkPermission('stock:ver')(req);
-  if (permissionError) return permissionError;
-  
   try {
     const { searchParams } = new URL(req.url);
+    
+    // Log para depuración
+    console.log('Parámetros de búsqueda:', Object.fromEntries(searchParams.entries()));
     
     // Parámetros de filtrado
     const estado = searchParams.get('estado');
@@ -82,9 +81,10 @@ export async function GET(req: NextRequest) {
       }
     });
     
+    console.log(`Encontrados ${envios.length} envíos`);
     return NextResponse.json(envios);
   } catch (error: any) {
-    console.error('Error al obtener envíos de insumos:', error);
+    console.error('Error detallado:', error);
     return NextResponse.json(
       { error: error.message || 'Error al obtener envíos de insumos' },
       { status: 500 }

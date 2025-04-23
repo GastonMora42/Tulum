@@ -11,55 +11,10 @@
       "static/chunks/main-app.js",
       "static/chunks/app/(auth)/login/page.js"
     ],
-    "/api/auth/refresh/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/auth/refresh/route.js"
-    ],
     "/api/auth/login/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/api/auth/login/route.js"
-    ],
-    "/(fabrica)/layout": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(fabrica)/layout.js"
-    ],
-    "/(fabrica)/fabrica/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(fabrica)/fabrica/page.js"
-    ],
-    "/api/auth/me/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/auth/me/route.js"
-    ],
-    "/(fabrica)/fabrica/stock/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(fabrica)/fabrica/stock/page.js"
-    ],
-    "/api/stock/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/stock/route.js"
-    ],
-    "/(fabrica)/fabrica/stock/solicitud/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(fabrica)/fabrica/stock/solicitud/page.js"
-    ],
-    "/api/admin/insumos/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/admin/insumos/route.js"
-    ],
-    "/api/admin/envios-insumos/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/admin/envios-insumos/route.js"
     ],
     "/(admin)/layout": [
       "static/chunks/webpack.js",
@@ -71,10 +26,30 @@
       "static/chunks/main-app.js",
       "static/chunks/app/(admin)/admin/page.js"
     ],
+    "/api/auth/me/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/auth/me/route.js"
+    ],
+    "/(admin)/admin/insumos/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(admin)/admin/insumos/page.js"
+    ],
+    "/api/admin/insumos/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/insumos/route.js"
+    ],
     "/(admin)/admin/envios-insumos/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/(admin)/admin/envios-insumos/page.js"
+    ],
+    "/api/admin/envios-insumos/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/envios-insumos/route.js"
     ],
     "/(admin)/admin/envios-insumos/[id]/page": [
       "static/chunks/webpack.js",
@@ -91,10 +66,140 @@
       "static/chunks/main-app.js",
       "static/chunks/app/api/admin/envios-insumos/[id]/enviar/route.js"
     ],
-    "/_not-found/page": [
+    "/(admin)/admin/contingencias/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/_not-found/page.js"
+      "static/chunks/app/(admin)/admin/contingencias/page.js"
+    ],
+    "/api/contingencias/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/contingencias/route.js"
+    ],
+    "/(fabrica)/layout": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(fabrica)/layout.js"
+    ],
+    "/(fabrica)/fabrica/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(fabrica)/fabrica/page.js"
+    ],
+    "/(fabrica)/fabrica/stock/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(fabrica)/fabrica/stock/page.js"
+    ],
+    "/api/stock/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/stock/route.js"
+    ],
+    "/(fabrica)/fabrica/envios/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(fabrica)/fabrica/envios/page.js"
+    ],
+    "/api/fabrica/envios-pendientes/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/fabrica/envios-pendientes/route.js"
+    ],
+    "/(fabrica)/fabrica/produccion/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(fabrica)/fabrica/produccion/page.js"
+    ],
+    "/api/fabrica/produccion/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/fabrica/produccion/route.js"
+    ],
+    "/(fabrica)/fabrica/produccion/nueva/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(fabrica)/fabrica/produccion/nueva/page.js"
+    ],
+    "/api/fabrica/produccion/init/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/fabrica/produccion/init/route.js"
+    ],
+    "/(fabrica)/fabrica/stock/solicitud/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(fabrica)/fabrica/stock/solicitud/page.js"
+    ],
+    "/(fabrica)/fabrica/stock/ajuste/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(fabrica)/fabrica/stock/ajuste/page.js"
+    ],
+    "/api/productos/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/productos/route.js"
+    ],
+    "/api/stock/ajuste/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/stock/ajuste/route.js"
+    ],
+    "/(fabrica)/fabrica/produccion/[id]/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(fabrica)/fabrica/produccion/[id]/page.js"
+    ],
+    "/api/fabrica/produccion/[id]/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/fabrica/produccion/[id]/route.js"
+    ],
+    "/(fabrica)/fabrica/contingencias/nueva/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(fabrica)/fabrica/contingencias/nueva/page.js"
+    ],
+    "/(fabrica)/fabrica/recetas/[id]/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(fabrica)/fabrica/recetas/[id]/page.js"
+    ],
+    "/api/admin/recetas/[id]/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/recetas/[id]/route.js"
+    ],
+    "/(admin)/admin/envios/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(admin)/admin/envios/page.js"
+    ],
+    "/(admin)/admin/envios/nuevo/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(admin)/admin/envios/nuevo/page.js"
+    ],
+    "/api/admin/ubicaciones/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/ubicaciones/route.js"
+    ],
+    "/(admin)/admin/categorias/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(admin)/admin/categorias/page.js"
+    ],
+    "/api/admin/categorias/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/categorias/route.js"
+    ],
+    "/(admin)/admin/insumos/nuevo/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(admin)/admin/insumos/nuevo/page.js"
     ]
   }
 }

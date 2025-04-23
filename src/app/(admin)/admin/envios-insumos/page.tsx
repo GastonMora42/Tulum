@@ -54,55 +54,78 @@ export default function EnviosInsumosPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  useEffect(() => {
-    const fetchEnvios = async () => {
-      try {
-        setIsLoading(true);
-        
-        const response = await authenticatedFetch('/api/admin/envios-insumos');
-        
-        if (!response.ok) {
-          throw new Error('Error al cargar envíos');
-        }
-        
-        const data = await response.json();
-        setEnvios(data);
-      } catch (err: any) {
-        console.error('Error:', err);
-        setError('No se pudieron cargar los envíos');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchEnvios();
-  }, []);
-  
-  const handleEnviar = async (envioId: string) => {
+// Dentro del componente
+useEffect(() => {
+  const fetchEnvios = async () => {
     try {
-      if (!confirm('¿Confirmar envío? Esto descontará los insumos del inventario central.')) {
-        return;
-      }
+      setIsLoading(true);
       
-      const response = await authenticatedFetch(`/api/admin/envios-insumos/${envioId}/enviar`, {
-        method: 'POST'
-      });
+      // Log para depuración
+      console.log('Obteniendo envíos de insumos...');
+      
+      const response = await authenticatedFetch('/api/admin/envios-insumos');
       
       if (!response.ok) {
-        throw new Error('Error al procesar envío');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al cargar envíos');
       }
       
-      // Actualizar la lista
-      setEnvios(prevEnvios => 
-        prevEnvios.map(envio => 
-          envio.id === envioId ? { ...envio, estado: 'enviado' } : envio
-        )
-      );
+      const data = await response.json();
+      console.log('Envíos recibidos:', data.length);
+      setEnvios(data);
     } catch (err: any) {
-      console.error('Error:', err);
-      alert('Error al procesar el envío: ' + err.message);
+      console.error('Error completo:', err);
+      setError('No se pudieron cargar los envíos');
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  fetchEnvios();
+}, []);
+  
+const handleEnviar = async (envioId: string) => {
+  try {
+    if (!confirm('¿Confirmar envío? Esto procesará la solicitud de insumos.')) {
+      return;
+    }
+    
+    // Encontrar el envío actual usando el envioId
+    const envioActual = envios.find(e => e.id === envioId);
+    if (!envioActual) {
+      throw new Error('Envío no encontrado');
+    }
+    
+    const response = await authenticatedFetch(`/api/admin/envios-insumos/${envioId}/enviar`, {
+      method: 'POST',
+      body: JSON.stringify({
+        // Usar las cantidades ya definidas en la solicitud original
+        // No necesitamos mapear nada más
+        items: envioActual.items.map(item => ({ 
+          id: item.id, 
+          cantidad: item.cantidad 
+        }))
+      })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Error al procesar envío');
+    }
+    
+    // Actualizar la lista
+    setEnvios(prevEnvios => 
+      prevEnvios.map(envio => 
+        envio.id === envioId ? { ...envio, estado: 'enviado' } : envio
+      )
+    );
+    
+    alert('Envío procesado correctamente');
+  } catch (err: any) {
+    console.error('Error:', err);
+    alert('Error al procesar el envío: ' + err.message);
+  }
+};
   
   const formatDate = (dateString: string | null) => {
     if (!dateString) return '-';

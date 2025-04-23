@@ -53,12 +53,12 @@ interface Envio {
   items: ItemEnvio[];
 }
 
-// Esquema de validación
 const envioSchema = z.object({
   items: z.array(
     z.object({
       id: z.string(),
-      cantidad: z.number().int().min(0, 'La cantidad no puede ser negativa')
+      cantidad: z.number()
+        .nonnegative("La cantidad no puede ser negativa")
     })
   ),
   observaciones: z.string().optional()
@@ -111,10 +111,10 @@ export default function DetalleEnvioPage() {
         const data = await response.json();
         setEnvio(data);
         
-        // Inicializar formulario con los items
+        // Inicializar formulario con los items - IMPORTANTE: usar las cantidades originales
         setValue('items', data.items.map((item: ItemEnvio) => ({
           id: item.id,
-          cantidad: item.cantidad // Por defecto se envía la cantidad solicitada
+          cantidad: item.cantidad // Usar cantidad completa por defecto
         })));
         
         if (data.observaciones) {
@@ -127,39 +127,38 @@ export default function DetalleEnvioPage() {
         setIsLoading(false);
       }
     };
-
-    fetchEnvio();
-  }, [id, setValue]); // Aquí usamos id en lugar de params.id
   
-  const onSubmit = async (data: EnvioFormData) => {
-    try {
-      setIsSending(true);
-      setError(null);
-      
-      // Enviar datos al servidor
-      const response = await authenticatedFetch(`/api/admin/envios-insumos/${params.id}/enviar`, {
-        method: 'POST',
-        body: JSON.stringify({
-          items: data.items,
-          observaciones: data.observaciones
-        })
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al procesar envío');
-      }
-      
-      // Redireccionar a la lista
-      router.push('/admin/envios-insumos');
-      router.refresh();
-    } catch (err: any) {
-      console.error('Error:', err);
-      setError(err.message || 'Error al procesar el envío');
-    } finally {
-      setIsSending(false);
+    fetchEnvio();
+  }, [id, setValue]);
+
+// Modificar la función onSubmit
+const onSubmit = async (data: EnvioFormData) => {
+  try {
+    setIsSending(true);
+    setError(null);
+    
+    console.log('Enviando datos:', data); // Para depuración
+    
+    const response = await authenticatedFetch(`/api/admin/envios-insumos/${id}/enviar`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Error al procesar envío');
     }
-  };
+    
+    // Redireccionar a la lista
+    router.push('/admin/envios-insumos');
+    router.refresh();
+  } catch (err: any) {
+    console.error('Error:', err);
+    setError(err.message || 'Error al procesar el envío');
+  } finally {
+    setIsSending(false);
+  }
+};
   
   const formatDate = (dateString: string | null | undefined) => {
     if (!dateString) return '-';
@@ -354,38 +353,41 @@ export default function DetalleEnvioPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {fields.map((field, index) => {
-                  const itemOriginal = envio.items.find(i => i.id === field.id);
-                  const solicitado = itemOriginal ? itemOriginal.cantidad : 0;
-                  const unidad = itemOriginal?.insumo?.unidadMedida || '';
-                  
-                  return (
-                    <tr key={field.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {itemOriginal?.insumo?.nombre || ''}
-                        <input type="hidden" {...register(`items.${index}.id`)} />
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {solicitado}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <input
-                          type="number"
-                          min="0"
-                          max={solicitado}
-                          className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                          {...register(`items.${index}.cantidad`, { valueAsNumber: true })}
-                        />
-                        {errors.items?.[index]?.cantidad && (
-                          <p className="mt-1 text-xs text-red-600">{errors.items[index]?.cantidad?.message}</p>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {unidad}
-                      </td>
-                    </tr>
-                  );
-                })}
+{fields.map((field, index) => {
+  const itemOriginal = envio.items.find(i => i.id === field.id);
+  const solicitado = itemOriginal ? itemOriginal.cantidad : 0;
+  const unidad = itemOriginal?.insumo?.unidadMedida || '';
+  
+  return (
+    <tr key={field.id}>
+      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+        {itemOriginal?.insumo?.nombre || ''}
+        <input type="hidden" {...register(`items.${index}.id`)} />
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+        {solicitado}
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap">
+        <input
+          type="number"
+          min="0"
+          // Eliminar cualquier otra restricción como max
+          className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+          {...register(`items.${index}.cantidad`, { 
+            valueAsNumber: true,
+            min: { value: 0, message: "La cantidad no puede ser negativa" }
+          })}
+        />
+        {errors.items?.[index]?.cantidad && (
+          <p className="mt-1 text-xs text-red-600">{errors.items[index]?.cantidad?.message}</p>
+        )}
+      </td>
+      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+        {unidad}
+      </td>
+    </tr>
+  );
+})}
               </tbody>
             </table>
           </div>
