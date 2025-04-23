@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { format } from 'date-fns';
 import { authenticatedFetch } from '@/hooks/useAuth';
 import { ArrowLeft, Send, Package } from 'lucide-react';
+import { use } from 'react'; // Añade esta importación
 
 // Interfaces necesarias
 interface Ubicacion {
@@ -65,13 +66,17 @@ const envioSchema = z.object({
 
 type EnvioFormData = z.infer<typeof envioSchema>;
 
-export default function DetalleEnvioPage({ params }: { params: { id: string } }) {
+export default function DetalleEnvioPage() {
+  // Usar useParams en lugar de recibir params como prop
+  const params = useParams();
+  const id = params.id as string;
+  
   const [envio, setEnvio] = useState<Envio | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  
+
   const { 
     register, 
     handleSubmit, 
@@ -97,7 +102,7 @@ export default function DetalleEnvioPage({ params }: { params: { id: string } })
       try {
         setIsLoading(true);
         
-        const response = await authenticatedFetch(`/api/admin/envios-insumos/${params.id}`);
+        const response = await authenticatedFetch(`/api/admin/envios-insumos/${id}`);
         
         if (!response.ok) {
           throw new Error('Error al cargar envío');
@@ -124,7 +129,7 @@ export default function DetalleEnvioPage({ params }: { params: { id: string } })
     };
 
     fetchEnvio();
-  }, [params.id, setValue]);
+  }, [id, setValue]); // Aquí usamos id en lugar de params.id
   
   const onSubmit = async (data: EnvioFormData) => {
     try {

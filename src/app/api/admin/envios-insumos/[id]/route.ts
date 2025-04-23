@@ -12,8 +12,11 @@ export async function GET(
   if (authError) return authError;
   
   try {
+    // Extraer y esperar el ID antes de usarlo
+    const id = params.id;
+    
     const envio = await prisma.envio.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         origen: true,
         destino: true,

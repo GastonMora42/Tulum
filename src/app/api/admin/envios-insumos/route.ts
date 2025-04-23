@@ -98,7 +98,7 @@ export async function POST(req: NextRequest) {
   if (authError) return authError;
   
   // Verificar permiso
-  const permissionError = await checkPermission('fabrica:solicitar-insumos')(req);
+  const permissionError = await checkPermission('stock:ajustar')(req);
   if (permissionError) return permissionError;
   
   try {

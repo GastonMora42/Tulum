@@ -1,14 +1,12 @@
 {
-  "/api/admin/insumos/route": "app/api/admin/insumos/route.js",
-  "/api/productos/route": "app/api/productos/route.js",
-  "/api/stock/route": "app/api/stock/route.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/admin/envios-insumos/[id]/enviar/route": "app/api/admin/envios-insumos/[id]/enviar/route.js",
+  "/api/auth/me/route": "app/api/auth/me/route.js",
   "/api/admin/envios-insumos/route": "app/api/admin/envios-insumos/route.js",
-  "/api/fabrica/produccion/route": "app/api/fabrica/produccion/route.js",
-  "/api/fabrica/produccion/init/route": "app/api/fabrica/produccion/init/route.js",
-  "/(fabrica)/fabrica/page": "app/(fabrica)/fabrica/page.js",
-  "/(fabrica)/fabrica/produccion/page": "app/(fabrica)/fabrica/produccion/page.js",
-  "/(fabrica)/fabrica/produccion/nueva/page": "app/(fabrica)/fabrica/produccion/nueva/page.js",
-  "/(fabrica)/fabrica/stock/ajuste/page": "app/(fabrica)/fabrica/stock/ajuste/page.js",
+  "/api/admin/envios-insumos/[id]/route": "app/api/admin/envios-insumos/[id]/route.js",
   "/(fabrica)/fabrica/stock/page": "app/(fabrica)/fabrica/stock/page.js",
-  "/(fabrica)/fabrica/stock/solicitud/page": "app/(fabrica)/fabrica/stock/solicitud/page.js"
+  "/(fabrica)/fabrica/stock/solicitud/page": "app/(fabrica)/fabrica/stock/solicitud/page.js",
+  "/(admin)/admin/page": "app/(admin)/admin/page.js",
+  "/(admin)/admin/envios-insumos/page": "app/(admin)/admin/envios-insumos/page.js",
+  "/(admin)/admin/envios-insumos/[id]/page": "app/(admin)/admin/envios-insumos/[id]/page.js"
 }
