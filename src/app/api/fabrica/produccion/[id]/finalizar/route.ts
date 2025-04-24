@@ -17,15 +17,15 @@ export async function POST(
   req: NextRequest,
   context: { params: { id: string } }
 ) {
-  // Extraer id de los parámetros
-  const { id } = context.params;
-  
-  // Verificar autenticación
+  // Verificar autenticación primero
   const authError = await authMiddleware(req);
   if (authError) return authError;
   
-  // Verificar permiso
-  const permissionError = await checkPermission('produccion:editar')(req);
+  // Extraer ID después de la autenticación
+  const id = context.params.id;
+  
+  // Verificar permiso - MODIFICAMOS PARA USAR produccion:crear EN LUGAR DE produccion:editar
+  const permissionError = await checkPermission('produccion:crear')(req);
   if (permissionError) return permissionError;
   
   try {

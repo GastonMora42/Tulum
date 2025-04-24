@@ -33,40 +33,40 @@ export default function EnviosFabricaPage() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  useEffect(() => {
-    const fetchEnvios = async () => {
-      try {
-        setIsLoading(true);
-        
-        // Cargar envíos pendientes específicamente para la fábrica
-        const pendientesResponse = await authenticatedFetch('/api/fabrica/envios-pendientes');
-        
-        if (!pendientesResponse.ok) {
-          throw new Error('Error al cargar envíos pendientes');
-        }
-        
-        const pendientesData = await pendientesResponse.json();
-        setEnviosPendientes(pendientesData);
-        
-        // Cargar todos los envíos relacionados con la fábrica
-        const todosResponse = await authenticatedFetch('/api/fabrica/envios');
-        
-        if (!todosResponse.ok) {
-          throw new Error('Error al cargar historial de envíos');
-        }
-        
-        const todosData = await todosResponse.json();
-        setEnvios(todosData);
-      } catch (err) {
-        console.error('Error:', err);
-        setError('No se pudieron cargar los envíos');
-      } finally {
-        setIsLoading(false);
+useEffect(() => {
+  const fetchEnvios = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Cargar envíos pendientes específicamente para la fábrica
+      const pendientesResponse = await authenticatedFetch('/api/fabrica/envios-pendientes');
+      
+      if (!pendientesResponse.ok) {
+        throw new Error('Error al cargar envíos pendientes');
       }
-    };
+      
+      const pendientesData = await pendientesResponse.json();
+      setEnviosPendientes(pendientesData);
+      
+      // Cargar todos los envíos relacionados con la fábrica
+      const todosResponse = await authenticatedFetch('/api/fabrica/envios');
+      
+      if (!todosResponse.ok) {
+        throw new Error('Error al cargar historial de envíos');
+      }
+      
+      const todosData = await todosResponse.json();
+      setEnvios(todosData);
+    } catch (err) {
+      console.error('Error:', err);
+      setError('No se pudieron cargar los envíos');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    fetchEnvios();
-  }, []);
+  fetchEnvios();
+}, []);
 
   const getEstadoBadge = (estado: string) => {
     switch (estado) {

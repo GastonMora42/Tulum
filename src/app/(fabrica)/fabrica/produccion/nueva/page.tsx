@@ -139,13 +139,13 @@ const fetchInsumosStock = async (recetaId: string) => {
       console.log(`Respuesta de stock para ${item.insumoId}:`, stockData);
       
       // Asegurar que tomamos el stock real
-      const stock = stockData[0] || { cantidad: 0 };
+      const stock = stockData.find((s: { insumoId: string; }) => s.insumoId === item.insumoId);
       
       return {
         insumoId: item.insumoId,
         nombre: item.insumo.nombre,
         unidadMedida: item.insumo.unidadMedida,
-        cantidad: stock.cantidad
+        cantidad: stock ? stock.cantidad : 0
       };
     });
     
@@ -175,6 +175,59 @@ const fetchInsumosStock = async (recetaId: string) => {
     return true;
   };
   
+  // En src/app/(fabrica)/fabrica/produccion/nueva/page.tsx
+const fetchStockEficiente = async (recetaId: string) => {
+  try {
+    const receta = recetas.find(r => r.id === recetaId);
+    if (!receta) return;
+    
+    // Extraer todos los IDs de insumos
+    const insumoIds = receta.items.map(item => item.insumoId).join(',');
+    
+    // Hacer una sola llamada API para todos los insumos
+    const response = await authenticatedFetch(`/api/stock/batch?ubicacionId=ubicacion-fabrica&insumoIds=${insumoIds}`);
+    
+    if (!response.ok) {
+      throw new Error('Error al obtener stock de insumos');
+    }
+    
+    const stockData = await response.json();
+    
+    // Crear un mapa para búsqueda rápida
+    const stockMap = new Map();
+    stockData.forEach((stock: { insumoId: any; }) => {
+      stockMap.set(stock.insumoId, stock);
+    });
+    
+    // Mapear los datos de stock a nuestro formato
+    const stockResults = receta.items.map(item => {
+      const stock = stockMap.get(item.insumoId);
+      return {
+        insumoId: item.insumoId,
+        nombre: item.insumo.nombre,
+        unidadMedida: item.insumo.unidadMedida,
+        cantidad: stock ? stock.cantidad : 0
+      };
+    });
+    
+    setInsumosStock(stockResults);
+  } catch (err) {
+    console.error('Error al cargar stock de insumos:', err);
+  }
+};
+
+// Reemplazar el efecto de carga de receta
+useEffect(() => {
+  if (recetaId) {
+    const receta = recetas.find(r => r.id === recetaId);
+    setSelectedReceta(receta || null);
+    
+    if (receta) {
+      fetchStockEficiente(receta.id);
+    }
+  }
+}, [recetaId, recetas]);
+
 // En la función onSubmit, reemplazar con:
 const onSubmit = async (data: ProduccionFormData) => {
   // Verificar stock suficiente

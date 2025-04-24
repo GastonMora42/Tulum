@@ -24,6 +24,9 @@ interface AjusteStockParams {
 }
 
 class StockService {
+  corregirInconsistencias() {
+      throw new Error('Method not implemented.');
+  }
   // Obtener stock con filtros
   async getStock(filter: StockFilter) {
     console.log(`[StockService] Consultando stock con filtros:`, filter);
@@ -375,89 +378,79 @@ class StockService {
     }
   }
   
-  // Verificar stock de insumos para producción - MEJORADO SIGNIFICATIVAMENTE
-  async verificarStockInsumosParaProduccion(recetaId: string, cantidadProduccion: number, ubicacionId: string) {
-    console.log(`[StockService] Verificando stock para producción - Receta: ${recetaId}, Cantidad: ${cantidadProduccion}, Ubicación: ${ubicacionId}`);
+// src/server/services/stock/stockService.ts - Verifica que este método funciona correctamente
+async verificarStockInsumosParaProduccion(recetaId: string, cantidadProduccion: number, ubicacionId: string) {
+  console.log(`[StockService] Verificando stock para producción - Receta: ${recetaId}, Cantidad: ${cantidadProduccion}, Ubicación: ${ubicacionId}`);
+  
+  try {
+    // Obtener receta completa con sus items e insumos
+    const receta = await prisma.receta.findUnique({
+      where: { id: recetaId },
+      include: {
+        items: {
+          include: { insumo: true }
+        }
+      }
+    });
     
-    try {
-      // Obtener receta completa con sus items e insumos
-      const receta = await prisma.receta.findUnique({
-        where: { id: recetaId },
-        include: {
-          items: {
-            include: { insumo: true }
-          }
-        }
-      });
-      
-      if (!receta) {
-        throw new Error(`No se encontró la receta con ID ${recetaId}`);
+    if (!receta) {
+      throw new Error(`No se encontró la receta con ID ${recetaId}`);
+    }
+    
+    // Extraer IDs de insumos para consultar stock en una sola operación
+    const insumoIds = receta.items.map(item => item.insumoId);
+    
+    // Obtener stock actual de todos los insumos en una sola consulta
+    const stocks = await prisma.stock.findMany({
+      where: {
+        insumoId: { in: insumoIds },
+        ubicacionId
       }
-      
-      console.log(`[StockService] Receta encontrada: ${receta.nombre} con ${receta.items.length} items`);
-      
-      // Extraer IDs de insumos para consultar stock en una sola operación
-      const insumoIds = receta.items.map(item => item.insumoId);
-      
-      // Obtener stock actual de todos los insumos en una sola consulta
-      const stocks = await prisma.stock.findMany({
-        where: {
-          insumoId: { in: insumoIds },
-          ubicacionId
-        }
-      });
-      
-      console.log(`[StockService] Se encontraron ${stocks.length} registros de stock para los insumos de la receta`);
-      
-      // Crear un mapa para acceso rápido
-      const stockMap = new Map();
-      stocks.forEach(stock => {
-        stockMap.set(stock.insumoId, stock.cantidad);
-      });
-      
-      // Analizar cada item para ver si hay suficiente stock
-      const resultados = receta.items.map(item => {
-        // Calcular cantidad necesaria según la cantidad a producir
-        const cantidadNecesaria = item.cantidad * cantidadProduccion;
-        // Obtener stock disponible actual (0 si no existe)
-        const stockDisponible = stockMap.get(item.insumoId) || 0;
-        // Verificar si hay suficiente stock
-        const suficiente = stockDisponible >= cantidadNecesaria;
-        
-        return {
-          insumoId: item.insumoId,
-          nombre: item.insumo.nombre,
-          cantidadNecesaria,
-          stockDisponible,
-          suficiente,
-          unidadMedida: item.insumo.unidadMedida,
-          faltante: suficiente ? 0 : cantidadNecesaria - stockDisponible
-        };
-      });
-      
-      // Determinar si hay suficiente stock para toda la producción
-      const suficienteParaProduccion = resultados.every(r => r.suficiente);
-      
-      console.log(`[StockService] ¿Hay suficiente stock para producción? ${suficienteParaProduccion ? 'SI' : 'NO'}`);
-      if (!suficienteParaProduccion) {
-        const faltantes = resultados.filter(r => !r.suficiente);
-        console.log(`[StockService] Insumos con stock insuficiente:`, faltantes);
-      }
+    });
+    
+    // Crear un mapa para acceso rápido
+    const stockMap = new Map();
+    stocks.forEach(stock => {
+      stockMap.set(stock.insumoId, stock.cantidad);
+    });
+    
+    // Analizar cada item para ver si hay suficiente stock
+    const resultados = receta.items.map(item => {
+      // Calcular cantidad necesaria según la cantidad a producir
+      const cantidadNecesaria = item.cantidad * cantidadProduccion;
+      // Obtener stock disponible actual (0 si no existe)
+      const stockDisponible = stockMap.get(item.insumoId) || 0;
+      // Verificar si hay suficiente stock
+      const suficiente = stockDisponible >= cantidadNecesaria;
       
       return {
-        suficienteParaProduccion,
-        detalleInsumos: resultados,
-        receta: {
-          id: receta.id,
-          nombre: receta.nombre,
-          rendimiento: receta.rendimiento
-        }
+        insumoId: item.insumoId,
+        nombre: item.insumo.nombre,
+        cantidadNecesaria,
+        stockDisponible,
+        suficiente,
+        unidadMedida: item.insumo.unidadMedida,
+        faltante: suficiente ? 0 : cantidadNecesaria - stockDisponible
       };
-    } catch (error) {
-      console.error(`[StockService] Error al verificar stock para producción:`, error);
-      throw error;
-    }
+    });
+    
+    // Determinar si hay suficiente stock para toda la producción
+    const suficienteParaProduccion = resultados.every(r => r.suficiente);
+    
+    return {
+      suficienteParaProduccion,
+      detalleInsumos: resultados,
+      receta: {
+        id: receta.id,
+        nombre: receta.nombre,
+        rendimiento: receta.rendimiento
+      }
+    };
+  } catch (error) {
+    console.error(`[StockService] Error al verificar stock para producción:`, error);
+    throw error;
   }
+}
 
   // Método para el dashboard que muestra estadísticas de stock
   async getDashboardStock(ubicacionId: string) {

@@ -1,7 +1,8 @@
 // src/server/api/middlewares/authorization.ts
 import { NextRequest, NextResponse } from 'next/server';
 
-export function checkPermission(requiredPermission: string) {
+// src/server/api/middlewares/authorization.ts
+export function checkPermission(requiredPermission: string | string[]) {
   return async function(req: NextRequest) {
     const user = (req as any).user;
     
@@ -41,12 +42,14 @@ export function checkPermission(requiredPermission: string) {
     }
     
     // Verificar permiso wildcard o específico
+    const permissionsToCheck = Array.isArray(requiredPermission) ? requiredPermission : [requiredPermission];
+    
     if (Array.isArray(permissions) && 
-        (permissions.includes('*') || permissions.includes(requiredPermission))) {
+        (permissions.includes('*') || permissionsToCheck.some(perm => permissions.includes(perm)))) {
       return null; // Sin error, continuar
     }
     
-    console.log(`Usuario ${user.id} no tiene permiso ${requiredPermission}`);
+    console.log(`Usuario ${user.id} no tiene permiso ${Array.isArray(requiredPermission) ? requiredPermission.join(' o ') : requiredPermission}`);
     console.log('Permisos disponibles:', permissions);
     
     return NextResponse.json(

@@ -1,11 +1,4 @@
 {
-  "/api/admin/recetas/route": "app/api/admin/recetas/route.js",
-  "/api/admin/productos/route": "app/api/admin/productos/route.js",
-  "/api/admin/recetas/[id]/route": "app/api/admin/recetas/[id]/route.js",
-  "/(auth)/login/page": "app/(auth)/login/page.js",
-  "/(admin)/admin/recetas/nueva/page": "app/(admin)/admin/recetas/nueva/page.js",
-  "/(admin)/admin/recetas/[id]/page": "app/(admin)/admin/recetas/[id]/page.js",
-  "/(admin)/admin/insumos/page": "app/(admin)/admin/insumos/page.js",
-  "/(admin)/admin/recetas/page": "app/(admin)/admin/recetas/page.js",
-  "/(admin)/admin/productos/page": "app/(admin)/admin/productos/page.js"
+  "/_not-found/page": "app/_not-found/page.js",
+  "/(auth)/login/page": "app/(auth)/login/page.js"
 }
