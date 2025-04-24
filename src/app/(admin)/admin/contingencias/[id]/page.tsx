@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { useAuthStore } from '@/stores/authStore';
+import { authenticatedFetch } from '@/hooks/useAuth';
 
 interface Contingencia {
   id: string;
@@ -39,7 +40,7 @@ export default function DetalleContingenciaPage({ params }: { params: { id: stri
     const fetchContingencia = async () => {
       try {
         setIsLoading(true);
-        const response = await fetch(`/api/contingencias/${params.id}`);
+        const response = await authenticatedFetch(`/api/contingencias/${params.id}`);
         
         if (!response.ok) {
           throw new Error('Error al cargar contingencia');
@@ -78,7 +79,7 @@ export default function DetalleContingenciaPage({ params }: { params: { id: stri
         }
       }
       
-      const response = await fetch(`/api/contingencias/${params.id}`, {
+      const response = await authenticatedFetch(`/api/contingencias/${params.id}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'

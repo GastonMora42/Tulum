@@ -6,20 +6,115 @@
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
     ],
+    "/(auth)/login/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(auth)/login/page.js"
+    ],
+    "/api/auth/login/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/auth/login/route.js"
+    ],
+    "/(admin)/layout": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(admin)/layout.js"
+    ],
+    "/(admin)/admin/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(admin)/admin/page.js"
+    ],
+    "/api/auth/me/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/auth/me/route.js"
+    ],
+    "/api/reportes/stock/bajo/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/reportes/stock/bajo/route.js"
+    ],
+    "/api/contingencias/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/contingencias/route.js"
+    ],
+    "/api/admin/productos/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/productos/route.js"
+    ],
+    "/(admin)/admin/contingencias/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(admin)/admin/contingencias/page.js"
+    ],
+    "/(admin)/admin/stock/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(admin)/admin/stock/page.js"
+    ],
+    "/api/admin/ubicaciones/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/ubicaciones/route.js"
+    ],
+    "/api/stock/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/stock/route.js"
+    ],
+    "/(admin)/admin/productos/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(admin)/admin/productos/page.js"
+    ],
+    "/api/admin/categorias/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/categorias/route.js"
+    ],
+    "/(admin)/admin/productos/nuevo/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(admin)/admin/productos/nuevo/page.js"
+    ],
+    "/(admin)/admin/contingencias/[id]/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(admin)/admin/contingencias/[id]/page.js"
+    ],
+    "/api/contingencias/[id]/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/contingencias/[id]/route.js"
+    ],
     "/(fabrica)/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/(fabrica)/layout.js"
     ],
-    "/(fabrica)/fabrica/page": [
+    "/(fabrica)/fabrica/produccion/[id]/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(fabrica)/fabrica/page.js"
+      "static/chunks/app/(fabrica)/fabrica/produccion/[id]/page.js"
     ],
-    "/(auth)/login/page": [
+    "/api/fabrica/produccion/[id]/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(auth)/login/page.js"
+      "static/chunks/app/api/fabrica/produccion/[id]/route.js"
+    ],
+    "/(fabrica)/fabrica/produccion/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(fabrica)/fabrica/produccion/page.js"
+    ],
+    "/api/fabrica/produccion/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/fabrica/produccion/route.js"
     ],
     "/_not-found/page": [
       "static/chunks/webpack.js",

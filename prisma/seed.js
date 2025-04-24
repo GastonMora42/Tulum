@@ -57,7 +57,7 @@ async function main() {
   });
 
   // Crear ubicaciones
-  const fabrica = await prisma.ubicacion.upsert({
+  const fabricaCentral = await prisma.ubicacion.upsert({
     where: { id: 'ubicacion-fabrica' },
     update: {},
     create: {
@@ -69,14 +69,51 @@ async function main() {
     },
   });
 
-  const sucursal1 = await prisma.ubicacion.upsert({
-    where: { id: 'ubicacion-sucursal1' },
+  const oficinaCentral = await prisma.ubicacion.upsert({
+    where: { id: 'ubicacion-admin' },
     update: {},
     create: {
-      id: 'ubicacion-sucursal1',
-      nombre: 'Tienda Tulum Centro',
+      id: 'ubicacion-admin',
+      nombre: 'Oficina Central',
+      tipo: 'admin',
+      direccion: 'Calle Corporativa 500, Tulum',
+      activo: true,
+    },
+  });
+
+  // Crear tiendas (reemplazando las anteriores)
+  const tiendaNeuquen = await prisma.ubicacion.upsert({
+    where: { id: 'ubicacion-neuquen' },
+    update: {},
+    create: {
+      id: 'ubicacion-neuquen',
+      nombre: 'Tienda Neuquén',
       tipo: 'sucursal',
-      direccion: 'Calle Centauro Sur, Tulum Centro',
+      direccion: 'Av. Argentina 200, Neuquén',
+      activo: true,
+    },
+  });
+
+  const tiendaBariloche = await prisma.ubicacion.upsert({
+    where: { id: 'ubicacion-bariloche' },
+    update: {},
+    create: {
+      id: 'ubicacion-bariloche',
+      nombre: 'Tienda Bariloche',
+      tipo: 'sucursal',
+      direccion: 'Mitre 150, Bariloche',
+      activo: true,
+    },
+  });
+
+  const tiendaMendoza = await prisma.ubicacion.upsert({
+    where: { id: 'ubicacion-mendoza' },
+    update: {},
+    create: {
+      id: 'ubicacion-mendoza',
+      nombre: 'Tienda Mendoza',
+      tipo: 'sucursal',
+      direccion: 'Av. San Martín 500, Mendoza',
       activo: true,
     },
   });
@@ -165,15 +202,29 @@ async function main() {
     }),
   ]);
 
-  // Crear stock inicial en fábrica
+  // Crear stock inicial en todas las ubicaciones
+  const sucursales = [tiendaNeuquen, tiendaBariloche, tiendaMendoza];
+  
+  // Stock de insumos en fábrica y admin
   await Promise.all([
-    // Stock de insumos
+    // Stock de insumos en fábrica
     ...insumos.map(insumo => 
       prisma.stock.create({
         data: {
           insumoId: insumo.id,
-          ubicacionId: fabrica.id,
+          ubicacionId: fabricaCentral.id,
           cantidad: 20,
+        },
+      })
+    ),
+    
+    // Stock de insumos en oficina central
+    ...insumos.map(insumo => 
+      prisma.stock.create({
+        data: {
+          insumoId: insumo.id,
+          ubicacionId: oficinaCentral.id,
+          cantidad: 50, // Mayor cantidad en admin para envíos
         },
       })
     ),
@@ -183,21 +234,23 @@ async function main() {
       prisma.stock.create({
         data: {
           productoId: producto.id,
-          ubicacionId: fabrica.id,
+          ubicacionId: fabricaCentral.id,
           cantidad: 30,
         },
       })
     ),
     
-    // Stock de productos en sucursal
-    ...productos.map(producto => 
-      prisma.stock.create({
-        data: {
-          productoId: producto.id,
-          ubicacionId: sucursal1.id,
-          cantidad: 15,
-        },
-      })
+    // Stock de productos en sucursales
+    ...sucursales.flatMap(sucursal => 
+      productos.map(producto => 
+        prisma.stock.create({
+          data: {
+            productoId: producto.id,
+            ubicacionId: sucursal.id,
+            cantidad: 15,
+          },
+        })
+      )
     )
   ]);
 

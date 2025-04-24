@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
+import { authenticatedFetch } from '@/hooks/useAuth';
 
 interface Contingencia {
   id: string;
@@ -37,7 +38,7 @@ export default function ContingenciasPage() {
         if (filtroEstado) params.append('estado', filtroEstado);
         if (filtroOrigen) params.append('origen', filtroOrigen);
         
-        const response = await fetch(`/api/contingencias?${params.toString()}`);
+        const response = await authenticatedFetch(`/api/contingencias?${params.toString()}`);
         
         if (!response.ok) {
           throw new Error('Error al cargar contingencias');

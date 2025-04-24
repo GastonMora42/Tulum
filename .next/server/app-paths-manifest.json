@@ -1,4 +1,10 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
-  "/(auth)/login/page": "app/(auth)/login/page.js"
+  "/api/fabrica/produccion/[id]/route": "app/api/fabrica/produccion/[id]/route.js",
+  "/(admin)/admin/contingencias/[id]/page": "app/(admin)/admin/contingencias/[id]/page.js",
+  "/(fabrica)/fabrica/produccion/page": "app/(fabrica)/fabrica/produccion/page.js",
+  "/(admin)/admin/productos/nuevo/page": "app/(admin)/admin/productos/nuevo/page.js",
+  "/(admin)/admin/productos/page": "app/(admin)/admin/productos/page.js",
+  "/(fabrica)/fabrica/produccion/[id]/page": "app/(fabrica)/fabrica/produccion/[id]/page.js",
+  "/(admin)/admin/contingencias/page": "app/(admin)/admin/contingencias/page.js"
 }

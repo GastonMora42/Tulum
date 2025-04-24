@@ -39,7 +39,8 @@ export async function GET(req: NextRequest) {
       where,
       include: {
         producto: tipo === 'producto' ? true : false,
-        insumo: tipo === 'insumo' ? true : false
+        insumo: tipo === 'insumo' ? true : false,
+        ubicacion: true  // Esta línea es importante
       }
     });
     

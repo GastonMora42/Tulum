@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { authenticatedFetch } from '@/hooks/useAuth';
 
 // Esquema de validación
 const contingenciaSchema = z.object({
@@ -46,7 +47,7 @@ export default function NuevaContingenciaPage() {
       setIsLoading(true);
       setError(null);
       
-      const response = await fetch('/api/contingencias', {
+      const response = await authenticatedFetch('/api/contingencias', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

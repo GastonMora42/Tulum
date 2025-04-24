@@ -16,14 +16,17 @@ const rechazarContingenciaSchema = z.object({
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }  // Cambiar aquí para usar context
 ) {
   // Aplicar middleware de autenticación
   const authResponse = await authMiddleware(req);
   if (authResponse) return authResponse;
 
   try {
-    const contingencia = await contingenciaService.obtenerContingencia(params.id);
+    // Usar context.params en lugar de params directamente
+    const id = context.params.id;
+    
+    const contingencia = await contingenciaService.obtenerContingencia(id);
     
     if (!contingencia) {
       return NextResponse.json(
@@ -44,13 +47,14 @@ export async function GET(
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   // Aplicar middleware de autenticación
   const authResponse = await authMiddleware(req);
   if (authResponse) return authResponse;
 
   try {
+    const id = context.params.id;
     const user = (req as any).user;
     const body = await req.json();
     const { accion } = body;
@@ -69,7 +73,7 @@ export async function PATCH(
         }
         
         resultado = await contingenciaService.resolverContingencia(
-          params.id,
+          id,
           {
             respuesta: body.respuesta,
             resueltoPor: user.id,
@@ -89,7 +93,7 @@ export async function PATCH(
         }
         
         resultado = await contingenciaService.rechazarContingencia(
-          params.id,
+          id,
           {
             respuesta: body.respuesta,
             resueltoPor: user.id
@@ -99,7 +103,7 @@ export async function PATCH(
         
       case 'en_revision':
         resultado = await contingenciaService.enRevisionContingencia(
-          params.id,
+          id,
           user.id
         );
         break;
