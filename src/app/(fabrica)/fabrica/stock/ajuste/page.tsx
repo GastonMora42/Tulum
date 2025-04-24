@@ -6,6 +6,7 @@ import { useForm } from 'react-hook-form';
 import { authenticatedFetch } from '@/hooks/useAuth';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useAuthStore } from '@/stores/authStore';
 
 // Interfaces para los tipos de datos
 interface Insumo {
@@ -37,6 +38,7 @@ export default function AjusteStockPage() {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const router = useRouter();
+  const { user } = useAuthStore();
   
   const { 
     register, 
@@ -53,6 +55,14 @@ export default function AjusteStockPage() {
       motivo: 'Ajuste manual de stock'
     }
   });
+
+  useEffect(() => {
+    if (user?.roleId === 'role-fabrica') {
+      // Mostrar mensaje y redirigir
+      alert('Como operador de fábrica, no puede ajustar el stock directamente. Debe utilizar el flujo de solicitud y recepción de insumos.');
+      router.replace('/fabrica/stock/solicitud');
+    }
+  }, [user, router]);
   
   // Observar el tipo seleccionado
   const tipoSeleccionado = watch('tipo');
@@ -130,6 +140,17 @@ export default function AjusteStockPage() {
       setIsSaving(false);
     }
   };
+  
+  if (user?.roleId === 'role-fabrica') {
+    return (
+      <div className="p-6 bg-red-50 border-l-4 border-red-500 text-red-700">
+        <h2 className="text-lg font-medium mb-2">Acceso restringido</h2>
+        <p>Como operador de fábrica, no puede ajustar el stock directamente.</p>
+        <p>Debe utilizar el flujo completo de solicitud y recepción de insumos para modificar el inventario.</p>
+        <p className="mt-2">Redirigiendo a solicitud de insumos...</p>
+      </div>
+    );
+  }
   
   return (
     <div className="space-y-6">

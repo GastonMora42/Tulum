@@ -13,6 +13,16 @@ export function checkPermission(requiredPermission: string | string[]) {
       );
     }
     
+    // Restricción específica para ajuste de stock en rol fábrica
+    if (user.roleId === 'role-fabrica' && 
+        (requiredPermission === 'stock:ajustar' || 
+         (Array.isArray(requiredPermission) && requiredPermission.includes('stock:ajustar')))) {
+      return NextResponse.json(
+        { error: 'Como operador de fábrica, no puede ajustar el stock directamente. Debe utilizar el flujo de solicitud y recepción de insumos.' },
+        { status: 403 }
+      );
+    }
+    
     // Tratar admin como rol especial con todos los permisos
     if (user.roleId === 'role-admin') {
       return null; // Sin error, continuar

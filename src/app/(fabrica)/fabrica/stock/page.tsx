@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { authenticatedFetch } from '@/hooks/useAuth';
+import { useAuthStore } from '@/stores/authStore';
 
 interface InsumoStock {
   id: string;
@@ -33,6 +34,7 @@ export default function StockPage() {
   const [inconsistencias, setInconsistencias] = useState<any[]>([]);
   const [mostrarAlerta, setMostrarAlerta] = useState(false);
   const [corrigiendo, setCorrigiendo] = useState(false);
+  const { user } = useAuthStore();
   
   useEffect(() => {
     const fetchStock = async () => {
@@ -151,15 +153,17 @@ export default function StockPage() {
           >
             Solicitar Insumos
           </Link>
-          <Link 
-            href="/fabrica/stock/ajuste" 
-            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
-          >
-            Ajustar Stock
-          </Link>
+          {/* Mostrar el botón de ajuste solo si no es rol de fábrica */}
+          {user?.roleId !== 'role-fabrica' && (
+            <Link 
+              href="/fabrica/stock/ajuste" 
+              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+            >
+              Ajustar Stock
+            </Link>
+          )}
         </div>
-      </div>
-      
+        </div>
       {/* Stock de Insumos */}
       <div className="bg-white shadow overflow-hidden sm:rounded-lg">
         <div className="px-4 py-5 sm:px-6 bg-blue-50">

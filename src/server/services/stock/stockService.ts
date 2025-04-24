@@ -163,10 +163,15 @@ class StockService {
       let isAdmin = false;
       
       try {
-        const usuario = await tx.user.findUnique({
-          where: { id: usuarioId },
+        // Verificar rol del usuario
+        const usuario = await prisma.user.findUnique({
+          where: { id: params.usuarioId },
           include: { role: true }
         });
+        
+        if (usuario?.roleId === 'role-fabrica' && !params.produccionId && !params.envioId) {
+          throw new Error('Los operadores de fábrica solo pueden modificar stock a través de producciones o envíos.');
+        }
         
         // Considerar admin si es role-admin o tiene el permiso explícito
         isAdmin = usuario?.roleId === 'role-admin' || allowNegative;

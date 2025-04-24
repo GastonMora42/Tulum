@@ -140,7 +140,10 @@ export default function FabricaLayout({
       icon: <Archive className="w-5 h-5" />,
       submenu: [
         { href: '/fabrica/stock', label: 'Estado Actual' },
-        { href: '/fabrica/stock/ajuste', label: 'Ajustar Stock' },
+        // Ocultar ajuste de stock para rol de fábrica
+        ...(user?.roleId !== 'role-fabrica' ? [
+          { href: '/fabrica/stock/ajuste', label: 'Ajustar Stock' }
+        ] : []),
         { href: '/fabrica/stock/solicitud', label: 'Solicitar Insumos' }
       ]
     },

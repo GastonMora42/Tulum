@@ -1,11 +1,12 @@
 {
-  "/api/fabrica/envios-pendientes/route": "app/api/fabrica/envios-pendientes/route.js",
-  "/api/fabrica/envios/route": "app/api/fabrica/envios/route.js",
+  "/api/stock/route": "app/api/stock/route.js",
+  "/api/admin/insumos/route": "app/api/admin/insumos/route.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/productos/route": "app/api/productos/route.js",
+  "/api/auth/me/route": "app/api/auth/me/route.js",
+  "/(auth)/login/page": "app/(auth)/login/page.js",
+  "/(fabrica)/fabrica/page": "app/(fabrica)/fabrica/page.js",
+  "/(fabrica)/fabrica/stock/solicitud/page": "app/(fabrica)/fabrica/stock/solicitud/page.js",
   "/(fabrica)/fabrica/stock/page": "app/(fabrica)/fabrica/stock/page.js",
-  "/(fabrica)/fabrica/produccion/nueva/page": "app/(fabrica)/fabrica/produccion/nueva/page.js",
-  "/(fabrica)/fabrica/produccion/page": "app/(fabrica)/fabrica/produccion/page.js",
-  "/(fabrica)/fabrica/produccion/[id]/page": "app/(fabrica)/fabrica/produccion/[id]/page.js",
-  "/(fabrica)/fabrica/envios/nuevo/page": "app/(fabrica)/fabrica/envios/nuevo/page.js",
-  "/(fabrica)/fabrica/stock/ajuste/page": "app/(fabrica)/fabrica/stock/ajuste/page.js",
-  "/(fabrica)/fabrica/envios/page": "app/(fabrica)/fabrica/envios/page.js"
+  "/(fabrica)/fabrica/stock/ajuste/page": "app/(fabrica)/fabrica/stock/ajuste/page.js"
 }

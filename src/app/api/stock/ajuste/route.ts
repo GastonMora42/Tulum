@@ -17,6 +17,15 @@ export async function POST(req: NextRequest) {
     return permissionResponse;
   }
   
+  // Verificación adicional para el rol de fábrica
+  const user = (req as any).user;
+  if (user.roleId === 'role-fabrica') {
+    return NextResponse.json(
+      { error: 'Los operadores de fábrica deben utilizar el flujo de solicitud y recepción para manejar el stock.' },
+      { status: 403 }
+    );
+  }
+  
   try {
     const body = await req.json();
     const { productoId, insumoId, ubicacionId, cantidad, motivo } = body;
