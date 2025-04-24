@@ -113,9 +113,9 @@ for (const item of envio.items) {
   }
 }
 
-// Una vez verificado, proceder con el ajuste de stock
 for (const item of envio.items) {
   if (item && item.insumoId) {
+    // Reducir stock en origen (código existente)
     await stockService.ajustarStock({
       insumoId: item.insumoId,
       ubicacionId: envio.origenId || '',
@@ -123,7 +123,16 @@ for (const item of envio.items) {
       motivo: `Envío de insumos #${id}`,
       usuarioId: user.id,
       envioId: id,
-      allowNegative: isAdmin // Permitir stock negativo si es admin
+      allowNegative: isAdmin
+    });
+    
+    await stockService.ajustarStock({
+      insumoId: item.insumoId,
+      ubicacionId: envio.destinoId,
+      cantidad: item.cantidad || 0, // Cantidad positiva porque entra al destino
+      motivo: `Recepción de insumos #${id}`,
+      usuarioId: user.id,
+      envioId: id
     });
   }
 }
