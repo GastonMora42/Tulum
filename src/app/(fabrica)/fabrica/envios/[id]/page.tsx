@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
-import { ChevronLeft, Clipboard, Check, AlertTriangle, Loader2, Package } from 'lucide-react';
+import { ChevronLeft, Clipboard, Check, AlertTriangle, Loader2, Package, CheckCircle } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
 import Link from 'next/link';
 import { useForm, useFieldArray } from 'react-hook-form';
@@ -68,6 +68,7 @@ export default function RecibirEnvioPage({ params }: { params: { id: string } })
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const router = useRouter();
 
   const { 
@@ -161,17 +162,19 @@ export default function RecibirEnvioPage({ params }: { params: { id: string } })
       
       const resultado = await response.json();
       
-      // Redireccionar según si hay contingencias o no
-      if (resultado.hayDiscrepancias) {
-        // Mostrar alerta y redireccionar a contingencias
-        alert('Se ha generado una contingencia debido a las diferencias detectadas.');
-        router.push('/fabrica/contingencias');
-      } else {
-        // Redireccionar a la lista de envíos
-        router.push('/fabrica/envios');
-      }
+      // Mostrar mensaje de éxito
+      setSuccess('Envío recibido correctamente. El stock ha sido actualizado.');
       
-      router.refresh();
+      // Redireccionar después de un breve retraso
+      setTimeout(() => {
+        if (resultado.hayDiscrepancias) {
+          router.push('/fabrica/contingencias');
+        } else {
+          router.push('/fabrica/envios');
+        }
+        router.refresh();
+      }, 2000);
+      
     } catch (err: any) {
       console.error('Error:', err);
       setError(err.message || 'Error al recibir el envío');
@@ -233,6 +236,20 @@ export default function RecibirEnvioPage({ params }: { params: { id: string } })
           <ChevronLeft className="h-4 w-4 mr-1" />
           Volver
         </button>
+      </div>
+    );
+  }
+
+  // Mostrar mensaje de éxito
+  if (success) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64">
+        <div className="bg-green-100 text-green-800 p-4 rounded-lg mb-4 flex items-center">
+          <CheckCircle className="h-6 w-6 mr-2" />
+          {success}
+        </div>
+        <p className="text-gray-500 mb-4">Redirigiendo...</p>
+        <div className="animate-spin h-8 w-8 border-4 border-green-500 border-t-transparent rounded-full"></div>
       </div>
     );
   }
@@ -391,12 +408,7 @@ export default function RecibirEnvioPage({ params }: { params: { id: string } })
         <div className="flex items-center">
           <h1 className="text-2xl font-bold mr-3">Recibir Envío #{envio.id.slice(-6)}</h1>
           <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getEstadoBadge(envio.estado)}`}>
-          if (envio.estado !== 'enviado' && envio.estado !== 'en_transito') {
-             envio.estado === 'enviado' ? 'Enviado' : 
-             envio.estado === 'en_transito' ? 'En tránsito' : 
-             envio.estado === 'recibido' ? 'Recibido' : 
-             envio.estado === 'contingencia' ? 'Con contingencia' : 
-             'Estado desconocido'}
+            {envio.estado === 'enviado' ? 'Enviado' : 'En tránsito'}
           </span>
         </div>
         <button
@@ -408,23 +420,23 @@ export default function RecibirEnvioPage({ params }: { params: { id: string } })
         </button>
       </div>
 
-      {/* Información del envío */}
-      <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-        <div className="px-4 py-5 sm:px-6 bg-gray-50">
-          <h3 className="text-lg leading-6 font-medium text-gray-900">Información del Envío</h3>
+      {/* Información del envío - Panel mejorado */}
+      <div className="bg-white shadow-lg rounded-lg overflow-hidden border border-blue-100">
+        <div className="px-4 py-5 sm:px-6 bg-blue-50">
+          <h3 className="text-lg leading-6 font-medium text-blue-900">Información del Envío</h3>
         </div>
-        <div className="border-t border-gray-200 px-4 py-5 sm:p-0">
+        <div className="border-t border-blue-100 px-4 py-5 sm:p-0">
           <dl className="sm:divide-y sm:divide-gray-200">
             <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
               <dt className="text-sm font-medium text-gray-500">Origen</dt>
               <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                {envio.origen.nombre} ({envio.origen.tipo})
+                <span className="font-medium">{envio.origen.nombre}</span> ({envio.origen.tipo})
               </dd>
             </div>
             <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
               <dt className="text-sm font-medium text-gray-500">Destino</dt>
               <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                {envio.destino.nombre} ({envio.destino.tipo})
+                <span className="font-medium">{envio.destino.nombre}</span> ({envio.destino.tipo})
               </dd>
             </div>
             <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
@@ -437,8 +449,8 @@ export default function RecibirEnvioPage({ params }: { params: { id: string } })
         </div>
       </div>
 
-      {/* Formulario de recepción */}
-      <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+      {/* Formulario de recepción - Mejorado */}
+      <div className="bg-white shadow-lg rounded-lg overflow-hidden border-2 border-green-100">
         <div className="px-4 py-5 sm:px-6 bg-green-50">
           <h3 className="text-lg leading-6 font-medium text-green-900 flex items-center">
             <Clipboard className="h-5 w-5 mr-2 text-green-600" />
@@ -448,21 +460,22 @@ export default function RecibirEnvioPage({ params }: { params: { id: string } })
             Verifique las cantidades recibidas y reporte cualquier discrepancia.
           </p>
         </div>
-        <div className="border-t border-gray-200 p-4">
+        <div className="border-t border-green-100 p-6">
           {error && (
-            <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-md">
-              {error}
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-md flex items-start">
+              <AlertTriangle className="h-5 w-5 mr-2 mt-0.5" />
+              <span>{error}</span>
             </div>
           )}
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            <div className="space-y-4">
-              <h4 className="text-md font-medium text-gray-900">Insumos Recibidos</h4>
-              <p className="text-sm text-gray-500">
+            <div className="space-y-6">
+              <h4 className="text-md font-medium text-gray-900 border-b pb-2">Insumos Recibidos</h4>
+              <p className="text-sm text-gray-500 mb-4">
                 Si las cantidades recibidas difieren de las enviadas, se generará automáticamente una contingencia.
               </p>
 
-              <div className="bg-gray-50 p-4 rounded-md">
+              <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
                 {fields.map((field, index) => {
                   const itemEnvioId = field.itemEnvioId;
                   const cantidadRecibida = watch(`items.${index}.cantidadRecibida`);
@@ -470,12 +483,12 @@ export default function RecibirEnvioPage({ params }: { params: { id: string } })
                   const hayDiferencia = tieneDiferencia(itemEnvioId, cantidadRecibida);
 
                   return (
-                    <div key={field.id} className="flex flex-col md:flex-row gap-4 mb-4 pb-4 border-b border-gray-200 last:border-0 last:mb-0 last:pb-0">
+                    <div key={field.id} className={`flex flex-col md:flex-row gap-4 mb-6 pb-6 border-b border-gray-200 last:border-0 last:mb-0 last:pb-0 ${hayDiferencia ? 'bg-yellow-50 p-4 rounded-lg' : ''}`}>
                       <div className="flex-1">
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Insumo
                         </label>
-                        <div className="flex items-center bg-gray-100 p-2 rounded">
+                        <div className="flex items-center bg-white p-3 rounded border border-gray-300">
                           <span className="text-sm font-medium">
                             {envioItem?.insumo.nombre}
                           </span>
@@ -486,7 +499,7 @@ export default function RecibirEnvioPage({ params }: { params: { id: string } })
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Cantidad enviada
                         </label>
-                        <div className="flex items-center bg-gray-100 p-2 rounded">
+                        <div className="flex items-center bg-white p-3 rounded border border-gray-300">
                           <span className="text-sm font-medium">
                             {envioItem?.cantidad} {envioItem?.insumo.unidadMedida}
                           </span>
@@ -514,7 +527,8 @@ export default function RecibirEnvioPage({ params }: { params: { id: string } })
                           <p className="mt-1 text-sm text-red-600">{errors.items[index]?.cantidadRecibida?.message}</p>
                         )}
                         {hayDiferencia && (
-                          <p className="mt-1 text-sm text-orange-600">
+                          <p className="mt-1 text-sm text-orange-600 flex items-center">
+                            <AlertTriangle className="h-4 w-4 mr-1" />
                             Diferencia detectada: {cantidadRecibida < (envioItem?.cantidad || 0) ? 'faltante' : 'excedente'}
                           </p>
                         )}
@@ -542,16 +556,16 @@ export default function RecibirEnvioPage({ params }: { params: { id: string } })
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? (
                   <>
-                    <Loader2 className="animate-spin h-4 w-4 mr-2" /> 
+                    <Loader2 className="animate-spin h-5 w-5 mr-2" /> 
                     Procesando...
                   </>
                 ) : (
                   <>
-                    <Check className="h-4 w-4 mr-2" />
+                    <Check className="h-5 w-5 mr-2" />
                     Confirmar Recepción
                   </>
                 )}

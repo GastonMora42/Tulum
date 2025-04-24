@@ -1,1 +1,6 @@
-{}
+{
+  "/api/auth/me/route": "app/api/auth/me/route.js",
+  "/api/fabrica/envios-pendientes/route": "app/api/fabrica/envios-pendientes/route.js",
+  "/(auth)/login/page": "app/(auth)/login/page.js",
+  "/(fabrica)/fabrica/envios/page": "app/(fabrica)/fabrica/envios/page.js"
+}

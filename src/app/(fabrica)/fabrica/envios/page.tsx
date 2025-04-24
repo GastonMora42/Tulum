@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
-import { Package, TruckIcon, AlertTriangle, Search, Filter, RefreshCw } from 'lucide-react';
+import { Package, TruckIcon, AlertTriangle, Search, Filter, RefreshCw, Bell } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
 
 interface Envio {
@@ -31,12 +31,12 @@ export default function EnviosFabricaPage() {
   const [enviosPendientes, setEnviosPendientes] = useState<Envio[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const router = useRouter();
 
-useEffect(() => {
-  const fetchEnvios = async () => {
+  const fetchData = async () => {
     try {
-      setIsLoading(true);
+      setRefreshing(true);
       
       // Cargar envíos pendientes específicamente para la fábrica
       const pendientesResponse = await authenticatedFetch('/api/fabrica/envios-pendientes');
@@ -62,11 +62,17 @@ useEffect(() => {
       setError('No se pudieron cargar los envíos');
     } finally {
       setIsLoading(false);
+      setRefreshing(false);
     }
   };
 
-  fetchEnvios();
-}, []);
+  useEffect(() => {
+    fetchData();
+
+    // Programar actualización periódica
+    const intervalId = setInterval(fetchData, 60000); // Actualizar cada minuto
+    return () => clearInterval(intervalId);
+  }, []);
 
   const getEstadoBadge = (estado: string) => {
     switch (estado) {
@@ -98,13 +104,38 @@ useEffect(() => {
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Envíos de Insumos</h1>
 
-      {/* Envíos pendientes de recepción */}
-      <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-        <div className="px-4 py-5 sm:px-6 bg-yellow-50">
+      {/* Contador de envíos pendientes */}
+      {enviosPendientes.length > 0 && (
+        <div className="bg-amber-50 border-l-4 border-amber-400 p-4 flex items-center justify-between">
+          <div className="flex items-center">
+            <Bell className="h-5 w-5 text-amber-500 mr-2" />
+            <span className="font-medium">
+              Tienes {enviosPendientes.length} envío{enviosPendientes.length !== 1 ? 's' : ''} pendiente{enviosPendientes.length !== 1 ? 's' : ''} de recepción
+            </span>
+          </div>
+          <button 
+            onClick={fetchData}
+            className="text-green-600 hover:text-green-800 flex items-center"
+            disabled={refreshing}
+          >
+            <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
+            Actualizar
+          </button>
+        </div>
+      )}
+
+      {/* Envíos pendientes de recepción - Panel destacado */}
+      <div className="bg-white shadow-lg rounded-lg overflow-hidden border-2 border-yellow-200">
+        <div className="px-4 py-5 sm:px-6 bg-yellow-50 flex justify-between items-center">
           <h3 className="text-lg leading-6 font-medium text-yellow-900 flex items-center">
             <TruckIcon className="h-5 w-5 mr-2 text-yellow-600" />
             Envíos Pendientes de Recepción
           </h3>
+          {enviosPendientes.length > 0 && (
+            <span className="bg-yellow-200 text-yellow-800 py-1 px-3 rounded-full text-sm font-medium">
+              {enviosPendientes.length} pendiente{enviosPendientes.length !== 1 ? 's' : ''}
+            </span>
+          )}
         </div>
         <div className="border-t border-gray-200">
           {isLoading ? (
@@ -121,42 +152,38 @@ useEffect(() => {
               <Package className="mx-auto h-12 w-12 text-gray-400" />
               <h3 className="mt-2 text-sm font-medium text-gray-900">No hay envíos pendientes</h3>
               <p className="mt-1 text-sm text-gray-500">
-                No tienes envíos pendientes de recepción actualmente.
+                Todos los envíos han sido recepcionados correctamente.
               </p>
             </div>
           ) : (
             <ul className="divide-y divide-gray-200">
               {enviosPendientes.map(envio => (
-                <li key={envio.id}>
-                  <div className="block hover:bg-gray-50">
-                    <div className="px-4 py-4 sm:px-6">
+                <li key={envio.id} className="hover:bg-yellow-50 transition-colors">
+                  <div className="block">
+                    <div className="px-6 py-4">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center">
-                          <p className="text-sm font-medium text-indigo-600 truncate">
+                        <div className="flex flex-col">
+                          <p className="text-sm font-medium text-indigo-600 mb-1">
                             Envío #{envio.id.slice(-6)}
                           </p>
-                          <span className={`ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getEstadoBadge(envio.estado)}`}>
-                            {envio.estado === 'enviado' ? 'Enviado' : 'En tránsito'}
-                          </span>
-                        </div>
-                        <div className="ml-2 flex-shrink-0 flex">
-                          <Link
-                            href={`/fabrica/envios/${envio.id}`}
-                            className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                          >
-                            Recibir Envío
-                          </Link>
-                        </div>
-                      </div>
-                      <div className="mt-2 sm:flex sm:justify-between">
-                        <div className="sm:flex">
-                          <p className="flex items-center text-sm text-gray-500">
-                            Desde: {envio.origen.nombre}
-                          </p>
-                          <p className="mt-2 flex items-center text-sm text-gray-500 sm:mt-0 sm:ml-6">
+                          <div className="flex items-center">
+                            <span className={`mr-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getEstadoBadge(envio.estado)}`}>
+                              {envio.estado === 'enviado' ? 'Enviado' : 'En tránsito'}
+                            </span>
+                            <p className="text-sm text-gray-500">
+                              Desde: <span className="font-medium">{envio.origen.nombre}</span>
+                            </p>
+                          </div>
+                          <p className="text-sm text-gray-500 mt-1">
                             Fecha de envío: {formatDate(envio.fechaEnvio)}
                           </p>
                         </div>
+                        <Link
+                          href={`/fabrica/envios/${envio.id}`}
+                          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
+                        >
+                          Recibir Envío
+                        </Link>
                       </div>
                     </div>
                   </div>
