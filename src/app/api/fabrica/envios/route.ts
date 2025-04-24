@@ -1,4 +1,4 @@
-// src/app/api/fabrica/envios-pendientes/route.ts
+// src/app/api/fabrica/envios/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/server/db/client';
 import { authMiddleware } from '@/server/api/middlewares/auth';
@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
   if (authError) return authError;
   
   try {
-    // Obtener usuario de la solicitud
+    // Obtener usuario
     const user = (req as any).user;
     
     if (!user) {
@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     // Identificar si es admin para privilegios especiales
     const isAdmin = user.roleId === 'role-admin';
     
-    // PASO 1: Determinar la ubicación de fábrica correcta
+    // Determinar la ubicación de fábrica correcta
     let fabricaId: string;
     
     // Si el usuario tiene sucursalId, verificar si es una fábrica
@@ -32,40 +32,20 @@ export async function GET(req: NextRequest) {
         where: { id: user.sucursalId }
       });
       
-      // Si la ubicación del usuario es de tipo 'fabrica', usarla
       if (sucursalUsuario && sucursalUsuario.tipo === 'fabrica') {
         fabricaId = user.sucursalId;
-      } 
-      // Si no es fábrica y no es admin, error
-      else if (!isAdmin) {
+      } else if (!isAdmin) {
         return NextResponse.json(
           { error: 'El usuario no está asignado a una fábrica' },
           { status: 403 }
         );
-      }
-      // Admin con sucursal que no es fábrica - usar la fábrica predeterminada
-      else {
+      } else {
         fabricaId = 'ubicacion-fabrica';
       }
-    } 
-    // Usuario sin sucursalId
-    else {
-      // Si es admin, permitir acceso a la fábrica predeterminada
-      if (isAdmin) {
+    } else {
+      if (isAdmin || user.roleId === 'role-fabrica') {
         fabricaId = 'ubicacion-fabrica';
-      }
-      // Si no es admin pero tiene rol de fábrica, usar la fábrica predeterminada
-      else if (user.roleId === 'role-fabrica') {
-        fabricaId = 'ubicacion-fabrica';
-        // Opcional: Asignar la fábrica al usuario para futuras consultas
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { sucursalId: fabricaId }
-        });
-        console.log(`Usuario ${user.id} actualizado con ubicación de fábrica predeterminada`);
-      }
-      // Si no es admin ni tiene rol de fábrica, error
-      else {
+      } else {
         return NextResponse.json(
           { error: 'El usuario no tiene permisos para acceder a la fábrica' },
           { status: 403 }
@@ -73,7 +53,7 @@ export async function GET(req: NextRequest) {
       }
     }
     
-    // PASO 2: Verificar que la ubicación de fábrica existe
+    // Verificar que la ubicación de fábrica existe
     const fabricaVerificada = await prisma.ubicacion.findUnique({
       where: { id: fabricaId }
     });
@@ -86,19 +66,30 @@ export async function GET(req: NextRequest) {
       );
     }
     
-    console.log(`Buscando envíos pendientes para la fábrica: ${fabricaVerificada.nombre} (${fabricaId})`);
+    // Obtener parámetros de filtrado
+    const { searchParams } = new URL(req.url);
+    const estado = searchParams.get('estado');
+    const limit = parseInt(searchParams.get('limit') || '50');
     
-    // PASO 3: Obtener los envíos pendientes para la fábrica
+    // Construir consulta
+    const where: any = {
+      OR: [
+        { origenId: fabricaId },  // Envíos desde la fábrica
+        { destinoId: fabricaId }  // Envíos hacia la fábrica
+      ]
+    };
+    
+    // Filtrar por estado si se proporciona
+    if (estado) {
+      where.estado = estado;
+    }
+    
+    console.log(`Buscando envíos para la fábrica: ${fabricaVerificada.nombre} (${fabricaId})`);
+    
+    // Ejecutar consulta
     const envios = await prisma.envio.findMany({
-      where: {
-        destinoId: fabricaId,
-        estado: 'enviado', // Solo los que están en estado enviado y pendientes de recepción
-        items: {
-          some: {
-            insumoId: { not: null } // Solo envíos de insumos
-          }
-        }
-      },
+      where,
+      take: limit,
       include: {
         origen: true,
         destino: true,
@@ -111,22 +102,23 @@ export async function GET(req: NextRequest) {
         },
         items: {
           include: {
-            insumo: true
+            insumo: true,
+            producto: true
           }
         }
       },
       orderBy: {
-        fechaEnvio: 'desc'
+        fechaCreacion: 'desc'
       }
     });
     
-    console.log(`Se encontraron ${envios.length} envíos pendientes para la fábrica`);
+    console.log(`Se encontraron ${envios.length} envíos para la fábrica`);
     
     return NextResponse.json(envios);
   } catch (error: any) {
-    console.error('Error detallado al obtener envíos pendientes:', error);
+    console.error('Error detallado al obtener envíos:', error);
     return NextResponse.json(
-      { error: error.message || 'Error al obtener envíos pendientes' },
+      { error: error.message || 'Error al obtener envíos' },
       { status: 500 }
     );
   }

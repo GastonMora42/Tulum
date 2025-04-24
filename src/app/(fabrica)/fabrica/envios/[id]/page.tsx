@@ -64,6 +64,9 @@ const recepcionSchema = z.object({
 type RecepcionFormData = z.infer<typeof recepcionSchema>;
 
 export default function RecibirEnvioPage({ params }: { params: { id: string } }) {
+  // Extraer el ID al inicio del componente para evitar accesos directos a params.id
+  const envioId = params.id;
+  
   const [envio, setEnvio] = useState<Envio | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -96,7 +99,8 @@ export default function RecibirEnvioPage({ params }: { params: { id: string } })
       try {
         setIsLoading(true);
         
-        const response = await authenticatedFetch(`/api/envios/${params.id}`);
+        // Usar envioId en lugar de params.id
+        const response = await authenticatedFetch(`/api/envios/${envioId}`);
         
         if (!response.ok) {
           throw new Error('Error al cargar el envío');
@@ -121,7 +125,8 @@ export default function RecibirEnvioPage({ params }: { params: { id: string } })
     };
 
     fetchEnvio();
-  }, [params.id, setValue]);
+  // Usar envioId en lugar de params.id en las dependencias
+  }, [envioId, setValue]);
 
   const onSubmit = async (data: RecepcionFormData) => {
     if (!envio) return;
@@ -149,8 +154,8 @@ export default function RecibirEnvioPage({ params }: { params: { id: string } })
         }
       }
       
-      // Enviar datos al servidor
-      const response = await authenticatedFetch(`/api/fabrica/envios/${envio.id}/recibir`, {
+      // Enviar datos al servidor - usar envioId en lugar de params.id
+      const response = await authenticatedFetch(`/api/fabrica/envios/${envioId}/recibir`, {
         method: 'POST',
         body: JSON.stringify(data)
       });

@@ -1,6 +1,11 @@
 {
-  "/api/auth/me/route": "app/api/auth/me/route.js",
   "/api/fabrica/envios-pendientes/route": "app/api/fabrica/envios-pendientes/route.js",
-  "/(auth)/login/page": "app/(auth)/login/page.js",
+  "/api/fabrica/envios/route": "app/api/fabrica/envios/route.js",
+  "/(fabrica)/fabrica/stock/page": "app/(fabrica)/fabrica/stock/page.js",
+  "/(fabrica)/fabrica/produccion/nueva/page": "app/(fabrica)/fabrica/produccion/nueva/page.js",
+  "/(fabrica)/fabrica/produccion/page": "app/(fabrica)/fabrica/produccion/page.js",
+  "/(fabrica)/fabrica/produccion/[id]/page": "app/(fabrica)/fabrica/produccion/[id]/page.js",
+  "/(fabrica)/fabrica/envios/nuevo/page": "app/(fabrica)/fabrica/envios/nuevo/page.js",
+  "/(fabrica)/fabrica/stock/ajuste/page": "app/(fabrica)/fabrica/stock/ajuste/page.js",
   "/(fabrica)/fabrica/envios/page": "app/(fabrica)/fabrica/envios/page.js"
 }

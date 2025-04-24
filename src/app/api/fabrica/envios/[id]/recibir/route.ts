@@ -24,8 +24,8 @@ export async function POST(
   const authError = await authMiddleware(req);
   if (authError) return authError;
   
-  // Verificar permiso
-  const permissionError = await checkPermission('fabrica:recibir-envios')(req);
+  // Verificar permiso - USAMOS 'stock:ajustar' EN LUGAR DE 'fabrica:recibir-envios'
+  const permissionError = await checkPermission('stock:ajustar')(req);
   if (permissionError) return permissionError;
   
   try {
@@ -72,8 +72,10 @@ export async function POST(
       );
     }
     
-    // Verificar que el destino coincida con la sucursal del usuario
-    if (envio.destinoId !== user.sucursalId) {
+    // Verificar que el destino coincide con la sucursal del usuario o es la fábrica predeterminada
+    const userSucursalId = user.sucursalId || 'ubicacion-fabrica';
+    
+    if (envio.destinoId !== userSucursalId) {
       return NextResponse.json(
         { error: 'No tiene permiso para recibir este envío' },
         { status: 403 }
@@ -82,7 +84,7 @@ export async function POST(
     
     // Crear un mapa de los items del envío para fácil acceso
     const itemsEnvioMap = new Map();
-    envio.items.forEach((item: { id: any; }) => {
+    envio.items.forEach((item) => {
       itemsEnvioMap.set(item.id, item);
     });
     
@@ -106,7 +108,7 @@ export async function POST(
       if (itemRecibido.cantidadRecibida !== itemEnvio.cantidad) {
         hayDiscrepancias = true;
         discrepancias.push({
-          insumo: itemEnvio.insumo.nombre,
+          insumo: itemEnvio.insumo?.nombre || 'Desconocido',
           cantidadEnviada: itemEnvio.cantidad,
           cantidadRecibida: itemRecibido.cantidadRecibida,
           diferencia: itemEnvio.cantidad - itemRecibido.cantidadRecibida
