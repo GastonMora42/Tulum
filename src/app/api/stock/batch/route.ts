@@ -14,6 +14,7 @@ export async function GET(req: NextRequest) {
     const ubicacionId = searchParams.get('ubicacionId');
     const insumoIds = searchParams.get('insumoIds')?.split(',') || [];
     
+    
     if (!ubicacionId) {
       return NextResponse.json(
         { error: 'Se requiere el parámetro ubicacionId' },
