@@ -1,62 +1,159 @@
-@import "tailwindcss";
-
 :root {
+  /* Base */
   --background: #ffffff;
   --foreground: #171717;
   
-  /* Tus colores personalizados, optimizados para contraste */
-  --color-primary-dark: #2a1514; /* Versión más oscura de #311716 para mejor contraste */
-  --color-primary: #311716;
-  --color-primary-light: #462625; /* Versión más clara para fondos oscuros */
+  /* Contraste garantizado para texto */
+  --text-primary: rgba(0, 0, 0, 0.87);
+  --text-secondary: rgba(0, 0, 0, 0.67);
+  --text-disabled: rgba(0, 0, 0, 0.38);
   
-  --color-secondary-dark: #8a644e; /* Versión más oscura de #9c7561 */
-  --color-secondary: #9c7561;
-  --color-secondary-light: #b08c7a; /* Versión más clara */
+  /* Colores para fondos con suficiente contraste */
+  --surface-100: #ffffff;
+  --surface-200: #f8f5f3;
+  --surface-300: #f0ece9;
   
-  --color-accent-dark: #d9a15d; /* Versión más oscura de #eeb077 */
-  --color-accent: #eeb077;
-  --color-accent-light: #f5c99a; /* Versión más clara */
+  /* Bordes visibles en todas las plataformas */
+  --border-light: rgba(0, 0, 0, 0.12);
+  --border-medium: rgba(0, 0, 0, 0.23);
+  --border-dark: rgba(0, 0, 0, 0.38);
   
-  /* Colores para texto */
-  --text-on-dark: rgba(255, 255, 255, 0.95);
-  --text-on-light: rgba(0, 0, 0, 0.87);
+  /* Colores personalizados con buen contraste */
+  --tulum-brown: #311716;
+  --tulum-tan: #9c7561;
+  --tulum-beige: #eeb077;
   
-  /* Asegúrate de tener suficiente contraste en los grises */
-  --gray-100: #f8f5f3;
-  --gray-200: #eee3d8;
-  --gray-300: #d1c7be;
-  --gray-400: #b4a99e;
-  --gray-500: #948a81;
-  --gray-600: #766c64;
-  --gray-700: #5a5047;
-  --gray-800: #3d352f;
-  --gray-900: #1f1a17;
+  /* Valores específicos para formularios */
+  --input-border: rgba(0, 0, 0, 0.23);
+  --input-background: #ffffff;
+  --input-text: rgba(0, 0, 0, 0.87);
+  --input-placeholder: rgba(0, 0, 0, 0.38);
+  
+  /* Valores para tablas */
+  --table-header-bg: #f0ece9;
+  --table-header-text: rgba(0, 0, 0, 0.87);
+  --table-row-border: rgba(0, 0, 0, 0.12);
+  --table-row-alt: #f8f5f3;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #121212; /* Un poco más claro que #0a0a0a para mejor visibilidad */
-    --foreground: #f5f5f5; /* Un poco menos brillante que #ededed */
-    
-    /* Ajuste de colores para el modo oscuro */
-    --color-primary: #462625; /* Más claro para ser visible en fondo oscuro */
-    --color-secondary: #b08c7a;
-    --color-accent: #f5c99a;
-  }
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
+/* Ajustes globales para mejorar el texto en todas las plataformas */
 body {
   background: var(--background);
-  color: var(--foreground);
+  color: var(--text-primary);
   font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  letter-spacing: 0.01em;
+}
+
+/* Clases específicas para garantizar contraste */
+.text-high-contrast {
+  color: var(--text-primary) !important;
+  font-weight: 500;
+}
+
+/* Clase específica para Windows */
+@media screen and (-ms-high-contrast: active), (-ms-high-contrast: none) {
+  /* Mejoras específicas para Windows */
+  .win-fix {
+    text-shadow: 0 0 0 transparent;
+    font-weight: 500;
+    color: var(--text-primary) !important;
+  }
+  
+  input, select, textarea {
+    border-color: var(--input-border) !important;
+    color: var(--input-text) !important;
+  }
+  
+  th, td {
+    border-color: var(--table-row-border) !important;
+  }
+}
+
+/* Mejoras para tablas */
+table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+th {
+  background-color: var(--table-header-bg);
+  color: var(--table-header-text);
+  font-weight: 600;
+  text-align: left;
+  border-bottom: 1px solid var(--table-row-border);
+}
+
+td {
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--table-row-border);
+}
+
+/* Mejoras para inputs */
+input, textarea, select {
+  color: var(--input-text);
+  background-color: var(--input-background);
+  border: 1px solid var(--input-border);
+}
+
+input::placeholder, textarea::placeholder {
+  color: var(--input-placeholder);
+}
+
+/* Mejoras para contenedores */
+.card, .bg-white {
+  background-color: var(--surface-100);
+  border: 1px solid var(--border-light);
+}
+
+/* Agregar esto a tu globals.css */
+.windows-platform {
+  /* Mejoras de contraste específicas para Windows */
+  
+  /* Mejorar todos los textos */
+  body {
+    color: #000000;
+    font-weight: 400;
+    letter-spacing: 0.015em;
+  }
+  
+  /* Ajustes para tablas */
+  th {
+    background-color: #e6e2df !important;
+    color: #000000 !important;
+    font-weight: 600 !important;
+    border-bottom: 2px solid rgba(0, 0, 0, 0.2) !important;
+  }
+  
+  td {
+    color: #000000 !important;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.15) !important;
+  }
+  
+  /* Mejoras para inputs y formularios */
+  input, textarea, select, button {
+    border: 1px solid rgba(0, 0, 0, 0.3) !important;
+  }
+  
+  input::placeholder, textarea::placeholder {
+    color: rgba(0, 0, 0, 0.5) !important;
+  }
+  
+  /* Mejores bordes y sombras */
+  .shadow-sm, .shadow {
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15), 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+  }
+  
+  /* Fondos más definidos */
+  .bg-gray-50, .bg-gray-100 {
+    background-color: #eeeae7 !important;
+  }
+  
+  /* Bordes más visibles */
+  .border, [class*="border-"] {
+    border-width: 1px !important;
+    border-color: rgba(0, 0, 0, 0.2) !important;
+  }
 }
