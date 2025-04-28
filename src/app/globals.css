@@ -3,6 +3,46 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  
+  /* Tus colores personalizados, optimizados para contraste */
+  --color-primary-dark: #2a1514; /* Versión más oscura de #311716 para mejor contraste */
+  --color-primary: #311716;
+  --color-primary-light: #462625; /* Versión más clara para fondos oscuros */
+  
+  --color-secondary-dark: #8a644e; /* Versión más oscura de #9c7561 */
+  --color-secondary: #9c7561;
+  --color-secondary-light: #b08c7a; /* Versión más clara */
+  
+  --color-accent-dark: #d9a15d; /* Versión más oscura de #eeb077 */
+  --color-accent: #eeb077;
+  --color-accent-light: #f5c99a; /* Versión más clara */
+  
+  /* Colores para texto */
+  --text-on-dark: rgba(255, 255, 255, 0.95);
+  --text-on-light: rgba(0, 0, 0, 0.87);
+  
+  /* Asegúrate de tener suficiente contraste en los grises */
+  --gray-100: #f8f5f3;
+  --gray-200: #eee3d8;
+  --gray-300: #d1c7be;
+  --gray-400: #b4a99e;
+  --gray-500: #948a81;
+  --gray-600: #766c64;
+  --gray-700: #5a5047;
+  --gray-800: #3d352f;
+  --gray-900: #1f1a17;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #121212; /* Un poco más claro que #0a0a0a para mejor visibilidad */
+    --foreground: #f5f5f5; /* Un poco menos brillante que #ededed */
+    
+    /* Ajuste de colores para el modo oscuro */
+    --color-primary: #462625; /* Más claro para ser visible en fondo oscuro */
+    --color-secondary: #b08c7a;
+    --color-accent: #f5c99a;
+  }
 }
 
 @theme inline {
@@ -12,15 +52,11 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
