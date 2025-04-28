@@ -18,6 +18,7 @@ export function OfflineStatus() {
   
   const containerRef = useRef<HTMLDivElement>(null);
 
+  
   // Monitorear estado de conexión
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
