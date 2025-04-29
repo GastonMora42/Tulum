@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Package, Plus, Search, Filter, RefreshCw, AlertCircle } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
+import { ContrastEnhancer } from '@/components/ui/ContrastEnhancer';
+import { HCTable, HCTh } from '@/components/ui/HighContrastComponents';
 
 interface Producto {
   id: string;
@@ -140,20 +142,21 @@ export default function ProductosPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold">Gestión de Productos</h1>
-        <Link 
-          href="/admin/productos/nuevo" 
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Nuevo Producto
-        </Link>
-      </div>
+    <ContrastEnhancer>
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-black">Gestión de Productos</h1>
+          <Link 
+            href="/admin/productos/nuevo" 
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Nuevo Producto
+          </Link>
+        </div>
 
-      {/* Filtros */}
-      <div className="bg-white p-4 rounded-lg shadow">
+        {/* Filtros */}
+        <div className="bg-white p-4 rounded-lg shadow">
         <form onSubmit={handleSearch} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
@@ -236,73 +239,71 @@ export default function ProductosPage() {
         </form>
       </div>
 
-      {/* Mensajes de error */}
       {error && (
-        <div className="bg-red-50 border-l-4 border-red-400 p-4">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <AlertCircle className="h-5 w-5 text-red-400" />
-            </div>
-            <div className="ml-3">
-              <p className="text-sm text-red-700">{error}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Tabla de productos */}
-      <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-        {isLoading ? (
-          <div className="text-center py-10">
-            <div className="inline-block animate-spin h-8 w-8 border-4 border-indigo-500 border-t-transparent rounded-full"></div>
-            <p className="mt-2 text-sm text-gray-500">Cargando productos...</p>
-          </div>
-        ) : productos.length === 0 ? (
-          <div className="text-center py-10">
-            <Package className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No hay productos</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              {search || categoriaId 
-                ? 'No se encontraron productos con los filtros aplicados.' 
-                : 'Comienza creando un nuevo producto.'}
-            </p>
-            <div className="mt-6">
-              <Link
-                href="/admin/productos/nuevo"
-                className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Nuevo Producto
-              </Link>
+          <div className="bg-red-50 border-l-4 border-red-400 p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <AlertCircle className="h-5 w-5 text-red-400" />
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-black">{error}</p>
+              </div>
             </div>
           </div>
-        ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Nombre
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+        )}
+        {/* Tabla de productos */}
+        <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+          {isLoading ? (
+            <div className="text-center py-10">
+              <div className="inline-block animate-spin h-8 w-8 border-4 border-indigo-500 border-t-transparent rounded-full"></div>
+              <p className="mt-2 text-sm text-black">Cargando productos...</p>
+            </div>
+          ) : productos.length === 0 ? (
+            <div className="text-center py-10">
+              <Package className="mx-auto h-12 w-12 text-gray-400" />
+              <h3 className="mt-2 text-sm font-medium text-black">No hay productos</h3>
+              <p className="mt-1 text-sm text-black">
+                {search || categoriaId 
+                  ? 'No se encontraron productos con los filtros aplicados.' 
+                  : 'Comienza creando un nuevo producto.'}
+              </p>
+              <div className="mt-6">
+                <Link
+                  href="/admin/productos/nuevo"
+                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nuevo Producto
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <HCTable className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                    <HCTh scope="col" className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                        Nombre
+                      </HCTh>
+                      <HCTh scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Precio
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      </HCTh>
+                    <HCTh scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Código de Barras
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      </HCTh>
+                    <HCTh scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Categoría
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      </HCTh>
+                    <HCTh scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Stock Mínimo
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      </HCTh>
+                    <HCTh scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Estado
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      </HCTh>
+                    <HCTh scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Acciones
-                    </th>
+                      </HCTh>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -374,7 +375,7 @@ export default function ProductosPage() {
                     </tr>
                   ))}
                 </tbody>
-              </table>
+                </HCTable>
             </div>
 
             {/* Paginación */}
@@ -457,5 +458,6 @@ export default function ProductosPage() {
         )}
       </div>
     </div>
+    </ContrastEnhancer>
   );
 }
