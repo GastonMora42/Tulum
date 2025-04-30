@@ -1,5 +1,10 @@
 {
-  "/api/auth/refresh/route": "app/api/auth/refresh/route.js",
+  "/favicon.ico/route": "app/favicon.ico/route.js",
+  "/api/auth/me/route": "app/api/auth/me/route.js",
+  "/api/admin/productos/route": "app/api/admin/productos/route.js",
+  "/api/admin/categorias/route": "app/api/admin/categorias/route.js",
   "/page": "app/page.js",
-  "/(auth)/login/page": "app/(auth)/login/page.js"
+  "/(auth)/login/page": "app/(auth)/login/page.js",
+  "/(admin)/admin/page": "app/(admin)/admin/page.js",
+  "/(admin)/admin/productos/page": "app/(admin)/admin/productos/page.js"
 }

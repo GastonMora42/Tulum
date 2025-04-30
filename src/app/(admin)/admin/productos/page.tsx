@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Package, Plus, Search, Filter, RefreshCw, AlertCircle } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
 import { ContrastEnhancer } from '@/components/ui/ContrastEnhancer';
-import { HCTable, HCTh } from '@/components/ui/HighContrastComponents';
+import { HCTable, HCTh, HCTd } from '@/components/ui/HighContrastComponents';
 
 interface Producto {
   id: string;
