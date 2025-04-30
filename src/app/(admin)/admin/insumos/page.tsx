@@ -1,4 +1,3 @@
-// src/app/(admin)/admin/insumos/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -6,8 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Package, Plus, Search, Filter, RefreshCw } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
-import { HCTable, HCTh } from '@/components/ui/HighContrastComponents';
 import { ContrastEnhancer } from '@/components/ui/ContrastEnhancer';
+import { HCLabel, HCInput, HCSelect, HCTable, HCTh, HCTd } from '@/components/ui/HighContrastComponents';
 
 interface Insumo {
   id: string;
@@ -44,7 +43,7 @@ export default function InsumosPage() {
   });
   const router = useRouter();
 
-const fetchInsumos = async (page = 1) => {
+  const fetchInsumos = async (page = 1) => {
     setIsLoading(true);
     try {
       // Construir query params
@@ -125,66 +124,66 @@ const fetchInsumos = async (page = 1) => {
           </Link>
         </div>
 
-      {/* Búsqueda y filtros */}
-      <div className="rounded-lg border bg-card shadow">
-        <div className="p-4">
-          <form onSubmit={handleSearch} className="flex flex-col gap-4 sm:flex-row sm:items-end">
-            <div className="flex-1">
-              <label htmlFor="search" className="block text-sm font-medium mb-1">
-                Buscar insumos
-              </label>
-              <div className="relative">
-                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                <input
-                  type="text"
-                  id="search"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Nombre o descripción..."
-                  className="w-full rounded-md border bg-background pl-9 pr-4 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                />
+        {/* Búsqueda y filtros */}
+        <div className="rounded-lg border bg-card shadow">
+          <div className="p-4">
+            <form onSubmit={handleSearch} className="flex flex-col gap-4 sm:flex-row sm:items-end">
+              <div className="flex-1">
+                <HCLabel htmlFor="search" className="block text-sm font-medium mb-1">
+                  Buscar insumos
+                </HCLabel>
+                <div className="relative">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <HCInput
+                    type="text"
+                    id="search"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Nombre o descripción..."
+                    className="w-full rounded-md border bg-background pl-9 pr-4 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                  />
+                </div>
               </div>
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="soloActivos"
-                checked={soloActivos}
-                onChange={(e) => setSoloActivos(e.target.checked)}
-                className="h-4 w-4 rounded border-input accent-accent"
-              />
-              <label htmlFor="soloActivos" className="text-sm">
-                Mostrar solo activos
-              </label>
-            </div>
-            
-            <div className="flex gap-2">
-              <button
-                type="submit"
-                className="inline-flex items-center justify-center whitespace-nowrap rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <Filter className="mr-2 h-4 w-4" />
-                Filtrar
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setSearch('');
-                  fetchInsumos(1);
-                }}
-                className="inline-flex items-center justify-center whitespace-nowrap rounded-md border bg-background px-4 py-2 text-sm font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Restablecer
-              </button>
-            </div>
-          </form>
+              
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="soloActivos"
+                  checked={soloActivos}
+                  onChange={(e) => setSoloActivos(e.target.checked)}
+                  className="h-4 w-4 rounded border-input accent-accent"
+                />
+                <HCLabel htmlFor="soloActivos" className="text-sm">
+                  Mostrar solo activos
+                </HCLabel>
+              </div>
+              
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  className="inline-flex items-center justify-center whitespace-nowrap rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <Filter className="mr-2 h-4 w-4" />
+                  Filtrar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearch('');
+                    fetchInsumos(1);
+                  }}
+                  className="inline-flex items-center justify-center whitespace-nowrap rounded-md border bg-background px-4 py-2 text-sm font-medium text-black hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Restablecer
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
-      </div>
 
-      {/* Tabla de insumos */}
-      <div className="rounded-lg border bg-card shadow">
+        {/* Tabla de insumos */}
+        <div className="rounded-lg border bg-card shadow">
           {isLoading ? (
             <div className="flex items-center justify-center p-8">
               <div className="flex flex-col items-center gap-2">
@@ -206,110 +205,110 @@ const fetchInsumos = async (page = 1) => {
                         Nombre
                       </HCTh>
                       <HCTh className="whitespace-nowrap px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
-                      Unidad de Medida
+                        Unidad de Medida
                       </HCTh>
-                    <HCTh className="whitespace-nowrap px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
-                      Stock Mínimo
+                      <HCTh className="whitespace-nowrap px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                        Stock Mínimo
                       </HCTh>
-                    <HCTh className="whitespace-nowrap px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
-                      Proveedor
+                      <HCTh className="whitespace-nowrap px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                        Proveedor
                       </HCTh>
-                    <HCTh className="whitespace-nowrap px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
-                      Estado
+                      <HCTh className="whitespace-nowrap px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                        Estado
                       </HCTh>
-                    <HCTh className="whitespace-nowrap px-6 py-3 text-right text-xs font-medium uppercase tracking-wider">
-                      Acciones
+                      <HCTh className="whitespace-nowrap px-6 py-3 text-right text-xs font-medium uppercase tracking-wider">
+                        Acciones
                       </HCTh>
-                  </tr>
-                </thead>
-                <tbody className="divide-y bg-card">
-                  {insumos.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="px-6 py-4 text-center text-sm text-muted-foreground">
-                        No se encontraron insumos
-                      </td>
                     </tr>
-                  ) : (
-                    insumos.map((insumo) => (
-                      <tr key={insumo.id} className="hover:bg-muted/50">
-                        <td className="whitespace-nowrap px-6 py-4">
-                          <div className="text-sm font-medium">{insumo.nombre}</div>
-                          {insumo.descripcion && (
-                            <div className="text-xs text-muted-foreground">{insumo.descripcion}</div>
-                          )}
-                        </td>
-                        <td className="whitespace-nowrap px-6 py-4 text-sm">
-                          {insumo.unidadMedida}
-                        </td>
-                        <td className="whitespace-nowrap px-6 py-4 text-sm">
-                          {insumo.stockMinimo}
-                        </td>
-                        <td className="whitespace-nowrap px-6 py-4 text-sm">
-                          {insumo.proveedor?.nombre || '-'}
-                        </td>
-                        <td className="whitespace-nowrap px-6 py-4">
-                          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                            insumo.activo 
-                              ? 'bg-accent/20 text-accent-foreground' 
-                              : 'bg-destructive/20 text-destructive-foreground'
-                          }`}>
-                            {insumo.activo ? 'Activo' : 'Inactivo'}
-                          </span>
-                        </td>
-                        <td className="whitespace-nowrap px-6 py-4 text-right text-sm">
-                          <Link 
-                            href={`/admin/insumos/${insumo.id}`}
-                            className="inline-flex items-center justify-center font-medium text-accent hover:text-accent/80 mr-3"
-                          >
-                            Editar
-                          </Link>
-                          <button 
-                            className={`inline-flex items-center justify-center font-medium ${
-                              insumo.activo ? 'text-destructive hover:text-destructive/80' : 'text-accent hover:text-accent/80'
-                            }`}
-                            onClick={() => handleToggleActive(insumo.id, insumo.activo)}
-                          >
-                            {insumo.activo ? 'Desactivar' : 'Activar'}
-                          </button>
-                        </td>
+                  </thead>
+                  <tbody className="divide-y bg-card">
+                    {insumos.length === 0 ? (
+                      <tr>
+                        <HCTd colSpan={6} className="px-6 py-4 text-center text-sm">
+                          No se encontraron insumos
+                        </HCTd>
                       </tr>
-                    ))
-                  )}
-                </tbody>
+                    ) : (
+                      insumos.map((insumo) => (
+                        <tr key={insumo.id} className="hover:bg-muted/50">
+                          <HCTd className="whitespace-nowrap px-6 py-4">
+                            <div className="text-sm font-medium">{insumo.nombre}</div>
+                            {insumo.descripcion && (
+                              <div className="text-xs text-black">{insumo.descripcion}</div>
+                            )}
+                          </HCTd>
+                          <HCTd className="whitespace-nowrap px-6 py-4 text-sm">
+                            {insumo.unidadMedida}
+                          </HCTd>
+                          <HCTd className="whitespace-nowrap px-6 py-4 text-sm">
+                            {insumo.stockMinimo}
+                          </HCTd>
+                          <HCTd className="whitespace-nowrap px-6 py-4 text-sm">
+                            {insumo.proveedor?.nombre || '-'}
+                          </HCTd>
+                          <HCTd className="whitespace-nowrap px-6 py-4">
+                            <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                              insumo.activo 
+                                ? 'bg-accent/20 text-accent-foreground' 
+                                : 'bg-destructive/20 text-destructive-foreground'
+                            }`}>
+                              {insumo.activo ? 'Activo' : 'Inactivo'}
+                            </span>
+                          </HCTd>
+                          <HCTd className="whitespace-nowrap px-6 py-4 text-right text-sm">
+                            <Link 
+                              href={`/admin/insumos/${insumo.id}`}
+                              className="inline-flex items-center justify-center font-medium text-accent hover:text-accent/80 mr-3"
+                            >
+                              Editar
+                            </Link>
+                            <button 
+                              className={`inline-flex items-center justify-center font-medium ${
+                                insumo.activo ? 'text-destructive hover:text-destructive/80' : 'text-accent hover:text-accent/80'
+                              }`}
+                              onClick={() => handleToggleActive(insumo.id, insumo.activo)}
+                            >
+                              {insumo.activo ? 'Desactivar' : 'Activar'}
+                            </button>
+                          </HCTd>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
                 </HCTable>
-            </div>
+              </div>
 
-            {/* Paginación */}
-            <div className="flex items-center justify-between border-t bg-card px-4 py-3">
-              <div className="text-sm text-muted-foreground">
-                Mostrando <span className="font-medium">{Math.min(1, paginationInfo.total)}</span> a <span className="font-medium">
-                  {Math.min(paginationInfo.page * paginationInfo.limit, paginationInfo.total)}
-                </span> de <span className="font-medium">{paginationInfo.total}</span> resultados
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handlePageChange(paginationInfo.page - 1)}
-                  disabled={paginationInfo.page === 1}
-                  className="inline-flex items-center justify-center rounded-md border px-3 py-2 text-sm disabled:opacity-50 disabled:pointer-events-none hover:bg-muted"
-                >
-                  Anterior
-                </button>
-                <div className="text-sm">
-                  Página {paginationInfo.page} de {paginationInfo.totalPages}
+              {/* Paginación */}
+              <div className="flex items-center justify-between border-t bg-card px-4 py-3">
+                <div className="text-sm text-black">
+                  Mostrando <span className="font-medium">{Math.min(1, paginationInfo.total)}</span> a <span className="font-medium">
+                    {Math.min(paginationInfo.page * paginationInfo.limit, paginationInfo.total)}
+                  </span> de <span className="font-medium">{paginationInfo.total}</span> resultados
                 </div>
-                <button
-                  onClick={() => handlePageChange(paginationInfo.page + 1)}
-                  disabled={paginationInfo.page === paginationInfo.totalPages}
-                  className="inline-flex items-center justify-center rounded-md border px-3 py-2 text-sm disabled:opacity-50 disabled:pointer-events-none hover:bg-muted"
-                >
-                  Siguiente
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => handlePageChange(paginationInfo.page - 1)}
+                    disabled={paginationInfo.page === 1}
+                    className="inline-flex items-center justify-center rounded-md border px-3 py-2 text-sm text-black disabled:opacity-50 disabled:pointer-events-none hover:bg-muted"
+                  >
+                    Anterior
+                  </button>
+                  <div className="text-sm text-black">
+                    Página {paginationInfo.page} de {paginationInfo.totalPages}
+                  </div>
+                  <button
+                    onClick={() => handlePageChange(paginationInfo.page + 1)}
+                    disabled={paginationInfo.page === paginationInfo.totalPages}
+                    className="inline-flex items-center justify-center rounded-md border px-3 py-2 text-sm text-black disabled:opacity-50 disabled:pointer-events-none hover:bg-muted"
+                  >
+                    Siguiente
+                  </button>
+                </div>
               </div>
-            </div>
-          </>
-        )}
+            </>
+          )}
+        </div>
       </div>
-    </div>
     </ContrastEnhancer>
   );
 }

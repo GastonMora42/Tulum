@@ -1,137 +1,167 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
+import { useForm, useFieldArray } from 'react-hook-form';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { format } from 'date-fns';
-import { ChevronLeft, Send, TruckIcon, AlertTriangle, Loader2, Package } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
-import Link from 'next/link';
+import { ArrowLeft, Send, Package } from 'lucide-react';
+import { ContrastEnhancer } from '@/components/ui/ContrastEnhancer';
+import { HCInput, HCTextarea, HCLabel } from '@/components/ui/HighContrastComponents';
+
+// Interfaces
+interface Ubicacion {
+  id: string;
+  nombre: string;
+  tipo: string;
+}
+
+interface Usuario {
+  id: string;
+  name: string;
+  email: string;
+}
+
+interface Insumo {
+  id: string;
+  nombre: string;
+  unidadMedida: string;
+}
 
 interface ItemEnvio {
   id: string;
   insumoId: string;
   cantidad: number;
-  cantidadRecibida: number | null;
-  insumo: {
-    id: string;
-    nombre: string;
-    unidadMedida: string;
-  };
-}
-
-interface Contingencia {
-  id: string;
-  titulo: string;
-  descripcion: string;
-  estado: string;
-  fechaCreacion: string;
+  cantidadRecibida?: number | null;
+  insumo: Insumo;
 }
 
 interface Envio {
   id: string;
   origenId: string;
   destinoId: string;
+  usuarioId: string;
+  estado: string;
   fechaCreacion: string;
   fechaEnvio: string | null;
   fechaRecepcion: string | null;
-  estado: string;
-  observaciones: string | null;
-  usuarioId: string;
-  origen: {
-    id: string;
-    nombre: string;
-    tipo: string;
-  };
-  destino: {
-    id: string;
-    nombre: string;
-    tipo: string;
-  };
-  usuario: {
-    id: string;
-    name: string;
-    email: string;
-  };
+  observaciones?: string | null;
+  origen: Ubicacion;
+  destino: Ubicacion;
+  usuario: Usuario;
   items: ItemEnvio[];
-  contingencias: Contingencia[];
 }
 
-export default function DetalleEnvioPage({ params }: { params: { id: string } }) {
+const envioSchema = z.object({
+  items: z.array(
+    z.object({
+      id: z.string(),
+      cantidad: z.number()
+        .nonnegative("La cantidad no puede ser negativa")
+    })
+  ),
+  observaciones: z.string().optional()
+});
+
+type EnvioFormData = z.infer<typeof envioSchema>;
+
+export default function DetalleEnvioPage() {
+  // Usar useParams en lugar de recibir params como prop
+  const params = useParams();
+  const id = params.id as string;
+  
   const [envio, setEnvio] = useState<Envio | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
+  const { 
+    register, 
+    handleSubmit, 
+    watch,
+    control,
+    setValue,
+    formState: { errors } 
+  } = useForm<EnvioFormData>({
+    resolver: zodResolver(envioSchema),
+    defaultValues: {
+      items: [],
+      observaciones: ''
+    }
+  });
+  
+  const { fields } = useFieldArray({
+    control,
+    name: "items"
+  });
+  
   useEffect(() => {
     const fetchEnvio = async () => {
       try {
         setIsLoading(true);
         
-        const response = await authenticatedFetch(`/api/envios/${params.id}`);
+        const response = await authenticatedFetch(`/api/admin/envios-insumos/${id}`);
         
         if (!response.ok) {
-          throw new Error('Error al cargar el envío');
+          throw new Error('Error al cargar envío');
         }
         
         const data = await response.json();
         setEnvio(data);
-      } catch (err) {
+        
+        // Inicializar formulario con los items - IMPORTANTE: usar las cantidades originales
+        setValue('items', data.items.map((item: ItemEnvio) => ({
+          id: item.id,
+          cantidad: item.cantidad // Usar cantidad completa por defecto
+        })));
+        
+        if (data.observaciones) {
+          setValue('observaciones', data.observaciones);
+        }
+      } catch (err: any) {
         console.error('Error:', err);
-        setError('No se pudo cargar el envío');
+        setError('Error al cargar el envío');
       } finally {
         setIsLoading(false);
       }
     };
-
+  
     fetchEnvio();
-  }, [params.id]);
+  }, [id, setValue]);
 
-  const handleEnviar = async () => {
-    if (!envio || envio.estado !== 'pendiente') return;
+// Modificar la función onSubmit
+const onSubmit = async (data: EnvioFormData) => {
+  try {
+    setIsSending(true);
+    setError(null);
     
-    try {
-      setIsProcessing(true);
-      setError(null);
-      
-      const response = await authenticatedFetch(`/api/admin/envios-insumos/${envio.id}/enviar`, {
-        method: 'POST'
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al marcar como enviado');
-      }
-      
-      // Actualizar envío
-      const updatedEnvio = await response.json();
-      setEnvio(updatedEnvio);
-    } catch (err: any) {
-      console.error('Error:', err);
-      setError(err.message || 'Error al marcar como enviado');
-    } finally {
-      setIsProcessing(false);
+    console.log('Enviando datos:', data); // Para depuración
+    
+    const response = await authenticatedFetch(`/api/admin/envios-insumos/${id}/enviar`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Error al procesar envío');
     }
-  };
-
-  const getEstadoBadge = (estado: string) => {
-    switch (estado) {
-      case 'pendiente':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'enviado':
-        return 'bg-blue-100 text-blue-800';
-      case 'en_transito':
-        return 'bg-indigo-100 text-indigo-800';
-      case 'recibido':
-        return 'bg-green-100 text-green-800';
-      case 'con_contingencia':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const formatDate = (dateString: string | null) => {
+    
+    // Redireccionar a la lista
+    router.push('/admin/envios-insumos');
+    router.refresh();
+  } catch (err: any) {
+    console.error('Error:', err);
+    setError(err.message || 'Error al procesar el envío');
+  } finally {
+    setIsSending(false);
+  }
+};
+  
+  const formatDate = (dateString: string | null | undefined) => {
     if (!dateString) return '-';
     try {
       return format(new Date(dateString), 'dd/MM/yyyy HH:mm');
@@ -139,289 +169,271 @@ export default function DetalleEnvioPage({ params }: { params: { id: string } })
       return dateString;
     }
   };
-
+  
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
-        <span className="ml-2 text-gray-500">Cargando envío...</span>
-      </div>
+      <ContrastEnhancer>
+        <div className="flex justify-center items-center h-48">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-500"></div>
+        </div>
+      </ContrastEnhancer>
     );
   }
-
-  if (error || !envio) {
+  
+  if (!envio) {
     return (
-      <div className="flex flex-col items-center justify-center h-64">
-        <div className="text-red-500 mb-4">{error || 'Envío no encontrado'}</div>
-        <button
-          onClick={() => router.back()}
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200"
-        >
-          <ChevronLeft className="h-4 w-4 mr-1" />
-          Volver
-        </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center">
-          <h1 className="text-2xl font-bold mr-3">Detalle de Envío #{envio.id.slice(-6)}</h1>
-          <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getEstadoBadge(envio.estado)}`}>
-            {envio.estado === 'pendiente' ? 'Pendiente' : 
-             envio.estado === 'enviado' ? 'Enviado' : 
-             envio.estado === 'en_transito' ? 'En tránsito' : 
-             envio.estado === 'recibido' ? 'Recibido' : 
-             'Con contingencia'}
-          </span>
-        </div>
-        <button
-          onClick={() => router.back()}
-          className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-        >
-          <ChevronLeft className="h-4 w-4 mr-1" />
-          Volver
-        </button>
-      </div>
-
-      {/* Información general */}
-      <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-        <div className="px-4 py-5 sm:px-6 bg-gray-50">
-          <h3 className="text-lg leading-6 font-medium text-gray-900">Información General</h3>
-        </div>
-        <div className="border-t border-gray-200 px-4 py-5 sm:p-0">
-          <dl className="sm:divide-y sm:divide-gray-200">
-            <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-              <dt className="text-sm font-medium text-gray-500">Origen</dt>
-              <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                {envio.origen.nombre} ({envio.origen.tipo})
-              </dd>
-            </div>
-            <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-              <dt className="text-sm font-medium text-gray-500">Destino</dt>
-              <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                {envio.destino.nombre} ({envio.destino.tipo})
-              </dd>
-            </div>
-            <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-              <dt className="text-sm font-medium text-gray-500">Creado por</dt>
-              <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                {envio.usuario.name}
-              </dd>
-            </div>
-            <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-              <dt className="text-sm font-medium text-gray-500">Fecha de creación</dt>
-              <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                {formatDate(envio.fechaCreacion)}
-              </dd>
-            </div>
-            <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-              <dt className="text-sm font-medium text-gray-500">Fecha de envío</dt>
-              <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                {formatDate(envio.fechaEnvio)}
-              </dd>
-            </div>
-            <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-              <dt className="text-sm font-medium text-gray-500">Fecha de recepción</dt>
-              <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                {formatDate(envio.fechaRecepcion)}
-              </dd>
-            </div>
-            {envio.observaciones && (
-              <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                <dt className="text-sm font-medium text-gray-500">Observaciones</dt>
-                <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                  {envio.observaciones}
-                </dd>
-              </div>
-            )}
-          </dl>
-        </div>
-      </div>
-
-      {/* Contingencias */}
-      {envio.contingencias && envio.contingencias.length > 0 && (
-        <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-          <div className="px-4 py-5 sm:px-6 bg-red-50">
-            <h3 className="text-lg leading-6 font-medium text-red-900 flex items-center">
-              <AlertTriangle className="h-5 w-5 mr-2 text-red-500" />
-              Contingencias
-            </h3>
-          </div>
-          <div className="border-t border-gray-200">
-            <ul className="divide-y divide-gray-200">
-              {envio.contingencias.map(contingencia => (
-                <li key={contingencia.id} className="px-4 py-4 sm:px-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h4 className="text-md font-medium text-gray-900">
-                        {contingencia.titulo}
-                      </h4>
-                      <p className="mt-1 text-sm text-gray-500">
-                        {formatDate(contingencia.fechaCreacion)}
-                      </p>
-                      <p className="mt-2 text-sm text-gray-700">
-                        {contingencia.descripcion}
-                      </p>
-                    </div>
-                    <div>
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        contingencia.estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
-                        contingencia.estado === 'en_revision' ? 'bg-blue-100 text-blue-800' :
-                        contingencia.estado === 'resuelto' ? 'bg-green-100 text-green-800' :
-                        'bg-red-100 text-red-800'
-                      }`}>
-                        {contingencia.estado === 'pendiente' ? 'Pendiente' :
-                         contingencia.estado === 'en_revision' ? 'En Revisión' :
-                         contingencia.estado === 'resuelto' ? 'Resuelto' : 'Rechazado'}
-                      </span>
-                      <div className="mt-2">
-                        <Link
-                          href={`/admin/contingencias/${contingencia.id}`}
-                          className="text-indigo-600 hover:text-indigo-900 text-sm font-medium"
-                        >
-                          Ver detalle
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      )}
-
-      {/* Insumos */}
-      <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-        <div className="px-4 py-5 sm:px-6 bg-gray-50">
-          <h3 className="text-lg leading-6 font-medium text-gray-900 flex items-center">
-            <Package className="h-5 w-5 mr-2 text-gray-500" />
-            Insumos
-          </h3>
-        </div>
-        <div className="border-t border-gray-200">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Insumo
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Cantidad enviada
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Cantidad recibida
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                >
-                  Diferencia
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {envio.items.map(item => {
-                const diferencia = item.cantidadRecibida !== null
-                  ? item.cantidad - item.cantidadRecibida
-                  : null;
-                
-                return (
-                  <tr key={item.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {item.insumo.nombre}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {item.cantidad} {item.insumo.unidadMedida}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {item.cantidadRecibida !== null
-                        ? `${item.cantidadRecibida} ${item.insumo.unidadMedida}`
-                        : '-'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      {diferencia !== null ? (
-                        <span className={diferencia === 0
-                          ? 'text-green-600'
-                          : 'text-red-600'
-                        }>
-                          {diferencia > 0 ? `-${diferencia}` : `+${Math.abs(diferencia)}`} {item.insumo.unidadMedida}
-                        </span>
-                      ) : '-'}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Acciones */}
-      {envio.estado === 'pendiente' && (
-        <div className="flex justify-end">
+      <ContrastEnhancer>
+        <div className="text-center py-10">
+          <p className="text-red-500">{error || 'Envío no encontrado'}</p>
           <button
-            onClick={handleEnviar}
-            disabled={isProcessing}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            onClick={() => router.back()}
+            className="mt-4 px-4 py-2 bg-indigo-600 text-white rounded"
           >
-            {isProcessing ? (
-              <>
-                <Loader2 className="animate-spin h-4 w-4 mr-2" />
-                Procesando...
-              </>
-            ) : (
-              <>
-                <Send className="h-4 w-4 mr-2" />
-                Marcar como enviado
-              </>
-            )}
+            Volver
           </button>
         </div>
-      )}
-
-      {envio.estado === 'con_contingencia' && (
-        <div className="bg-red-50 p-4 rounded-md">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <AlertTriangle className="h-5 w-5 text-red-400" aria-hidden="true" />
-            </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-red-800">
-                Este envío tiene contingencias pendientes
+      </ContrastEnhancer>
+    );
+  }
+  
+  // Si el envío ya fue procesado, mostrar vista de solo lectura
+  if (envio.estado !== 'pendiente') {
+    return (
+      <ContrastEnhancer>
+        <div className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-bold text-black">Detalle de Envío #{envio.id.substr(-6)}</h1>
+            <button
+              onClick={() => router.back()}
+              className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm rounded-md text-black bg-white hover:bg-gray-50"
+            >
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Volver
+            </button>
+          </div>
+          
+          <div className="bg-white shadow sm:rounded-lg">
+            <div className="px-4 py-5 sm:px-6 bg-blue-50">
+              <h3 className="text-lg leading-6 font-medium text-blue-900">
+                Envío {envio.estado === 'enviado' ? 'Procesado' : 'Recibido'}
               </h3>
-              <div className="mt-2 text-sm text-red-700">
-                <p>
-                  Se han detectado discrepancias entre las cantidades enviadas y recibidas.
-                  Por favor, revisa y resuelve las contingencias para continuar con el proceso.
-                </p>
-              </div>
-              <div className="mt-4">
-                <div className="-mx-2 -my-1.5 flex">
-                  <Link
-                    href={`/admin/contingencias/${envio.contingencias[0]?.id || ''}`}
-                    className="bg-red-50 px-2 py-1.5 rounded-md text-sm font-medium text-red-800 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                  >
-                    Ver contingencia
-                  </Link>
+              <p className="mt-1 max-w-2xl text-sm text-blue-500">
+                Este envío ya ha sido {envio.estado === 'enviado' ? 'procesado' : 'recibido por la fábrica'}.
+              </p>
+            </div>
+            <div className="border-t border-gray-200 px-4 py-5 sm:p-0">
+              <dl className="sm:divide-y sm:divide-gray-200">
+                <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                  <dt className="text-sm font-medium text-black">Destino</dt>
+                  <dd className="mt-1 text-sm text-black sm:mt-0 sm:col-span-2">
+                    {envio.destino.nombre}
+                  </dd>
                 </div>
-              </div>
+                <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                  <dt className="text-sm font-medium text-black">Estado</dt>
+                  <dd className="mt-1 text-sm text-black sm:mt-0 sm:col-span-2">
+                    <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                      envio.estado === 'enviado' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
+                    }`}>
+                      {envio.estado === 'enviado' ? 'Enviado' : 'Recibido'}
+                    </span>
+                  </dd>
+                </div>
+                <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                  <dt className="text-sm font-medium text-black">Fecha de creación</dt>
+                  <dd className="mt-1 text-sm text-black sm:mt-0 sm:col-span-2">
+                    {formatDate(envio.fechaCreacion)}
+                  </dd>
+                </div>
+                {envio.fechaEnvio && (
+                  <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                    <dt className="text-sm font-medium text-black">Fecha de envío</dt>
+                    <dd className="mt-1 text-sm text-black sm:mt-0 sm:col-span-2">
+                      {formatDate(envio.fechaEnvio)}
+                    </dd>
+                  </div>
+                )}
+                {envio.observaciones && (
+                  <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                    <dt className="text-sm font-medium text-black">Observaciones</dt>
+                    <dd className="mt-1 text-sm text-black sm:mt-0 sm:col-span-2">
+                      {envio.observaciones}
+                    </dd>
+                  </div>
+                )}
+              </dl>
+            </div>
+          </div>
+          
+          <div className="bg-white shadow sm:rounded-lg">
+            <div className="px-4 py-5 sm:px-6 bg-indigo-50">
+              <h3 className="text-lg leading-6 font-medium text-indigo-900">
+                Insumos Enviados
+              </h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                      Insumo
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                      Cantidad
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                      Unidad
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {envio.items.map((item) => (
+                    <tr key={item.id}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-black">
+                        {item.insumo.nombre}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-black">
+                        {item.cantidad}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-black">
+                        {item.insumo.unidadMedida}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
-      )}
-    </div>
+      </ContrastEnhancer>
+    );
+  }
+  
+  // Formulario de envío para estado pendiente
+  return (
+    <ContrastEnhancer>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-black">Procesar Envío #{envio.id.substr(-6)}</h1>
+          <button
+            onClick={() => router.back()}
+            className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm rounded-md text-black bg-white hover:bg-gray-50"
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Volver
+          </button>
+        </div>
+        
+        {error && (
+          <div className="bg-red-100 p-4 rounded-md text-red-700">
+            {error}
+          </div>
+        )}
+        
+        <div className="bg-white shadow sm:rounded-lg">
+          <div className="px-4 py-5 sm:px-6 bg-yellow-50">
+            <h3 className="text-lg leading-6 font-medium text-yellow-900">
+              <Package className="inline-block h-5 w-5 mr-2" />
+              Solicitud de Insumos
+            </h3>
+            <p className="mt-1 max-w-2xl text-sm text-yellow-500">
+              Ajuste las cantidades según disponibilidad y procese el envío.
+            </p>
+          </div>
+          
+          <form onSubmit={handleSubmit(onSubmit)} className="p-6 space-y-6">
+            <div className="overflow-x-auto bg-gray-50 rounded-lg p-4">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                      Insumo
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                      Cantidad Solicitada
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                      Cantidad a Enviar
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                      Unidad
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {fields.map((field, index) => {
+                    const itemOriginal = envio.items.find(i => i.id === field.id);
+                    const solicitado = itemOriginal ? itemOriginal.cantidad : 0;
+                    const unidad = itemOriginal?.insumo?.unidadMedida || '';
+                    
+                    return (
+                      <tr key={field.id}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-black">
+                          {itemOriginal?.insumo?.nombre || ''}
+                          <input type="hidden" {...register(`items.${index}.id`)} />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-black">
+                          {solicitado}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <HCInput
+                            type="number"
+                            min="0"
+                            className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                            {...register(`items.${index}.cantidad`, { 
+                              valueAsNumber: true,
+                              min: { value: 0, message: "La cantidad no puede ser negativa" }
+                            })}
+                          />
+                          {errors.items?.[index]?.cantidad && (
+                            <p className="mt-1 text-xs text-red-600">{errors.items[index]?.cantidad?.message}</p>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-black">
+                          {unidad}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            
+            <div>
+              <HCLabel htmlFor="observaciones" className="block text-sm font-medium mb-1">
+                Observaciones
+              </HCLabel>
+              <HCTextarea
+                id="observaciones"
+                rows={3}
+                className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+                placeholder="Observaciones sobre el envío..."
+                {...register('observaciones')}
+              ></HCTextarea>
+            </div>
+            
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                disabled={isSending}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                {isSending ? (
+                  <>
+                    <div className="animate-spin mr-2 h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+                    Procesando...
+                  </>
+                ) : (
+                  <>
+                    <Send className="mr-2 h-4 w-4" />
+                    Procesar Envío
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </ContrastEnhancer>
   );
 }

@@ -8,6 +8,8 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
+import { ContrastEnhancer } from '@/components/ui/ContrastEnhancer';
+import { HCInput, HCLabel, HCSelect, HCTextarea } from '@/components/ui/HighContrastComponents';
 
 interface Categoria {
   id: string;
@@ -219,272 +221,278 @@ const {
 
   if (isFetching) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
-        <span className="ml-2 text-gray-500">Cargando producto...</span>
-      </div>
+      <ContrastEnhancer>
+        <div className="flex items-center justify-center h-64">
+          <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+          <span className="ml-2 text-black">Cargando producto...</span>
+        </div>
+      </ContrastEnhancer>
     );
   }
 
   if (!producto && !isFetching) {
     return (
-      <div className="flex flex-col items-center justify-center h-64">
-        <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
-        <h2 className="text-xl font-semibold text-gray-900 mb-2">Producto no encontrado</h2>
-        <p className="text-gray-500 mb-4">El producto que estás buscando no existe o ha sido eliminado.</p>
-        <button
-          onClick={() => router.push('/admin/productos')}
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700"
-        >
-          <ChevronLeft className="h-4 w-4 mr-2" />
-          Volver a productos
-        </button>
-      </div>
+      <ContrastEnhancer>
+        <div className="flex flex-col items-center justify-center h-64">
+          <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
+          <h2 className="text-xl font-semibold text-black mb-2">Producto no encontrado</h2>
+          <p className="text-black mb-4">El producto que estás buscando no existe o ha sido eliminado.</p>
+          <button
+            onClick={() => router.push('/admin/productos')}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700"
+          >
+            <ChevronLeft className="h-4 w-4 mr-2" />
+            Volver a productos
+          </button>
+        </div>
+      </ContrastEnhancer>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center">
-          <Package className="h-6 w-6 text-indigo-600 mr-2" />
-          <h1 className="text-2xl font-bold">Editar Producto</h1>
+    <ContrastEnhancer>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center">
+            <Package className="h-6 w-6 text-indigo-600 mr-2" />
+            <h1 className="text-2xl font-bold text-black">Editar Producto</h1>
+          </div>
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-black bg-white hover:bg-gray-50"
+          >
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            Volver
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-        >
-          <ChevronLeft className="h-4 w-4 mr-1" />
-          Volver
-        </button>
-      </div>
 
-      <div className="bg-white shadow overflow-hidden sm:rounded-lg p-6">
-        {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-md">
-            {error}
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label htmlFor="nombre" className="block text-sm font-medium text-gray-700 mb-1">
-                Nombre *
-              </label>
-              <input
-                id="nombre"
-                type="text"
-                {...register('nombre')}
-                className="block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              />
-              {errors.nombre && (
-                <p className="mt-1 text-sm text-red-600">{errors.nombre.message}</p>
-              )}
+        <div className="bg-white shadow overflow-hidden sm:rounded-lg p-6">
+          {error && (
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-md">
+              {error}
             </div>
-            
-            <div>
-              <label htmlFor="categoriaId" className="block text-sm font-medium text-gray-700 mb-1">
-                Categoría *
-              </label>
-              <select
-                id="categoriaId"
-                {...register('categoriaId')}
-                className="block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              >
-                <option value="">Seleccionar categoría</option>
-                {categorias.map(categoria => (
-                  <option key={categoria.id} value={categoria.id}>
-                    {categoria.nombre}
-                  </option>
-                ))}
-              </select>
-              {errors.categoriaId && (
-                <p className="mt-1 text-sm text-red-600">{errors.categoriaId.message}</p>
-              )}
-              <div className="mt-1 text-xs text-gray-500">
-                <Link 
-                  href="/admin/categorias/nueva"
-                  className="text-indigo-600 hover:text-indigo-500"
-                >
-                  + Crear nueva categoría
-                </Link>
-              </div>
-            </div>
-          </div>
+          )}
 
-          <div>
-            <label htmlFor="descripcion" className="block text-sm font-medium text-gray-700 mb-1">
-              Descripción
-            </label>
-            <textarea
-              id="descripcion"
-              rows={3}
-              {...register('descripcion')}
-              className="block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-              <label htmlFor="precio" className="block text-sm font-medium text-gray-700 mb-1">
-                Precio *
-              </label>
-              <div className="relative rounded-md shadow-sm">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <span className="text-gray-500 sm:text-sm">$</span>
-                </div>
-                <input
-                  id="precio"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  {...register('precio', { valueAsNumber: true })}
-                  className="block w-full pl-7 pr-12 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <HCLabel htmlFor="nombre" className="block text-sm font-medium mb-1">
+                  Nombre *
+                </HCLabel>
+                <HCInput
+                  id="nombre"
+                  type="text"
+                  {...register('nombre')}
+                  className="block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                 />
-              </div>
-              {errors.precio && (
-                <p className="mt-1 text-sm text-red-600">{errors.precio.message}</p>
-              )}
-            </div>
-
-            <div>
-              <label htmlFor="codigoBarras" className="block text-sm font-medium text-gray-700 mb-1">
-                Código de Barras
-              </label>
-              <input
-                id="codigoBarras"
-                type="text"
-                {...register('codigoBarras')}
-                className="block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="stockMinimo" className="block text-sm font-medium text-gray-700 mb-1">
-                Stock Mínimo
-              </label>
-              <input
-                id="stockMinimo"
-                type="number"
-                min="0"
-                step="1"
-                {...register('stockMinimo', { valueAsNumber: true })}
-                className="block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              />
-              {errors.stockMinimo && (
-                <p className="mt-1 text-sm text-red-600">{errors.stockMinimo.message}</p>
-              )}
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Imagen del Producto
-            </label>
-            <div className="flex items-center space-x-6">
-              <div className="flex-shrink-0">
-                {imagePreview ? (
-                  <div className="relative h-24 w-24 rounded-md overflow-hidden">
-                    <img
-                      src={imagePreview}
-                      alt="Vista previa"
-                      className="h-full w-full object-cover"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setImagePreview(null);
-                        setImageFile(null);
-                      }}
-                      className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1 shadow-lg"
-                    >
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                ) : (
-                  <div className="h-24 w-24 rounded-md border-2 border-dashed border-gray-300 flex items-center justify-center">
-                    <Package className="h-10 w-10 text-gray-400" />
-                  </div>
+                {errors.nombre && (
+                  <p className="mt-1 text-sm text-red-600">{errors.nombre.message}</p>
                 )}
               </div>
-              <div className="flex-1">
-                <label
-                  htmlFor="imagen"
-                  className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 cursor-pointer"
+              
+              <div>
+                <HCLabel htmlFor="categoriaId" className="block text-sm font-medium mb-1">
+                  Categoría *
+                </HCLabel>
+                <HCSelect
+                  id="categoriaId"
+                  {...register('categoriaId')}
+                  className="block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                 >
-                  <Upload className="h-4 w-4 mr-2" />
-                  {imagePreview ? 'Cambiar imagen' : 'Subir imagen'}
-                  <input
-                    id="imagen"
-                    type="file"
-                    accept="image/*"
-                    className="sr-only"
-                    onChange={handleImageChange}
-                  />
-                </label>
-                <p className="mt-1 text-xs text-gray-500">
-                  PNG, JPG, GIF hasta 5MB
-                </p>
+                  <option value="">Seleccionar categoría</option>
+                  {categorias.map(categoria => (
+                    <option key={categoria.id} value={categoria.id}>
+                      {categoria.nombre}
+                    </option>
+                  ))}
+                </HCSelect>
+                {errors.categoriaId && (
+                  <p className="mt-1 text-sm text-red-600">{errors.categoriaId.message}</p>
+                )}
+                <div className="mt-1 text-xs text-gray-500">
+                  <Link 
+                    href="/admin/categorias/nueva"
+                    className="text-indigo-600 hover:text-indigo-500"
+                  >
+                    + Crear nueva categoría
+                  </Link>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="flex items-center">
-            <input
-              id="activo"
-              type="checkbox"
-              {...register('activo')}
-              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-            />
-            <label htmlFor="activo" className="ml-2 block text-sm text-gray-700">
-              Producto activo
-            </label>
-          </div>
+            <div>
+              <HCLabel htmlFor="descripcion" className="block text-sm font-medium mb-1">
+                Descripción
+              </HCLabel>
+              <HCTextarea
+                id="descripcion"
+                rows={3}
+                {...register('descripcion')}
+                className="block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              />
+            </div>
 
-          <div className="flex justify-between pt-4">
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={isDeleting}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-            >
-              {isDeleting ? (
-                <>
-                  <Loader2 className="animate-spin h-4 w-4 mr-2" /> 
-                  Procesando...
-                </>
-              ) : (
-                <>
-                  <Trash className="h-4 w-4 mr-2" />
-                  {producto?.activo ? 'Desactivar producto' : 'Activar producto'}
-                </>
-              )}
-            </button>
-            
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="animate-spin h-4 w-4 mr-2" /> 
-                  Guardando...
-                </>
-              ) : (
-                <>
-                  <Save className="h-4 w-4 mr-2" />
-                  Guardar cambios
-                </>
-              )}
-            </button>
-          </div>
-        </form>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <HCLabel htmlFor="precio" className="block text-sm font-medium mb-1">
+                  Precio *
+                </HCLabel>
+                <div className="relative rounded-md shadow-sm">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <span className="text-gray-500 sm:text-sm">$</span>
+                  </div>
+                  <HCInput
+                    id="precio"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    {...register('precio', { valueAsNumber: true })}
+                    className="block w-full pl-7 pr-12 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  />
+                </div>
+                {errors.precio && (
+                  <p className="mt-1 text-sm text-red-600">{errors.precio.message}</p>
+                )}
+              </div>
+
+              <div>
+                <HCLabel htmlFor="codigoBarras" className="block text-sm font-medium mb-1">
+                  Código de Barras
+                </HCLabel>
+                <HCInput
+                  id="codigoBarras"
+                  type="text"
+                  {...register('codigoBarras')}
+                  className="block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                />
+              </div>
+
+              <div>
+                <HCLabel htmlFor="stockMinimo" className="block text-sm font-medium mb-1">
+                  Stock Mínimo
+                </HCLabel>
+                <HCInput
+                  id="stockMinimo"
+                  type="number"
+                  min="0"
+                  step="1"
+                  {...register('stockMinimo', { valueAsNumber: true })}
+                  className="block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                />
+                {errors.stockMinimo && (
+                  <p className="mt-1 text-sm text-red-600">{errors.stockMinimo.message}</p>
+                )}
+              </div>
+            </div>
+
+            <div>
+              <HCLabel className="block text-sm font-medium mb-1">
+                Imagen del Producto
+              </HCLabel>
+              <div className="flex items-center space-x-6">
+                <div className="flex-shrink-0">
+                  {imagePreview ? (
+                    <div className="relative h-24 w-24 rounded-md overflow-hidden">
+                      <img
+                        src={imagePreview}
+                        alt="Vista previa"
+                        className="h-full w-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setImagePreview(null);
+                          setImageFile(null);
+                        }}
+                        className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1 shadow-lg"
+                      >
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="h-24 w-24 rounded-md border-2 border-dashed border-gray-300 flex items-center justify-center">
+                      <Package className="h-10 w-10 text-gray-400" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <label
+                    htmlFor="imagen"
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-black bg-white hover:bg-gray-50 cursor-pointer"
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    {imagePreview ? 'Cambiar imagen' : 'Subir imagen'}
+                    <input
+                      id="imagen"
+                      type="file"
+                      accept="image/*"
+                      className="sr-only"
+                      onChange={handleImageChange}
+                    />
+                  </label>
+                  <p className="mt-1 text-xs text-black">
+                    PNG, JPG, GIF hasta 5MB
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center">
+              <input
+                id="activo"
+                type="checkbox"
+                {...register('activo')}
+                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+              />
+              <label htmlFor="activo" className="ml-2 block text-sm text-black">
+                Producto activo
+              </label>
+            </div>
+
+            <div className="flex justify-between pt-4">
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="animate-spin h-4 w-4 mr-2" /> 
+                    Procesando...
+                  </>
+                ) : (
+                  <>
+                    <Trash className="h-4 w-4 mr-2" />
+                    {producto?.activo ? 'Desactivar producto' : 'Activar producto'}
+                  </>
+                )}
+              </button>
+              
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="animate-spin h-4 w-4 mr-2" /> 
+                    Guardando...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Guardar cambios
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
+    </ContrastEnhancer>
   );
 }

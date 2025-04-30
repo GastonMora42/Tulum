@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { ContrastEnhancer } from '@/components/ui/ContrastEnhancer';
+import { HCInput, HCLabel, HCSelect } from '@/components/ui/HighContrastComponents';
 
 interface User {
   id: string;
@@ -143,120 +145,126 @@ export default function EditarUsuarioPage({ params }: { params: { id: string } }
   
   if (isLoading) {
     return (
-      <div className="text-center py-10">
-        <p className="text-lg">Cargando...</p>
-      </div>
+      <ContrastEnhancer>
+        <div className="text-center py-10">
+          <p className="text-lg text-black">Cargando...</p>
+        </div>
+      </ContrastEnhancer>
     );
   }
   
   if (!user && !isLoading) {
     return (
-      <div className="text-center py-10">
-        <p className="text-lg text-red-500">Usuario no encontrado</p>
-        <button
-          onClick={() => router.back()}
-          className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-        >
-          Volver
-        </button>
-      </div>
+      <ContrastEnhancer>
+        <div className="text-center py-10">
+          <p className="text-lg text-red-500">Usuario no encontrado</p>
+          <button
+            onClick={() => router.back()}
+            className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            Volver
+          </button>
+        </div>
+      </ContrastEnhancer>
     );
   }
   
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Editar Usuario</h1>
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="text-indigo-600 hover:text-indigo-900"
-        >
-          Volver
-        </button>
-      </div>
-      
-      <div className="bg-white shadow overflow-hidden sm:rounded-lg p-6">
-        {error && (
-          <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-md">
-            {error}
-          </div>
-        )}
-        
-        <div className="mb-6 p-4 bg-gray-50 rounded-md">
-          <p className="text-sm text-gray-500">
-            <strong>Email:</strong> {user?.email}
-          </p>
+    <ContrastEnhancer>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-black">Editar Usuario</h1>
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="text-indigo-600 hover:text-indigo-900"
+          >
+            Volver
+          </button>
         </div>
         
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          <div>
-            <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-              Nombre
-            </label>
-            <input
-              id="name"
-              type="text"
-              {...register('name')}
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-            />
-            {errors.name && (
-              <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
-            )}
+        <div className="bg-white shadow overflow-hidden sm:rounded-lg p-6">
+          {error && (
+            <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-md">
+              {error}
+            </div>
+          )}
+          
+          <div className="mb-6 p-4 bg-gray-50 rounded-md">
+            <p className="text-sm text-black">
+              <strong className="text-black">Email:</strong> {user?.email}
+            </p>
           </div>
           
-          <div>
-            <label htmlFor="roleId" className="block text-sm font-medium text-gray-700">
-              Rol
-            </label>
-            <select
-              id="roleId"
-              {...register('roleId')}
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-            >
-              <option value="">Seleccionar rol</option>
-              {roles.map(role => (
-                <option key={role.id} value={role.id}>{role.name}</option>
-              ))}
-            </select>
-            {errors.roleId && (
-              <p className="mt-1 text-sm text-red-600">{errors.roleId.message}</p>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            <div>
+              <HCLabel htmlFor="name" className="block text-sm font-medium mb-1">
+                Nombre
+              </HCLabel>
+              <HCInput
+                id="name"
+                type="text"
+                {...register('name')}
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              />
+              {errors.name && (
+                <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
+              )}
+            </div>
+            
+            <div>
+              <HCLabel htmlFor="roleId" className="block text-sm font-medium mb-1">
+                Rol
+              </HCLabel>
+              <HCSelect
+                id="roleId"
+                {...register('roleId')}
+                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              >
+                <option value="">Seleccionar rol</option>
+                {roles.map(role => (
+                  <option key={role.id} value={role.id}>{role.name}</option>
+                ))}
+              </HCSelect>
+              {errors.roleId && (
+                <p className="mt-1 text-sm text-red-600">{errors.roleId.message}</p>
+              )}
+            </div>
+            
+            {/* Mostrar selección de sucursal solo si es vendedor */}
+            {isVendedor && (
+              <div>
+                <HCLabel htmlFor="sucursalId" className="block text-sm font-medium mb-1">
+                  Sucursal
+                </HCLabel>
+                <HCSelect
+                  id="sucursalId"
+                  {...register('sucursalId')}
+                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                >
+                  <option value="">Seleccionar sucursal</option>
+                  {ubicaciones
+                    .filter(ubicacion => ubicacion.tipo === 'sucursal')
+                    .map(ubicacion => (
+                      <option key={ubicacion.id} value={ubicacion.id}>{ubicacion.nombre}</option>
+                    ))
+                  }
+                </HCSelect>
+              </div>
             )}
-          </div>
-          
-          {/* Mostrar selección de sucursal solo si es vendedor */}
-          {isVendedor && (
-  <div>
-    <label htmlFor="sucursalId" className="block text-sm font-medium text-gray-700">
-      Sucursal
-    </label>
-    <select
-      id="sucursalId"
-      {...register('sucursalId')}
-      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-    >
-      <option value="">Seleccionar sucursal</option>
-      {ubicaciones
-        .filter(ubicacion => ubicacion.tipo === 'sucursal')
-        .map(ubicacion => (
-          <option key={ubicacion.id} value={ubicacion.id}>{ubicacion.nombre}</option>
-        ))
-      }
-    </select>
-  </div>
-)}
-          
-<div className="flex justify-end">
-  <button
-    type="submit"
-    disabled={isSaving}
-    className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-  >
-    {isSaving ? 'Guardando...' : 'Guardar Cambios'}
-  </button>
-</div>
-        </form>
+            
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                disabled={isSaving}
+                className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                {isSaving ? 'Guardando...' : 'Guardar Cambios'}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
+    </ContrastEnhancer>
   );
 }
