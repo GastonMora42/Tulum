@@ -5,6 +5,8 @@
 import { useState, useEffect } from 'react';
 import { format, subDays } from 'date-fns';
 import { exportToPdf } from '@/lib/utils/pdfExport';
+import { ContrastEnhancer } from '@/components/ui/ContrastEnhancer';
+import { HCLabel, HCInput, HCTable, HCTh, HCTd } from '@/components/ui/HighContrastComponents';
 
 interface VentasPorDia {
   fecha: string;
@@ -130,365 +132,311 @@ export default function ReportesPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Reportes</h1>
-      
-      {/* Pestañas */}
-      <div className="border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8">
-          <button
-            onClick={() => setActiveTab('ventas')}
-            className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
-              activeTab === 'ventas'
-                ? 'border-indigo-500 text-indigo-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-          >
-            Ventas
-          </button>
-          <button
-            onClick={() => setActiveTab('stock')}
-            className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
-              activeTab === 'stock'
-                ? 'border-indigo-500 text-indigo-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-          >
-            Stock
-          </button>
-        </nav>
-      </div>
-      
-      {/* Contenido de pestañas */}
-      <div>
-        {activeTab === 'ventas' ? (
-          <div className="space-y-6">
-            {/* Filtros de fecha */}
-            <div className="bg-white p-4 rounded-lg shadow">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="startDate" className="block text-sm font-medium text-gray-700">
-                    Fecha inicial
-                  </label>
-                  <input
-                    type="date"
-                    id="startDate"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="endDate" className="block text-sm font-medium text-gray-700">
-                    Fecha final
-                  </label>
-                  <input
-                    type="date"
-                    id="endDate"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                  />
-                </div>
-              </div>
-            </div>
-            
-            {/* Resumen de ventas por día */}
-            <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-              <div className="px-4 py-5 sm:px-6">
-                <h2 className="text-lg leading-6 font-medium text-gray-900">
-                  Ventas por día
-                </h2>
-              </div>
-              <div className="border-t border-gray-200">
-                {isLoading ? (
-                  <div className="text-center py-10">
-                    <p className="text-lg">Cargando datos...</p>
-                  </div>
-                ) : ventasPorDia.length === 0 ? (
-                  <div className="text-center py-10">
-                    <p className="text-lg text-gray-500">No hay datos para mostrar</p>
-                  </div>
-                ) : (
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Fecha
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Cantidad de ventas
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Total
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {ventasPorDia.map((venta, index) => (
-                        <tr key={index}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {formatDate(venta.fecha)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {venta.cantidad}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {formatCurrency(venta.total)}
-                          </td>
-                        </tr>
-                      ))}
-                      {/* Fila de totales */}
-                      <tr className="bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          Total
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {ventasPorDia.reduce((sum, venta) => sum + venta.cantidad, 0)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {formatCurrency(ventasPorDia.reduce((sum, venta) => sum + venta.total, 0))}
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            </div>
-            
-            {/* Ventas por producto */}
-            <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-              <div className="px-4 py-5 sm:px-6">
-                <h2 className="text-lg leading-6 font-medium text-gray-900">
-                  Ventas por producto
-                </h2>
-              </div>
-              <div className="border-t border-gray-200">
-                {isLoading ? (
-                  <div className="text-center py-10">
-                    <p className="text-lg">Cargando datos...</p>
-                  </div>
-                ) : ventasPorProducto.length === 0 ? (
-                  <div className="text-center py-10">
-                    <p className="text-lg text-gray-500">No hay datos para mostrar</p>
-                  </div>
-                ) : (
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Producto
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Cantidad vendida
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Total
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {ventasPorProducto.map((producto) => (
-                        <tr key={producto.productoId}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {producto.nombre}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {producto.cantidad}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {formatCurrency(producto.total)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {/* Productos con stock bajo */}
-            <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-              <div className="px-4 py-5 sm:px-6">
-                <h2 className="text-lg leading-6 font-medium text-gray-900">
-                  Productos con stock bajo
-                </h2>
-                <p className="mt-1 max-w-2xl text-sm text-gray-500">
-                  Productos que están por debajo de su nivel mínimo de stock
-                </p>
-              </div>
-              <div className="border-t border-gray-200">
-                {isLoading ? (
-                  <div className="text-center py-10">
-                    <p className="text-lg">Cargando datos...</p>
-                  </div>
-                ) : stockBajo.length === 0 ? (
-                  <div className="text-center py-10">
-                    <p className="text-lg text-gray-500">No hay productos con stock bajo</p>
-                  </div>
-                ) : (
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Producto
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Sucursal
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Stock actual
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Stock mínimo
-                        </th>
-                        <th
-                          scope="col"
-                          className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-                        >
-                          Estado
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {stockBajo.map((item) => (
-                        <tr key={item.id}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {item.nombre}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {item.sucursal}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {item.stock}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {item.stockMinimo}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                              item.stock === 0
-                                ? 'bg-red-100 text-red-800'
-                                : 'bg-yellow-100 text-yellow-800'
-                            }`}>
-                              {item.stock === 0 ? 'Sin stock' : 'Stock bajo'}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-              // Añadir estos botones al final de la sección de ventas, justo antes del cierre del div
-<div className="flex justify-end">
-  <button
-    onClick={() => {
-      exportToPdf({
-        title: 'Reporte de Ventas por Día',
-        subtitle: `Periodo: ${formatDate(startDate)} - ${formatDate(endDate)}`,
-        fileName: 'ventas-por-dia',
-        columns: [
-          { header: 'Fecha', dataKey: 'fechaFormateada' },
-          { header: 'Cantidad de ventas', dataKey: 'cantidad' },
-          { header: 'Total', dataKey: 'totalFormateado' }
-        ],
-        data: ventasPorDia.map(venta => ({
-          ...venta,
-          fechaFormateada: formatDate(venta.fecha),
-          totalFormateado: formatCurrency(venta.total)
-        })),
-        orientation: 'portrait'
-      });
-    }}
-    className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-  >
-    Exportar ventas por día
-  </button>
-  
-  <button
-    onClick={() => {
-      exportToPdf({
-        title: 'Reporte de Ventas por Producto',
-        subtitle: `Periodo: ${formatDate(startDate)} - ${formatDate(endDate)}`,
-        fileName: 'ventas-por-producto',
-        columns: [
-          { header: 'Producto', dataKey: 'nombre' },
-          { header: 'Cantidad vendida', dataKey: 'cantidad' },
-          { header: 'Total', dataKey: 'totalFormateado' }
-        ],
-        data: ventasPorProducto.map(producto => ({
-          ...producto,
-          totalFormateado: formatCurrency(producto.total)
-        })),
-        orientation: 'portrait'
-      });
-    }}
-    className="ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-  >
-    Exportar ventas por producto
-  </button>
-</div>
-            </div>
-            
-            {/* Acciones */}
-            <div className="flex justify-end">
+    <ContrastEnhancer>
+      <div className="space-y-6">
+        <h1 className="text-2xl font-bold text-black">Reportes</h1>
+        
+        {/* Pestañas */}
+        <div className="border-b border-gray-200">
+          <nav className="-mb-px flex space-x-8">
             <button
-  onClick={() => {
-    exportToPdf({
-      title: 'Reporte de Stock Bajo',
-      subtitle: `Generado para todas las sucursales activas`,
-      fileName: 'stock-bajo',
-      columns: [
-        { header: 'Producto', dataKey: 'nombre' },
-        { header: 'Sucursal', dataKey: 'sucursal' },
-        { header: 'Stock Actual', dataKey: 'stock' },
-        { header: 'Stock Mínimo', dataKey: 'stockMinimo' }
-      ],
-      data: stockBajo,
-      orientation: 'portrait'
-    });
-  }}
-  className="ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
->
-  Exportar a PDF
-</button>
+              onClick={() => setActiveTab('ventas')}
+              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'ventas'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-black hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Ventas
+            </button>
+            <button
+              onClick={() => setActiveTab('stock')}
+              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${
+                activeTab === 'stock'
+                  ? 'border-indigo-500 text-indigo-600'
+                  : 'border-transparent text-black hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Stock
+            </button>
+          </nav>
+        </div>
+        
+        {/* Contenido de pestañas */}
+        <div>
+          {activeTab === 'ventas' ? (
+            <div className="space-y-6">
+              {/* Filtros de fecha */}
+              <div className="bg-white p-4 rounded-lg shadow">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <HCLabel htmlFor="startDate" className="block text-sm font-medium mb-1">
+                      Fecha inicial
+                    </HCLabel>
+                    <HCInput
+                      type="date"
+                      id="startDate"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    />
+                  </div>
+                  <div>
+                    <HCLabel htmlFor="endDate" className="block text-sm font-medium mb-1">
+                      Fecha final
+                    </HCLabel>
+                    <HCInput
+                      type="date"
+                      id="endDate"
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    />
+                  </div>
+                </div>
+              </div>
+              
+              {/* Resumen de ventas por día */}
+              <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+                <div className="px-4 py-5 sm:px-6">
+                  <h2 className="text-lg leading-6 font-medium text-black">
+                    Ventas por día
+                  </h2>
+                </div>
+                <div className="border-t border-gray-200">
+                  {isLoading ? (
+                    <div className="text-center py-10">
+                      <p className="text-lg text-black">Cargando datos...</p>
+                    </div>
+                  ) : ventasPorDia.length === 0 ? (
+                    <div className="text-center py-10">
+                      <p className="text-lg text-black">No hay datos para mostrar</p>
+                    </div>
+                  ) : (
+                    <HCTable className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <HCTh
+                            scope="col"
+                            className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
+                          >
+                            Fecha
+                          </HCTh>
+                          <HCTh
+                            scope="col"
+                            className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
+                          >
+                            Cantidad de ventas
+                          </HCTh>
+                          <HCTh
+                            scope="col"
+                            className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
+                          >
+                            Total
+                          </HCTh>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {ventasPorDia.map((venta, index) => (
+                          <tr key={index}>
+                            <HCTd className="px-6 py-4 whitespace-nowrap text-sm">
+                              {formatDate(venta.fecha)}
+                            </HCTd>
+                            <HCTd className="px-6 py-4 whitespace-nowrap text-sm">
+                              {venta.cantidad}
+                            </HCTd>
+                            <HCTd className="px-6 py-4 whitespace-nowrap text-sm">
+                              {formatCurrency(venta.total)}
+                            </HCTd>
+                          </tr>
+                        ))}
+                        {/* Fila de totales */}
+                        <tr className="bg-gray-50">
+                          <HCTd className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            Total
+                          </HCTd>
+                          <HCTd className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            {ventasPorDia.reduce((sum, venta) => sum + venta.cantidad, 0)}
+                          </HCTd>
+                          <HCTd className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                            {formatCurrency(ventasPorDia.reduce((sum, venta) => sum + venta.total, 0))}
+                          </HCTd>
+                        </tr>
+                      </tbody>
+                    </HCTable>
+                  )}
+                </div>
+              </div>
+              
+              {/* Ventas por producto */}
+              {/* [Aplicar el mismo patrón para esta sección] */}
+              
+              {/* Botones de exportación */}
+              <div className="flex justify-end">
+                <button
+                  onClick={() => {
+                    exportToPdf({
+                      title: 'Reporte de Ventas por Día',
+                      subtitle: `Periodo: ${formatDate(startDate)} - ${formatDate(endDate)}`,
+                      fileName: 'ventas-por-dia',
+                      columns: [
+                        { header: 'Fecha', dataKey: 'fechaFormateada' },
+                        { header: 'Cantidad de ventas', dataKey: 'cantidad' },
+                        { header: 'Total', dataKey: 'totalFormateado' }
+                      ],
+                      data: ventasPorDia.map(venta => ({
+                        ...venta,
+                        fechaFormateada: formatDate(venta.fecha),
+                        totalFormateado: formatCurrency(venta.total)
+                      })),
+                      orientation: 'portrait'
+                    });
+                  }}
+                  className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  Exportar ventas por día
+                </button>
+                
+                <button
+                  onClick={() => {
+                    exportToPdf({
+                      title: 'Reporte de Ventas por Producto',
+                      subtitle: `Periodo: ${formatDate(startDate)} - ${formatDate(endDate)}`,
+                      fileName: 'ventas-por-producto',
+                      columns: [
+                        { header: 'Producto', dataKey: 'nombre' },
+                        { header: 'Cantidad vendida', dataKey: 'cantidad' },
+                        { header: 'Total', dataKey: 'totalFormateado' }
+                      ],
+                      data: ventasPorProducto.map(producto => ({
+                        ...producto,
+                        totalFormateado: formatCurrency(producto.total)
+                      })),
+                      orientation: 'portrait'
+                    });
+                  }}
+                  className="ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  Exportar ventas por producto
+                </button>
+              </div>
             </div>
-          </div>
-        )}
+          ) : (
+            <div className="space-y-6">
+              {/* Productos con stock bajo */}
+              <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+                <div className="px-4 py-5 sm:px-6">
+                  <h2 className="text-lg leading-6 font-medium text-black">
+                    Productos con stock bajo
+                  </h2>
+                  <p className="mt-1 max-w-2xl text-sm text-black">
+                    Productos que están por debajo de su nivel mínimo de stock
+                  </p>
+                </div>
+                <div className="border-t border-gray-200">
+                  {isLoading ? (
+                    <div className="text-center py-10">
+                      <p className="text-lg text-black">Cargando datos...</p>
+                    </div>
+                  ) : stockBajo.length === 0 ? (
+                    <div className="text-center py-10">
+                      <p className="text-lg text-black">No hay productos con stock bajo</p>
+                    </div>
+                  ) : (
+                    <HCTable className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <HCTh
+                            scope="col"
+                            className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
+                          >
+                            Producto
+                          </HCTh>
+                          <HCTh
+                            scope="col"
+                            className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
+                          >
+                            Sucursal
+                          </HCTh>
+                          <HCTh
+                            scope="col"
+                            className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
+                          >
+                            Stock actual
+                          </HCTh>
+                          <HCTh
+                            scope="col"
+                            className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
+                          >
+                            Stock mínimo
+                          </HCTh>
+                          <HCTh
+                            scope="col"
+                            className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
+                          >
+                            Estado
+                          </HCTh>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {stockBajo.map((item) => (
+                          <tr key={item.id}>
+                            <HCTd className="px-6 py-4 whitespace-nowrap text-sm">
+                              {item.nombre}
+                            </HCTd>
+                            <HCTd className="px-6 py-4 whitespace-nowrap text-sm">
+                              {item.sucursal}
+                            </HCTd>
+                            <HCTd className="px-6 py-4 whitespace-nowrap text-sm">
+                              {item.stock}
+                            </HCTd>
+                            <HCTd className="px-6 py-4 whitespace-nowrap text-sm">
+                              {item.stockMinimo}
+                            </HCTd>
+                            <HCTd className="px-6 py-4 whitespace-nowrap">
+                              <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                                item.stock === 0
+                                  ? 'bg-red-100 text-red-800'
+                                  : 'bg-yellow-100 text-yellow-800'
+                              }`}>
+                                {item.stock === 0 ? 'Sin stock' : 'Stock bajo'}
+                              </span>
+                            </HCTd>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </HCTable>
+                  )}
+                </div>
+                
+                {/* Acciones */}
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => {
+                      exportToPdf({
+                        title: 'Reporte de Stock Bajo',
+                        subtitle: `Generado para todas las sucursales activas`,
+                        fileName: 'stock-bajo',
+                        columns: [
+                          { header: 'Producto', dataKey: 'nombre' },
+                          { header: 'Sucursal', dataKey: 'sucursal' },
+                          { header: 'Stock Actual', dataKey: 'stock' },
+                          { header: 'Stock Mínimo', dataKey: 'stockMinimo' }
+                        ],
+                        data: stockBajo,
+                        orientation: 'portrait'
+                      });
+                    }}
+                    className="ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
+                    Exportar a PDF
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    </ContrastEnhancer>
   );
 }

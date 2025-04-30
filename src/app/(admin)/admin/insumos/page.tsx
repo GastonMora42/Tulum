@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Package, Plus, Search, Filter, RefreshCw } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
+import { HCTable, HCTh } from '@/components/ui/HighContrastComponents';
+import { ContrastEnhancer } from '@/components/ui/ContrastEnhancer';
 
 interface Insumo {
   id: string;
@@ -107,20 +109,21 @@ const fetchInsumos = async (page = 1) => {
   };
 
   return (
-    <div className="flex flex-col gap-6 p-4 md:gap-8 md:p-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Package className="h-6 w-6 text-accent" />
-          <h1 className="text-2xl font-bold tracking-tight">Gestión de Insumos</h1>
+    <ContrastEnhancer>
+      <div className="flex flex-col gap-6 p-4 md:gap-8 md:p-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Package className="h-6 w-6 text-accent" />
+            <h1 className="text-2xl font-bold tracking-tight text-black">Gestión de Insumos</h1>
+          </div>
+          <Link 
+            href="/admin/insumos/nuevo"
+            className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            <Plus className="h-4 w-4" />
+            Nuevo Insumo
+          </Link>
         </div>
-        <Link 
-          href="/admin/insumos/nuevo"
-          className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-        >
-          <Plus className="h-4 w-4" />
-          Nuevo Insumo
-        </Link>
-      </div>
 
       {/* Búsqueda y filtros */}
       <div className="rounded-lg border bg-card shadow">
@@ -182,41 +185,41 @@ const fetchInsumos = async (page = 1) => {
 
       {/* Tabla de insumos */}
       <div className="rounded-lg border bg-card shadow">
-        {isLoading ? (
-          <div className="flex items-center justify-center p-8">
-            <div className="flex flex-col items-center gap-2">
-              <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Cargando insumos...</p>
+          {isLoading ? (
+            <div className="flex items-center justify-center p-8">
+              <div className="flex flex-col items-center gap-2">
+                <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground" />
+                <p className="text-sm text-black">Cargando insumos...</p>
+              </div>
             </div>
-          </div>
-        ) : error ? (
-          <div className="flex items-center justify-center p-8">
-            <p className="text-sm text-destructive">{error}</p>
-          </div>
-        ) : (
-          <>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-muted text-muted-foreground">
-                  <tr>
-                    <th className="whitespace-nowrap px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
-                      Nombre
-                    </th>
-                    <th className="whitespace-nowrap px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+          ) : error ? (
+            <div className="flex items-center justify-center p-8">
+              <p className="text-sm text-destructive">{error}</p>
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <HCTable className="w-full">
+                  <thead className="bg-muted text-muted-foreground">
+                    <tr>
+                      <HCTh className="whitespace-nowrap px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                        Nombre
+                      </HCTh>
+                      <HCTh className="whitespace-nowrap px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
                       Unidad de Medida
-                    </th>
-                    <th className="whitespace-nowrap px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                      </HCTh>
+                    <HCTh className="whitespace-nowrap px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
                       Stock Mínimo
-                    </th>
-                    <th className="whitespace-nowrap px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                      </HCTh>
+                    <HCTh className="whitespace-nowrap px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
                       Proveedor
-                    </th>
-                    <th className="whitespace-nowrap px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                      </HCTh>
+                    <HCTh className="whitespace-nowrap px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
                       Estado
-                    </th>
-                    <th className="whitespace-nowrap px-6 py-3 text-right text-xs font-medium uppercase tracking-wider">
+                      </HCTh>
+                    <HCTh className="whitespace-nowrap px-6 py-3 text-right text-xs font-medium uppercase tracking-wider">
                       Acciones
-                    </th>
+                      </HCTh>
                   </tr>
                 </thead>
                 <tbody className="divide-y bg-card">
@@ -273,7 +276,7 @@ const fetchInsumos = async (page = 1) => {
                     ))
                   )}
                 </tbody>
-              </table>
+                </HCTable>
             </div>
 
             {/* Paginación */}
@@ -307,5 +310,6 @@ const fetchInsumos = async (page = 1) => {
         )}
       </div>
     </div>
+    </ContrastEnhancer>
   );
 }

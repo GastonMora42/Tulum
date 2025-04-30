@@ -20,6 +20,8 @@ import {
   Store,
   Box
 } from 'lucide-react';
+import { HCInput, HCLabel, HCSelect, HCTable, HCTd, HCTh } from '@/components/ui/HighContrastComponents';
+import { ContrastEnhancer } from '@/components/ui/ContrastEnhancer';
 
 // Interfaces
 interface StockItem {
@@ -363,233 +365,235 @@ export default function StockPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-[#311716]">Gestión de Stock</h1>
-        
-        <div className="flex space-x-2">
-          <button
-            onClick={() => {/* Implementar lógica para transferir stock */}}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-[#311716] hover:bg-[#4a292a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#311716]"
-          >
-            <Truck className="h-4 w-4 mr-2" />
-            Transferir Stock
-          </button>
-        </div>
-      </div>
-
-      {/* Filtros */}
-      <div className="bg-white p-4 rounded-lg shadow-sm border border-[#eee3d8]">
-        <form onSubmit={handleSearch} className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div>
-              <label htmlFor="ubicacion" className="block text-sm font-medium text-gray-700 mb-1">
-                Ubicación
-              </label>
-              <select
-                id="ubicacion"
-                value={ubicacionId}
-                onChange={(e) => setUbicacionId(e.target.value)}
-                className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#eeb077] focus:border-[#eeb077] sm:text-sm rounded-md"
-              >
-                <option value="">Todas las ubicaciones</option>
-                {ubicaciones.map((ubicacion) => (
-                  <option key={ubicacion.id} value={ubicacion.id}>
-                    {ubicacion.nombre} ({ubicacion.tipo})
-                  </option>
-                ))}
-              </select>
-            </div>
-            
-            <div>
-              <label htmlFor="tipoItem" className="block text-sm font-medium text-gray-700 mb-1">
-                Tipo de Item
-              </label>
-              <select
-                id="tipoItem"
-                value={tipoItem}
-                onChange={(e) => setTipoItem(e.target.value)}
-                className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#eeb077] focus:border-[#eeb077] sm:text-sm rounded-md"
-              >
-                <option value="todos">Todos</option>
-                <option value="producto">Productos</option>
-                <option value="insumo">Insumos</option>
-              </select>
-            </div>
-            
-            <div>
-              <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-1">
-                Buscar
-              </label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Search className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  type="text"
-                  id="search"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Nombre, código..."
-                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#eeb077] focus:border-[#eeb077] sm:text-sm"
-                />
-              </div>
-            </div>
-            
-            <div className="flex items-end">
-              <div className="flex items-center h-10">
-                <input
-                  id="showLowStock"
-                  type="checkbox"
-                  checked={showLowStock}
-                  onChange={(e) => setShowLowStock(e.target.checked)}
-                  className="h-4 w-4 text-[#eeb077] focus:ring-[#eeb077] border-gray-300 rounded"
-                />
-                <label htmlFor="showLowStock" className="ml-2 block text-sm text-gray-700">
-                  Mostrar solo stock bajo mínimo
-                </label>
-              </div>
-            </div>
-          </div>
+    <ContrastEnhancer>
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-black">Gestión de Stock</h1>
           
-          <div className="flex justify-end gap-2">
+          <div className="flex space-x-2">
             <button
-              type="submit"
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#311716] hover:bg-[#4a292a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#311716]"
+              onClick={() => {/* Implementar lógica para transferir stock */}}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-[#311716] hover:bg-[#4a292a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#311716]"
             >
-              <Filter className="h-4 w-4 mr-2" />
-              Filtrar
+              <Truck className="h-4 w-4 mr-2" />
+              Transferir Stock
             </button>
+          </div>
+        </div>
+  
+        {/* Filtros */}
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-[#eee3d8]">
+          <form onSubmit={handleSearch} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div>
+                <HCLabel htmlFor="ubicacion" className="block text-sm font-medium mb-1">
+                  Ubicación
+                </HCLabel>
+                <HCSelect
+                  id="ubicacion"
+                  value={ubicacionId}
+                  onChange={(e) => setUbicacionId(e.target.value)}
+                  className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#eeb077] focus:border-[#eeb077] sm:text-sm rounded-md"
+                >
+                  <option value="">Todas las ubicaciones</option>
+                  {ubicaciones.map((ubicacion) => (
+                    <option key={ubicacion.id} value={ubicacion.id}>
+                      {ubicacion.nombre} ({ubicacion.tipo})
+                    </option>
+                  ))}
+                </HCSelect>
+              </div>
+              
+              <div>
+                <HCLabel htmlFor="tipoItem" className="block text-sm font-medium mb-1">
+                  Tipo de Item
+                </HCLabel>
+                <HCSelect
+                  id="tipoItem"
+                  value={tipoItem}
+                  onChange={(e) => setTipoItem(e.target.value)}
+                  className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#eeb077] focus:border-[#eeb077] sm:text-sm rounded-md"
+                >
+                  <option value="todos">Todos</option>
+                  <option value="producto">Productos</option>
+                  <option value="insumo">Insumos</option>
+                </HCSelect>
+              </div>
+              
+              <div>
+                <HCLabel htmlFor="search" className="block text-sm font-medium mb-1">
+                  Buscar
+                </HCLabel>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Search className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <HCInput
+                    type="text"
+                    id="search"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Nombre, código..."
+                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-[#eeb077] focus:border-[#eeb077] sm:text-sm"
+                  />
+                </div>
+              </div>
+              
+              <div className="flex items-end">
+                <div className="flex items-center h-10">
+                  <input
+                    id="showLowStock"
+                    type="checkbox"
+                    checked={showLowStock}
+                    onChange={(e) => setShowLowStock(e.target.checked)}
+                    className="h-4 w-4 text-[#eeb077] focus:ring-[#eeb077] border-gray-300 rounded"
+                  />
+                  <HCLabel htmlFor="showLowStock" className="ml-2 block text-sm">
+                    Mostrar solo stock bajo mínimo
+                  </HCLabel>
+                </div>
+              </div>
+            </div>
             
-            <button
-              type="button"
-              onClick={() => {
-                setSearchQuery('');
-                setShowLowStock(false);
-              }}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#eeb077]"
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Limpiar filtros
-            </button>
-          </div>
-        </form>
+            <div className="flex justify-end gap-2">
+              <button
+                type="submit"
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#311716] hover:bg-[#4a292a] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#311716]"
+              >
+                <Filter className="h-4 w-4 mr-2" />
+                Filtrar
+              </button>
+              
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery('');
+                  setShowLowStock(false);
+                }}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-black bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#eeb077]"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Limpiar filtros
+              </button>
+            </div>
+          </form>
+        </div>
+  
+        {/* Tabla de stock */}
+        <div className="bg-white shadow-sm overflow-hidden rounded-lg border border-[#eee3d8]">
+          {isLoading ? (
+            <div className="text-center py-10">
+              <div className="inline-block animate-spin h-8 w-8 border-4 border-[#eeb077] border-t-transparent rounded-full"></div>
+              <p className="mt-2 text-sm text-black">Cargando stock...</p>
+            </div>
+          ) : error ? (
+            <div className="text-center py-10">
+              <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+              <p className="text-red-500">{error}</p>
+            </div>
+          ) : stock.length === 0 ? (
+            <div className="text-center py-10">
+              <Archive className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="mt-2 text-sm font-medium text-black">No hay stock</h3>
+              <p className="mt-1 text-sm text-black">
+                No se encontraron items de stock con los filtros seleccionados.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <HCTable className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-[#fcf3ea]">
+                  <tr>
+                    <HCTh scope="col" className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                      Item
+                    </HCTh>
+                    <HCTh scope="col" className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                      Tipo
+                    </HCTh>
+                    <HCTh scope="col" className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                      Ubicación
+                    </HCTh>
+                    <HCTh scope="col" className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                      Stock Actual
+                    </HCTh>
+                    <HCTh scope="col" className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                      Stock Mínimo
+                    </HCTh>
+                    <HCTh scope="col" className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                      Última Actualización
+                    </HCTh>
+                    <HCTh scope="col" className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider">
+                      Acciones
+                    </HCTh>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {stock.map((item) => {
+                    const nombre = item.producto?.nombre || item.insumo?.nombre || 'Desconocido';
+                    const tipo = item.producto ? 'Producto' : 'Insumo';
+                    const stockMinimo = item.producto?.stockMinimo || item.insumo?.stockMinimo || 0;
+                    const unidad = item.insumo?.unidadMedida || 'unidades';
+                    const isStockBajo = item.cantidad <= stockMinimo;
+                    
+                    return (
+                      <tr key={item.id} className="hover:bg-[#f8f5f3]">
+                        <HCTd className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-medium text-black">{nombre}</div>
+                          {item.producto?.codigoBarras && (
+                            <div className="text-xs text-black">Código: {item.producto.codigoBarras}</div>
+                          )}
+                        </HCTd>
+                        <HCTd className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                            tipo === 'Producto' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
+                          }`}>
+                            {tipo}
+                          </span>
+                        </HCTd>
+                        <HCTd className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center text-sm text-black">
+                            {item.ubicacion ? (
+                              <>
+                                {renderUbicacionIcon(item.ubicacion.tipo)}
+                                {item.ubicacion.nombre}
+                              </>
+                            ) : (
+                              <span className="text-black">Ubicación desconocida</span>
+                            )}
+                          </div>
+                        </HCTd>
+                        <HCTd className="px-6 py-4 whitespace-nowrap">
+                          <span className={`font-medium ${isStockBajo ? 'text-red-600' : 'text-black'}`}>
+                            {item.cantidad} {unidad}
+                          </span>
+                        </HCTd>
+                        <HCTd className="px-6 py-4 whitespace-nowrap text-sm text-black">
+                          {stockMinimo} {unidad}
+                        </HCTd>
+                        <HCTd className="px-6 py-4 whitespace-nowrap text-sm text-black">
+                          {new Date(item.ultimaActualizacion).toLocaleString()}
+                        </HCTd>
+                        <HCTd className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <button
+                            onClick={() => openAjusteModal(item)}
+                            className="text-[#311716] hover:text-[#eeb077] mr-3"
+                          >
+                            <Edit className="h-5 w-5 inline mr-1" />
+                            Ajustar
+                          </button>
+                        </HCTd>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </HCTable>
+            </div>
+          )}
+        </div>
+        
+        {/* Modal de ajuste */}
+        <AjusteModal />
       </div>
-
-      {/* Tabla de stock */}
-      <div className="bg-white shadow-sm overflow-hidden rounded-lg border border-[#eee3d8]">
-        {isLoading ? (
-          <div className="text-center py-10">
-            <div className="inline-block animate-spin h-8 w-8 border-4 border-[#eeb077] border-t-transparent rounded-full"></div>
-            <p className="mt-2 text-sm text-gray-500">Cargando stock...</p>
-          </div>
-        ) : error ? (
-          <div className="text-center py-10">
-            <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-            <p className="text-red-500">{error}</p>
-          </div>
-        ) : stock.length === 0 ? (
-          <div className="text-center py-10">
-            <Archive className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No hay stock</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              No se encontraron items de stock con los filtros seleccionados.
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-[#fcf3ea]">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-[#311716] uppercase tracking-wider">
-                    Item
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-[#311716] uppercase tracking-wider">
-                    Tipo
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-[#311716] uppercase tracking-wider">
-                    Ubicación
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-[#311716] uppercase tracking-wider">
-                    Stock Actual
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-[#311716] uppercase tracking-wider">
-                    Stock Mínimo
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-[#311716] uppercase tracking-wider">
-                    Última Actualización
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-[#311716] uppercase tracking-wider">
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {stock.map((item) => {
-                  const nombre = item.producto?.nombre || item.insumo?.nombre || 'Desconocido';
-                  const tipo = item.producto ? 'Producto' : 'Insumo';
-                  const stockMinimo = item.producto?.stockMinimo || item.insumo?.stockMinimo || 0;
-                  const unidad = item.insumo?.unidadMedida || 'unidades';
-                  const isStockBajo = item.cantidad <= stockMinimo;
-                  
-                  return (
-                    <tr key={item.id} className="hover:bg-[#f8f5f3]">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-[#311716]">{nombre}</div>
-                        {item.producto?.codigoBarras && (
-                          <div className="text-xs text-gray-500">Código: {item.producto.codigoBarras}</div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          tipo === 'Producto' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
-                        }`}>
-                          {tipo}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-  <div className="flex items-center text-sm text-gray-900">
-    {item.ubicacion ? (
-      <>
-        {renderUbicacionIcon(item.ubicacion.tipo)}
-        {item.ubicacion.nombre}
-      </>
-    ) : (
-      <span className="text-gray-500">Ubicación desconocida</span>
-    )}
-  </div>
-</td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`font-medium ${isStockBajo ? 'text-red-600' : 'text-gray-900'}`}>
-                          {item.cantidad} {unidad}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {stockMinimo} {unidad}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(item.ultimaActualizacion).toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button
-                          onClick={() => openAjusteModal(item)}
-                          className="text-[#311716] hover:text-[#eeb077] mr-3"
-                        >
-                          <Edit className="h-5 w-5 inline mr-1" />
-                          Ajustar
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-      
-      {/* Modal de ajuste */}
-      <AjusteModal />
-    </div>
+    </ContrastEnhancer>
   );
 }

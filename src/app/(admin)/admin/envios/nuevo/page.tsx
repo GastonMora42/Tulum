@@ -7,6 +7,8 @@ import { authenticatedFetch } from '@/hooks/useAuth';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { ContrastEnhancer } from '@/components/ui/ContrastEnhancer';
+import { HCLabel, HCSelect, HCTextarea, HCInput } from '@/components/ui/HighContrastComponents';
 
 // Interfaces
 interface Ubicacion {
@@ -198,201 +200,203 @@ export default function NuevoEnvioPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Nuevo Envío de Insumos</h1>
-        <button
-          type="button"
-          onClick={() => router.back()}
-          className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-        >
-          <ChevronLeft className="h-4 w-4 mr-1" />
-          Volver
-        </button>
-      </div>
-
-      <div className="bg-white shadow overflow-hidden sm:rounded-lg p-6">
-        {error && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-md">
-            {error}
-          </div>
-        )}
-
-        {isFetching ? (
-          <div className="flex justify-center items-center h-40">
-            <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
-            <span className="ml-2 text-gray-500">Cargando datos...</span>
-          </div>
-        ) : (
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label htmlFor="origenId" className="block text-sm font-medium text-gray-700 mb-1">
-                  Origen
-                </label>
-                <select
-                  id="origenId"
-                  {...register('origenId')}
-                  className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-                >
-                  <option value="">Seleccionar origen</option>
-                  {ubicaciones.map(ubicacion => (
-                    <option key={ubicacion.id} value={ubicacion.id}>
-                      {ubicacion.nombre} ({ubicacion.tipo})
-                    </option>
-                  ))}
-                </select>
-                {errors.origenId && (
-                  <p className="mt-1 text-sm text-red-600">{errors.origenId.message}</p>
-                )}
-              </div>
-              
-              <div>
-                <label htmlFor="destinoId" className="block text-sm font-medium text-gray-700 mb-1">
-                  Destino
-                </label>
-                <select
-                  id="destinoId"
-                  {...register('destinoId')}
-                  className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-                >
-                  <option value="">Seleccionar destino</option>
-                  {ubicaciones
-                    .filter(ubicacion => ubicacion.id !== origenId)
-                    .map(ubicacion => (
+    <ContrastEnhancer>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-black">Nuevo Envío de Insumos</h1>
+          <button
+            type="button"
+            onClick={() => router.back()}
+            className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-black bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+          >
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            Volver
+          </button>
+        </div>
+  
+        <div className="bg-white shadow overflow-hidden sm:rounded-lg p-6">
+          {error && (
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-md">
+              {error}
+            </div>
+          )}
+  
+          {isFetching ? (
+            <div className="flex justify-center items-center h-40">
+              <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+              <span className="ml-2 text-black">Cargando datos...</span>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <HCLabel htmlFor="origenId" className="block text-sm font-medium mb-1">
+                    Origen
+                  </HCLabel>
+                  <HCSelect
+                    id="origenId"
+                    {...register('origenId')}
+                    className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                  >
+                    <option value="">Seleccionar origen</option>
+                    {ubicaciones.map(ubicacion => (
                       <option key={ubicacion.id} value={ubicacion.id}>
                         {ubicacion.nombre} ({ubicacion.tipo})
                       </option>
                     ))}
-                </select>
-                {errors.destinoId && (
-                  <p className="mt-1 text-sm text-red-600">{errors.destinoId.message}</p>
+                  </HCSelect>
+                  {errors.origenId && (
+                    <p className="mt-1 text-sm text-red-600">{errors.origenId.message}</p>
+                  )}
+                </div>
+                
+                <div>
+                  <HCLabel htmlFor="destinoId" className="block text-sm font-medium mb-1">
+                    Destino
+                  </HCLabel>
+                  <HCSelect
+                    id="destinoId"
+                    {...register('destinoId')}
+                    className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                  >
+                    <option value="">Seleccionar destino</option>
+                    {ubicaciones
+                      .filter(ubicacion => ubicacion.id !== origenId)
+                      .map(ubicacion => (
+                        <option key={ubicacion.id} value={ubicacion.id}>
+                          {ubicacion.nombre} ({ubicacion.tipo})
+                        </option>
+                      ))}
+                  </HCSelect>
+                  {errors.destinoId && (
+                    <p className="mt-1 text-sm text-red-600">{errors.destinoId.message}</p>
+                  )}
+                </div>
+              </div>
+  
+              <div>
+                <HCLabel htmlFor="observaciones" className="block text-sm font-medium mb-1">
+                  Observaciones (opcional)
+                </HCLabel>
+                <HCTextarea
+                  id="observaciones"
+                  rows={3}
+                  {...register('observaciones')}
+                  className="block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                ></HCTextarea>
+              </div>
+  
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-medium leading-6 text-black">Insumos</h3>
+                  <button
+                    type="button"
+                    onClick={() => append({ insumoId: '', cantidad: 1 })}
+                    className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Agregar insumo
+                  </button>
+                </div>
+  
+                {errors.items && !Array.isArray(errors.items) && (
+                  <p className="text-sm text-red-600">{errors.items.message}</p>
                 )}
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="observaciones" className="block text-sm font-medium text-gray-700 mb-1">
-                Observaciones (opcional)
-              </label>
-              <textarea
-                id="observaciones"
-                rows={3}
-                {...register('observaciones')}
-                className="block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              ></textarea>
-            </div>
-
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-medium leading-6 text-gray-900">Insumos</h3>
-                <button
-                  type="button"
-                  onClick={() => append({ insumoId: '', cantidad: 1 })}
-                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Agregar insumo
-                </button>
-              </div>
-
-              {errors.items && !Array.isArray(errors.items) && (
-                <p className="text-sm text-red-600">{errors.items.message}</p>
-              )}
-
-              <div className="bg-gray-50 p-4 rounded-md">
-                {fields.map((field, index) => {
-                  const insumoId = watch(`items.${index}.insumoId`);
-                  const cantidad = watch(`items.${index}.cantidad`);
-                  const insumo = getInsumo(insumoId);
-                  const stockDisponible = insumo?.stock?.cantidad || 0;
-                  const tieneStockSuficiente = hasEnoughStock(insumoId, cantidad);
-
-                  return (
-                    <div key={field.id} className="flex flex-col md:flex-row gap-4 mb-4 pb-4 border-b border-gray-200 last:border-0 last:mb-0 last:pb-0">
-                      <div className="flex-1">
-                        <label htmlFor={`items.${index}.insumoId`} className="block text-sm font-medium text-gray-700 mb-1">
-                          Insumo
-                        </label>
-                        <select
-                          id={`items.${index}.insumoId`}
-                          {...register(`items.${index}.insumoId`)}
-                          className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
-                        >
-                          <option value="">Seleccionar insumo</option>
-                          {insumos.map(insumo => (
-                            <option key={insumo.id} value={insumo.id}>
-                              {insumo.nombre} - Stock: {insumo.stock?.cantidad || 0} {insumo.unidadMedida}
-                            </option>
-                          ))}
-                        </select>
-                        {errors.items?.[index]?.insumoId && (
-                          <p className="mt-1 text-sm text-red-600">{errors.items[index]?.insumoId?.message}</p>
-                        )}
-                      </div>
-                      
-                      <div className="md:w-1/4">
-                        <label htmlFor={`items.${index}.cantidad`} className="block text-sm font-medium text-gray-700 mb-1">
-                          Cantidad
-                        </label>
-                        <div className="flex items-center">
-                          <input
-                            id={`items.${index}.cantidad`}
-                            type="number"
-                            min="1"
-                            {...register(`items.${index}.cantidad`, { valueAsNumber: true })}
-                            className={`block w-full py-2 px-3 border rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm ${!tieneStockSuficiente && insumoId ? 'border-red-300' : 'border-gray-300'}`}
-                          />
-                          {insumo && (
-                            <span className="ml-2 text-sm text-gray-500">{insumo.unidadMedida}</span>
+  
+                <div className="bg-gray-50 p-4 rounded-md">
+                  {fields.map((field, index) => {
+                    const insumoId = watch(`items.${index}.insumoId`);
+                    const cantidad = watch(`items.${index}.cantidad`);
+                    const insumo = getInsumo(insumoId);
+                    const stockDisponible = insumo?.stock?.cantidad || 0;
+                    const tieneStockSuficiente = hasEnoughStock(insumoId, cantidad);
+  
+                    return (
+                      <div key={field.id} className="flex flex-col md:flex-row gap-4 mb-4 pb-4 border-b border-gray-200 last:border-0 last:mb-0 last:pb-0">
+                        <div className="flex-1">
+                          <HCLabel htmlFor={`items.${index}.insumoId`} className="block text-sm font-medium mb-1">
+                            Insumo
+                          </HCLabel>
+                          <HCSelect
+                            id={`items.${index}.insumoId`}
+                            {...register(`items.${index}.insumoId`)}
+                            className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+                          >
+                            <option value="">Seleccionar insumo</option>
+                            {insumos.map(insumo => (
+                              <option key={insumo.id} value={insumo.id}>
+                                {insumo.nombre} - Stock: {insumo.stock?.cantidad || 0} {insumo.unidadMedida}
+                              </option>
+                            ))}
+                          </HCSelect>
+                          {errors.items?.[index]?.insumoId && (
+                            <p className="mt-1 text-sm text-red-600">{errors.items[index]?.insumoId?.message}</p>
                           )}
                         </div>
-                        {errors.items?.[index]?.cantidad && (
-                          <p className="mt-1 text-sm text-red-600">{errors.items[index]?.cantidad?.message}</p>
-                        )}
-                        {insumoId && !tieneStockSuficiente && (
-                          <p className="mt-1 text-sm text-red-600">Stock insuficiente (disp: {stockDisponible})</p>
-                        )}
+                        
+                        <div className="md:w-1/4">
+                          <HCLabel htmlFor={`items.${index}.cantidad`} className="block text-sm font-medium mb-1">
+                            Cantidad
+                          </HCLabel>
+                          <div className="flex items-center">
+                            <HCInput
+                              id={`items.${index}.cantidad`}
+                              type="number"
+                              min="1"
+                              {...register(`items.${index}.cantidad`, { valueAsNumber: true })}
+                              className={`block w-full py-2 px-3 border rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm ${!tieneStockSuficiente && insumoId ? 'border-red-300' : 'border-gray-300'}`}
+                            />
+                            {insumo && (
+                              <span className="ml-2 text-sm text-black">{insumo.unidadMedida}</span>
+                            )}
+                          </div>
+                          {errors.items?.[index]?.cantidad && (
+                            <p className="mt-1 text-sm text-red-600">{errors.items[index]?.cantidad?.message}</p>
+                          )}
+                          {insumoId && !tieneStockSuficiente && (
+                            <p className="mt-1 text-sm text-red-600">Stock insuficiente (disp: {stockDisponible})</p>
+                          )}
+                        </div>
+                        
+                        <div className="flex items-end">
+                          <button
+                            type="button"
+                            onClick={() => remove(index)}
+                            disabled={fields.length <= 1}
+                            className={`inline-flex items-center justify-center p-2 border border-transparent rounded-md ${fields.length <= 1 ? 'text-gray-400 cursor-not-allowed' : 'text-red-600 hover:bg-red-50'}`}
+                          >
+                            <Trash className="h-5 w-5" />
+                          </button>
+                        </div>
                       </div>
-                      
-                      <div className="flex items-end">
-                        <button
-                          type="button"
-                          onClick={() => remove(index)}
-                          disabled={fields.length <= 1}
-                          className={`inline-flex items-center justify-center p-2 border border-transparent rounded-md ${fields.length <= 1 ? 'text-gray-400 cursor-not-allowed' : 'text-red-600 hover:bg-red-50'}`}
-                        >
-                          <Trash className="h-5 w-5" />
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-
-            <div className="flex justify-end pt-4">
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="animate-spin h-4 w-4 mr-2" /> 
-                    Creando envío...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Crear envío
-                  </>
-                )}
-              </button>
-            </div>
-          </form>
-        )}
+  
+              <div className="flex justify-end pt-4">
+                <button
+                  type="submit"
+                  disabled={isLoading}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="animate-spin h-4 w-4 mr-2" /> 
+                      Creando envío...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Crear envío
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
       </div>
-    </div>
+    </ContrastEnhancer>
   );
 }
