@@ -1,3 +1,4 @@
+// src/app/(fabrica)/fabrica/stock/ajuste/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -7,6 +8,8 @@ import { authenticatedFetch } from '@/hooks/useAuth';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuthStore } from '@/stores/authStore';
+import { ContrastEnhancer } from '@/components/ui/ContrastEnhancer';
+import { HCInput, HCSelect, HCLabel, HCButton } from '@/components/ui/HighContrastComponents';
 
 // Interfaces para los tipos de datos
 interface Insumo {
@@ -143,140 +146,141 @@ export default function AjusteStockPage() {
   
   if (user?.roleId === 'role-fabrica') {
     return (
-      <div className="p-6 bg-red-50 border-l-4 border-red-500 text-red-700">
-        <h2 className="text-lg font-medium mb-2">Acceso restringido</h2>
-        <p>Como operador de fábrica, no puede ajustar el stock directamente.</p>
-        <p>Debe utilizar el flujo completo de solicitud y recepción de insumos para modificar el inventario.</p>
-        <p className="mt-2">Redirigiendo a solicitud de insumos...</p>
-      </div>
+      <ContrastEnhancer>
+        <div className="p-6 bg-red-50 border-l-4 border-red-500 text-black">
+          <h2 className="text-lg font-medium mb-2">Acceso restringido</h2>
+          <p>Como operador de fábrica, no puede ajustar el stock directamente.</p>
+          <p>Debe utilizar el flujo completo de solicitud y recepción de insumos para modificar el inventario.</p>
+          <p className="mt-2">Redirigiendo a solicitud de insumos...</p>
+        </div>
+      </ContrastEnhancer>
     );
   }
   
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Ajuste de Stock</h1>
-        <button
-          onClick={() => router.back()}
-          className="text-indigo-600 hover:text-indigo-900"
-        >
-          Volver
-        </button>
-      </div>
-      
-      <div className="bg-white shadow overflow-hidden sm:rounded-lg p-6">
-        {error && (
-          <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-md">
-            {error}
-          </div>
-        )}
+    <ContrastEnhancer>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-black">Ajuste de Stock</h1>
+          <HCButton
+            onClick={() => router.back()}
+            className="text-black hover:underline"
+          >
+            Volver
+          </HCButton>
+        </div>
         
-        {successMessage && (
-          <div className="mb-4 p-4 bg-green-100 text-green-700 rounded-md">
-            {successMessage}
-          </div>
-        )}
-        
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {/* Tipo de item (producto o insumo) */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Tipo de item
-            </label>
-            <div className="flex space-x-4">
-              <label className="inline-flex items-center">
-                <input
-                  type="radio"
-                  {...register('tipo')}
-                  value="insumo"
-                  className="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
-                />
-                <span className="ml-2 text-gray-700">Insumo</span>
-              </label>
-              <label className="inline-flex items-center">
-                <input
-                  type="radio"
-                  {...register('tipo')}
-                  value="producto"
-                  className="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
-                />
-                <span className="ml-2 text-gray-700">Producto</span>
-              </label>
+        <div className="bg-white shadow overflow-hidden sm:rounded-lg p-6">
+          {error && (
+            <div className="mb-4 p-4 bg-red-100 text-black rounded-md">
+              {error}
             </div>
-            {errors.tipo && (
-              <p className="mt-1 text-sm text-red-600">{errors.tipo.message}</p>
-            )}
-          </div>
+          )}
           
-          {/* Selector de item */}
-          <div>
-            <label htmlFor="itemId" className="block text-sm font-medium text-gray-700">
-              {tipoSeleccionado === 'producto' ? 'Producto' : 'Insumo'}
-            </label>
-            <select
-              id="itemId"
-              {...register('itemId')}
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-            >
-              <option value="">Seleccionar {tipoSeleccionado === 'producto' ? 'producto' : 'insumo'}</option>
-              {tipoSeleccionado === 'producto' 
-                ? productos.map(producto => (
-                    <option key={producto.id} value={producto.id}>{producto.nombre}</option>
-                  ))
-                : insumos.map(insumo => (
-                    <option key={insumo.id} value={insumo.id}>{insumo.nombre}</option>
-                  ))
-              }
-            </select>
-            {errors.itemId && (
-              <p className="mt-1 text-sm text-red-600">{errors.itemId.message}</p>
-            )}
-          </div>
+          {successMessage && (
+            <div className="mb-4 p-4 bg-green-100 text-black rounded-md">
+              {successMessage}
+            </div>
+          )}
           
-          {/* Cantidad */}
-          <div>
-            <label htmlFor="cantidad" className="block text-sm font-medium text-gray-700">
-              Cantidad a agregar
-            </label>
-            <input
-              id="cantidad"
-              type="number"
-              min="1"
-              {...register('cantidad', { valueAsNumber: true })}
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-            />
-            {errors.cantidad && (
-              <p className="mt-1 text-sm text-red-600">{errors.cantidad.message}</p>
-            )}
-          </div>
-          
-          {/* Motivo */}
-          <div>
-            <label htmlFor="motivo" className="block text-sm font-medium text-gray-700">
-              Motivo del ajuste
-            </label>
-            <input
-              id="motivo"
-              type="text"
-              {...register('motivo')}
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-            />
-            {errors.motivo && (
-              <p className="mt-1 text-sm text-red-600">{errors.motivo.message}</p>
-            )}
-          </div>
-          
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              disabled={isLoading || isSaving}
-              className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-400"
-            >
-              {isSaving ? 'Guardando...' : 'Ajustar Stock'}
-            </button>
-          </div>
-        </form>
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            {/* Tipo de item (producto o insumo) */}
+            <div>
+              <HCLabel className="block text-sm font-medium mb-1">
+                Tipo de item
+              </HCLabel>
+              <div className="flex space-x-4">
+                <label className="inline-flex items-center">
+                  <input
+                    type="radio"
+                    {...register('tipo')}
+                    value="insumo"
+                    className="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
+                  />
+                  <span className="ml-2 text-black">Insumo</span>
+                </label>
+                <label className="inline-flex items-center">
+                  <input
+                    type="radio"
+                    {...register('tipo')}
+                    value="producto"
+                    className="h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
+                  />
+                  <span className="ml-2 text-black">Producto</span>
+                </label>
+              </div>
+              {errors.tipo && (
+                <p className="mt-1 text-sm text-red-600">{errors.tipo.message}</p>
+              )}
+            </div>
+            
+            {/* Selector de item */}
+            <div>
+              <HCLabel htmlFor="itemId" className="block text-sm font-medium text-black">
+                {tipoSeleccionado === 'producto' ? 'Producto' : 'Insumo'}
+              </HCLabel>
+              <HCSelect
+                id="itemId"
+                {...register('itemId')}
+              >
+                <option value="">Seleccionar {tipoSeleccionado === 'producto' ? 'producto' : 'insumo'}</option>
+                {tipoSeleccionado === 'producto' 
+                  ? productos.map(producto => (
+                      <option key={producto.id} value={producto.id}>{producto.nombre}</option>
+                    ))
+                  : insumos.map(insumo => (
+                      <option key={insumo.id} value={insumo.id}>{insumo.nombre}</option>
+                    ))
+                }
+              </HCSelect>
+              {errors.itemId && (
+                <p className="mt-1 text-sm text-red-600">{errors.itemId.message}</p>
+              )}
+            </div>
+            
+            {/* Cantidad */}
+            <div>
+              <HCLabel htmlFor="cantidad" className="block text-sm font-medium text-black">
+                Cantidad a agregar
+              </HCLabel>
+              <HCInput
+                id="cantidad"
+                type="number"
+                min="1"
+                {...register('cantidad', { valueAsNumber: true })}
+              />
+              {errors.cantidad && (
+                <p className="mt-1 text-sm text-red-600">{errors.cantidad.message}</p>
+              )}
+            </div>
+            
+            {/* Motivo */}
+            <div>
+              <HCLabel htmlFor="motivo" className="block text-sm font-medium text-black">
+                Motivo del ajuste
+              </HCLabel>
+              <HCInput
+                id="motivo"
+                type="text"
+                {...register('motivo')}
+              />
+              {errors.motivo && (
+                <p className="mt-1 text-sm text-red-600">{errors.motivo.message}</p>
+              )}
+            </div>
+            
+            <div className="flex justify-end">
+              <HCButton
+                type="submit"
+                disabled={isLoading || isSaving}
+                className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-400"
+              >
+                {isSaving ? 'Guardando...' : 'Ajustar Stock'}
+              </HCButton>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
+    </ContrastEnhancer>
   );
 }

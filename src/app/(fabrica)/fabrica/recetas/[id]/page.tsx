@@ -6,6 +6,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { authenticatedFetch } from '@/hooks/useAuth';
 import { Book, ArrowLeft, ChevronRight, Clock, Calendar, Beaker, ShoppingBag, Check, Package2 } from 'lucide-react';
+import { ContrastEnhancer } from '@/components/ui/ContrastEnhancer';
+import { HCTable, HCTh, HCTd, HCButton } from '@/components/ui/HighContrastComponents';
 
 interface RecetaItem {
   id: string;
@@ -109,251 +111,257 @@ export default function RecetaDetallesPage({ params }: { params: { id: string } 
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
-      </div>
+      <ContrastEnhancer>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
+        </div>
+      </ContrastEnhancer>
     );
   }
 
   if (error || !receta) {
     return (
-      <div className="flex flex-col items-center justify-center h-64">
-        <div className="text-red-500 mb-4">{error || 'Receta no encontrada'}</div>
-        <button
-          onClick={() => router.push('/fabrica/recetas')}
-          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700"
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Volver al listado
-        </button>
-      </div>
+      <ContrastEnhancer>
+        <div className="flex flex-col items-center justify-center h-64">
+          <div className="text-red-500 mb-4">{error || 'Receta no encontrada'}</div>
+          <HCButton
+            onClick={() => router.push('/fabrica/recetas')}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700"
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Volver al listado
+          </HCButton>
+        </div>
+      </ContrastEnhancer>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Encabezado */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center">
-          <Book className="h-6 w-6 text-green-600 mr-2" />
-          <h1 className="text-2xl font-bold">{receta.nombre}</h1>
-        </div>
-        <button
-          onClick={() => router.push('/fabrica/recetas')}
-          className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Volver
-        </button>
-      </div>
-      
-      {/* Contenido principal */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Columna izquierda: Información general */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Detalles básicos */}
-          <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-            <div className="px-4 py-5 sm:px-6 bg-gray-50">
-              <h2 className="text-lg font-medium text-gray-900">Información de la Receta</h2>
-              <p className="mt-1 max-w-2xl text-sm text-gray-500">Detalles y especificaciones</p>
-            </div>
-            <div className="border-t border-gray-200 px-4 py-5 sm:p-0">
-              <dl className="sm:divide-y sm:divide-gray-200">
-                <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Nombre</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{receta.nombre}</dd>
-                </div>
-                <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Descripción</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{receta.descripcion || 'Sin descripción'}</dd>
-                </div>
-                <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Rendimiento</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{receta.rendimiento} unidades por lote</dd>
-                </div>
-                <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-                  <dt className="text-sm font-medium text-gray-500">Productos asociados</dt>
-                  <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">
-                    {receta.productoRecetas && receta.productoRecetas.length > 0 ? (
-                      <ul className="divide-y divide-gray-200">
-                        {receta.productoRecetas.map(pr => (
-                          <li key={pr.id} className="py-2 flex items-center">
-                            <Package2 className="h-4 w-4 text-gray-400 mr-2" />
-                            {pr.producto.nombre}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <span className="text-gray-500">No hay productos asociados</span>
-                    )}
-                  </dd>
-                </div>
-              </dl>
-            </div>
+    <ContrastEnhancer>
+      <div className="space-y-6">
+        {/* Encabezado */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center">
+            <Book className="h-6 w-6 text-green-600 mr-2" />
+            <h1 className="text-2xl font-bold text-black">{receta.nombre}</h1>
           </div>
-          
-          {/* Ingredientes */}
-          <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-            <div className="px-4 py-5 sm:px-6 bg-gray-50">
-              <h2 className="text-lg font-medium text-gray-900">Ingredientes necesarios</h2>
-              <p className="mt-1 max-w-2xl text-sm text-gray-500">Insumos para producir un lote</p>
-            </div>
-            <div className="border-t border-gray-200">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Insumo</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock actual</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {receta.items.map(item => {
-                    const stock = verificarStock(item);
-                    return (
-                      <tr key={item.id}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {item.insumo.nombre}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {item.cantidad} {item.insumo.unidadMedida}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {stock.disponible} {item.insumo.unidadMedida}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            stock.suficiente 
-                              ? 'bg-green-100 text-green-800' 
-                              : 'bg-red-100 text-red-800'
-                          }`}>
-                            {stock.suficiente ? 'Disponible' : 'Insuficiente'}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <HCButton
+            onClick={() => router.push('/fabrica/recetas')}
+            className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-black bg-white hover:bg-gray-50"
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Volver
+          </HCButton>
         </div>
         
-        {/* Columna derecha: Acciones y datos adicionales */}
-        <div className="space-y-6">
-          {/* Panel de acciones */}
-          <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-            <div className="px-4 py-5 sm:px-6 bg-gray-50">
-              <h2 className="text-lg font-medium text-gray-900">Acciones</h2>
-            </div>
-            <div className="border-t border-gray-200 p-4">
-              <Link 
-                href={`/fabrica/produccion/nueva?recetaId=${receta.id}`}
-                className="w-full mb-3 inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700"
-              >
-                <Beaker className="mr-2 h-4 w-4" />
-                Iniciar Producción
-              </Link>
-              
-              <Link 
-                href={`/fabrica/stock/solicitud?recetaId=${receta.id}`}
-                className="w-full inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-              >
-                <ShoppingBag className="mr-2 h-4 w-4" />
-                Solicitar Insumos
-              </Link>
-            </div>
-          </div>
-          
-          {/* Panel de información adicional */}
-          <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-            <div className="px-4 py-5 sm:px-6 bg-gray-50">
-              <h2 className="text-lg font-medium text-gray-900">Información adicional</h2>
-            </div>
-            <div className="border-t border-gray-200 px-4 py-5">
-              <div className="mb-4">
-                <div className="flex items-center">
-                  <Clock className="h-5 w-5 text-gray-400 mr-2" />
-                  <h3 className="text-sm font-medium text-gray-700">Tiempo estimado de producción</h3>
-                </div>
-                <p className="mt-1 text-sm text-gray-500 pl-7">
-                  {receta.items.length <= 3 ? '1-2 horas' : receta.items.length <= 6 ? '2-4 horas' : '4+ horas'}
-                </p>
+        {/* Contenido principal */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Columna izquierda: Información general */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Detalles básicos */}
+            <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+              <div className="px-4 py-5 sm:px-6 bg-gray-50">
+                <h2 className="text-lg font-medium text-black">Información de la Receta</h2>
+                <p className="mt-1 max-w-2xl text-sm text-black">Detalles y especificaciones</p>
               </div>
-              
-              <div className="mb-4">
-                <div className="flex items-center">
-                  <Calendar className="h-5 w-5 text-gray-400 mr-2" />
-                  <h3 className="text-sm font-medium text-gray-700">Última producción</h3>
-                </div>
-                <p className="mt-1 text-sm text-gray-500 pl-7">
-                  No hay registros recientes
-                </p>
-              </div>
-              
-              <div>
-                <div className="flex items-center">
-                  <Check className="h-5 w-5 text-gray-400 mr-2" />
-                  <h3 className="text-sm font-medium text-gray-700">Verificación de calidad</h3>
-                </div>
-                <p className="mt-1 text-sm text-gray-500 pl-7">
-                  Seguir procedimiento estándar
-                </p>
-              </div>
-            </div>
-          </div>
-          
-          {/* Estado de stock */}
-          <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-            <div className="px-4 py-5 sm:px-6 bg-gray-50">
-              <h2 className="text-lg font-medium text-gray-900">Estado del stock</h2>
-            </div>
-            <div className="border-t border-gray-200 px-4 py-5">
-              {/* Cálculo de cuántos lotes completos se pueden producir */}
-              {(() => {
-                const lotesDisponibles = receta.items.map(item => {
-                  const stockDisponible = stockInsumos[item.insumoId] || 0;
-                  return Math.floor(stockDisponible / item.cantidad);
-                });
-                
-                const lotesPosibles = lotesDisponibles.length > 0 ? Math.min(...lotesDisponibles) : 0;
-                const produccionPosible = lotesPosibles * receta.rendimiento;
-                
-                return (
-                  <div>
-                    <div className="flex justify-between mb-1">
-                      <span className="text-sm font-medium text-gray-700">Lotes posibles con el stock actual</span>
-                      <span className="text-sm font-semibold text-gray-900">{lotesPosibles}</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2.5">
-                      <div 
-                        className={`h-2.5 rounded-full ${lotesPosibles > 0 ? 'bg-green-600' : 'bg-red-600'}`}
-                        style={{ width: `${Math.min(100, lotesPosibles * 20)}%` }} // 5 lotes o más = 100%
-                      ></div>
-                    </div>
-                    <p className="mt-2 text-sm text-gray-600">
-                      Con el stock actual puede producir aproximadamente <span className="font-semibold">{produccionPosible}</span> unidades.
-                    </p>
-                    
-                    {lotesPosibles === 0 && (
-                      <div className="mt-3 p-2 bg-red-50 text-red-700 text-sm rounded border border-red-200">
-                        No hay suficiente stock de todos los insumos para producir.
-                      </div>
-                    )}
-                    
-                    {lotesPosibles > 0 && lotesPosibles < 3 && (
-                      <div className="mt-3 p-2 bg-yellow-50 text-yellow-700 text-sm rounded border border-yellow-200">
-                        Stock limitado. Considere solicitar más insumos.
-                      </div>
-                    )}
+              <div className="border-t border-gray-200 px-4 py-5 sm:p-0">
+                <dl className="sm:divide-y sm:divide-gray-200">
+                  <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                    <dt className="text-sm font-medium text-black">Nombre</dt>
+                    <dd className="mt-1 text-sm text-black sm:mt-0 sm:col-span-2">{receta.nombre}</dd>
                   </div>
-                );
-              })()}
+                  <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                    <dt className="text-sm font-medium text-black">Descripción</dt>
+                    <dd className="mt-1 text-sm text-black sm:mt-0 sm:col-span-2">{receta.descripcion || 'Sin descripción'}</dd>
+                  </div>
+                  <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                    <dt className="text-sm font-medium text-black">Rendimiento</dt>
+                    <dd className="mt-1 text-sm text-black sm:mt-0 sm:col-span-2">{receta.rendimiento} unidades por lote</dd>
+                  </div>
+                  <div className="py-4 sm:py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                    <dt className="text-sm font-medium text-black">Productos asociados</dt>
+                    <dd className="mt-1 text-sm text-black sm:mt-0 sm:col-span-2">
+                      {receta.productoRecetas && receta.productoRecetas.length > 0 ? (
+                        <ul className="divide-y divide-gray-200">
+                          {receta.productoRecetas.map(pr => (
+                            <li key={pr.id} className="py-2 flex items-center">
+                              <Package2 className="h-4 w-4 text-gray-400 mr-2" />
+                              {pr.producto.nombre}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <span className="text-black">No hay productos asociados</span>
+                      )}
+                    </dd>
+                  </div>
+                </dl>
+              </div>
+            </div>
+            
+            {/* Ingredientes */}
+            <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+              <div className="px-4 py-5 sm:px-6 bg-gray-50">
+                <h2 className="text-lg font-medium text-black">Ingredientes necesarios</h2>
+                <p className="mt-1 max-w-2xl text-sm text-black">Insumos para producir un lote</p>
+              </div>
+              <div className="border-t border-gray-200">
+                <HCTable>
+                  <thead>
+                    <tr>
+                      <HCTh>Insumo</HCTh>
+                      <HCTh>Cantidad</HCTh>
+                      <HCTh>Stock actual</HCTh>
+                      <HCTh>Estado</HCTh>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {receta.items.map(item => {
+                      const stock = verificarStock(item);
+                      return (
+                        <tr key={item.id}>
+                          <HCTd>
+                            {item.insumo.nombre}
+                          </HCTd>
+                          <HCTd>
+                            {item.cantidad} {item.insumo.unidadMedida}
+                          </HCTd>
+                          <HCTd>
+                            {stock.disponible} {item.insumo.unidadMedida}
+                          </HCTd>
+                          <HCTd>
+                            <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                              stock.suficiente 
+                                ? 'bg-green-100 text-black' 
+                                : 'bg-red-100 text-black'
+                            }`}>
+                              {stock.suficiente ? 'Disponible' : 'Insuficiente'}
+                            </span>
+                          </HCTd>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </HCTable>
+              </div>
+            </div>
+          </div>
+          
+          {/* Columna derecha: Acciones y datos adicionales */}
+          <div className="space-y-6">
+            {/* Panel de acciones */}
+            <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+              <div className="px-4 py-5 sm:px-6 bg-gray-50">
+                <h2 className="text-lg font-medium text-black">Acciones</h2>
+              </div>
+              <div className="border-t border-gray-200 p-4">
+                <Link 
+                  href={`/fabrica/produccion/nueva?recetaId=${receta.id}`}
+                  className="w-full mb-3 inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700"
+                >
+                  <Beaker className="mr-2 h-4 w-4" />
+                  Iniciar Producción
+                </Link>
+                
+                <Link 
+                  href={`/fabrica/stock/solicitud?recetaId=${receta.id}`}
+                  className="w-full inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-black bg-white hover:bg-gray-50"
+                >
+                  <ShoppingBag className="mr-2 h-4 w-4" />
+                  Solicitar Insumos
+                </Link>
+              </div>
+            </div>
+            
+            {/* Panel de información adicional */}
+            <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+              <div className="px-4 py-5 sm:px-6 bg-gray-50">
+                <h2 className="text-lg font-medium text-black">Información adicional</h2>
+              </div>
+              <div className="border-t border-gray-200 px-4 py-5">
+                <div className="mb-4">
+                  <div className="flex items-center">
+                    <Clock className="h-5 w-5 text-gray-400 mr-2" />
+                    <h3 className="text-sm font-medium text-black">Tiempo estimado de producción</h3>
+                  </div>
+                  <p className="mt-1 text-sm text-black pl-7">
+                    {receta.items.length <= 3 ? '1-2 horas' : receta.items.length <= 6 ? '2-4 horas' : '4+ horas'}
+                  </p>
+                </div>
+                
+                <div className="mb-4">
+                  <div className="flex items-center">
+                    <Calendar className="h-5 w-5 text-gray-400 mr-2" />
+                    <h3 className="text-sm font-medium text-black">Última producción</h3>
+                  </div>
+                  <p className="mt-1 text-sm text-black pl-7">
+                    No hay registros recientes
+                  </p>
+                </div>
+                
+                <div>
+                  <div className="flex items-center">
+                    <Check className="h-5 w-5 text-gray-400 mr-2" />
+                    <h3 className="text-sm font-medium text-black">Verificación de calidad</h3>
+                  </div>
+                  <p className="mt-1 text-sm text-black pl-7">
+                    Seguir procedimiento estándar
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            {/* Estado de stock */}
+            <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+              <div className="px-4 py-5 sm:px-6 bg-gray-50">
+                <h2 className="text-lg font-medium text-black">Estado del stock</h2>
+              </div>
+              <div className="border-t border-gray-200 px-4 py-5">
+                {/* Cálculo de cuántos lotes completos se pueden producir */}
+                {(() => {
+                  const lotesDisponibles = receta.items.map(item => {
+                    const stockDisponible = stockInsumos[item.insumoId] || 0;
+                    return Math.floor(stockDisponible / item.cantidad);
+                  });
+                  
+                  const lotesPosibles = lotesDisponibles.length > 0 ? Math.min(...lotesDisponibles) : 0;
+                  const produccionPosible = lotesPosibles * receta.rendimiento;
+                  
+                  return (
+                    <div>
+                      <div className="flex justify-between mb-1">
+                        <span className="text-sm font-medium text-black">Lotes posibles con el stock actual</span>
+                        <span className="text-sm font-semibold text-black">{lotesPosibles}</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2.5">
+                        <div 
+                          className={`h-2.5 rounded-full ${lotesPosibles > 0 ? 'bg-green-600' : 'bg-red-600'}`}
+                          style={{ width: `${Math.min(100, lotesPosibles * 20)}%` }} // 5 lotes o más = 100%
+                        ></div>
+                      </div>
+                      <p className="mt-2 text-sm text-black">
+                        Con el stock actual puede producir aproximadamente <span className="font-semibold">{produccionPosible}</span> unidades.
+                      </p>
+                      
+                      {lotesPosibles === 0 && (
+                        <div className="mt-3 p-2 bg-red-50 text-black text-sm rounded border border-red-200">
+                          No hay suficiente stock de todos los insumos para producir.
+                        </div>
+                      )}
+                      
+                      {lotesPosibles > 0 && lotesPosibles < 3 && (
+                        <div className="mt-3 p-2 bg-yellow-50 text-black text-sm rounded border border-yellow-200">
+                          Stock limitado. Considere solicitar más insumos.
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </ContrastEnhancer>
   );
 }
