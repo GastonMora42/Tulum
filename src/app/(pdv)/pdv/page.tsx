@@ -1,4 +1,4 @@
-// src/app/(pdv)/pdv/page.tsx (actualización)
+// src/app/(pdv)/pdv/page.tsx - Versión mejorada
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -7,9 +7,20 @@ import { CartDisplay } from '@/components/pdv/CartDisplay';
 import { CheckoutModal } from '@/components/pdv/CheckoutModal';
 import { useCartStore } from '@/stores/cartStore';
 import { useOffline } from '@/hooks/useOffline';
-import { OfflineStatus } from '@/components/ui/OfflineStatus';
-import { AlertCircle, CheckCircle, X } from 'lucide-react';
 import { SucursalSetupModal } from '@/components/pdv/SucursalSetupModal';
+import { 
+  AlertCircle, 
+  CheckCircle, 
+  X, 
+  ShoppingCart, 
+  Tag, 
+  Search,
+  CreditCard,
+  DollarSign,
+  QrCode,
+  Package,
+  Layers
+} from 'lucide-react';
 
 interface Producto {
   id: string;
@@ -26,6 +37,8 @@ export default function PDVPage() {
   const [hayCajaAbierta, setHayCajaAbierta] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showSucursalModal, setShowSucursalModal] = useState(false);
+  const [categoriasProductos, setCategoriasProductos] = useState<any[]>([]);
+  const [productosPopulares, setProductosPopulares] = useState<Producto[]>([]);
   
   const { addItem } = useCartStore();
   const { isOnline } = useOffline();
@@ -40,14 +53,12 @@ export default function PDVPage() {
         const sucursalId = localStorage.getItem('sucursalId');
         
         if (!sucursalId) {
-          // Si no hay sucursal, mostrar modal de configuración
           setShowSucursalModal(true);
           return;
         }
         
         if (!isOnline) {
           // Si estamos offline, asumimos que hay caja abierta
-          // Esto se sincronizará cuando volvamos a estar online
           setHayCajaAbierta(true);
           return;
         }
@@ -62,6 +73,21 @@ export default function PDVPage() {
           const data = await response.json();
           throw new Error(data.error || 'Error al verificar el estado de la caja');
         }
+
+        // Cargar categorías de productos
+        const categoriasResponse = await fetch('/api/admin/categorias');
+        if (categoriasResponse.ok) {
+          const categoriasData = await categoriasResponse.json();
+          setCategoriasProductos(categoriasData);
+        }
+
+        // Cargar productos populares (simulados por ahora)
+        setProductosPopulares([
+          {id: 'popular1', nombre: 'Difusor Premium', precio: 450, descripcion: 'Difusor aromático de bambú'},
+          {id: 'popular2', nombre: 'Vela Aromática', precio: 350, descripcion: 'Vela aromática de lavanda'},
+          {id: 'popular3', nombre: 'Aceite Esencial', precio: 280, descripcion: 'Aceite esencial de limón'},
+          {id: 'popular4', nombre: 'Set de Velas', precio: 650, descripcion: 'Set de 3 velas aromáticas'},
+        ]);
       } catch (error) {
         console.error('Error al verificar caja:', error);
         setNotification({
@@ -80,7 +106,6 @@ export default function PDVPage() {
     setShowSucursalModal(false);
     
     if (sucursalId) {
-      // Recargar la página para aplicar la nueva configuración
       window.location.reload();
     }
   };
@@ -184,7 +209,7 @@ export default function PDVPage() {
   if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
         <span className="ml-3 text-lg">Cargando...</span>
       </div>
     );
@@ -222,7 +247,7 @@ export default function PDVPage() {
           
           <button
             onClick={handleAbrirCaja}
-            className="py-3 px-6 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+            className="py-3 px-6 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
             Abrir Caja
           </button>
@@ -258,39 +283,72 @@ export default function PDVPage() {
       
       {/* Área de productos */}
       <div className="lg:col-span-2 bg-white rounded-lg shadow overflow-hidden flex flex-col">
-        <div className="p-4 border-b">
+        <div className="p-4 border-b border-gray-100 bg-blue-50">
           <h2 className="text-xl font-bold text-gray-800">Productos</h2>
           <ProductSearch onProductSelect={handleProductSelect} className="mt-3" />
         </div>
 
         <SucursalSetupModal
-        isOpen={showSucursalModal}
-        onClose={handleSucursalSetup}
-      />
+          isOpen={showSucursalModal}
+          onClose={handleSucursalSetup}
+        />
         
         <div className="flex-grow p-4 overflow-y-auto">
-          {/* Aquí puedes agregar secciones de productos populares o categorías */}
-          {/* Por ejemplo, un grid de categorías o productos frecuentes */}
-          <h3 className="text-lg font-semibold text-gray-700 mb-3">Productos Populares</h3>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {/* Aquí irían los productos populares, este es un ejemplo */}
-            <button 
-              className="bg-white border border-gray-200 p-3 rounded-lg hover:shadow-md flex flex-col items-center text-center"
-              onClick={() => handleProductSelect({
-                id: 'popular1',
-                nombre: 'Difusor Premium',
-                precio: 450
-              })}
-            >
-              <div className="h-20 w-20 bg-gray-100 rounded-full mb-2 flex items-center justify-center">
-                {/* Icono o imagen del producto */}
-                <span className="text-gray-400">Img</span>
+          {/* Categorías */}
+          {categoriasProductos.length > 0 && (
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-3">Categorías</h3>
+              <div className="flex flex-wrap gap-2">
+                {categoriasProductos.map(categoria => (
+                  <button
+                    key={categoria.id}
+                    className="bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
+                  >
+                    <Tag size={16} />
+                    {categoria.nombre}
+                  </button>
+                ))}
               </div>
-              <span className="font-medium">Difusor Premium</span>
-              <span className="text-indigo-600 font-bold">$450</span>
-            </button>
-            
-            {/* Más productos populares aquí */}
+            </div>
+          )}
+          
+          {/* Productos Populares */}
+          <div>
+            <h3 className="text-lg font-semibold text-gray-800 mb-3">Productos Populares</h3>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              {productosPopulares.map((producto) => (
+                <button 
+                  key={producto.id}
+                  className="bg-white border border-gray-200 p-4 rounded-lg hover:shadow-md flex flex-col items-center text-center transition-all"
+                  onClick={() => handleProductSelect(producto)}
+                >
+                  <div className="h-20 w-20 bg-blue-50 rounded-full mb-3 flex items-center justify-center">
+                    <Package className="h-10 w-10 text-blue-400" />
+                  </div>
+                  <span className="font-medium text-gray-800 mb-1">{producto.nombre}</span>
+                  <span className="text-blue-600 font-bold">${producto.precio.toFixed(2)}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          {/* Formas de pago - Información visual */}
+          <div className="mt-8 pt-6 border-t border-gray-100">
+            <h3 className="text-sm font-medium text-gray-500 mb-3">Métodos de pago aceptados</h3>
+            <div className="flex space-x-4">
+              <div className="flex items-center text-gray-500">
+                <DollarSign size={20} className="mr-1" />
+                <span className="text-sm">Efectivo</span>
+              </div>
+              <div className="flex items-center text-gray-500">
+                <CreditCard size={20} className="mr-1" />
+                <span className="text-sm">Tarjeta</span>
+              </div>
+              <div className="flex items-center text-gray-500">
+                <QrCode size={20} className="mr-1" />
+                <span className="text-sm">QR</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -306,9 +364,6 @@ export default function PDVPage() {
         onClose={() => setIsCheckoutOpen(false)}
         onComplete={handleCheckoutComplete}
       />
-      
-      {/* Indicador de estado offline */}
-      <OfflineStatus />
     </div>
   );
 }

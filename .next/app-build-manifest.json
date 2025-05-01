@@ -6,20 +6,30 @@
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
     ],
-    "/page": [
+    "/(pdv)/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/page.js"
+      "static/chunks/app/(pdv)/layout.js"
+    ],
+    "/(pdv)/pdv/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(pdv)/pdv/page.js"
+    ],
+    "/api/auth/me/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/auth/me/route.js"
+    ],
+    "/api/pdv/cierre/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/pdv/cierre/route.js"
     ],
     "/(auth)/login/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/(auth)/login/page.js"
-    ],
-    "/api/auth/refresh/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/auth/refresh/route.js"
     ],
     "/api/auth/login/route": [
       "static/chunks/webpack.js",
@@ -36,11 +46,6 @@
       "static/chunks/main-app.js",
       "static/chunks/app/(admin)/admin/page.js"
     ],
-    "/api/auth/me/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/auth/me/route.js"
-    ],
     "/api/reportes/stock/bajo/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
@@ -51,40 +56,20 @@
       "static/chunks/main-app.js",
       "static/chunks/app/api/contingencias/route.js"
     ],
-    "/api/admin/productos/route": [
+    "/(admin)/admin/productos/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/admin/productos/route.js"
+      "static/chunks/app/(admin)/admin/productos/page.js"
     ],
-    "/(pdv)/layout": [
+    "/(pdv)/pdv/dashboard/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(pdv)/layout.js"
+      "static/chunks/app/(pdv)/pdv/dashboard/page.js"
     ],
-    "/(pdv)/pdv/page": [
+    "/api/pdv/cierre/resumen/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(pdv)/pdv/page.js"
-    ],
-    "/(pdv)/pdv/ventas/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(pdv)/pdv/ventas/page.js"
-    ],
-    "/(pdv)/pdv/cierre/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(pdv)/pdv/cierre/page.js"
-    ],
-    "/api/admin/ubicaciones/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/admin/ubicaciones/route.js"
-    ],
-    "/api/pdv/cierre/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/pdv/cierre/route.js"
+      "static/chunks/app/api/pdv/cierre/resumen/route.js"
     ],
     "/api/pdv/ventas/route": [
       "static/chunks/webpack.js",
