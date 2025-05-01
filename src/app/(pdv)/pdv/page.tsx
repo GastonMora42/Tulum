@@ -1,9 +1,17 @@
 // src/app/(pdv)/pdv/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useCartStore } from '@/stores/cartStore';
 import { useOffline } from '@/hooks/useOffline';
+import Link from 'next/link';
+import { 
+  Search, ShoppingCart, Tag, BarChart2, AlertCircle, 
+  PlusCircle, MinusCircle, Trash2, CreditCard, DollarSign,
+  User, Receipt, Send, Clock, CheckCircle, X, Filter
+} from 'lucide-react';
+import { authenticatedFetch } from '@/hooks/useAuth';
+import { useAuthStore } from '@/stores/authStore';
 
 interface Producto {
   id: string;
@@ -11,110 +19,245 @@ interface Producto {
   precio: number;
   descripcion: string | null;
   codigoBarras: string | null;
+  categoriaId: string;
+  categoria?: {
+    nombre: string;
+  };
+  imagen?: string;
 }
 
+interface Categoria {
+  id: string;
+  nombre: string;
+}
+
+// Component for the Point of Sale main interface
 export default function PDVPage() {
+  // References
+  const barcodeInputRef = useRef<HTMLInputElement>(null);
+  
+  // State
   const [productos, setProductos] = useState<Producto[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [filteredProductos, setFilteredProductos] = useState<Producto[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [categoriaSeleccionada, setCategoriaSeleccionada] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [checkoutSuccess, setCheckoutSuccess] = useState(false);
   const [checkoutMessage, setCheckoutMessage] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('efectivo');
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [clienteNombre, setClienteNombre] = useState('');
+  const [clienteCuit, setClienteCuit] = useState('');
+  const [facturar, setFacturar] = useState(false);
+  const [showClientModal, setShowClientModal] = useState(false);
+  const [showCartAlert, setShowCartAlert] = useState(false);
   
-  const { items, addItem, removeItem, updateItem, getSubtotal, getTotal, checkout, clearCart } = useCartStore();
+  // Access stores and hooks  
+  const { 
+    items, addItem, removeItem, updateItem, getSubtotal, getTotal, 
+    checkout, clearCart, setCliente, applyGeneralDiscount
+  } = useCartStore();
   const { isOnline, searchProductosCache, pendingOperations } = useOffline();
+  const { user } = useAuthStore();
   
-  // Cargar productos (de caché si offline, o del servidor si online)
+  // Focus on barcode input when component mounts
   useEffect(() => {
-    const loadProductos = async () => {
+    // Focus barcode input on initial load
+    if (barcodeInputRef.current) {
+      barcodeInputRef.current.focus();
+    }
+    
+    // Listen for keydown events globally
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // If F2 is pressed, focus the barcode input
+      if (e.key === 'F2') {
+        e.preventDefault();
+        if (barcodeInputRef.current) {
+          barcodeInputRef.current.focus();
+        }
+      }
+      
+      // If F3 is pressed, show payment screen
+      if (e.key === 'F3' && items.length > 0) {
+        e.preventDefault();
+        setShowPaymentModal(true);
+      }
+      
+      // If Escape is pressed, close any open modal
+      if (e.key === 'Escape') {
+        setShowPaymentModal(false);
+        setShowClientModal(false);
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [items]);
+  
+  // Load products and categories
+  useEffect(() => {
+    const loadData = async () => {
       try {
         setIsLoading(true);
         
-        let productosData: Producto[];
-        
+        // Load data based on connectivity state
         if (isOnline) {
-          // En un entorno real, cargaríamos del servidor
-          // Por ahora, simulamos datos
-          await new Promise(resolve => setTimeout(resolve, 800));
+          // Load categories
+          const categoriasResponse = await authenticatedFetch('/api/admin/categorias');
+          if (categoriasResponse.ok) {
+            const categoriasData = await categoriasResponse.json();
+            setCategorias(categoriasData);
+          }
           
-          productosData = [
-            { id: '1', nombre: 'Difusor Bambú', precio: 450, descripcion: 'Difusor aromático de bambú', codigoBarras: '1001' },
-            { id: '2', nombre: 'Vela Lavanda', precio: 350, descripcion: 'Vela aromática de lavanda', codigoBarras: '1002' },
-            { id: '3', nombre: 'Aceite Esencial Limón', precio: 280, descripcion: 'Aceite esencial 100% puro de limón', codigoBarras: '1003' }
-          ];
+          // Load products with stock information
+          const sucursalId = localStorage.getItem('sucursalId');
+          if (!sucursalId) {
+            setError('No se ha configurado la sucursal para este usuario');
+            setIsLoading(false);
+            return;
+          }
+          
+          const productosResponse = await authenticatedFetch(
+            `/api/pdv/productos-disponibles?sucursalId=${sucursalId}`
+          );
+          
+          if (productosResponse.ok) {
+            const productosData = await productosResponse.json();
+            setProductos(productosData);
+            setFilteredProductos(productosData);
+          } else {
+            throw new Error('Error al cargar los productos');
+          }
         } else {
-          // Cargar de caché local
+          // Load from local cache
           const cachedProductos = await searchProductosCache('');
-          productosData = cachedProductos.map(p => ({
+          const mappedProductos = cachedProductos.map(p => ({
             id: p.id,
             nombre: p.nombre,
             precio: p.precio,
             descripcion: p.descripcion || null,
-            codigoBarras: p.codigoBarras || null
+            codigoBarras: p.codigoBarras || null,
+            categoriaId: p.categoriaId
           }));
+          
+          setProductos(mappedProductos);
+          setFilteredProductos(mappedProductos);
+          
+          // For categories in offline mode, we use tags from cached products
+          const uniqueCategories = Array.from(
+            new Set(cachedProductos.map(p => p.categoriaId))
+          ).map(id => ({
+            id,
+            nombre: cachedProductos.find(p => p.categoriaId === id)?.tags?.[0] || 'Categoría'
+          }));
+          
+          setCategorias(uniqueCategories);
         }
-        
-        setProductos(productosData);
-        setFilteredProductos(productosData);
       } catch (err) {
-        console.error('Error al cargar productos:', err);
-        setError('No se pudieron cargar los productos');
+        console.error('Error al cargar datos:', err);
+        setError('Error al cargar los productos');
       } finally {
         setIsLoading(false);
       }
     };
     
-    loadProductos();
+    loadData();
   }, [isOnline, searchProductosCache]);
   
-  // Filtrar productos al buscar
+  // Filter products based on search query and selected category
   useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredProductos(productos);
-      return;
+    let filtered = [...productos];
+    
+    // Apply category filter
+    if (categoriaSeleccionada) {
+      filtered = filtered.filter(p => p.categoriaId === categoriaSeleccionada);
     }
     
-    const query = searchQuery.toLowerCase();
-    const filtered = productos.filter(
-      producto => 
-        producto.nombre.toLowerCase().includes(query) ||
-        (producto.descripcion?.toLowerCase().includes(query)) ||
-        (producto.codigoBarras?.includes(query))
-    );
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        producto => 
+          producto.nombre.toLowerCase().includes(query) ||
+          (producto.descripcion?.toLowerCase().includes(query)) ||
+          (producto.codigoBarras?.includes(query))
+      );
+    }
     
     setFilteredProductos(filtered);
-  }, [searchQuery, productos]);
+  }, [searchQuery, categoriaSeleccionada, productos]);
   
-  // Manejar cambios en la búsqueda
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
+  // Handle barcode search
+  const handleBarcodeSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      const barcode = e.currentTarget.value.trim();
+      if (barcode) {
+        // Look for product with this barcode
+        const producto = productos.find(p => p.codigoBarras === barcode);
+        if (producto) {
+          addItem(producto);
+          // Show quick feedback
+          setShowCartAlert(true);
+          setTimeout(() => setShowCartAlert(false), 1500);
+        } else {
+          // Flash error
+          setError('Producto no encontrado');
+          setTimeout(() => setError(null), 2000);
+        }
+        
+        // Clear the input for next scan
+        e.currentTarget.value = '';
+      }
+    }
   };
   
-  // Agregar producto al carrito
-  const handleAddToCart = (producto: Producto) => {
-    addItem(producto);
+  // Handle category selection
+  const handleCategorySelect = (categoriaId: string) => {
+    setCategoriaSeleccionada(prev => prev === categoriaId ? '' : categoriaId);
   };
   
-  // Procesar compra
+  // Handle payment and checkout
   const handleCheckout = async () => {
+    // First, apply client data if it's an invoice
+    if (facturar) {
+      setCliente(clienteNombre, clienteCuit);
+    }
+    
     try {
       setIsCheckingOut(true);
       setError(null);
       
       const result = await checkout({
-        facturar: false, // Por ahora, sin factura
-        metodoPago: 'efectivo',
+        facturar,
+        metodoPago: selectedPaymentMethod,
+        datosAdicionales: {
+          montoIngresado: parseFloat(paymentAmount) || getTotal()
+        }
       });
       
       if (result.success) {
         setCheckoutSuccess(true);
         setCheckoutMessage(result.message || 'Venta realizada con éxito');
-        // Limpiar después de 3 segundos
+        setShowPaymentModal(false);
+        
+        // Show success message that automatically disappears
         setTimeout(() => {
           setCheckoutSuccess(false);
           setCheckoutMessage('');
+          
+          // Reset all states
+          setSelectedPaymentMethod('efectivo');
+          setPaymentAmount('');
+          setClienteNombre('');
+          setClienteCuit('');
+          setFacturar(false);
         }, 3000);
       } else {
         setError(result.message || 'Error al procesar la venta');
@@ -127,116 +270,213 @@ export default function PDVPage() {
     }
   };
   
+  // Render helper: format currency
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('es-AR', { 
+      style: 'currency', 
+      currency: 'ARS',
+      minimumFractionDigits: 2 
+    }).format(amount);
+  };
+  
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full">
-      {/* Catálogo de productos */}
-      <div className="md:col-span-2 bg-white rounded-lg shadow p-4">
-        <div className="mb-4">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={handleSearchChange}
-            placeholder="Buscar producto por nombre, descripción o código"
-            className="w-full p-2 border rounded-md"
-          />
+    <div className="flex flex-col md:flex-row h-[calc(100vh-4rem)] overflow-hidden">
+      {/* Left column - Product Catalog */}
+      <div className="w-full md:w-2/3 flex flex-col h-full overflow-hidden bg-white shadow-md rounded-lg border border-gray-200">
+        {/* Fixed header area with search */}
+        <div className="p-3 border-b border-gray-200 bg-white">
+          <div className="flex gap-2 mb-2">
+            <div className="relative flex-grow">
+              <input
+                ref={barcodeInputRef}
+                type="text"
+                placeholder="Escanear código de barras (F2)"
+                className="w-full p-2 pl-10 border rounded-lg shadow-sm"
+                onKeyDown={handleBarcodeSearch}
+              />
+              <div className="absolute left-3 top-2.5 text-gray-400">
+                <BarChart2 size={20} />
+              </div>
+            </div>
+            
+            <div className="relative flex-grow">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Buscar producto"
+                className="w-full p-2 pl-10 border rounded-lg shadow-sm"
+              />
+              <div className="absolute left-3 top-2.5 text-gray-400">
+                <Search size={20} />
+              </div>
+            </div>
+          </div>
+          
+          {/* Categories horizontal scroll */}
+          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
+            {categorias.map(categoria => (
+              <button
+                key={categoria.id}
+                onClick={() => handleCategorySelect(categoria.id)}
+                className={`px-3 py-1.5 rounded-full whitespace-nowrap text-sm font-medium ${
+                  categoriaSeleccionada === categoria.id
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                <Tag size={14} className="inline mr-1" />
+                {categoria.nombre}
+              </button>
+            ))}
+          </div>
         </div>
         
-        {isLoading ? (
-          <div className="flex justify-center items-center h-64">
-            <p>Cargando productos...</p>
-          </div>
-        ) : error ? (
-          <div className="text-red-500 text-center h-64 flex items-center justify-center">
-            {error}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto max-h-[calc(100vh-200px)]">
-            {filteredProductos.map(producto => (
-              <div 
+        {/* Scrollable product grid */}
+        <div className="flex-grow overflow-y-auto p-3 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          {isLoading ? (
+            <div className="col-span-full flex justify-center items-center h-full">
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+            </div>
+          ) : filteredProductos.length === 0 ? (
+            <div className="col-span-full flex flex-col justify-center items-center h-full text-gray-500">
+              <Search size={48} className="mb-2" />
+              <p>No se encontraron productos</p>
+              {searchQuery && (
+                <button 
+                  className="mt-2 text-blue-600 hover:underline"
+                  onClick={() => setSearchQuery('')}
+                >
+                  Limpiar búsqueda
+                </button>
+              )}
+            </div>
+          ) : (
+            filteredProductos.map(producto => (
+              <div
                 key={producto.id}
-                className="border rounded-lg p-3 hover:shadow-md cursor-pointer"
-                onClick={() => handleAddToCart(producto)}
+                onClick={() => {
+                  addItem(producto);
+                  setShowCartAlert(true);
+                  setTimeout(() => setShowCartAlert(false), 1500);
+                }}
+                className="bg-white border rounded-lg p-3 shadow-sm hover:shadow transition cursor-pointer flex flex-col h-32"
               >
-                <h3 className="font-semibold">{producto.nombre}</h3>
-                <p className="text-sm text-gray-600 truncate">{producto.descripcion}</p>
+                <h3 className="font-semibold text-sm text-gray-800 mb-1 line-clamp-2">
+                  {producto.nombre}
+                </h3>
+                <p className="text-xs text-gray-500 flex-grow line-clamp-2">
+                  {producto.descripcion || producto.codigoBarras || 'Sin descripción'}
+                </p>
                 <div className="flex justify-between items-center mt-2">
-                  <span className="font-bold text-lg">${producto.precio.toFixed(2)}</span>
+                  <span className="font-bold text-lg text-blue-600">
+                    ${producto.precio.toFixed(2)}
+                  </span>
                   <button
-                    className="bg-indigo-600 text-white p-1 rounded-full"
+                    className="bg-blue-600 text-white p-1 rounded-full"
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleAddToCart(producto);
+                      addItem(producto);
+                      setShowCartAlert(true);
+                      setTimeout(() => setShowCartAlert(false), 1500);
                     }}
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
+                    <PlusCircle size={20} />
                   </button>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
+            ))
+          )}
+        </div>
       </div>
       
-      {/* Carrito de compra */}
-      <div className="bg-white rounded-lg shadow p-4 flex flex-col h-full">
-        <h2 className="text-xl font-bold mb-4">Carrito de Compra</h2>
+      {/* Right column - Shopping Cart */}
+      <div className="w-full md:w-1/3 flex flex-col h-full bg-gray-50 shadow-md rounded-lg border border-gray-200 overflow-hidden">
+        <div className="p-3 border-b border-gray-200 bg-white">
+          <h2 className="text-lg font-bold text-gray-800 flex items-center">
+            <ShoppingCart size={20} className="mr-2 text-blue-600" />
+            Carrito
+            {items.length > 0 && (
+              <span className="ml-2 px-2 py-0.5 text-sm bg-blue-600 text-white rounded-full">
+                {items.length}
+              </span>
+            )}
+          </h2>
+        </div>
         
         {!isOnline && (
-          <div className="bg-amber-100 text-amber-800 p-2 rounded-md mb-3 text-sm">
-            Modo fuera de línea. {pendingOperations} operación(es) pendiente(s) de sincronizar.
+          <div className="bg-amber-50 border-b border-amber-200 p-2 text-sm text-amber-800">
+            <div className="flex items-center">
+              <AlertCircle size={16} className="mr-1" />
+              <span>Modo fuera de línea. {pendingOperations} operación(es) pendiente(s).</span>
+            </div>
           </div>
         )}
         
         {checkoutSuccess && (
-          <div className="bg-green-100 text-green-800 p-2 rounded-md mb-3 text-sm">
-            {checkoutMessage}
+          <div className="bg-green-50 border-b border-green-200 p-2 text-sm text-green-800">
+            <div className="flex items-center">
+              <CheckCircle size={16} className="mr-1" />
+              <span>{checkoutMessage}</span>
+            </div>
           </div>
         )}
         
-        <div className="flex-grow overflow-y-auto">
+        {error && (
+          <div className="bg-red-50 border-b border-red-200 p-2 text-sm text-red-800">
+            <div className="flex items-center">
+              <AlertCircle size={16} className="mr-1" />
+              <span>{error}</span>
+            </div>
+          </div>
+        )}
+        
+        {/* Cart items - scrollable */}
+        <div className="flex-grow overflow-y-auto p-3">
           {items.length === 0 ? (
-            <div className="text-gray-500 text-center py-8">
-              El carrito está vacío
+            <div className="h-full flex flex-col justify-center items-center text-gray-400">
+              <ShoppingCart size={48} className="mb-2" />
+              <p className="text-center">
+                El carrito está vacío<br />
+                Seleccione productos para agregar
+              </p>
             </div>
           ) : (
             <ul className="divide-y">
               {items.map(item => (
-                <li key={item.id} className="py-2">
-                  <div className="flex justify-between">
-                    <span className="font-medium">{item.nombre}</span>
-                    <span>${item.precio.toFixed(2)}</span>
+                <li key={item.id} className="py-3 first:pt-0 last:pb-0">
+                  <div className="flex justify-between mb-1">
+                    <span className="font-medium text-gray-800">{item.nombre}</span>
+                    <span className="font-medium text-blue-600">${item.precio.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between items-center mt-1">
                     <div className="flex items-center">
                       <button
-                        className="text-gray-500 hover:text-gray-700"
+                        className="text-gray-500 hover:text-gray-700 bg-gray-100 rounded-full p-1"
                         onClick={() => updateItem(item.id, item.cantidad - 1)}
                         disabled={item.cantidad <= 1}
                       >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                        </svg>
+                        <MinusCircle size={18} />
                       </button>
-                      <span className="mx-2">{item.cantidad}</span>
+                      <span className="mx-2 w-8 text-center">{item.cantidad}</span>
                       <button
-                        className="text-gray-500 hover:text-gray-700"
+                        className="text-gray-500 hover:text-gray-700 bg-gray-100 rounded-full p-1"
                         onClick={() => updateItem(item.id, item.cantidad + 1)}
                       >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                        </svg>
+                        <PlusCircle size={18} />
                       </button>
                     </div>
-                    <button
-                      className="text-red-500 hover:text-red-700"
-                      onClick={() => removeItem(item.id)}
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
+                    <div className="flex items-center">
+                      <span className="mr-2 text-gray-700">
+                        ${(item.precio * item.cantidad).toFixed(2)}
+                      </span>
+                      <button
+                        className="text-red-500 hover:text-red-700 bg-red-50 rounded-full p-1"
+                        onClick={() => removeItem(item.id)}
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
                   </div>
                 </li>
               ))}
@@ -244,34 +484,202 @@ export default function PDVPage() {
           )}
         </div>
         
-        <div className="border-t pt-4 mt-2">
+        {/* Cart totals and checkout */}
+        <div className="p-3 border-t border-gray-200 bg-white">
           <div className="flex justify-between mb-2">
-            <span className="font-medium">Subtotal:</span>
-            <span>${getSubtotal().toFixed(2)}</span>
+            <span className="font-medium text-gray-600">Subtotal:</span>
+            <span className="font-medium">{formatCurrency(getSubtotal())}</span>
           </div>
-          <div className="flex justify-between font-bold text-lg">
+          <div className="flex justify-between font-bold text-lg mb-3">
             <span>Total:</span>
-            <span>${getTotal().toFixed(2)}</span>
+            <span className="text-blue-600">{formatCurrency(getTotal())}</span>
           </div>
           
-          <div className="grid grid-cols-2 gap-2 mt-4">
+          <div className="grid grid-cols-2 gap-2">
             <button
               onClick={clearCart}
               disabled={items.length === 0 || isCheckingOut}
-              className="py-2 px-4 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="py-3 px-4 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancelar
             </button>
             <button
-              onClick={handleCheckout}
+              onClick={() => setShowPaymentModal(true)}
               disabled={items.length === 0 || isCheckingOut}
-              className="py-2 px-4 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="py-3 px-4 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isCheckingOut ? 'Procesando...' : 'Cobrar'}
+              Cobrar (F3)
             </button>
+          </div>
+          
+          <div className="mt-3 flex justify-center">
+            <Link href="/pdv/ventas" className="text-sm text-blue-600 hover:underline">
+              Ver historial de ventas
+            </Link>
           </div>
         </div>
       </div>
+      
+      {/* Payment Modal */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg w-full max-w-lg mx-4 overflow-hidden">
+            <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+              <h2 className="text-xl font-bold text-gray-800">Procesar Pago</h2>
+              <button 
+                onClick={() => setShowPaymentModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="p-4">
+              <div className="mb-4">
+                <div className="flex justify-between font-bold text-lg mb-4">
+                  <span>Total a pagar:</span>
+                  <span className="text-blue-600">{formatCurrency(getTotal())}</span>
+                </div>
+                
+                <div className="mb-4">
+                  <label className="block text-gray-700 mb-2 font-medium">
+                    Método de pago
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPaymentMethod('efectivo')}
+                      className={`py-3 px-4 rounded-lg flex items-center justify-center ${
+                        selectedPaymentMethod === 'efectivo'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      <DollarSign size={20} className="mr-2" />
+                      Efectivo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPaymentMethod('tarjeta')}
+                      className={`py-3 px-4 rounded-lg flex items-center justify-center ${
+                        selectedPaymentMethod === 'tarjeta'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      <CreditCard size={20} className="mr-2" />
+                      Tarjeta
+                    </button>
+                  </div>
+                </div>
+                
+                {selectedPaymentMethod === 'efectivo' && (
+                  <div className="mb-4">
+                    <label className="block text-gray-700 mb-2 font-medium">
+                      Monto recibido
+                    </label>
+                    <input
+                      type="number"
+                      value={paymentAmount}
+                      onChange={(e) => setPaymentAmount(e.target.value)}
+                      placeholder={getTotal().toFixed(2)}
+                      className="w-full p-3 border rounded-lg"
+                    />
+                    
+                    {paymentAmount && parseFloat(paymentAmount) >= getTotal() && (
+                      <div className="mt-2 text-right">
+                        <span className="text-gray-700">Cambio: </span>
+                        <span className="font-bold">
+                          {formatCurrency(parseFloat(paymentAmount) - getTotal())}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                <div className="mb-4">
+                  <div className="flex items-center mb-2">
+                    <input
+                      type="checkbox"
+                      id="facturar"
+                      checked={facturar}
+                      onChange={(e) => setFacturar(e.target.checked)}
+                      className="mr-2"
+                    />
+                    <label htmlFor="facturar" className="text-gray-700 font-medium">
+                      Facturar esta venta
+                    </label>
+                  </div>
+                  
+                  {facturar && (
+                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                      <div className="mb-2">
+                        <label className="block text-gray-700 mb-1 text-sm">
+                          Nombre/Razón Social
+                        </label>
+                        <input
+                          type="text"
+                          value={clienteNombre}
+                          onChange={(e) => setClienteNombre(e.target.value)}
+                          className="w-full p-2 border rounded-lg text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-gray-700 mb-1 text-sm">
+                          CUIT/DNI
+                        </label>
+                        <input
+                          type="text"
+                          value={clienteCuit}
+                          onChange={(e) => setClienteCuit(e.target.value)}
+                          className="w-full p-2 border rounded-lg text-sm"
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowPaymentModal(false)}
+                  className="py-2 px-4 border border-gray-300 rounded-lg text-gray-700"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleCheckout}
+                  disabled={
+                    isCheckingOut || 
+                    (facturar && (!clienteNombre || !clienteCuit)) ||
+                    (selectedPaymentMethod === 'efectivo' && 
+                     paymentAmount && 
+                     parseFloat(paymentAmount) < getTotal())
+                  }
+                  className="py-2 px-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isCheckingOut ? (
+                    <div className="flex items-center">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Procesando...
+                    </div>
+                  ) : (
+                    'Finalizar Venta'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Quick add feedback alert */}
+      {showCartAlert && (
+        <div className="fixed bottom-4 right-4 bg-green-600 text-white p-3 rounded-lg shadow-lg flex items-center animate-fade-in-out z-50">
+          <CheckCircle size={20} className="mr-2" />
+          <span>Producto agregado al carrito</span>
+        </div>
+      )}
     </div>
   );
 }
