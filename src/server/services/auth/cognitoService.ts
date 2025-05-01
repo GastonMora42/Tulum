@@ -54,6 +54,7 @@ constructor() {
     console.error("Faltan variables de entorno críticas para Cognito");
   }
   
+  
   // Configurar el cliente de AWS con credenciales explícitas
   this.client = new CognitoIdentityProviderClient({
     region: process.env.AWS_REGION as string,
