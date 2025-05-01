@@ -6,7 +6,8 @@ class ApiClient {
   private defaultHeaders: HeadersInit;
   
   constructor() {
-    this.baseUrl = '';
+    // Usar la URL base absoluta o relativa dependiendo del entorno
+    this.baseUrl = typeof window !== 'undefined' ? window.location.origin : '';
     this.defaultHeaders = {
       'Content-Type': 'application/json',
     };
@@ -59,31 +60,27 @@ class ApiClient {
   
   // Métodos HTTP
   async get<T>(endpoint: string, params?: Record<string, string>): Promise<T> {
-    const url = new URL(`${this.baseUrl}${endpoint}`);
-    
-    // Añadir parámetros de consulta
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        url.searchParams.append(key, value);
-      });
+    try {
+      // Asegurarse de que el endpoint comienza con una barra si es una ruta relativa
+      const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+      const url = new URL(`${this.baseUrl}${normalizedEndpoint}`);
+      
+      // Añadir parámetros de consulta
+      if (params) {
+        Object.entries(params).forEach(([key, value]) => {
+          url.searchParams.append(key, value);
+        });
+      }
+      
+      const headers = await this.getAuthHeaders();
+      const response = await fetch(url.toString(), { headers });
+      return this.handleResponse(response);
+    } catch (error) {
+      console.error('Error en petición GET:', error);
+      throw error;
     }
-    
-    const headers = await this.getAuthHeaders();
-    const response = await fetch(url.toString(), { headers });
-    return this.handleResponse(response);
   }
-  
-  async post<T>(endpoint: string, data: any): Promise<T> {
-    const headers = await this.getAuthHeaders();
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(data)
-    });
-    
-    return this.handleResponse(response);
-  }
-  
+
   async put<T>(endpoint: string, data: any): Promise<T> {
     const headers = await this.getAuthHeaders();
     const response = await fetch(`${this.baseUrl}${endpoint}`, {
@@ -106,6 +103,5 @@ class ApiClient {
   }
 }
 
-// Singleton
 const apiClient = new ApiClient();
 export default apiClient;

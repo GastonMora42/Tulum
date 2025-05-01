@@ -1,45 +1,42 @@
-// src/app/api/pdv/ventas/route.ts
+// src/app/api/pdv/ventas/route.ts (continuación)
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/server/db/client';
 import { authMiddleware } from '@/server/api/middlewares/auth';
 import { checkPermission } from '@/server/api/middlewares/authorization';
 import { ventaService } from '@/server/services/venta/ventaService';
 
+// GET - Obtener ventas con filtros
 export async function GET(req: NextRequest) {
   // Aplicar middleware de autenticación
   const authError = await authMiddleware(req);
   if (authError) return authError;
   
   // Verificar permiso
-  const permissionError = await checkPermission('venta:ver')(req);
+  const permissionError = await checkPermission(['venta:ver', 'admin'])(req);
   if (permissionError) return permissionError;
   
   try {
     const { searchParams } = new URL(req.url);
     
-    // Parámetros
+    // Filtros opcionales
     const sucursalId = searchParams.get('sucursalId');
-    const desde = searchParams.get('desde') ? new Date(searchParams.get('desde') as string) : undefined;
-    const hasta = searchParams.get('hasta') ? new Date(searchParams.get('hasta') as string) : undefined;
+    const desde = searchParams.get('desde') ? new Date(searchParams.get('desde')!) : undefined;
+    const hasta = searchParams.get('hasta') ? new Date(searchParams.get('hasta')!) : undefined;
+    const usuarioId = searchParams.get('usuarioId');
+    const facturada = searchParams.get('facturada') === 'true' ? true : 
+                     searchParams.get('facturada') === 'false' ? false : undefined;
     
-    if (!sucursalId) {
-      return NextResponse.json(
-        { error: 'Se requiere ID de sucursal' },
-        { status: 400 }
-      );
-    }
+    // Construir objeto de filtros
+    const filtros: any = {};
     
-    // Si hay fechas, ajustar hora
-    if (hasta) {
-      hasta.setHours(23, 59, 59, 999);
-    }
+    if (sucursalId) filtros.sucursalId = sucursalId;
+    if (desde) filtros.desde = desde;
+    if (hasta) filtros.hasta = hasta;
+    if (usuarioId) filtros.usuarioId = usuarioId;
+    if (facturada !== undefined) filtros.facturada = facturada;
     
-    // Obtener ventas
-    const ventas = await ventaService.getVentas({
-      sucursalId,
-      desde,
-      hasta
-    });
+    // Obtener ventas usando el servicio
+    const ventas = await ventaService.getVentas(filtros);
     
     return NextResponse.json(ventas);
   } catch (error: any) {
@@ -51,72 +48,125 @@ export async function GET(req: NextRequest) {
   }
 }
 
+// POST - Crear nueva venta
 export async function POST(req: NextRequest) {
   // Aplicar middleware de autenticación
   const authError = await authMiddleware(req);
   if (authError) return authError;
   
   // Verificar permiso
-  const permissionError = await checkPermission('venta:crear')(req);
+  const permissionError = await checkPermission(['venta:crear', 'admin'])(req);
   if (permissionError) return permissionError;
   
   try {
     const body = await req.json();
     
-    // Validar datos mínimos requeridos
+    // Validar que haya ítems
     if (!body.items || !Array.isArray(body.items) || body.items.length === 0) {
       return NextResponse.json(
-        { error: 'Se requieren items para la venta' },
+        { error: 'La venta debe contener al menos un ítem' },
         { status: 400 }
       );
     }
     
-    if (!body.total || typeof body.total !== 'number' || body.total <= 0) {
+    // Validar que haya pagos
+    if (!body.pagos || !Array.isArray(body.pagos) || body.pagos.length === 0) {
       return NextResponse.json(
-        { error: 'Se requiere un total válido para la venta' },
+        { error: 'La venta debe contener al menos un método de pago' },
         { status: 400 }
       );
     }
     
-    if (!body.metodoPago) {
+    // Verificar que hay una caja abierta
+    const sucursalId = body.sucursalId;
+    const cajaAbierta = await prisma.cierreCaja.findFirst({
+      where: {
+        sucursalId,
+        estado: 'abierto'
+      }
+    });
+    
+    if (!cajaAbierta) {
       return NextResponse.json(
-        { error: 'Se requiere un método de pago' },
+        { error: 'No hay una caja abierta para esta sucursal. Debe abrir una caja antes de realizar ventas.' },
         { status: 400 }
       );
     }
     
     // Obtener usuario
     const user = (req as any).user;
-    const sucursalId = user.sucursalId || localStorage.getItem('sucursalId');
     
-    if (!sucursalId) {
+    // Asegurarse que el total de pagos coincide con el total de la venta
+    const totalPagos = body.pagos.reduce((sum: number, pago: any) => sum + pago.monto, 0);
+    
+    if (Math.abs(totalPagos - body.total) > 0.01) { // Permitir pequeña diferencia por redondeo
       return NextResponse.json(
-        { error: 'No se ha configurado la sucursal para este usuario' },
+        { error: `El total de pagos (${totalPagos}) no coincide con el total de la venta (${body.total})` },
         { status: 400 }
       );
     }
     
-    // Crear pagos
-    const pagos = [{
-      medioPago: body.metodoPago,
-      monto: body.total,
-      referencia: body.referencia || null,
-      datosPago: body.datosPago || null
-    }];
+const venta = await ventaService.crearVenta({
+    sucursalId,
+    usuarioId: user.id,
+    items: body.items,
+    total: body.total,
+    descuento: body.descuento || 0,
+    codigoDescuento: body.codigoDescuento,
+    facturar: body.facturar || false,
+    clienteNombre: body.clienteNombre,
+    clienteCuit: body.clienteCuit,
+    pagos: body.pagos
+  });
+  
+  // Verificar que venta no sea nulo antes de acceder a sus propiedades
+  if (!venta) {
+    return NextResponse.json(
+      { error: 'Error al crear la venta' },
+      { status: 500 }
+    );
+  }
+  
+  // Ahora podemos acceder a venta.id con seguridad
+  console.log(`Integrando con ARCA para facturación de venta ${venta.id}`);
     
-    // Crear venta
-    const venta = await ventaService.crearVenta({
-      sucursalId,
-      usuarioId: user.id,
-      items: body.items,
-      total: body.total,
-      descuento: body.descuento || 0,
-      codigoDescuento: body.codigoDescuento,
-      facturar: body.facturar || false,
-      clienteNombre: body.clienteNombre,
-      clienteCuit: body.clienteCuit,
-      pagos
-    });
+    // Si se requiere facturación, integrar con ARCA (sistema externo)
+    if (body.facturar && body.clienteCuit) {
+      try {
+        // Código para integración con ARCA
+        // Este es un placeholder para la integración real
+        console.log(`Integrando con ARCA para facturación de venta ${venta.id}`);
+        
+        // Placeholder para respuesta de ARCA
+        const arcaResponse = {
+          success: true,
+          numeroFactura: `A-0001-${Math.floor(Math.random() * 10000).toString().padStart(8, '0')}`,
+          fechaFactura: new Date().toISOString()
+        };
+        
+        // Actualizar la venta con número de factura
+        if (arcaResponse.success) {
+          await prisma.venta.update({
+            where: { id: venta.id },
+            data: {
+              numeroFactura: arcaResponse.numeroFactura
+            }
+          });
+        }
+      } catch (facturacionError) {
+        console.error('Error en facturación con ARCA:', facturacionError);
+        // No fallamos la venta por error de facturación, pero lo registramos
+        await prisma.contingencia.create({
+          data: {
+            titulo: `Error de facturación en venta ${venta.id}`,
+            descripcion: `No se pudo generar la factura: ${facturacionError instanceof Error ? facturacionError.message : 'Error desconocido'}`,
+            origen: 'sucursal',
+            creadoPor: user.id,
+            estado: 'pendiente'
+          }
+        });
+      }
+    }
     
     return NextResponse.json(venta, { status: 201 });
   } catch (error: any) {

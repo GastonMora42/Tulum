@@ -1,11 +1,14 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
   "/api/auth/me/route": "app/api/auth/me/route.js",
-  "/api/admin/insumos/route": "app/api/admin/insumos/route.js",
-  "/api/stock/route": "app/api/stock/route.js",
+  "/api/admin/ubicaciones/route": "app/api/admin/ubicaciones/route.js",
+  "/favicon.ico/route": "app/favicon.ico/route.js",
+  "/api/pdv/cierre/route": "app/api/pdv/cierre/route.js",
+  "/api/pdv/ventas/route": "app/api/pdv/ventas/route.js",
   "/page": "app/page.js",
   "/(auth)/login/page": "app/(auth)/login/page.js",
-  "/(fabrica)/fabrica/page": "app/(fabrica)/fabrica/page.js",
-  "/(fabrica)/fabrica/stock/page": "app/(fabrica)/fabrica/stock/page.js",
-  "/(fabrica)/fabrica/stock/solicitud/page": "app/(fabrica)/fabrica/stock/solicitud/page.js"
+  "/(admin)/admin/page": "app/(admin)/admin/page.js",
+  "/(pdv)/pdv/page": "app/(pdv)/pdv/page.js",
+  "/(pdv)/pdv/ventas/page": "app/(pdv)/pdv/ventas/page.js",
+  "/(pdv)/pdv/cierre/page": "app/(pdv)/pdv/cierre/page.js"
 }

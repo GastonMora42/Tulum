@@ -26,60 +26,75 @@
       "static/chunks/main-app.js",
       "static/chunks/app/api/auth/login/route.js"
     ],
-    "/(fabrica)/layout": [
+    "/(admin)/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(fabrica)/layout.js"
+      "static/chunks/app/(admin)/layout.js"
     ],
-    "/(fabrica)/fabrica/page": [
+    "/(admin)/admin/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(fabrica)/fabrica/page.js"
+      "static/chunks/app/(admin)/admin/page.js"
     ],
     "/api/auth/me/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/api/auth/me/route.js"
     ],
-    "/api/fabrica/produccion/route": [
+    "/api/reportes/stock/bajo/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/fabrica/produccion/route.js"
-    ],
-    "/api/fabrica/envios-pendientes/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/fabrica/envios-pendientes/route.js"
-    ],
-    "/api/fabrica/envios/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/fabrica/envios/route.js"
-    ],
-    "/api/stock/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/stock/route.js"
+      "static/chunks/app/api/reportes/stock/bajo/route.js"
     ],
     "/api/contingencias/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/api/contingencias/route.js"
     ],
-    "/(fabrica)/fabrica/stock/page": [
+    "/api/admin/productos/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(fabrica)/fabrica/stock/page.js"
+      "static/chunks/app/api/admin/productos/route.js"
     ],
-    "/(fabrica)/fabrica/stock/solicitud/page": [
+    "/(pdv)/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(fabrica)/fabrica/stock/solicitud/page.js"
+      "static/chunks/app/(pdv)/layout.js"
     ],
-    "/api/admin/insumos/route": [
+    "/(pdv)/pdv/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/admin/insumos/route.js"
+      "static/chunks/app/(pdv)/pdv/page.js"
+    ],
+    "/(pdv)/pdv/ventas/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(pdv)/pdv/ventas/page.js"
+    ],
+    "/(pdv)/pdv/cierre/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(pdv)/pdv/cierre/page.js"
+    ],
+    "/api/admin/ubicaciones/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/ubicaciones/route.js"
+    ],
+    "/api/pdv/cierre/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/pdv/cierre/route.js"
+    ],
+    "/api/pdv/ventas/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/pdv/ventas/route.js"
+    ],
+    "/_not-found/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/_not-found/page.js"
     ]
   }
 }
