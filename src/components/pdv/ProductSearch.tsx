@@ -1,8 +1,10 @@
-// src/components/pdv/ProductSearch.tsx
+// src/components/pdv/ProductSearch.tsx (mejorado)
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useOffline } from '@/hooks/useOffline';
+import { Search, Loader, Tag, Briefcase, Package } from 'lucide-react';
+import { authenticatedFetch } from '@/hooks/useAuth';
 
 interface Producto {
   id: string;
@@ -11,6 +13,8 @@ interface Producto {
   descripcion?: string;
   codigoBarras?: string;
   imagen?: string;
+  stock?: number;
+  categoria?: { nombre: string };
 }
 
 interface ProductSearchProps {
@@ -22,7 +26,25 @@ export function ProductSearch({ onProductSelect, className = '' }: ProductSearch
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<Producto[]>([]);
+  const [showResults, setShowResults] = useState(false);
+  const [recentlyAdded, setRecentlyAdded] = useState<Set<string>>(new Set());
   const { isOnline, searchProductosCache } = useOffline();
+  const searchRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Cerrar resultados cuando se hace clic fuera
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowResults(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   // Manejar búsqueda cuando el término cambia
   useEffect(() => {
@@ -33,6 +55,7 @@ export function ProductSearch({ onProductSelect, className = '' }: ProductSearch
       }
 
       setIsLoading(true);
+      setShowResults(true);
 
       try {
         // Si estamos offline, buscar en caché
@@ -40,8 +63,9 @@ export function ProductSearch({ onProductSelect, className = '' }: ProductSearch
           const cachedResults = await searchProductosCache(searchTerm);
           setResults(cachedResults);
         } else {
-          // Si estamos online, hacer petición al API
-          const response = await fetch(`/api/productos?search=${encodeURIComponent(searchTerm)}`);
+          // Si estamos online, hacer petición al API usando authenticatedFetch
+          const response = await authenticatedFetch(`/api/pdv/productos-disponibles?search=${encodeURIComponent(searchTerm)}&sucursalId=${localStorage.getItem('sucursalId') || ''}`);
+          
           if (!response.ok) throw new Error('Error al buscar productos');
           const data = await response.json();
           setResults(data.data || []);
@@ -58,54 +82,123 @@ export function ProductSearch({ onProductSelect, className = '' }: ProductSearch
     return () => clearTimeout(handler);
   }, [searchTerm, isOnline, searchProductosCache]);
 
+  // Manejar selección de producto
+  const handleSelect = (product: Producto) => {
+    onProductSelect(product);
+    setSearchTerm('');
+    setResults([]);
+    setShowResults(false);
+    
+    // Guardar producto como recientemente añadido
+    setRecentlyAdded(prev => new Set([...prev, product.id]));
+    
+    // Quitar de recientemente añadidos después de unos segundos
+    setTimeout(() => {
+      setRecentlyAdded(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(product.id);
+        return newSet;
+      });
+    }, 2000);
+  };
+
+  // Manejar escaneo de código de barras
+  const handleBarcodeScan = async (barcode: string) => {
+    try {
+      setIsLoading(true);
+      
+      // Buscar producto por código de barras
+      const response = await authenticatedFetch(`/api/pdv/productos-disponibles?codigoBarras=${barcode}&sucursalId=${localStorage.getItem('sucursalId') || ''}`);
+      
+      if (!response.ok) throw new Error('Error al buscar producto por código de barras');
+      const data = await response.json();
+      
+      if (data.data && data.data.length > 0) {
+        const product = data.data[0];
+        handleSelect(product);
+      } else {
+        // No se encontró producto con ese código
+        console.log('No se encontró producto con el código de barras:', barcode);
+      }
+    } catch (error) {
+      console.error('Error al escanear código de barras:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Enfocar en el input cuando se monta el componente
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, []);
+
   return (
-    <div className={`product-search ${className}`}>
+    <div ref={searchRef} className={`product-search relative ${className}`}>
       <div className="relative">
+        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+          <Search className="h-5 w-5 text-gray-400" />
+        </div>
         <input
+          ref={inputRef}
           type="text"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           placeholder="Buscar productos por nombre, código o descripción..."
-          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#eeb077] focus:border-[#eeb077] text-gray-900"
           aria-label="Buscar productos"
         />
         {isLoading && (
-          <div className="absolute right-3 top-3">
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-600"></div>
+          <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+            <Loader className="h-5 w-5 text-gray-400 animate-spin" />
           </div>
         )}
       </div>
 
-      {results.length > 0 && (
-        <div className="mt-2 bg-white border border-gray-200 rounded-lg shadow-lg max-h-96 overflow-y-auto">
+      {showResults && results.length > 0 && (
+        <div className="absolute mt-2 bg-white border border-gray-200 rounded-xl shadow-lg max-h-96 overflow-y-auto w-full z-10">
           {results.map((product) => (
             <button
               key={product.id}
-              onClick={() => {
-                onProductSelect(product);
-                setSearchTerm('');
-                setResults([]);
-              }}
-              className="w-full text-left p-3 hover:bg-gray-100 border-b border-gray-100 flex items-center"
+              onClick={() => handleSelect(product)}
+              className={`w-full text-left p-4 hover:bg-gray-50 border-b border-gray-100 flex items-center transition-all ${
+                recentlyAdded.has(product.id) ? 'bg-green-50' : ''
+              }`}
             >
-              {product.imagen && (
-                <div className="flex-shrink-0 h-12 w-12 mr-3">
+              <div className="flex-shrink-0 h-12 w-12 mr-4 bg-gray-100 rounded-lg flex items-center justify-center">
+                {product.imagen ? (
                   <img
                     src={product.imagen}
                     alt={product.nombre}
-                    className="h-full w-full object-cover rounded"
+                    className="h-full w-full object-cover rounded-lg"
                   />
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-gray-900 truncate">{product.nombre}</p>
-                <p className="text-sm text-gray-500 truncate">{product.descripcion}</p>
-                {product.codigoBarras && (
-                  <p className="text-xs text-gray-400">Código: {product.codigoBarras}</p>
+                ) : (
+                  <Package className="h-6 w-6 text-gray-500" />
                 )}
               </div>
-              <div className="ml-2">
-                <span className="text-lg font-bold text-indigo-700">${product.precio.toFixed(2)}</span>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-gray-900 truncate">{product.nombre}</p>
+                {product.descripcion && (
+                  <p className="text-sm text-gray-500 truncate">{product.descripcion}</p>
+                )}
+                <div className="flex items-center mt-1">
+                  {product.codigoBarras && (
+                    <span className="text-xs text-gray-400 mr-2">#{product.codigoBarras}</span>
+                  )}
+                  {product.categoria && (
+                    <span className="flex items-center text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
+                      <Tag className="h-3 w-3 mr-1" />
+                      {product.categoria.nombre}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="ml-4 flex flex-col items-end">
+                <span className="text-lg font-bold text-[#311716]">${product.precio.toFixed(2)}</span>
+                <span className="text-xs text-gray-500">
+                  Stock: {product.stock || 0} unid.
+                </span>
               </div>
             </button>
           ))}

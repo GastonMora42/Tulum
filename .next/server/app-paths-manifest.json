@@ -1,15 +1,13 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
-  "/api/auth/me/route": "app/api/auth/me/route.js",
-  "/api/pdv/cierre/route": "app/api/pdv/cierre/route.js",
-  "/api/auth/login/route": "app/api/auth/login/route.js",
-  "/api/reportes/stock/bajo/route": "app/api/reportes/stock/bajo/route.js",
-  "/api/contingencias/route": "app/api/contingencias/route.js",
-  "/api/pdv/cierre/resumen/route": "app/api/pdv/cierre/resumen/route.js",
   "/api/pdv/ventas/route": "app/api/pdv/ventas/route.js",
+  "/api/pdv/cierre/route": "app/api/pdv/cierre/route.js",
+  "/api/admin/categorias/route": "app/api/admin/categorias/route.js",
+  "/api/contingencias/route": "app/api/contingencias/route.js",
+  "/api/pdv/productos-disponibles/route": "app/api/pdv/productos-disponibles/route.js",
+  "/api/reportes/stock/bajo/route": "app/api/reportes/stock/bajo/route.js",
   "/(auth)/login/page": "app/(auth)/login/page.js",
-  "/(pdv)/pdv/dashboard/page": "app/(pdv)/pdv/dashboard/page.js",
-  "/(pdv)/pdv/page": "app/(pdv)/pdv/page.js",
   "/(admin)/admin/page": "app/(admin)/admin/page.js",
-  "/(admin)/admin/productos/page": "app/(admin)/admin/productos/page.js"
+  "/(pdv)/pdv/page": "app/(pdv)/pdv/page.js",
+  "/(pdv)/pdv/dashboard/page": "app/(pdv)/pdv/dashboard/page.js"
 }
