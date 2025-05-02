@@ -150,6 +150,8 @@ export default function AdminLayout({
     { href: '/admin/usuarios', label: 'Usuarios', icon: <Users className="w-5 h-5" /> },
     { href: '/admin/contingencias', label: 'Contingencias', icon: <AlertTriangle className="w-5 h-5" /> },
     { href: '/admin/reportes', label: 'Reportes', icon: <BarChart2 className="w-5 h-5" /> },
+    { href: '/fabrica', label: 'Fabrica', icon: <HomeIcon className="w-5 h-5" /> },
+    { href: '/pdv', label: 'PDV', icon: <HomeIcon className="w-5 h-5" /> }
   ];
   
   // Control de submenús

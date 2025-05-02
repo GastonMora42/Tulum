@@ -16,6 +16,11 @@
       "static/chunks/main-app.js",
       "static/chunks/app/(auth)/login/page.js"
     ],
+    "/api/auth/refresh/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/auth/refresh/route.js"
+    ],
     "/api/auth/login/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
@@ -46,6 +51,36 @@
       "static/chunks/main-app.js",
       "static/chunks/app/api/contingencias/route.js"
     ],
+    "/api/admin/productos/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/admin/productos/route.js"
+    ],
+    "/(fabrica)/layout": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(fabrica)/layout.js"
+    ],
+    "/(fabrica)/fabrica/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(fabrica)/fabrica/page.js"
+    ],
+    "/api/fabrica/produccion/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/fabrica/produccion/route.js"
+    ],
+    "/api/fabrica/envios-pendientes/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/fabrica/envios-pendientes/route.js"
+    ],
+    "/api/fabrica/envios/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/fabrica/envios/route.js"
+    ],
     "/(pdv)/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
@@ -56,50 +91,15 @@
       "static/chunks/main-app.js",
       "static/chunks/app/(pdv)/pdv/page.js"
     ],
-    "/api/admin/productos/route": [
+    "/api/stock/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/api/admin/productos/route.js"
+      "static/chunks/app/api/stock/route.js"
     ],
     "/api/pdv/cierre/route": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/api/pdv/cierre/route.js"
-    ],
-    "/api/admin/categorias/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/admin/categorias/route.js"
-    ],
-    "/api/pdv/productos-disponibles/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/pdv/productos-disponibles/route.js"
-    ],
-    "/api/pdv/ventas/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/pdv/ventas/route.js"
-    ],
-    "/(pdv)/pdv/cierre/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(pdv)/pdv/cierre/page.js"
-    ],
-    "/(pdv)/pdv/ventas/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(pdv)/pdv/ventas/page.js"
-    ],
-    "/(pdv)/pdv/dashboard/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(pdv)/pdv/dashboard/page.js"
-    ],
-    "/api/pdv/cierre/resumen/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/pdv/cierre/resumen/route.js"
     ],
     "/_not-found/page": [
       "static/chunks/webpack.js",

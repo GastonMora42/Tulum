@@ -111,7 +111,7 @@ export default function PDVLayout({
           <div className="flex justify-between h-16">
             <div className="flex">
               <div className="flex-shrink-0 flex items-center">
-                <span className="text-xl font-bold">PDV {sucursalNombre && `- ${sucursalNombre}`}</span>
+                <span className="text-xl font-bold">Punto de Venta {sucursalNombre && `- ${sucursalNombre}`}</span>
               </div>
               <nav className="hidden md:ml-6 md:flex md:space-x-4">
                 <Link 
@@ -343,7 +343,7 @@ export default function PDVLayout({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
             <p className="text-gray-600 text-sm">
-              Sistema de Aromaterapia &copy; {new Date().getFullYear()}
+              Sistema Tulum Punto de Venta &copy; {new Date().getFullYear()}
             </p>
             <div className="flex items-center space-x-2">
               {!isOnline ? (
