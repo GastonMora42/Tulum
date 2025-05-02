@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/server/db/client';
 import { authMiddleware } from '@/server/api/middlewares/auth';
+import { format } from 'date-fns'; // Añadida esta importación
 
 export async function POST(req: NextRequest) {
   // Aplicar middleware de autenticación
@@ -21,7 +22,10 @@ export async function POST(req: NextRequest) {
     
     // Obtener usuario
     const user = (req as any).user;
-    const sucursalId = localStorage.getItem('sucursalId');
+    
+    // No podemos usar localStorage del lado del servidor
+    // Necesitamos obtener sucursalId del cuerpo de la solicitud o de las cookies
+    const sucursalId = body.sucursalId;
     
     if (!sucursalId) {
       return NextResponse.json(
@@ -32,7 +36,7 @@ export async function POST(req: NextRequest) {
     
     // Verificar si hay diferencias
     let hayDiferencias = false;
-    const diferenciasPorProducto = [];
+    const diferenciasPorProducto: { productoId: any; stockTeorico: any; stockFisico: any; diferencia: number; }[] = [];
     
     for (const producto of productos) {
       const { productoId, stockTeorico, stockFisico } = producto;
@@ -51,15 +55,14 @@ export async function POST(req: NextRequest) {
     
     // Proceso en transacción
     const resultado = await prisma.$transaction(async (tx) => {
-      // 1. Actualizar conciliación
-      const conciliacion = await tx.conciliacion.update({
-        where: { id },
-        data: {
-          estado: hayDiferencias ? 'con_contingencia' : 'completada',
-          detalles: productos,
-          observaciones
-        }
-      });
+      // 1. Actualizar conciliación usando SQL directo en vez del modelo
+      await tx.$executeRaw`
+        UPDATE "Conciliacion"
+        SET "estado" = ${hayDiferencias ? 'con_contingencia' : 'completada'},
+            "detalles" = ${JSON.stringify(productos)},
+            "observaciones" = ${observaciones || ''}
+        WHERE "id" = ${id}
+      `;
       
       // 2. Si hay diferencias, crear contingencia
       if (hayDiferencias) {
@@ -68,9 +71,11 @@ export async function POST(req: NextRequest) {
           `- ${diff.productoId}: Teórico=${diff.stockTeorico}, Físico=${diff.stockFisico}, Diferencia=${diff.diferencia}`
         ).join('\n');
         
+        const fechaFormateada = format(new Date(), 'dd/MM/yyyy');
+        
         await tx.contingencia.create({
           data: {
-            titulo: `Diferencias en conciliación de inventario ${format(new Date(id), 'dd/MM/yyyy')}`,
+            titulo: `Diferencias en conciliación de inventario ${fechaFormateada}`,
             descripcion: `Se encontraron diferencias en la conciliación de inventario:\n\n${detallesTexto}\n\nObservaciones: ${observaciones || 'Ninguna'}`,
             origen: 'sucursal',
             creadoPor: user.id,
@@ -107,7 +112,7 @@ export async function POST(req: NextRequest) {
               stockId: stock.id,
               tipoMovimiento: 'ajuste',
               cantidad: Math.abs(stockFisico - stock.cantidad),
-              motivo: `Ajuste por conciliación de inventario ${format(new Date(id), 'dd/MM/yyyy')}`,
+              motivo: `Ajuste por conciliación de inventario ${format(new Date(), 'dd/MM/yyyy')}`,
               usuarioId: user.id,
               fecha: new Date()
             }
@@ -115,7 +120,13 @@ export async function POST(req: NextRequest) {
         }
       }
       
-      return { conciliacion, hayDiferencias };
+      return { 
+        success: true,
+        hayDiferencias,
+        mensaje: hayDiferencias 
+          ? 'Conciliación guardada con diferencias detectadas' 
+          : 'Conciliación completada sin diferencias'
+      };
     });
     
     return NextResponse.json(resultado);

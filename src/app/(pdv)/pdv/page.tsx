@@ -13,14 +13,11 @@ import {
   AlertCircle, 
   CheckCircle, 
   X, 
-  ShoppingCart, 
   Tag, 
   Search,
-  CreditCard,
-  DollarSign,
-  QrCode,
   Package,
-  Layers
+  Layers,
+  Grid
 } from 'lucide-react';
 import { Producto } from '@/types/models/producto';
 
@@ -33,9 +30,21 @@ export default function PDVPage() {
   const [categoriasProductos, setCategoriasProductos] = useState<any[]>([]);
   const [productosPopulares, setProductosPopulares] = useState<Producto[]>([]);
   const [activeCategory, setActiveCategory] = useState<string>('todos');
+  const [isMobileView, setIsMobileView] = useState(false);
   
-  const { addItem } = useCartStore();
+  const { addItem, items } = useCartStore();
   const { isOnline } = useOffline();
+  
+  // Check if mobile view
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobileView(window.innerWidth < 768);
+    };
+    
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
   
   // Verificar si hay caja abierta
   useEffect(() => {
@@ -251,12 +260,6 @@ export default function PDVPage() {
         )}
         
         <div className="text-center bg-white p-8 rounded-xl shadow-lg max-w-md w-full">
-          <div className="bg-[#eeb077]/20 p-4 rounded-full inline-flex mb-6">
-            <DollarSign size={32} className="text-[#311716]" />
-          </div>
-          <h2 className="text-2xl font-bold text-[#311716] mb-4">No hay una caja abierta</h2>
-          <p className="text-gray-600 mb-8">Debe abrir una caja antes de realizar ventas</p>
-          
           <button
             onClick={handleAbrirCaja}
             className="w-full py-3 px-6 bg-[#311716] text-white rounded-lg hover:bg-[#462625] transition-colors"
@@ -293,8 +296,8 @@ export default function PDVPage() {
         </div>
       )}
       
-      {/* Área de productos */}
-      <div className="lg:col-span-2 bg-white rounded-xl shadow-sm overflow-hidden flex flex-col">
+      {/* Área de productos - Responsive */}
+      <div className={`${isMobileView ? 'col-span-1' : 'lg:col-span-2'} ${isMobileView && items.length > 0 ? 'hidden' : 'block'} bg-white rounded-xl shadow-sm overflow-hidden flex flex-col`}>
         <div className="p-4 border-b border-gray-100 bg-gray-50">
           <h2 className="text-xl font-bold text-[#311716] mb-3">Productos</h2>
           <ProductSearch onProductSelect={handleProductSelect} className="mt-3" />
@@ -374,32 +377,27 @@ export default function PDVPage() {
               )}
             </div>
           </div>
-          
-          {/* Formas de pago - Información visual */}
-          <div className="mt-8 pt-6 border-t border-gray-100">
-            <h3 className="text-sm font-medium text-gray-500 mb-3">Métodos de pago aceptados</h3>
-            <div className="flex flex-wrap gap-3">
-              <div className="flex items-center bg-gray-50 px-3 py-2 rounded-lg text-gray-600">
-                <DollarSign size={16} className="mr-1 text-[#9c7561]" />
-                <span className="text-sm">Efectivo</span>
-              </div>
-              <div className="flex items-center bg-gray-50 px-3 py-2 rounded-lg text-gray-600">
-                <CreditCard size={16} className="mr-1 text-[#9c7561]" />
-                <span className="text-sm">Tarjeta</span>
-              </div>
-              <div className="flex items-center bg-gray-50 px-3 py-2 rounded-lg text-gray-600">
-                <QrCode size={16} className="mr-1 text-[#9c7561]" />
-                <span className="text-sm">QR</span>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
       
-      {/* Carrito */}
-      <div className="h-full">
+      {/* Carrito - Responsive */}
+      <div className={`${isMobileView && items.length === 0 ? 'hidden' : 'block'} h-full`}>
         <CartDisplay onCheckout={handleCheckout} className="h-full bg-white rounded-xl shadow-sm" />
       </div>
+
+      {/* Mobile Toggle View Button */}
+      {isMobileView && (
+        <button
+          onClick={() => {}}
+          className="fixed bottom-4 right-4 z-40 bg-[#311716] text-white p-3 rounded-full shadow-lg"
+        >
+          {items.length === 0 ? (
+            <Grid size={24} />
+          ) : (
+            <Layers size={24} />
+          )}
+        </button>
+      )}
       
       {/* Modal de checkout */}
       <CheckoutModal

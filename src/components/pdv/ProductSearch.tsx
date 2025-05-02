@@ -125,29 +125,30 @@ export function ProductSearch({ onProductSelect, className = '' }: ProductSearch
   }, []);
 
   return (
-    <div ref={searchRef} className={`product-search relative ${className}`}>
-      <div className="relative">
-        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-          <Search className="h-5 w-5 text-gray-400" />
-        </div>
-        <input
-          ref={inputRef}
-          type="text"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Buscar productos por nombre, código o descripción..."
-          className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#eeb077] focus:border-[#eeb077] text-gray-900"
-          aria-label="Buscar productos"
-        />
-        {isLoading && (
-          <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-            <Loader className="h-5 w-5 text-gray-400 animate-spin" />
-          </div>
-        )}
+<div ref={searchRef} className="product-search relative w-full">
+  <div className="relative">
+    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+      <Search className="h-5 w-5 text-gray-400" />
+    </div>
+    <input
+      ref={inputRef}
+      type="text"
+      value={searchTerm}
+      onChange={(e) => setSearchTerm(e.target.value)}
+      placeholder="Buscar productos..."
+      className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#eeb077] focus:border-[#eeb077] text-gray-900 text-base"
+      aria-label="Buscar productos"
+    />
+    {isLoading && (
+      <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+        <Loader className="h-5 w-5 text-gray-400 animate-spin" />
       </div>
+    )}
+  </div>
 
-      {showResults && results.length > 0 && (
-        <div className="absolute mt-2 bg-white border border-gray-200 rounded-xl shadow-lg max-h-96 overflow-y-auto w-full z-10">
+  {/* Make results take full width on mobile */}
+  {showResults && results.length > 0 && (
+    <div className="absolute mt-2 bg-white border border-gray-200 rounded-xl shadow-lg max-h-96 overflow-y-auto w-full z-10">
           {results.map((product) => (
             <button
               key={product.id}

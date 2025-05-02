@@ -40,6 +40,19 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
     { id: 'transferencia', name: 'Transferencia', icon: <Smartphone size={24} className="text-orange-600" /> }
   ];
   
+  useEffect(() => {
+    // Lock body scroll when modal is open
+    if (isOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isOpen]);
+  
   // Actualizar monto cuando cambia el carrito
   useEffect(() => {
     const total = getTotal();
@@ -358,21 +371,28 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                 </div>
               )}
               
-              <div className="flex justify-between gap-3 mt-6">
-                <button
-                  onClick={goToPreviousStep}
-                  className="py-2 px-4 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100"
-                >
-                  Atrás
-                </button>
-                
-                <button
-                  onClick={goToNextStep}
-                  className="py-2 px-4 bg-[#311716] text-white rounded-lg hover:bg-[#462625]"
-                >
-                  Revisar y Confirmar
-                </button>
-              </div>
+              <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
+  <div className="bg-white rounded-xl shadow-xl w-full max-w-lg transform transition-all">
+    {/* Modal content... */}
+    
+    {/* Make buttons full width on mobile */}
+    <div className="flex flex-col sm:flex-row gap-3 mt-6">
+      <button
+        onClick={goToPreviousStep}
+        className="py-2 px-4 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 w-full sm:w-auto"
+      >
+        Atrás
+      </button>
+      
+      <button
+        onClick={goToNextStep}
+        className="py-2 px-4 bg-[#311716] text-white rounded-lg hover:bg-[#462625] w-full sm:w-auto"
+      >
+        Continuar
+      </button>
+    </div>
+  </div>
+</div>
             </>
           )}
           

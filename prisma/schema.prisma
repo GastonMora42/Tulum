@@ -26,6 +26,8 @@ model User {
   envios       Envio[]
   contingencias Contingencia[]
   movimientosStock MovimientoStock[]
+    // Añadir esta nueva relación
+  conciliaciones Conciliacion[]
 }
 
 model Role {
@@ -194,6 +196,9 @@ model Ubicacion {
   enviosDestino Envio[] @relation("envioDestino")
   usuarios  User[]
   ventas    Venta[]
+
+  // Añadir esta nueva relación
+  conciliaciones Conciliacion[]
 }
 
 // Distribución
@@ -334,4 +339,16 @@ model CodigoDescuento {
   usoMaximo     Int?
   usosActuales  Int       @default(0)
   activo        Boolean   @default(true)
+}
+
+model Conciliacion {
+  id            String    @id @default(uuid())
+  sucursalId    String
+  sucursal      Ubicacion @relation(fields: [sucursalId], references: [id])
+  fecha         DateTime  @default(now())
+  estado        String    // pendiente, completada, con_contingencia
+  usuarioId     String
+  usuario       User      @relation(fields: [usuarioId], references: [id])
+  detalles      Json?     // Array de productos y cantidades
+  observaciones String?
 }

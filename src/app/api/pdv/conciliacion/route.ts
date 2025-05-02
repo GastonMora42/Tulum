@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/server/db/client';
 import { authMiddleware } from '@/server/api/middlewares/auth';
+import { format } from 'date-fns';
 
 export async function GET(req: NextRequest) {
   // Aplicar middleware de autenticación
@@ -19,24 +20,25 @@ export async function GET(req: NextRequest) {
       );
     }
     
-    // Buscar conciliación activa
-    // Verificar si hay una conciliación en proceso
-    const conciliacionActiva = await prisma.conciliacion.findFirst({
-      where: {
-        sucursalId,
-        estado: { not: 'completada' }
-      },
-      orderBy: {
-        fecha: 'desc'
-      }
-    });
+    // Use findFirst with custom table query since conciliacion might not be in the schema yet
+    const conciliacionActiva = await prisma.$queryRaw`
+      SELECT * FROM "Conciliacion" 
+      WHERE "sucursalId" = ${sucursalId} 
+      AND "estado" != 'completada' 
+      ORDER BY "fecha" DESC 
+      LIMIT 1
+    `;
     
-    if (!conciliacionActiva) {
+    // If no reconciliation in process
+    if (!conciliacionActiva || (Array.isArray(conciliacionActiva) && conciliacionActiva.length === 0)) {
       return NextResponse.json(
         { message: 'No hay conciliación activa' },
         { status: 404 }
       );
     }
+    
+    // Get the active reconciliation (first item if array)
+    const conciliacion = Array.isArray(conciliacionActiva) ? conciliacionActiva[0] : conciliacionActiva;
     
     // Obtener datos de productos
     const productos = await prisma.stock.findMany({
@@ -49,18 +51,54 @@ export async function GET(req: NextRequest) {
       }
     });
     
+    // Explicitly declare diferenciasPorProducto as an array type
+    const diferenciasPorProducto: Array<{
+      id: string;
+      nombre: string;
+      stockTeorico: number;
+      stockFisico: number | null;
+      diferencia: number;
+    }> = [];
+    
     // Formatear datos para la respuesta
     const formattedData = {
-      fecha: conciliacionActiva.fecha,
-      estado: conciliacionActiva.estado,
-      usuario: conciliacionActiva.usuarioId,
-      productos: productos.map(stock => ({
-        id: stock.productoId,
-        nombre: stock.producto?.nombre || 'Producto desconocido',
-        stockTeorico: stock.cantidad,
-        stockFisico: conciliacionActiva.detalles?.find((d: any) => d.productoId === stock.productoId)?.stockFisico || null,
-        diferencia: 0 // Se calculará en el frontend
-      }))
+      fecha: conciliacion.fecha,
+      estado: conciliacion.estado,
+      usuario: conciliacion.usuarioId,
+      productos: productos.map(stock => {
+        // Make sure stock.producto exists
+        if (!stock.producto) {
+          return {
+            id: stock.productoId || 'unknown',
+            nombre: 'Producto desconocido',
+            stockTeorico: stock.cantidad,
+            stockFisico: null,
+            diferencia: 0
+          };
+        }
+        
+        // Find stockFisico in detalles if it exists
+        let stockFisico = null;
+        if (conciliacion.detalles) {
+          // Ensure detalles is properly parsed
+          const detalles = typeof conciliacion.detalles === 'string' 
+            ? JSON.parse(conciliacion.detalles) 
+            : conciliacion.detalles;
+            
+          const item = detalles.find((d: any) => d.productoId === stock.productoId);
+          if (item) {
+            stockFisico = item.stockFisico;
+          }
+        }
+        
+        return {
+          id: stock.productoId || 'unknown',
+          nombre: stock.producto.nombre || 'Producto desconocido',
+          stockTeorico: stock.cantidad,
+          stockFisico: stockFisico,
+          diferencia: stockFisico !== null ? stockFisico - stock.cantidad : 0
+        };
+      })
     };
     
     return NextResponse.json(formattedData);
@@ -92,30 +130,38 @@ export async function POST(req: NextRequest) {
     // Obtener usuario
     const user = (req as any).user;
     
-    // Verificar si ya existe una conciliación en proceso
-    const conciliacionExistente = await prisma.conciliacion.findFirst({
-      where: {
-        sucursalId,
-        estado: { not: 'completada' }
-      }
-    });
+    // Check if a conciliation is already in progress using raw query
+    const conciliacionExistente = await prisma.$queryRaw`
+      SELECT * FROM "Conciliacion" 
+      WHERE "sucursalId" = ${sucursalId} 
+      AND "estado" != 'completada' 
+      LIMIT 1
+    `;
     
-    if (conciliacionExistente) {
+    if (conciliacionExistente && (
+      !Array.isArray(conciliacionExistente) || conciliacionExistente.length > 0
+    )) {
       // Ya existe, retornar la existente
-      return NextResponse.json(conciliacionExistente);
+      const conciliacion = Array.isArray(conciliacionExistente) 
+        ? conciliacionExistente[0] 
+        : conciliacionExistente;
+        
+      return NextResponse.json(conciliacion);
     }
     
-    // Crear nueva conciliación
-    const nuevaConciliacion = await prisma.conciliacion.create({
-      data: {
-        sucursalId,
-        fecha: new Date(),
-        estado: 'pendiente',
-        usuarioId: user.id
-      }
-    });
+    // Create new conciliation using raw query if the table exists
+    const currentDate = new Date();
+    const formattedDate = format(currentDate, 'yyyy-MM-dd');
     
-    // Obtener datos de productos para la conciliación
+    // Create a unique ID based on date
+    const id = `conciliacion-${formattedDate}-${sucursalId}`;
+    
+    await prisma.$executeRaw`
+      INSERT INTO "Conciliacion" ("id", "sucursalId", "fecha", "estado", "usuarioId", "detalles")
+      VALUES (${id}, ${sucursalId}, ${currentDate}, 'pendiente', ${user.id}, '[]')
+    `;
+    
+    // Get products for the conciliation
     const productos = await prisma.stock.findMany({
       where: {
         ubicacionId: sucursalId,
@@ -126,17 +172,27 @@ export async function POST(req: NextRequest) {
       }
     });
     
-    // Formatear datos para la respuesta
+    // Prepare empty diferenciasPorProducto array with correct type
+    const diferenciasPorProducto: Array<{
+      id: string;
+      nombre: string;
+      stockTeorico: number;
+      stockFisico: number | null;
+      diferencia: number;
+    }> = [];
+    
+    // Format response data
     const formattedData = {
-      fecha: nuevaConciliacion.fecha,
-      estado: nuevaConciliacion.estado,
-      usuario: nuevaConciliacion.usuarioId,
+      id,
+      fecha: currentDate,
+      estado: 'pendiente',
+      usuario: user.id,
       productos: productos.map(stock => ({
-        id: stock.productoId,
+        id: stock.productoId || 'unknown',
         nombre: stock.producto?.nombre || 'Producto desconocido',
         stockTeorico: stock.cantidad,
         stockFisico: null,
-        diferencia: 0 // Se calculará en el frontend
+        diferencia: 0
       }))
     };
     
