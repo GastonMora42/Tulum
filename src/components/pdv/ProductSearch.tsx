@@ -5,22 +5,12 @@ import { useState, useEffect, useRef } from 'react';
 import { useOffline } from '@/hooks/useOffline';
 import { Search, Loader, Tag, Briefcase, Package } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
-
-interface Producto {
-  id: string;
-  nombre: string;
-  precio: number;
-  descripcion?: string;
-  codigoBarras?: string;
-  imagen?: string;
-  stock?: number;
-  categoria?: { nombre: string };
-}
+import { Producto } from '@/types/models/producto';
 
 interface ProductSearchProps {
-  onProductSelect: (product: Producto) => void;
-  className?: string;
-}
+    onProductSelect: (product: Producto) => void;
+    className?: string;
+  }
 
 export function ProductSearch({ onProductSelect, className = '' }: ProductSearchProps) {
   const [searchTerm, setSearchTerm] = useState('');

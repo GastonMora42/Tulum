@@ -22,16 +22,7 @@ import {
   Package,
   Layers
 } from 'lucide-react';
-
-interface Producto {
-  categoriaId: string;
-  id: string;
-  nombre: string;
-  precio: number;
-  descripcion?: string;
-  codigoBarras?: string;
-  imagen?: string;
-}
+import { Producto } from '@/types/models/producto';
 
 export default function PDVPage() {
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
@@ -171,7 +162,7 @@ export default function PDVPage() {
   // Manejar selección de producto
   const handleProductSelect = (producto: Producto) => {
     addItem(producto);
-    
+
     setNotification({
       type: 'success',
       message: `"${producto.nombre}" agregado al carrito`

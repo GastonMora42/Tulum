@@ -291,7 +291,6 @@ model CierreCaja {
   observaciones String?
 }
 
-// Contingencias
 model Contingencia {
   id              String    @id @default(uuid())
   titulo          String
@@ -306,6 +305,9 @@ model Contingencia {
   envioId         String?
   envio           Envio?    @relation(fields: [envioId], references: [id])
   
+  // Agregar campo tipo para mejor categorización
+  tipo            String?   // producto, stock, caja, sistema, otro
+  
   // Datos generales
   fechaCreacion   DateTime  @default(now())
   creadoPor       String
@@ -315,6 +317,9 @@ model Contingencia {
   fechaRespuesta  DateTime?
   resueltoPor     String?
   ajusteRealizado Boolean   @default(false)
+  
+  // Campo para marcar urgencia
+  urgente         Boolean   @default(false)
 }
 
 // Codigos de descuento

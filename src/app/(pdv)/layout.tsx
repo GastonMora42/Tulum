@@ -8,7 +8,10 @@ import Link from 'next/link';
 import { useOffline } from '@/hooks/useOffline';
 import { OfflineStatus } from '@/components/ui/OfflineStatus';
 import { 
-  ShoppingCart, Tag, Home, Clock, Settings, LogOut, Menu, X
+  ShoppingCart, Tag, Home, Clock, Settings, LogOut, Menu, X,
+  Package,
+  AlertTriangle,
+  Archive
 } from 'lucide-react';
 
 export default function PDVLayout({
@@ -270,6 +273,41 @@ export default function PDVLayout({
                   Dashboard
                 </span>
               </Link>
+              <Link 
+    href="/pdv/recepcion" 
+    className={`${
+      pathname.startsWith('/pdv/recepcion') ? 'bg-[#462625] text-white' : 'text-gray-200 hover:bg-[#462625] hover:text-white'
+    } px-3 py-2 rounded-md text-sm font-medium transition-colors duration-150`}
+  >
+    <span className="flex items-center">
+      <Package className="mr-2 h-4 w-4" />
+      Recepción
+    </span>
+  </Link>
+  
+  <Link 
+    href="/pdv/contingencias" 
+    className={`${
+      pathname.startsWith('/pdv/contingencias') ? 'bg-[#462625] text-white' : 'text-gray-200 hover:bg-[#462625] hover:text-white'
+    } px-3 py-2 rounded-md text-sm font-medium transition-colors duration-150`}
+  >
+    <span className="flex items-center">
+      <AlertTriangle className="mr-2 h-4 w-4" />
+      Contingencias
+    </span>
+  </Link>
+  
+  <Link 
+    href="/pdv/conciliacion" 
+    className={`${
+      pathname.startsWith('/pdv/conciliacion') ? 'bg-[#462625] text-white' : 'text-gray-200 hover:bg-[#462625] hover:text-white'
+    } px-3 py-2 rounded-md text-sm font-medium transition-colors duration-150`}
+  >
+    <span className="flex items-center">
+      <Archive className="mr-2 h-4 w-4" />
+      Inventario
+    </span>
+  </Link>
               <div className="border-t border-[#462625] pt-2 pb-1">
                 <div className="flex items-center justify-between px-3">
                   <span className="text-sm font-medium text-gray-200">{user?.name}</span>

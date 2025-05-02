@@ -88,6 +88,8 @@ class VentaService {
           clienteCuit: facturar ? clienteCuit : null,
         }
       });
+
+      
       
       // Crear items de venta
       for (const item of items) {
