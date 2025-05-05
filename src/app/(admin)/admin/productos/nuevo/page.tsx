@@ -10,10 +10,28 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
 import { ContrastEnhancer } from '@/components/ui/ContrastEnhancer';
 import { HCInput, HCLabel } from '@/components/ui/HighContrastComponents';
+import { ImageUploader } from '@/components/ui/ImageUploader';
+import { BarcodeGenerator } from '@/components/productos/BardcodeGenerator';
 
 interface Categoria {
   id: string;
   nombre: string;
+}
+
+interface Producto {
+  id: string;
+  nombre: string;
+  descripcion: string | null;
+  precio: number;
+  codigoBarras: string | null;
+  imagen: string | null;
+  categoriaId: string;
+  stockMinimo: number;
+  activo: boolean;
+  categoria: {
+    id: string;
+    nombre: string;
+  };
 }
 
 // Esquema de validación
@@ -30,6 +48,7 @@ const productoSchema = z.object({
 type ProductoFormData = z.infer<typeof productoSchema>;
 
 export default function NuevoProductoPage() {
+  const [producto, setProducto] = useState<Producto | null>(null);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingCategorias, setIsFetchingCategorias] = useState(true);
@@ -37,6 +56,8 @@ export default function NuevoProductoPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const router = useRouter();
+  const [previewUrl, setPreviewUrl] = useState<string | null>(producto?.imagen || null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
 
   const { 
     register, 
@@ -289,58 +310,27 @@ export default function NuevoProductoPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Imagen del Producto
-              </label>
-              <div className="flex items-center space-x-6">
-                <div className="flex-shrink-0">
-                  {imagePreview ? (
-                    <div className="relative h-24 w-24 rounded-md overflow-hidden">
-                      <img
-                        src={imagePreview}
-                        alt="Vista previa"
-                        className="h-full w-full object-cover"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setImagePreview(null);
-                          setImageFile(null);
-                        }}
-                        className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1 shadow-lg"
-                      >
-                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="h-24 w-24 rounded-md border-2 border-dashed border-gray-300 flex items-center justify-center">
-                      <Package className="h-10 w-10 text-gray-400" />
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1">
-                  <label
-                    htmlFor="imagen"
-                    className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 cursor-pointer"
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
-                    Subir imagen
-                    <input
-                      id="imagen"
-                      type="file"
-                      accept="image/*"
-                      className="sr-only"
-                      onChange={handleImageChange}
-                    />
-                  </label>
-                  <p className="mt-1 text-xs text-gray-500">
-                    PNG, JPG, GIF hasta 5MB
-                  </p>
-                </div>
-              </div>
-            </div>
+  <HCLabel className="block text-sm font-medium mb-1">
+    Imagen del Producto
+  </HCLabel>
+  <ImageUploader
+  type="product"
+  initialImage={producto?.imagen || null}
+  onImageUpload={(imageUrl) => {
+    setImageUrl(imageUrl);
+  }}
+/>
+</div>
+
+{producto?.codigoBarras && (
+  <div className="mt-4 pt-4 border-t">
+    <h3 className="text-lg font-medium">Código de Barras</h3>
+    <BarcodeGenerator 
+      value={producto.codigoBarras} 
+      productName={producto.nombre} 
+    />
+  </div>
+)}
 
             <div className="flex items-center">
               <input

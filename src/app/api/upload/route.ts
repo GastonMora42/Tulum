@@ -7,6 +7,16 @@ import { s3Service } from '@/server/services/storage/s3Service';
 import sharp from 'sharp';
 
 export async function POST(req: NextRequest) {
+
+  // Al inicio de la función POST
+console.log("[API] Iniciando upload de imagen");
+
+// Después de procesar la imagen
+console.log("[API] Imagen procesada correctamente");
+
+// Antes de llamar a S3
+console.log("[API] Intentando generar URL firmada de S3");
+
   // Verificar autenticación
   const authError = await authMiddleware(req);
   if (authError) return authError;

@@ -13,13 +13,6 @@ import { HCInput, HCLabel, HCSelect, HCTextarea } from '@/components/ui/HighCont
 import { ImageUploader } from '@/components/ui/ImageUploader';
 import { BarcodeGenerator } from '@/components/productos/BardcodeGenerator';
 
-interface ImageUploaderProps {
-  onImageUpload: (imageUrl: string) => void;
-  type: 'product' | 'contingency';
-  initialImage?: string | null; // Permite null explícitamente
-  className?: string;
-}
-
 interface Categoria {
   id: string;
   nombre: string;
@@ -407,60 +400,6 @@ const {
                 {errors.stockMinimo && (
                   <p className="mt-1 text-sm text-red-600">{errors.stockMinimo.message}</p>
                 )}
-              </div>
-            </div>
-
-            <div>
-              <HCLabel className="block text-sm font-medium mb-1">
-                Imagen del Producto
-              </HCLabel>
-              <div className="flex items-center space-x-6">
-                <div className="flex-shrink-0">
-                  {imagePreview ? (
-                    <div className="relative h-24 w-24 rounded-md overflow-hidden">
-                      <img
-                        src={imagePreview}
-                        alt="Vista previa"
-                        className="h-full w-full object-cover"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setImagePreview(null);
-                          setImageFile(null);
-                        }}
-                        className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1 shadow-lg"
-                      >
-                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="h-24 w-24 rounded-md border-2 border-dashed border-gray-300 flex items-center justify-center">
-                      <Package className="h-10 w-10 text-gray-400" />
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1">
-                  <label
-                    htmlFor="imagen"
-                    className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-black bg-white hover:bg-gray-50 cursor-pointer"
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
-                    {imagePreview ? 'Cambiar imagen' : 'Subir imagen'}
-                    <input
-                      id="imagen"
-                      type="file"
-                      accept="image/*"
-                      className="sr-only"
-                      onChange={handleImageChange}
-                    />
-                  </label>
-                  <p className="mt-1 text-xs text-black">
-                    PNG, JPG, GIF hasta 5MB
-                  </p>
-                </div>
               </div>
             </div>
 
