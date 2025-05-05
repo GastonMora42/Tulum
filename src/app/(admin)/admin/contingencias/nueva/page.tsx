@@ -7,6 +7,8 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { authenticatedFetch } from '@/hooks/useAuth';
+import { ImageUploader } from '@/components/ui/ImageUploader';
+import { HCLabel } from '@/components/ui/HighContrastComponents';
 
 // Esquema de validación
 const contingenciaSchema = z.object({
@@ -121,6 +123,21 @@ export default function NuevaContingenciaPage() {
               <p className="mt-1 text-sm text-red-600">{errors.descripcion.message}</p>
             )}
           </div>
+
+          <div className="space-y-2">
+  <HCLabel htmlFor="imagen" className="block text-sm font-medium">
+    Imagen (opcional)
+  </HCLabel>
+  <ImageUploader
+    type="contingency"
+    onImageUpload={(imageUrl) => {
+      setImageUrl(imageUrl);
+    }}
+  />
+  <p className="text-xs text-gray-500">
+    Las imágenes de contingencias se eliminarán automáticamente después de 30 días.
+  </p>
+</div>
           
           <div>
             <label htmlFor="origen" className="block text-sm font-medium text-gray-700">

@@ -10,6 +10,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import Link from 'next/link';
 import { ContrastEnhancer } from '@/components/ui/ContrastEnhancer';
 import { HCInput, HCLabel, HCSelect, HCTextarea } from '@/components/ui/HighContrastComponents';
+import { ImageUploader } from '@/components/ui/ImageUploader';
+import { BarcodeGenerator } from '@/components/productos/BardcodeGenerator';
 
 interface Categoria {
   id: string;
@@ -357,16 +359,27 @@ const {
               </div>
 
               <div>
-                <HCLabel htmlFor="codigoBarras" className="block text-sm font-medium mb-1">
-                  Código de Barras
-                </HCLabel>
-                <HCInput
-                  id="codigoBarras"
-                  type="text"
-                  {...register('codigoBarras')}
-                  className="block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                />
-              </div>
+  <HCLabel className="block text-sm font-medium mb-1">
+    Imagen del Producto
+  </HCLabel>
+  <ImageUploader
+    type="product"
+    initialImage={producto?.imagen}
+    onImageUpload={(imageUrl) => {
+      setImageUrl(imageUrl);
+    }}
+  />
+</div>
+
+{producto.codigoBarras && (
+  <div className="mt-4 pt-4 border-t">
+    <h3 className="text-lg font-medium">Código de Barras</h3>
+    <BarcodeGenerator 
+      value={producto.codigoBarras} 
+      productName={producto.nombre} 
+    />
+  </div>
+)}
 
               <div>
                 <HCLabel htmlFor="stockMinimo" className="block text-sm font-medium mb-1">

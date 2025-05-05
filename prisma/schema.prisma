@@ -325,6 +325,9 @@ model Contingencia {
   
   // Campo para marcar urgencia
   urgente         Boolean   @default(false)
+
+  imagenUrl       String?
+  imagenExpiraEn  DateTime?
 }
 
 // Codigos de descuento

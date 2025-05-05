@@ -4,6 +4,7 @@ import prisma from '@/server/db/client';
 import { authMiddleware } from '@/server/api/middlewares/auth';
 import { checkPermission } from '@/server/api/middlewares/authorization';
 import { z } from 'zod';
+import { barcodeService } from '@/server/services/producto/barcodeService';
 
 // Esquema de validación para crear producto
 const productoSchema = z.object({
@@ -106,10 +107,19 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    // Verificar si ya existe un producto con el mismo código de barras
-    if (validation.data.codigoBarras) {
-      const existingProducto = await prisma.producto.findUnique({
-        where: { codigoBarras: validation.data.codigoBarras }
+    // Generar ID temporal para el código de barras
+    const tempId = uuidv4();
+    
+    // Generar código de barras si no se proporcionó uno
+    let codigoBarras = validation.data.codigoBarras;
+    if (!codigoBarras) {
+      codigoBarras = await barcodeService.generateBarcode(tempId);
+    }
+    
+    // Verificar si ya existe un producto con ese código
+    if (codigoBarras) {
+      const existingProducto = await prisma.producto.findFirst({
+        where: { codigoBarras }
       });
       
       if (existingProducto) {
@@ -120,13 +130,12 @@ export async function POST(req: NextRequest) {
       }
     }
     
-    // Obtener usuario de la request
-    const user = (req as any).user;
-    console.log(`Usuario ${user.name} está creando un producto:`, validation.data.nombre);
-    
-    // Crear producto
+    // Crear producto con el código generado
     const producto = await prisma.producto.create({
-      data: validation.data,
+      data: {
+        ...validation.data,
+        codigoBarras
+      },
       include: {
         categoria: true
       }
