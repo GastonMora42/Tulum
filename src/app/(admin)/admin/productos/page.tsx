@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Package, Plus, Search, Filter, RefreshCw, AlertCircle } from 'lucide-react';
+import { Package, Plus, Search, Filter, RefreshCw, AlertCircle, Printer } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
 import { ContrastEnhancer } from '@/components/ui/ContrastEnhancer';
 import { HCTable, HCTh, HCTd } from '@/components/ui/HighContrastComponents';
@@ -144,17 +144,25 @@ export default function ProductosPage() {
   return (
     <ContrastEnhancer>
       <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-black">Gestión de Productos</h1>
-          <Link 
-            href="/admin/productos/nuevo" 
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Nuevo Producto
-          </Link>
-        </div>
-
+      <div className="flex justify-between items-center">
+  <h1 className="text-2xl font-bold text-black">Gestión de Productos</h1>
+  <div className="flex gap-3">
+    <Link 
+      href="/admin/productos/imprimir-codigos" 
+      className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+    >
+      <Printer className="h-4 w-4 mr-2" />
+      Imprimir Códigos
+    </Link>
+    <Link 
+      href="/admin/productos/nuevo" 
+      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700"
+    >
+      <Plus className="h-4 w-4 mr-2" />
+      Nuevo Producto
+    </Link>
+  </div>
+</div>
         {/* Filtros */}
         <div className="bg-white p-4 rounded-lg shadow">
         <form onSubmit={handleSearch} className="space-y-4">

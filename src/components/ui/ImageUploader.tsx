@@ -1,13 +1,14 @@
-// src/components/ui/ImageUploader.tsx
+// src/components/ui/ImageUploader.tsx - Versión corregida
+
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Upload, X, Image, Loader } from 'lucide-react';
 
 interface ImageUploaderProps {
   onImageUpload: (imageUrl: string) => void;
   type: 'product' | 'contingency';
-  initialImage?: string | null; // Permite null explícitamente
+  initialImage?: string | null;
   className?: string;
 }
 
@@ -19,9 +20,15 @@ export function ImageUploader({
 }: ImageUploaderProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(initialImage || null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [imageUrl, setImageUrl] = useState<string | null>(initialImage || null);
+  
+  // Establecer imagen inicial cuando el componente se monta
+  useEffect(() => {
+    if (initialImage) {
+      setPreviewUrl(initialImage);
+    }
+  }, [initialImage]);
   
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -49,23 +56,34 @@ export function ImageUploader({
       };
       reader.readAsDataURL(file);
       
-      // Subir archivo
+      // Subir archivo - IMPORTANTE: usar FormData para archivos
       const formData = new FormData();
       formData.append('file', file);
       formData.append('type', type);
       
+      console.log(`Enviando imagen tipo: ${type}`);
+      
       const response = await fetch('/api/upload', {
         method: 'POST',
-        body: formData
+        body: formData,
+        // No incluir Content-Type en headers para que el navegador establezca el boundary correcto
       });
       
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Error al subir imagen');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al subir imagen');
       }
       
       const data = await response.json();
-      onImageUpload(data.imageUrl);
+      console.log('Respuesta de carga:', data);
+      
+      if (data.success && data.imageUrl) {
+        // Notificar al componente padre
+        onImageUpload(data.imageUrl);
+        console.log('URL de imagen devuelta:', data.imageUrl);
+      } else {
+        throw new Error('Respuesta incompleta del servidor');
+      }
     } catch (error: any) {
       console.error('Error:', error);
       setError(error.message || 'Error al subir imagen');
@@ -79,7 +97,7 @@ export function ImageUploader({
   
   const handleRemoveImage = () => {
     setPreviewUrl(null);
-    onImageUpload('');
+    onImageUpload(''); // Enviar string vacío para indicar eliminación
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -130,7 +148,7 @@ export function ImageUploader({
         type="button"
         onClick={() => fileInputRef.current?.click()}
         disabled={isUploading}
-        className="mt-2 inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm leading-4 font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50"
+        className="mt-2 inline-flex items-center px-3 py-1.5 border border-gray-300 text-sm leading-4 font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
       >
         {isUploading ? (
           <>

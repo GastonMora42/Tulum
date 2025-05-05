@@ -1,4 +1,5 @@
-// src/app/api/upload/route.ts
+// src/app/api/upload/route.ts - Versión corregida
+
 import { NextRequest, NextResponse } from 'next/server';
 import { authMiddleware } from '@/server/api/middlewares/auth';
 import { v4 as uuidv4 } from 'uuid';
@@ -11,16 +12,28 @@ export async function POST(req: NextRequest) {
   if (authError) return authError;
   
   try {
+    // Usar FormData para obtener el archivo
     const formData = await req.formData();
-    const file = formData.get('file') as File;
-    const type = formData.get('type') as string; // 'product' o 'contingency'
+    const file = formData.get('file') as File | null;
+    const type = formData.get('type') as string | null;
     
     if (!file) {
+      console.error('No se proporcionó archivo');
       return NextResponse.json(
         { error: 'No se proporcionó ningún archivo' },
         { status: 400 }
       );
     }
+    
+    if (!type || (type !== 'product' && type !== 'contingency')) {
+      console.error('Tipo de archivo inválido:', type);
+      return NextResponse.json(
+        { error: 'Tipo de archivo inválido' },
+        { status: 400 }
+      );
+    }
+    
+    console.log(`Procesando imagen de tipo ${type}, tamaño: ${file.size} bytes`);
     
     // Leer el archivo como buffer
     const fileBuffer = Buffer.from(await file.arrayBuffer());
@@ -50,9 +63,11 @@ export async function POST(req: NextRequest) {
     
     // Generar nombre único para archivo
     const filename = `${folder}/${uuidv4()}.${type === 'product' ? 'webp' : 'jpg'}`;
+    console.log(`Nombre de archivo generado: ${filename}`);
     
-    // Obtener URL firmada para subida
+    // Generar URL firmada de S3 para subida
     const uploadUrl = await s3Service.generatePresignedUploadUrl(filename, contentType);
+    console.log(`URL de subida generada: ${uploadUrl.substring(0, 60)}...`);
     
     // Subir imagen procesada a S3
     const uploadResponse = await fetch(uploadUrl, {
@@ -64,11 +79,15 @@ export async function POST(req: NextRequest) {
     });
     
     if (!uploadResponse.ok) {
+      console.error('Error al subir a S3:', uploadResponse.status, await uploadResponse.text());
       throw new Error('Error al subir imagen a S3');
     }
     
     // Construir URL pública
-    const publicUrl = `https://${process.env.S3_BUCKET_NAME}.s3.amazonaws.com/${filename}`;
+    const bucketName = process.env.S3_BUCKET_NAME || 'tulum-app';
+    const region = process.env.AWS_REGION || 'us-east-1';
+    const publicUrl = `https://${bucketName}.s3.${region}.amazonaws.com/${filename}`;
+    console.log(`URL pública generada: ${publicUrl}`);
     
     // Para contingencias, guardar la fecha de expiración (30 días)
     if (type === 'contingency') {
@@ -81,7 +100,8 @@ export async function POST(req: NextRequest) {
     
     return NextResponse.json({
       success: true,
-      imageUrl: publicUrl
+      imageUrl: publicUrl,
+      message: 'Imagen subida correctamente'
     });
   } catch (error: any) {
     console.error('Error al procesar imagen:', error);

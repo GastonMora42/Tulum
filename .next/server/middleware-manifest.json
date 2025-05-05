@@ -4,44 +4,21 @@
     "/": {
       "files": [
         "server/edge-runtime-webpack.js",
-        "server/src/middleware.js"
+        "server/middleware.js"
       ],
-      "name": "src/middleware",
+      "name": "middleware",
       "page": "/",
       "matchers": [
         {
-          "regexp": "^(?:\\/(_next\\/data\\/[^/]{1,}))?\\/admin(?:\\/((?:[^\\/#\\?]+?)(?:\\/(?:[^\\/#\\?]+?))*))?(\\.json)?[\\/#\\?]?$",
-          "originalSource": "/admin/:path*"
-        },
-        {
-          "regexp": "^(?:\\/(_next\\/data\\/[^/]{1,}))?\\/fabrica(?:\\/((?:[^\\/#\\?]+?)(?:\\/(?:[^\\/#\\?]+?))*))?(\\.json)?[\\/#\\?]?$",
-          "originalSource": "/fabrica/:path*"
-        },
-        {
-          "regexp": "^(?:\\/(_next\\/data\\/[^/]{1,}))?\\/pdv(?:\\/((?:[^\\/#\\?]+?)(?:\\/(?:[^\\/#\\?]+?))*))?(\\.json)?[\\/#\\?]?$",
-          "originalSource": "/pdv/:path*"
-        },
-        {
-          "regexp": "^(?:\\/(_next\\/data\\/[^/]{1,}))?\\/api(?:\\/((?:[^\\/#\\?]+?)(?:\\/(?:[^\\/#\\?]+?))*))?(\\.json)?[\\/#\\?]?$",
-          "originalSource": "/api/:path*"
-        },
-        {
-          "regexp": "^(?:\\/(_next\\/data\\/[^/]{1,}))?\\/login(\\.json)?[\\/#\\?]?$",
-          "originalSource": "/login"
-        },
-        {
-          "regexp": "^(?:\\/(_next\\/data\\/[^/]{1,}))?\\/register(\\.json)?[\\/#\\?]?$",
-          "originalSource": "/register"
+          "regexp": "^/.*$",
+          "originalSource": "/:path*"
         }
       ],
       "wasm": [],
       "assets": [],
       "env": {
-        "__NEXT_BUILD_ID": "Dnpv8m_2t4TH5GumDM5jH",
-        "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY": "8tsbUXRyKZuKzt9kwMUV1HVSvbw9Aoh/y3Dk/lKUaJ0=",
-        "__NEXT_PREVIEW_MODE_ID": "6332d65978ee562277d4a5bb83842b20",
-        "__NEXT_PREVIEW_MODE_ENCRYPTION_KEY": "da413f304398719ce7bff021e5b6a0a7351403087ebc9a51fda265a1ed65624d",
-        "__NEXT_PREVIEW_MODE_SIGNING_KEY": "77e8f1fa3b5e3cb3c558791461ddaa2824982e5a0b0a70a13f8d420fc72ce631"
+        "__NEXT_BUILD_ID": "development",
+        "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY": "8tsbUXRyKZuKzt9kwMUV1HVSvbw9Aoh/y3Dk/lKUaJ0="
       }
     }
   },
