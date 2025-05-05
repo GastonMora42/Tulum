@@ -7,6 +7,7 @@ import { Package, Plus, Search, Filter, RefreshCw, AlertCircle, Printer } from '
 import { authenticatedFetch } from '@/hooks/useAuth';
 import { ContrastEnhancer } from '@/components/ui/ContrastEnhancer';
 import { HCTable, HCTh, HCTd } from '@/components/ui/HighContrastComponents';
+import Image from 'next/image';
 
 interface Producto {
   id: string;
@@ -44,6 +45,7 @@ export default function ProductosPage() {
   const [search, setSearch] = useState('');
   const [categoriaId, setCategoriaId] = useState('');
   const [soloActivos, setSoloActivos] = useState(true);
+  const [imagenError, setImagenError] = useState<Record<string, boolean>>({});
   const [paginationInfo, setPaginationInfo] = useState<PaginationInfo>({
     page: 1,
     limit: 10,
@@ -318,13 +320,21 @@ export default function ProductosPage() {
                   {productos.map(producto => (
                     <tr key={producto.id} className="hover:bg-gray-50">
 <td className="px-6 py-4 whitespace-nowrap">
+<td className="px-6 py-4 whitespace-nowrap">
   <div className="flex items-center">
     {producto.imagen ? (
-      <div className="flex-shrink-0 h-10 w-10 mr-4">
-        <img 
-          className="h-10 w-10 rounded-full object-cover" 
-          src={producto.imagen} 
+      <div className="flex-shrink-0 h-10 w-10 mr-4 relative">
+        {/* Usar Next.js Image para mejor manejo de imágenes externas */}
+        <Image 
+          src={producto.imagen}
           alt={producto.nombre}
+          width={40}
+          height={40}
+          className="rounded-full object-cover"
+          unoptimized={true} // Importante para imágenes externas como S3
+          onError={() => {
+            console.error(`Error cargando imagen: ${producto.imagen}`);
+          }}
         />
       </div>
     ) : (
@@ -341,6 +351,7 @@ export default function ProductosPage() {
       )}
     </div>
   </div>
+</td>
 </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         ${producto.precio.toFixed(2)}

@@ -3,6 +3,8 @@ import { v4 as uuidv4 } from 'uuid';
 import prisma from '@/server/db/client';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import JsBarcode from 'jsbarcode';
+import { createCanvas } from 'canvas';
 
 export class BarcodeService {
   // Genera un código de barras único para un producto
@@ -44,8 +46,28 @@ export class BarcodeService {
       throw new Error(`No se pudo generar el código de barras: ${errorMessage}`);
     }
   }
-  generateFallbackBarcode(code: string): string | PromiseLike<string> {
-    throw new Error('Method not implemented.');
+
+  generateFallbackBarcode(code: string): string {
+    try {
+      // Crear un canvas para el código de barras
+      const canvas = createCanvas(300, 100);
+      
+      // Generar el código de barras
+      JsBarcode(canvas, code, {
+        format: "CODE128",
+        width: 2,
+        height: 100,
+        displayValue: true
+      });
+      
+      // Convertir a base64
+      return canvas.toDataURL();
+    } catch (error) {
+      console.error('Error en generación de código de barras fallback:', error);
+      
+      // Si todo falla, devolver una imagen simple
+      return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASwAAABkCAYAAAA8AQ3AAAAAAXNSR0IArs4c6QAAAERlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAA6ABAAMAAAABAAEAAKACAAQAAAABAAAArKADAAQAAAABAAAAZAAAAADRDfwrAAABWUlEQVR4Ae3asRHAIAwEQJBh2H9WMgz+BXdckUtFR7NNTs/iiwABAgQIECBAgAABAgQIECBAIEUgpVRlAgQIEDgCwuISECBAIEZAWGKoihAgQEBY3AECBAjECAhLDFURAgQICIs7QIAAgRgBYYmhKkKAAAFhcQcIECAQIyAsMVRFCBAgICzuAAECBGIEhCWGqggBAgSExR0gQIBAjICwxFAVIUCAgLC4AwQIEIgREJYYqiIECBAQFneAAAECMQLCEkNVhAABAsLiDhAgQCBGQFhiqIoQIEBAWNwBAgQIxAgISwxVEQIECAiLO0CAAIEYAWGJoSpCgAABYXEHCBAgECMgLDFURQgQIDBDcIEAAQIECBAg8BF4dNzsdDr24vsIECBAgAABAgQIECBAgACBvwLvdcK2bdl7n3LOlVK6tbbW2v4B4N8IECBQL3Bprb211lpPvY4FCRAgQIAAAQIECHwEPtcuOc5J/4D4AAAAAElFTkSuQmCC';
+    }
   }
   
   // Generar PDF con múltiples códigos para impresión en lote

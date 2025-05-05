@@ -19,6 +19,13 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+
+  images: {
+    domains: [
+      'arn:aws:s3:::tulum-bucket', // Reemplaza con tu dominio de S3
+      `${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com`
+    ],
+  },
   // aquí van otras opciones de Next.js si las necesitas...
 }
 

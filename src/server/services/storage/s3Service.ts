@@ -26,17 +26,15 @@ export class S3Service {
   }
   
   async generatePresignedUploadUrl(key: string, contentType: string): Promise<string> {
-    console.log(`Generando URL de subida para: ${key}, tipo: ${contentType}`);
-    
     try {
       const command = new PutObjectCommand({
         Bucket: this.bucketName,
         Key: key,
-        ContentType: contentType
+        ContentType: contentType,
+        ACL: 'public-read' // Añade esta línea
       });
       
       const url = await getSignedUrl(this.s3Client, command, { expiresIn: 3600 });
-      console.log(`URL generada exitosamente: ${url.substring(0, 50)}...`);
       return url;
     } catch (error) {
       console.error('Error al generar URL firmada:', error);
