@@ -13,6 +13,13 @@ import { HCInput, HCLabel, HCSelect, HCTextarea } from '@/components/ui/HighCont
 import { ImageUploader } from '@/components/ui/ImageUploader';
 import { BarcodeGenerator } from '@/components/productos/BardcodeGenerator';
 
+interface ImageUploaderProps {
+  onImageUpload: (imageUrl: string) => void;
+  type: 'product' | 'contingency';
+  initialImage?: string | null; // Permite null explícitamente
+  className?: string;
+}
+
 interface Categoria {
   id: string;
   nombre: string;
@@ -58,6 +65,8 @@ export default function EditarProductoPage({ params }: { params: { id: string } 
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const router = useRouter();
+  const [previewUrl, setPreviewUrl] = useState<string | null>(initialImage || null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
 
 const { 
   register, 
@@ -92,10 +101,11 @@ const {
         const productoData = await productoResponse.json();
         setProducto(productoData);
         
-        // Establecer vista previa de imagen
-        if (productoData.imagen) {
-          setImagePreview(productoData.imagen);
-        }
+      // Cuando estableces imagePreview, también establece imageUrl
+      if (productoData.imagen) {
+        setImagePreview(productoData.imagen);
+        setImageUrl(productoData.imagen);
+      }
         
         // Cargar categorías
         const categoriasResponse = await authenticatedFetch('/api/admin/categorias');

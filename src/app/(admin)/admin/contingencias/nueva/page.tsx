@@ -27,7 +27,8 @@ export default function NuevaContingenciaPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+
   const { 
     register, 
     handleSubmit, 

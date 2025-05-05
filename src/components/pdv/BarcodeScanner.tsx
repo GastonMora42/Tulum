@@ -15,7 +15,7 @@ export function BarcodeScanner({ onScan }: { onScan: (barcode: string) => void }
     // Iniciar escáner
     if (videoRef.current) {
       codeReader.decodeFromVideoDevice(
-        undefined, 
+        null, 
         videoRef.current, 
         (result: { getText: () => string; }) => {
           if (result) {

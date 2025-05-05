@@ -5,6 +5,7 @@ import { authMiddleware } from '@/server/api/middlewares/auth';
 import { checkPermission } from '@/server/api/middlewares/authorization';
 import { z } from 'zod';
 import { barcodeService } from '@/server/services/producto/barcodeService';
+import { v4 as uuidv4 } from 'uuid';
 
 // Esquema de validación para crear producto
 const productoSchema = z.object({

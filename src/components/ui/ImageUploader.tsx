@@ -7,15 +7,21 @@ import { Upload, X, Image, Loader } from 'lucide-react';
 interface ImageUploaderProps {
   onImageUpload: (imageUrl: string) => void;
   type: 'product' | 'contingency';
-  initialImage?: string;
+  initialImage?: string | null; // Permite null explícitamente
   className?: string;
 }
 
-export function ImageUploader({ onImageUpload, type, initialImage, className = '' }: ImageUploaderProps) {
+export function ImageUploader({ 
+  onImageUpload, 
+  type, 
+  initialImage = null, 
+  className = '' 
+}: ImageUploaderProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(initialImage || null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(initialImage || null);
   
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
