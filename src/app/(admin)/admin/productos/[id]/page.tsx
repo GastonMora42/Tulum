@@ -80,54 +80,60 @@ const {
 });
 
 
-  // Cargar producto y categorías
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setIsFetching(true);
-        
-        // Cargar producto
-        const productoResponse = await authenticatedFetch(`/api/admin/productos/${params.id}`);
-        if (!productoResponse.ok) {
-          throw new Error('Error al cargar producto');
-        }
-        const productoData = await productoResponse.json();
-        setProducto(productoData);
-        
-      // Cuando estableces imagePreview, también establece imageUrl
+// Cargar producto y categorías
+useEffect(() => {
+  const fetchData = async () => {
+    try {
+      setIsFetching(true);
+      console.log("Cargando producto con ID:", params.id);
+      
+      // Cargar producto
+      const productoResponse = await authenticatedFetch(`/api/admin/productos/${params.id}`);
+      if (!productoResponse.ok) {
+        console.error("Error en respuesta:", await productoResponse.text());
+        throw new Error('Error al cargar producto');
+      }
+      const productoData = await productoResponse.json();
+      console.log("Datos del producto recibidos:", productoData);
+      setProducto(productoData);
+      
+      // Establecer previsualización de imagen
       if (productoData.imagen) {
-        setImagePreview(productoData.imagen);
+        console.log("Estableciendo imagen previa:", productoData.imagen);
+        setPreviewUrl(productoData.imagen);
         setImageUrl(productoData.imagen);
       }
-        
-        // Cargar categorías
-        const categoriasResponse = await authenticatedFetch('/api/admin/categorias');
-        if (!categoriasResponse.ok) {
-          throw new Error('Error al cargar categorías');
-        }
-        const categoriasData = await categoriasResponse.json();
-        setCategorias(categoriasData);
-        
-        // Establecer valores del formulario
-        reset({
-          nombre: productoData.nombre,
-          descripcion: productoData.descripcion,
-          precio: productoData.precio,
-          codigoBarras: productoData.codigoBarras,
-          categoriaId: productoData.categoriaId,
-          stockMinimo: productoData.stockMinimo,
-          activo: productoData.activo
-        });
-      } catch (err) {
-        console.error('Error:', err);
-        setError('Error al cargar datos');
-      } finally {
-        setIsFetching(false);
+      
+      // Cargar categorías
+      const categoriasResponse = await authenticatedFetch('/api/admin/categorias');
+      if (!categoriasResponse.ok) {
+        throw new Error('Error al cargar categorías');
       }
-    };
+      const categoriasData = await categoriasResponse.json();
+      setCategorias(categoriasData);
+      
+      // Establecer valores del formulario con datos explícitos
+      reset({
+        nombre: productoData.nombre || '',
+        descripcion: productoData.descripcion || '',
+        precio: typeof productoData.precio === 'number' ? productoData.precio : 0,
+        codigoBarras: productoData.codigoBarras || '',
+        categoriaId: productoData.categoriaId || '',
+        stockMinimo: typeof productoData.stockMinimo === 'number' ? productoData.stockMinimo : 0,
+        activo: productoData.activo === false ? false : true
+      });
+      
+      console.log("Formulario resetado con datos:", productoData);
+    } catch (err) {
+      console.error('Error detallado:', err);
+      setError('Error al cargar datos del producto');
+    } finally {
+      setIsFetching(false);
+    }
+  };
 
-    fetchData();
-  }, [params.id, reset]);
+  fetchData();
+}, [params.id, reset]);
 
   // Manejar carga de imagen
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {

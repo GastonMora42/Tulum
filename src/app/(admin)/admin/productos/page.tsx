@@ -317,31 +317,31 @@ export default function ProductosPage() {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {productos.map(producto => (
                     <tr key={producto.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          {producto.imagen ? (
-                            <div className="flex-shrink-0 h-10 w-10 mr-4">
-                              <img 
-                                className="h-10 w-10 rounded-full object-cover" 
-                                src={producto.imagen} 
-                                alt={producto.nombre} 
-                              />
-                            </div>
-                          ) : (
-                            <div className="flex-shrink-0 h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center mr-4">
-                              <Package className="h-6 w-6 text-gray-500" />
-                            </div>
-                          )}
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">{producto.nombre}</div>
-                            {producto.descripcion && (
-                              <div className="text-sm text-gray-500 truncate max-w-xs">
-                                {producto.descripcion}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </td>
+<td className="px-6 py-4 whitespace-nowrap">
+  <div className="flex items-center">
+    {producto.imagen ? (
+      <div className="flex-shrink-0 h-10 w-10 mr-4">
+        <img 
+          className="h-10 w-10 rounded-full object-cover" 
+          src={producto.imagen} 
+          alt={producto.nombre}
+        />
+      </div>
+    ) : (
+      <div className="flex-shrink-0 h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center mr-4">
+        <Package className="h-6 w-6 text-gray-500" />
+      </div>
+    )}
+    <div>
+      <div className="text-sm font-medium text-gray-900">{producto.nombre}</div>
+      {producto.descripcion && (
+        <div className="text-sm text-gray-500 truncate max-w-xs">
+          {producto.descripcion}
+        </div>
+      )}
+    </div>
+  </div>
+</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         ${producto.precio.toFixed(2)}
                       </td>

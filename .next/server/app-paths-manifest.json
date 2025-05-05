@@ -1,13 +1,15 @@
 {
-  "/api/admin/productos/route": "app/api/admin/productos/route.js",
-  "/api/admin/categorias/route": "app/api/admin/categorias/route.js",
-  "/api/admin/productos/[id]/route": "app/api/admin/productos/[id]/route.js",
+  "/api/auth/login/route": "app/api/auth/login/route.js",
+  "/api/auth/me/route": "app/api/auth/me/route.js",
   "/api/reportes/stock/bajo/route": "app/api/reportes/stock/bajo/route.js",
   "/_not-found/page": "app/_not-found/page.js",
   "/api/contingencias/route": "app/api/contingencias/route.js",
+  "/api/admin/productos/route": "app/api/admin/productos/route.js",
+  "/api/admin/categorias/route": "app/api/admin/categorias/route.js",
+  "/api/admin/productos/print-barcodes/route": "app/api/admin/productos/print-barcodes/route.js",
+  "/page": "app/page.js",
   "/(auth)/login/page": "app/(auth)/login/page.js",
   "/(admin)/admin/page": "app/(admin)/admin/page.js",
   "/(admin)/admin/productos/page": "app/(admin)/admin/productos/page.js",
-  "/(admin)/admin/productos/nuevo/page": "app/(admin)/admin/productos/nuevo/page.js",
-  "/(admin)/admin/productos/[id]/page": "app/(admin)/admin/productos/[id]/page.js"
+  "/(admin)/admin/productos/imprimir-codigos/page": "app/(admin)/admin/productos/imprimir-codigos/page.js"
 }

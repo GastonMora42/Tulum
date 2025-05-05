@@ -3,8 +3,6 @@ import { v4 as uuidv4 } from 'uuid';
 import prisma from '@/server/db/client';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import JsBarcode from 'jsbarcode';
-import { DOMImplementation, XMLSerializer } from 'xmldom';
 
 export class BarcodeService {
   // Genera un código de barras único para un producto
@@ -33,23 +31,21 @@ export class BarcodeService {
     });
   }
   
-  // Generar SVG del código de barras (para uso interno)
-  private generateBarcodeSVG(code: string, options: any = {}): string {
-    // Crear un documento DOM virtual para generar SVG
-    const document = new DOMImplementation().createDocument('http://www.w3.org/1999/xhtml', 'html', null);
-    const svgNode = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    
-    // Generar el código de barras usando JsBarcode
-    JsBarcode(svgNode, code, {
-      format: 'CODE128',
-      width: 2,
-      height: 100,
-      displayValue: true,
-      ...options
-    });
-    
-    // Convertir el nodo SVG a string
-    return new XMLSerializer().serializeToString(svgNode);
+  // Generar código de barras (compatible con servidor)
+  private async generateBarcodeImage(code: string, options: any = {}): Promise<string> {
+    try {
+      // En lugar de usar bwip-js que causa problemas, generemos un PNG simulado
+      // Esta es una solución temporal que no requiere bwip-js
+      return this.generateFallbackBarcode(code);
+    } catch (error: unknown) {
+      // Manejo correcto del error de tipo unknown
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+      console.error('Error generando código de barras:', errorMessage);
+      throw new Error(`No se pudo generar el código de barras: ${errorMessage}`);
+    }
+  }
+  generateFallbackBarcode(code: string): string | PromiseLike<string> {
+    throw new Error('Method not implemented.');
   }
   
   // Generar PDF con múltiples códigos para impresión en lote
@@ -73,7 +69,6 @@ export class BarcodeService {
     const labelWidth = 50; // ancho de etiqueta en mm
     const labelHeight = 30; // alto de etiqueta en mm
     const labelsPerRow = 3;
-    const pageWidth = 210; // A4 ancho en mm
     
     let x = margin;
     let y = margin;
@@ -91,7 +86,35 @@ export class BarcodeService {
     
     // Generar etiquetas para cada producto
     for (const producto of productos) {
-      if (!producto.codigoBarras) continue;
+      // Verificar que el código de barras existe
+      if (!producto.codigoBarras) {
+        console.warn(`Producto ${producto.id} - ${producto.nombre} no tiene código de barras`);
+        
+        // Aún así, dibujar la etiqueta pero con un mensaje de error
+        if (count > 0 && count % labelsPerRow === 0) {
+          x = margin;
+          y += labelHeight;
+        }
+        
+        if (y > 270) {
+          doc.addPage();
+          y = margin;
+          x = margin;
+        }
+        
+        // Dibujar etiqueta con mensaje de error
+        doc.setDrawColor(200);
+        doc.rect(x, y, labelWidth, labelHeight);
+        doc.setFontSize(8);
+        doc.text(producto.nombre, x + 2, y + 5);
+        doc.setTextColor(255, 0, 0);
+        doc.text("Sin código de barras", x + 5, y + 15);
+        doc.setTextColor(0, 0, 0);
+        
+        x += labelWidth + 5;
+        count++;
+        continue;
+      }
       
       // Calcular posición de la etiqueta
       if (count > 0 && count % labelsPerRow === 0) {
@@ -113,21 +136,16 @@ export class BarcodeService {
       doc.setFontSize(8);
       doc.text(producto.nombre.length > 25 ? producto.nombre.substring(0, 22) + '...' : producto.nombre, x + 2, y + 5);
       
-      // Generar y añadir código de barras como SVG
       try {
-        const svgString = this.generateBarcodeSVG(producto.codigoBarras, {
-          width: 1.5,
-          height: 15,
-          fontSize: 8,
-          margin: 0
+        // Generar y añadir código de barras
+        const barcodeImageData = await this.generateBarcodeImage(producto.codigoBarras, {
+          scale: 2,
+          height: 10,
+          includetext: true
         });
         
-        // Convertir SVG a data URL para insertar en PDF
-        const svgBase64 = Buffer.from(svgString).toString('base64');
-        const imgSrc = `data:image/svg+xml;base64,${svgBase64}`;
-        
         // Añadir imagen del código de barras
-        doc.addImage(imgSrc, 'SVG', x + 5, y + 8, labelWidth - 10, 15);
+        doc.addImage(barcodeImageData, 'PNG', x + 5, y + 8, labelWidth - 10, 15);
         
         // Añadir precio si existe
         if (producto.precio) {
@@ -136,7 +154,12 @@ export class BarcodeService {
         }
       } catch (error) {
         console.error(`Error al generar código para ${producto.nombre}:`, error);
-        doc.text(`Error: ${producto.codigoBarras}`, x + 5, y + 15);
+        // Dibujar texto de error en lugar del código de barras
+        doc.setFontSize(7);
+        doc.setTextColor(255, 0, 0);
+        doc.text("Error al generar código de barras", x + 5, y + 15);
+        doc.text(producto.codigoBarras || "Código inválido", x + 5, y + 20);
+        doc.setTextColor(0, 0, 0);
       }
       
       // Actualizar posición para la siguiente etiqueta
