@@ -65,7 +65,7 @@ export default function EditarProductoPage({ params }: { params: { id: string } 
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const router = useRouter();
-  const [previewUrl, setPreviewUrl] = useState<string | null>(initialImage || null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(producto?.imagen || null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
 
 const { 
@@ -374,15 +374,15 @@ const {
     Imagen del Producto
   </HCLabel>
   <ImageUploader
-    type="product"
-    initialImage={producto?.imagen}
-    onImageUpload={(imageUrl) => {
-      setImageUrl(imageUrl);
-    }}
-  />
+  type="product"
+  initialImage={producto?.imagen || null}
+  onImageUpload={(imageUrl) => {
+    setImageUrl(imageUrl);
+  }}
+/>
 </div>
 
-{producto.codigoBarras && (
+{producto?.codigoBarras && (
   <div className="mt-4 pt-4 border-t">
     <h3 className="text-lg font-medium">Código de Barras</h3>
     <BarcodeGenerator 
