@@ -45,6 +45,7 @@ const productoSchema = z.object({
     activo: z.boolean()
   });  
 
+  
   type ProductoFormData = z.infer<typeof productoSchema>;
 
 export default function EditarProductoPage({ params }: { params: { id: string } }) {
