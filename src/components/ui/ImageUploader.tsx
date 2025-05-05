@@ -4,6 +4,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Upload, X, Image, Loader } from 'lucide-react';
+import { authenticatedFetch } from '@/hooks/useAuth';
 
 interface ImageUploaderProps {
   onImageUpload: (imageUrl: string) => void;
@@ -63,7 +64,7 @@ export function ImageUploader({
       
       console.log(`Enviando imagen tipo: ${type}`);
       
-      const response = await fetch('/api/upload', {
+      const response = await authenticatedFetch('/api/upload', {
         method: 'POST',
         body: formData,
         // No incluir Content-Type en headers para que el navegador establezca el boundary correcto
