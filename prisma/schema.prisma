@@ -10,69 +10,69 @@ datasource db {
 
 // Usuarios y Roles
 model User {
-  id           String    @id @default(uuid())
-  email        String    @unique
-  name         String
-  roleId       String
-  role         Role      @relation(fields: [roleId], references: [id])
-  sucursalId   String?
-  sucursal     Ubicacion? @relation(fields: [sucursalId], references: [id])
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  
+  id         String     @id @default(uuid())
+  email      String     @unique
+  name       String
+  roleId     String
+  role       Role       @relation(fields: [roleId], references: [id])
+  sucursalId String?
+  sucursal   Ubicacion? @relation(fields: [sucursalId], references: [id])
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
   // Relaciones
-  producciones Production[]
-  ventas       Venta[]
-  envios       Envio[]
-  contingencias Contingencia[]
+  producciones     Production[]
+  ventas           Venta[]
+  envios           Envio[]
+  contingencias    Contingencia[]
   movimientosStock MovimientoStock[]
-    // Añadir esta nueva relación
-  conciliaciones Conciliacion[]
+  // Añadir esta nueva relación
+  conciliaciones   Conciliacion[]
 }
 
 model Role {
-  id          String  @id @default(uuid())
-  name        String  @unique
-  permissions Json    // Array de permisos
+  id          String @id @default(uuid())
+  name        String @unique
+  permissions Json // Array de permisos
   users       User[]
 }
 
 // Productos e Insumos
 model Producto {
-  id             String      @id @default(uuid())
-  nombre         String
-  descripcion    String?
-  precio         Float
-  codigoBarras   String?     @unique
-  imagen         String?
-  categoriaId    String
-  categoria      Categoria   @relation(fields: [categoriaId], references: [id])
-  
+  id           String    @id @default(uuid())
+  nombre       String
+  descripcion  String?
+  precio       Float
+  codigoBarras String?   @unique
+  imagen       String?
+  categoriaId  String
+  categoria    Categoria @relation(fields: [categoriaId], references: [id])
+
   // Para gestión de stock
-  stockMinimo    Int         @default(0)
-  activo         Boolean     @default(true)
-  
+  stockMinimo Int     @default(0)
+  activo      Boolean @default(true)
+
   // Relaciones
-  stocks         Stock[]
+  stocks          Stock[]
   productoRecetas ProductoReceta[]
-  itemsVenta     ItemVenta[]
-  itemsEnvio     ItemEnvio[]
+  itemsVenta      ItemVenta[]
+  itemsEnvio      ItemEnvio[]
 }
 
 model Insumo {
-  id             String      @id @default(uuid())
-  nombre         String
-  descripcion    String?
-  unidadMedida   String      // litro, kg, unidad, etc.
-  stockMinimo    Float       @default(0)
-  proveedorId    String?
-  proveedor      Proveedor?  @relation(fields: [proveedorId], references: [id])
-  activo         Boolean     @default(true)
-  
+  id           String     @id @default(uuid())
+  nombre       String
+  descripcion  String?
+  unidadMedida String // litro, kg, unidad, etc.
+  stockMinimo  Float      @default(0)
+  proveedorId  String?
+  proveedor    Proveedor? @relation(fields: [proveedorId], references: [id])
+  activo       Boolean    @default(true)
+
   // Relaciones
-  stocks         Stock[]
-  recetaItems    RecetaItem[]
-  itemsEnvio     ItemEnvio[]
+  stocks      Stock[]
+  recetaItems RecetaItem[]
+  itemsEnvio  ItemEnvio[]
 }
 
 model Categoria {
@@ -82,36 +82,36 @@ model Categoria {
 }
 
 model Proveedor {
-  id          String   @id @default(uuid())
-  nombre      String
-  contacto    String?
-  telefono    String?
-  email       String?
-  direccion   String?
-  activo      Boolean  @default(true)
-  insumos     Insumo[]
+  id        String   @id @default(uuid())
+  nombre    String
+  contacto  String?
+  telefono  String?
+  email     String?
+  direccion String?
+  activo    Boolean  @default(true)
+  insumos   Insumo[]
 }
 
 // Recetas y Producción
 model Receta {
-  id             String        @id @default(uuid())
-  nombre         String
-  descripcion    String?
-  rendimiento    Int           // Cuántos productos finales genera
-  
+  id          String  @id @default(uuid())
+  nombre      String
+  descripcion String?
+  rendimiento Int // Cuántos productos finales genera
+
   // Relaciones
-  items          RecetaItem[]
+  items           RecetaItem[]
   productoRecetas ProductoReceta[]
-  producciones   Production[]
+  producciones    Production[]
 }
 
 model RecetaItem {
-  id        String  @id @default(uuid())
-  recetaId  String
-  receta    Receta  @relation(fields: [recetaId], references: [id])
-  insumoId  String
-  insumo    Insumo  @relation(fields: [insumoId], references: [id])
-  cantidad  Float   // Cantidad del insumo necesaria
+  id       String @id @default(uuid())
+  recetaId String
+  receta   Receta @relation(fields: [recetaId], references: [id])
+  insumoId String
+  insumo   Insumo @relation(fields: [insumoId], references: [id])
+  cantidad Float // Cantidad del insumo necesaria
 }
 
 model ProductoReceta {
@@ -123,79 +123,82 @@ model ProductoReceta {
 }
 
 model Production {
-  id          String    @id @default(uuid())
-  recetaId    String
-  receta      Receta    @relation(fields: [recetaId], references: [id])
-  cantidad    Int       // Cuántos productos se fabricaron
-  fechaInicio DateTime  @default(now())
-  fechaFin    DateTime?
-  usuarioId   String
-  usuario     User      @relation(fields: [usuarioId], references: [id])
+  id            String    @id @default(uuid())
+  recetaId      String
+  receta        Receta    @relation(fields: [recetaId], references: [id])
+  cantidad      Int // Cuántos productos se fabricaron
+  fechaInicio   DateTime  @default(now())
+  fechaFin      DateTime?
+  usuarioId     String
+  usuario       User      @relation(fields: [usuarioId], references: [id])
   observaciones String?
-  
+
   // Estado de la producción
-  estado      String    // en_proceso, finalizada, con_contingencia
-  
+  estado String // en_proceso, finalizada, con_contingencia
+
   // Relaciones
   contingencias Contingencia[]
 }
 
 // Stock
 model Stock {
-  id             String    @id @default(uuid())
-  ubicacionId    String
-  ubicacion      Ubicacion @relation(fields: [ubicacionId], references: [id])
-  
+  id          String    @id @default(uuid())
+  ubicacionId String
+  ubicacion   Ubicacion @relation(fields: [ubicacionId], references: [id])
+
   // Puede ser producto o insumo (uno de los dos)
-  productoId     String?
-  producto       Producto? @relation(fields: [productoId], references: [id])
-  insumoId       String?
-  insumo         Insumo?   @relation(fields: [insumoId], references: [id])
-  
-  cantidad       Float
-  version        Int       @default(0) // Para control optimista
-  
+  productoId String?
+  producto   Producto? @relation(fields: [productoId], references: [id])
+  insumoId   String?
+  insumo     Insumo?   @relation(fields: [insumoId], references: [id])
+
+  cantidad Float
+  version  Int   @default(0) // Para control optimista
+
   // Para auditoría
   ultimaActualizacion DateTime @default(now())
-  
+
   // Relaciones con movimientos
-  movimientos    MovimientoStock[]
+  movimientos MovimientoStock[]
 }
 
 model MovimientoStock {
-  id            String    @id @default(uuid())
-  stockId       String
-  stock         Stock     @relation(fields: [stockId], references: [id])
-  tipoMovimiento String    // entrada, salida, ajuste
-  cantidad      Float     // siempre positivo, la dirección la define tipoMovimiento
-  motivo        String    // producción, venta, envío, ajuste manual, etc.
-  
+  id             String @id @default(uuid())
+  stockId        String
+  stock          Stock  @relation(fields: [stockId], references: [id])
+  tipoMovimiento String // entrada, salida, ajuste
+  cantidad       Float // siempre positivo, la dirección la define tipoMovimiento
+  motivo         String // producción, venta, envío, ajuste manual, etc.
+
   // Referencias opcionales al origen del movimiento
-  ventaId       String?
-  envioId       String?
-  produccionId  String?
-  fecha         DateTime  @default(now())
-  
+  ventaId      String?
+  envioId      String?
+  produccionId String?
+  fecha        DateTime @default(now())
+
   // Para auditoría
-  usuarioId     String?
-  usuario       User?     @relation(fields: [usuarioId], references: [id])
+  usuarioId String?
+  usuario   User?   @relation(fields: [usuarioId], references: [id])
 }
 
 // Ubicaciones (Fábrica y Sucursales)
 model Ubicacion {
   id        String  @id @default(uuid())
   nombre    String
-  tipo      String  // fabrica, sucursal
+  tipo      String // fabrica, sucursal
   direccion String?
   telefono  String?
   activo    Boolean @default(true)
-  
+
+  facturasElectronicas FacturaElectronica[]
+  configuracionAFIP    ConfiguracionAFIP?
+
   // Relaciones
-  stocks    Stock[]
-  enviosOrigen Envio[] @relation("envioOrigen")
+  stocks        Stock[]
+  enviosOrigen  Envio[] @relation("envioOrigen")
   enviosDestino Envio[] @relation("envioDestino")
-  usuarios  User[]
-  ventas    Venta[]
+  usuarios      User[]
+  ventas        Venta[]
 
   // Añadir esta nueva relación
   conciliaciones Conciliacion[]
@@ -211,123 +214,125 @@ model Envio {
   fechaCreacion  DateTime  @default(now())
   fechaEnvio     DateTime?
   fechaRecepcion DateTime?
-  estado         String    // pendiente, enviado, en_transito, recibido, con_contingencia, finalizado
+  estado         String // pendiente, enviado, en_transito, recibido, con_contingencia, finalizado
   usuarioId      String
   usuario        User      @relation(fields: [usuarioId], references: [id])
-  
+
   // Relaciones
-  items          ItemEnvio[]
-  contingencias  Contingencia[]
+  items         ItemEnvio[]
+  contingencias Contingencia[]
 }
 
 model ItemEnvio {
-  id          String   @id @default(uuid())
-  envioId     String
-  envio       Envio    @relation(fields: [envioId], references: [id])
-  
+  id      String @id @default(uuid())
+  envioId String
+  envio   Envio  @relation(fields: [envioId], references: [id])
+
   // Campo opcional para producto
-  productoId  String?
-  producto    Producto? @relation(fields: [productoId], references: [id])
-  
+  productoId String?
+  producto   Producto? @relation(fields: [productoId], references: [id])
+
   // Campo opcional para insumo
-  insumoId    String?
-  insumo      Insumo?   @relation(fields: [insumoId], references: [id])
-  
-  cantidad    Int
+  insumoId String?
+  insumo   Insumo? @relation(fields: [insumoId], references: [id])
+
+  cantidad         Int
   cantidadRecibida Int?
 }
 
 // Ventas y Punto de Venta
 model Venta {
-  id            String    @id @default(uuid())
-  sucursalId    String
-  sucursal      Ubicacion @relation(fields: [sucursalId], references: [id])
-  fecha         DateTime  @default(now())
-  total         Float
-  descuento     Float     @default(0)
+  id              String    @id @default(uuid())
+  sucursalId      String
+  sucursal        Ubicacion @relation(fields: [sucursalId], references: [id])
+  fecha           DateTime  @default(now())
+  total           Float
+  descuento       Float     @default(0)
   codigoDescuento String?
-  usuarioId     String
-  usuario       User      @relation(fields: [usuarioId], references: [id])
-  
+  usuarioId       String
+  usuario         User      @relation(fields: [usuarioId], references: [id])
+
+  facturaElectronica FacturaElectronica?
+
   // Facturación
-  facturada     Boolean   @default(false)
+  facturada     Boolean @default(false)
   numeroFactura String?
   clienteNombre String?
   clienteCuit   String?
-  
+
   // Relaciones
-  items         ItemVenta[]
-  pagos         Pago[]
+  items ItemVenta[]
+  pagos Pago[]
 }
 
 model ItemVenta {
-  id         String   @id @default(uuid())
-  ventaId    String
-  venta      Venta    @relation(fields: [ventaId], references: [id])
-  productoId String
-  producto   Producto @relation(fields: [productoId], references: [id])
-  cantidad   Int
+  id             String   @id @default(uuid())
+  ventaId        String
+  venta          Venta    @relation(fields: [ventaId], references: [id])
+  productoId     String
+  producto       Producto @relation(fields: [productoId], references: [id])
+  cantidad       Int
   precioUnitario Float
-  descuento  Float    @default(0)
+  descuento      Float    @default(0)
 }
 
 model Pago {
-  id            String  @id @default(uuid())
-  ventaId       String
-  venta         Venta   @relation(fields: [ventaId], references: [id])
-  medioPago     String  // efectivo, tarjeta_credito, tarjeta_debito, transferencia, qr
-  monto         Float
-  referencia    String? // Número de transacción o referencia
-  datosPago     Json?   // Datos adicionales del pago
+  id                  String  @id @default(uuid())
+  ventaId             String
+  venta               Venta   @relation(fields: [ventaId], references: [id])
+  medioPago           String // efectivo, tarjeta_credito, tarjeta_debito, transferencia, qr
+  monto               Float
+  referencia          String? // Número de transacción o referencia
+  datosPago           Json? // Datos adicionales del pago
   periodoAcreditacion Int? // Días para acreditación (para oficina)
 }
 
 model CierreCaja {
-  id           String   @id @default(uuid())
-  sucursalId   String
-  fechaApertura DateTime @default(now())
-  fechaCierre  DateTime?
+  id              String    @id @default(uuid())
+  sucursalId      String
+  fechaApertura   DateTime  @default(now())
+  fechaCierre     DateTime?
   usuarioApertura String
-  usuarioCierre String?
-  montoInicial Float
-  montoFinal   Float?
-  diferencia   Float?
-  estado       String   // abierto, cerrado, con_contingencia
-  observaciones String?
+  usuarioCierre   String?
+  montoInicial    Float
+  montoFinal      Float?
+  diferencia      Float?
+  estado          String // abierto, cerrado, con_contingencia
+  observaciones   String?
 }
 
 model Contingencia {
-  id              String    @id @default(uuid())
-  titulo          String
-  descripcion     String
-  
+  id          String @id @default(uuid())
+  titulo      String
+  descripcion String
+
   // Origen de la contingencia
-  origen          String    // fabrica, sucursal, oficina
-  
+  origen String // fabrica, sucursal, oficina
+
   // Referencias opcionales según el origen
-  produccionId    String?
-  produccion      Production? @relation(fields: [produccionId], references: [id])
-  envioId         String?
-  envio           Envio?    @relation(fields: [envioId], references: [id])
-  
+  produccionId String?
+  produccion   Production? @relation(fields: [produccionId], references: [id])
+  envioId      String?
+  envio        Envio?      @relation(fields: [envioId], references: [id])
+
   // Agregar campo tipo para mejor categorización
-  tipo            String?   // producto, stock, caja, sistema, otro
-  
+  tipo String? // producto, stock, caja, sistema, otro
+
   // Datos generales
   fechaCreacion   DateTime  @default(now())
   creadoPor       String
   usuario         User      @relation(fields: [creadoPor], references: [id])
-  estado          String    // pendiente, en_revision, resuelto, rechazado
+  estado          String // pendiente, en_revision, resuelto, rechazado
   respuesta       String?
   fechaRespuesta  DateTime?
   resueltoPor     String?
   ajusteRealizado Boolean   @default(false)
-  
-  // Campo para marcar urgencia
-  urgente         Boolean   @default(false)
 
-  imagenUrl       String?
-  imagenExpiraEn  DateTime?
+  // Campo para marcar urgencia
+  urgente Boolean @default(false)
+
+  imagenUrl      String?
+  imagenExpiraEn DateTime?
 }
 
 // Codigos de descuento
@@ -335,7 +340,7 @@ model CodigoDescuento {
   id            String    @id @default(uuid())
   codigo        String    @unique
   descripcion   String?
-  tipoDescuento String    // porcentaje, monto_fijo
+  tipoDescuento String // porcentaje, monto_fijo
   valor         Float
   fechaInicio   DateTime
   fechaFin      DateTime?
@@ -349,9 +354,41 @@ model Conciliacion {
   sucursalId    String
   sucursal      Ubicacion @relation(fields: [sucursalId], references: [id])
   fecha         DateTime  @default(now())
-  estado        String    // pendiente, completada, con_contingencia
+  estado        String // pendiente, completada, con_contingencia
   usuarioId     String
   usuario       User      @relation(fields: [usuarioId], references: [id])
-  detalles      Json?     // Array de productos y cantidades
+  detalles      Json? // Array de productos y cantidades
   observaciones String?
+}
+
+model FacturaElectronica {
+  id              String    @id @default(uuid())
+  ventaId         String    @unique
+  venta           Venta     @relation(fields: [ventaId], references: [id])
+  sucursalId      String
+  sucursal        Ubicacion @relation(fields: [sucursalId], references: [id])
+  tipoComprobante String // "A", "B", etc.
+  puntoVenta      Int
+  numeroFactura   Int
+  fechaEmision    DateTime
+  cae             String?
+  vencimientoCae  DateTime?
+  estado          String // "pendiente", "procesando", "completada", "error"
+  xml             String? // XML enviado a AFIP
+  respuestaAFIP   Json? // Respuesta completa de AFIP
+  error           String?
+  qrData          String? // Datos para el código QR de AFIP
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model ConfiguracionAFIP {
+  id         String    @id @default(uuid())
+  sucursalId String    @unique
+  sucursal   Ubicacion @relation(fields: [sucursalId], references: [id])
+  cuit       String
+  puntoVenta Int
+  activo     Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 }

@@ -1,3 +1,4 @@
 {
-  "/(admin)/admin/productos/nuevo/page": "app/(admin)/admin/productos/nuevo/page.js"
+  "/favicon.ico/route": "app/favicon.ico/route.js",
+  "/page": "app/page.js"
 }

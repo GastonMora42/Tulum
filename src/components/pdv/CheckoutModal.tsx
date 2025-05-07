@@ -30,7 +30,7 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
   const [clienteCuit, setClienteCuit] = useState('');
   const [referencia, setReferencia] = useState('');
   const [currentStep, setCurrentStep] = useState(1);
-  
+  const [facturacionObligatoria, setFacturacionObligatoria] = useState(false);
   // Métodos de pago disponibles
   const paymentMethods: PaymentMethod[] = [
     { id: 'efectivo', name: 'Efectivo', icon: <DollarSign size={24} className="text-green-600" /> },
@@ -53,6 +53,17 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
     };
   }, [isOpen]);
   
+  useEffect(() => {
+    // Verificar si el método seleccionado requiere factura obligatoria
+    const esObligatoria = selectedMethod ? ['tarjeta_credito', 'tarjeta_debito', 'qr'].includes(selectedMethod) : false;
+    setFacturacionObligatoria(esObligatoria);
+    
+    // Si el pago es electrónico, establecer facturar a true
+    if (esObligatoria) {
+      setFacturar(true);
+    }
+  }, [selectedMethod]);
+
   // Actualizar monto cuando cambia el carrito
   useEffect(() => {
     const total = getTotal();
@@ -235,13 +246,22 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
             >
               Método de Pago
             </div>
-            <div 
-              className={`flex-1 border-b-2 pb-2 text-center ${
-                currentStep >= 2 ? 'border-[#9c7561] text-[#311716] font-medium' : 'border-gray-200 text-gray-400'
-              }`}
-            >
-              {facturar ? 'Facturación' : 'Detalles'}
-            </div>
+            <div className="flex items-center mb-4">
+  <input
+    id="facturar"
+    type="checkbox"
+    checked={facturar || facturacionObligatoria}
+    onChange={(e) => setFacturar(e.target.checked)}
+    disabled={facturacionObligatoria}
+    className="h-4 w-4 text-[#311716] focus:ring-[#9c7561] border-gray-300 rounded"
+  />
+  <label htmlFor="facturar" className="ml-2 block text-gray-700">
+    {facturacionObligatoria 
+      ? 'Facturación obligatoria para pagos electrónicos' 
+      : 'Generar factura'
+    }
+  </label>
+</div>
             <div 
               className={`flex-1 border-b-2 pb-2 text-center ${
                 currentStep >= 3 ? 'border-[#9c7561] text-[#311716] font-medium' : 'border-gray-200 text-gray-400'
