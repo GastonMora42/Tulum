@@ -1,14 +1,16 @@
-// src/services/facturacion/facturacionService.ts
+// src/server/services/facturacion/facturacionService.ts
+
 import { AfipSoapClient } from '@/lib/afip/afipSoapClient';
-import { FacturaData, RespuestaFacturaAFIP } from '@/types/afip';
-import { v4 as uuidv4 } from 'uuid';
 import QRCode from 'qrcode';
 import prisma from '@/server/db/client';
+import { v4 as uuidv4 } from 'uuid';
 
 export class FacturacionService {
   private afipClient: AfipSoapClient;
+  private cuit: string;
 
   constructor(cuit: string) {
+    this.cuit = cuit;
     this.afipClient = new AfipSoapClient(cuit);
   }
 
@@ -16,29 +18,34 @@ export class FacturacionService {
    * Genera el código QR requerido por AFIP
    */
   private async generarQR(factura: any): Promise<string> {
-    // Datos según especificación AFIP para QR
-    const qrData = {
-      ver: 1,
-      fecha: factura.fechaEmision.toISOString().split('T')[0],
-      cuit: factura.cuit,
-      ptoVta: factura.puntoVenta,
-      tipoCmp: factura.tipoComprobante === 'A' ? 1 : 6, // 1: Factura A, 6: Factura B
-      nroCmp: factura.numeroFactura,
-      importe: factura.venta.total,
-      moneda: 'PES',
-      ctz: 1,
-      tipoDocRec: factura.venta.clienteCuit ? 80 : 99, // 80: CUIT, 99: Consumidor Final
-      nroDocRec: factura.venta.clienteCuit || '0',
-      tipoCodAut: 'E',
-      codAut: factura.cae
-    };
+    try {
+      // Datos según especificación AFIP para QR
+      const qrData = {
+        ver: 1,
+        fecha: factura.fechaEmision.toISOString().split('T')[0],
+        cuit: this.cuit,
+        ptoVta: factura.puntoVenta,
+        tipoCmp: factura.tipoComprobante === 'A' ? 1 : 6, // 1: Factura A, 6: Factura B
+        nroCmp: factura.numeroFactura,
+        importe: factura.venta.total,
+        moneda: 'PES',
+        ctz: 1,
+        tipoDocRec: factura.venta.clienteCuit ? 80 : 99, // 80: CUIT, 99: Consumidor Final
+        nroDocRec: factura.venta.clienteCuit || '0',
+        tipoCodAut: 'E',
+        codAut: factura.cae
+      };
 
-    // Convertir a URL de AFIP
-    const qrText = `https://www.afip.gob.ar/fe/qr/?p=${Buffer.from(JSON.stringify(qrData)).toString('base64')}`;
-    
-    // Generar código QR
-    const qrImage = await QRCode.toDataURL(qrText);
-    return qrImage;
+      // Base64 encode the JSON data
+      const qrText = `https://www.afip.gob.ar/fe/qr/?p=${Buffer.from(JSON.stringify(qrData)).toString('base64')}`;
+      
+      // Generate QR code as data URL
+      const qrImage = await QRCode.toDataURL(qrText);
+      return qrImage;
+    } catch (error) {
+      console.error('Error generando QR:', error);
+      throw error;
+    }
   }
 
   /**
@@ -99,9 +106,10 @@ export class FacturacionService {
       const tipoComprobanteLetra = venta.clienteCuit ? 'A' : 'B';
 
       // Crear factura en estado pendiente
+      const facturaId = uuidv4();
       const factura = await prisma.facturaElectronica.create({
         data: {
-          id: uuidv4(),
+          id: facturaId,
           ventaId: venta.id,
           sucursalId: venta.sucursalId,
           tipoComprobante: tipoComprobanteLetra,
@@ -114,11 +122,11 @@ export class FacturacionService {
 
       // Calcular totales
       const importeTotal = venta.total;
-      const importeNeto = importeTotal / 1.21; // Para IVA 21%, ajustar según corresponda
+      const importeNeto = importeTotal / 1.21; // Para IVA 21%
       const importeIVA = importeTotal - importeNeto;
 
       // Preparar items para la factura
-      const itemsFactura = venta.items.map((item: { producto: { nombre: any; }; cantidad: number; precioUnitario: number; descuento: any; }) => ({
+      const itemsFactura = venta.items.map(item => ({
         descripcion: item.producto.nombre,
         cantidad: item.cantidad,
         precioUnitario: item.precioUnitario / 1.21, // Precio sin IVA
@@ -136,84 +144,92 @@ export class FacturacionService {
       // Fecha en formato YYYYMMDD
       const fechaComprobante = new Date().toISOString().split('T')[0].replace(/-/g, '');
 
-      // Crear factura en AFIP
-      const respuestaAFIP = await this.afipClient.createInvoice({
-        puntoVenta: configAFIP.puntoVenta,
-        comprobanteTipo,
-        concepto: 1, // 1 = Productos
-        docTipo: venta.clienteCuit ? 80 : 99, // 80 = CUIT, 99 = Consumidor Final
-        docNro: venta.clienteCuit || '0',
-        fechaComprobante,
-        importeTotal: parseFloat(importeTotal.toFixed(2)),
-        importeNeto: parseFloat(importeNeto.toFixed(2)),
-        importeIVA: parseFloat(importeIVA.toFixed(2)),
-        monedaId: 'PES', // Pesos argentinos
-        cotizacion: 1,
-        iva,
-        items: itemsFactura
-      });
+      try {
+        // Crear factura en AFIP
+        const respuestaAFIP = await this.afipClient.createInvoice({
+          puntoVenta: configAFIP.puntoVenta,
+          comprobanteTipo,
+          concepto: 1, // 1 = Productos
+          docTipo: venta.clienteCuit ? 80 : 99, // 80 = CUIT, 99 = Consumidor Final
+          docNro: venta.clienteCuit || '0',
+          fechaComprobante,
+          importeTotal: parseFloat(importeTotal.toFixed(2)),
+          importeNeto: parseFloat(importeNeto.toFixed(2)),
+          importeIVA: parseFloat(importeIVA.toFixed(2)),
+          monedaId: 'PES', // Pesos argentinos
+          cotizacion: 1,
+          iva,
+          items: itemsFactura
+        });
 
-      // Verificar resultado
-      if (respuestaAFIP.Resultado !== 'A') {
-        throw new Error(`Error en respuesta AFIP: ${JSON.stringify(respuestaAFIP.Errores || respuestaAFIP.Observaciones)}`);
-      }
-
-      // Convertir fecha CAE a Date
-      const fechaVencimiento = new Date(
-        respuestaAFIP.CAEFchVto.substring(0, 4) + '-' +
-        respuestaAFIP.CAEFchVto.substring(4, 6) + '-' +
-        respuestaAFIP.CAEFchVto.substring(6, 8)
-      );
-
-      // Actualizar factura con respuesta de AFIP
-      const facturaActualizada = await prisma.facturaElectronica.update({
-        where: { id: factura.id },
-        data: {
-          numeroFactura: respuestaAFIP.CbteNro,
-          cae: respuestaAFIP.CAE,
-          vencimientoCae: fechaVencimiento,
-          estado: 'completada',
-          respuestaAFIP: respuestaAFIP as any
+        // Verificar resultado
+        if (respuestaAFIP.Resultado !== 'A') {
+          throw new Error(`Error en respuesta AFIP: ${JSON.stringify(respuestaAFIP.Errores || respuestaAFIP.Observaciones)}`);
         }
-      });
 
-      // Generar QR
-      const datosFull = {
-        ...facturaActualizada,
-        cuit: configAFIP.cuit,
-        venta
-      };
-      
-      const qrData = await this.generarQR(datosFull);
-      
-      // Guardar QR
-      await prisma.facturaElectronica.update({
-        where: { id: factura.id },
-        data: {
-          qrData
-        }
-      });
+        // Convertir fecha CAE a Date
+        const fechaVencimiento = new Date(
+          parseInt(respuestaAFIP.CAEFchVto.substring(0, 4)),
+          parseInt(respuestaAFIP.CAEFchVto.substring(4, 6)) - 1,
+          parseInt(respuestaAFIP.CAEFchVto.substring(6, 8))
+        );
 
-      return {
-        success: true,
-        message: 'Factura generada correctamente',
-        facturaId: factura.id,
-        cae: respuestaAFIP.CAE
-      };
-    } catch (error) {
-      console.error('Error al generar factura:', error);
-
-      // Si ya se creó la factura pero falló, marcarla como error
-      if (arguments[0]) {
-        await prisma.facturaElectronica.updateMany({
-          where: { ventaId, estado: 'procesando' },
+        // Actualizar factura con respuesta de AFIP
+        const facturaActualizada = await prisma.facturaElectronica.update({
+          where: { id: factura.id },
           data: {
-            estado: 'error',
-            error: error instanceof Error ? error.message : 'Error desconocido'
+            numeroFactura: respuestaAFIP.CbteNro,
+            cae: respuestaAFIP.CAE,
+            vencimientoCae: fechaVencimiento,
+            estado: 'completada',
+            respuestaAFIP: respuestaAFIP
+          },
+          include: {
+            venta: true
           }
         });
-      }
 
+        // Generar QR
+        try {
+          const datosFull = {
+            ...facturaActualizada,
+            cuit: configAFIP.cuit
+          };
+          
+          const qrData = await this.generarQR(datosFull);
+          
+          // Guardar QR
+          await prisma.facturaElectronica.update({
+            where: { id: factura.id },
+            data: {
+              qrData
+            }
+          });
+        } catch (qrError) {
+          console.error('Error al generar QR:', qrError);
+          // No fallamos la operación completa si falla el QR
+        }
+
+        return {
+          success: true,
+          message: 'Factura generada correctamente',
+          facturaId: factura.id,
+          cae: respuestaAFIP.CAE
+        };
+      } catch (afipError) {
+        // Si falla la comunicación con AFIP, marcamos la factura como error
+        await prisma.facturaElectronica.update({
+          where: { id: factura.id },
+          data: {
+            estado: 'error',
+            error: afipError instanceof Error ? afipError.message : 'Error en comunicación con AFIP'
+          }
+        });
+        
+        throw afipError;
+      }
+    } catch (error) {
+      console.error('Error al generar factura:', error);
       throw error;
     }
   }

@@ -25,7 +25,8 @@ export function FacturaViewer({ facturaId, onClose }: FacturaViewerProps) {
         const response = await authenticatedFetch(`/api/pdv/facturas/${facturaId}`);
         
         if (!response.ok) {
-          throw new Error('Error al cargar la factura');
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Error al cargar la factura');
         }
         
         const data = await response.json();
@@ -51,7 +52,8 @@ export function FacturaViewer({ facturaId, onClose }: FacturaViewerProps) {
       });
       
       if (!response.ok) {
-        throw new Error('Error al generar PDF');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Error al generar PDF');
       }
       
       const blob = await response.blob();
@@ -78,7 +80,8 @@ export function FacturaViewer({ facturaId, onClose }: FacturaViewerProps) {
       });
       
       if (!response.ok) {
-        throw new Error('Error al generar PDF');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Error al generar PDF');
       }
       
       const blob = await response.blob();
@@ -87,10 +90,11 @@ export function FacturaViewer({ facturaId, onClose }: FacturaViewerProps) {
       // Crear link y simular clic para descargar
       const a = document.createElement('a');
       a.href = url;
-      a.download = `factura_${factura?.numeroFactura || facturaId}.pdf`;
+      a.download = `factura_${factura?.tipoComprobante || ''}_${factura?.numeroFactura || ''}.pdf`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     } catch (err) {
       console.error('Error al descargar:', err);
       setError(err instanceof Error ? err.message : 'Error desconocido');
@@ -176,7 +180,7 @@ export function FacturaViewer({ facturaId, onClose }: FacturaViewerProps) {
           <div>
             <h3 className="text-lg font-semibold mb-2 text-[#311716]">Información del Emisor</h3>
             <p className="text-gray-700">Tulum Aromaterapia</p>
-            <p className="text-gray-700">CUIT: {/* Aquí debería ir el CUIT de config */}</p>
+            <p className="text-gray-700">CUIT: {factura.respuestaAFIP?.Auth?.Cuit || 'N/A'}</p>
             <p className="text-gray-700">
               Punto de Venta: {String(factura.puntoVenta).padStart(4, '0')}
             </p>
@@ -221,7 +225,7 @@ export function FacturaViewer({ facturaId, onClose }: FacturaViewerProps) {
                       ${item.precioUnitario.toFixed(2)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                      ${(item.cantidad * item.precioUnitario).toFixed(2)}
+                      ${(item.cantidad * item.precioUnitario * (1 - item.descuento / 100)).toFixed(2)}
                     </td>
                   </tr>
                 ))}
@@ -266,12 +270,18 @@ export function FacturaViewer({ facturaId, onClose }: FacturaViewerProps) {
           
           {factura.qrData && (
             <div className="mt-4 md:mt-0">
-              <Image 
-                src={factura.qrData} 
-                alt="Código QR AFIP" 
-                width={100} 
-                height={100} 
-              />
+              {factura.qrData.startsWith('data:image') ? (
+                <img 
+                  src={factura.qrData} 
+                  alt="Código QR AFIP" 
+                  width={100} 
+                  height={100} 
+                />
+              ) : (
+                <div className="bg-gray-200 w-[100px] h-[100px] flex items-center justify-center text-xs text-gray-500">
+                  QR no disponible
+                </div>
+              )}
             </div>
           )}
         </div>

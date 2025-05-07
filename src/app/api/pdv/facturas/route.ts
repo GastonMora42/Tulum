@@ -1,4 +1,5 @@
 // src/app/api/pdv/facturas/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 import { authMiddleware } from '@/server/api/middlewares/auth';
 import prisma from '@/server/db/client';
@@ -11,31 +12,69 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { ventaId, sucursalId } = body;
+    const { ventaId } = body;
 
     if (!ventaId) {
-      return NextResponse.json({ error: 'Venta ID es requerido' }, { status: 400 });
+      return NextResponse.json({ error: 'El ID de venta es requerido' }, { status: 400 });
     }
 
-    // Usar sucursalId del body o buscarlo en la venta
-    let sucId = sucursalId;
-    if (!sucId) {
-      const venta = await prisma.venta.findUnique({
-        where: { id: ventaId }
-      });
-      if (!venta) {
-        return NextResponse.json({ error: 'Venta no encontrada' }, { status: 404 });
+    // Verificar si la venta existe
+    const venta = await prisma.venta.findUnique({
+      where: { id: ventaId },
+      include: {
+        sucursal: true,
+        facturaElectronica: true
       }
-      sucId = venta.sucursalId;
+    });
+
+    if (!venta) {
+      return NextResponse.json({ error: 'Venta no encontrada' }, { status: 404 });
+    }
+
+    // Verificar si ya tiene factura
+    if (venta.facturaElectronica) {
+      return NextResponse.json({ 
+        message: 'La venta ya tiene una factura asociada',
+        facturaId: venta.facturaElectronica.id,
+        success: true
+      });
+    }
+
+    // Verificar si la sucursal tiene configuración AFIP
+    const config = await prisma.configuracionAFIP.findFirst({
+      where: { 
+        sucursalId: venta.sucursalId,
+        activo: true
+      }
+    });
+
+    if (!config) {
+      return NextResponse.json({ 
+        error: 'La sucursal no tiene configuración AFIP activa' 
+      }, { status: 400 });
     }
 
     // Obtener servicio de facturación
-    const facturacionService = await getFacturacionService(sucId);
+    const facturacionService = await getFacturacionService(venta.sucursalId);
     
     // Generar factura
     const resultado = await facturacionService.generarFactura(ventaId);
     
-    return NextResponse.json(resultado);
+    if (!resultado.success) {
+      throw new Error(resultado.message || 'Error al generar factura');
+    }
+    
+    // Marcar venta como facturada
+    await prisma.venta.update({
+      where: { id: ventaId },
+      data: { facturada: true }
+    });
+    
+    return NextResponse.json({
+      success: true,
+      message: resultado.message || 'Factura generada correctamente',
+      facturaId: resultado.facturaId
+    });
   } catch (error) {
     console.error('Error en facturación:', error);
     return NextResponse.json(
@@ -69,7 +108,8 @@ export async function GET(req: NextRequest) {
             sucursal: true
           }
         }
-      }
+      },
+      orderBy: { createdAt: 'desc' }
     });
     
     return NextResponse.json(facturas);

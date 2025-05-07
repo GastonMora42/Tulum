@@ -1,12 +1,9 @@
 // src/lib/afip/afipSoapClient.ts
+
 import * as soap from 'soap';
-import * as fs from 'fs';
-import * as path from 'path';
 import * as crypto from 'crypto';
-import { promisify } from 'util';
 import { parseStringPromise } from 'xml2js';
 import { AFIP_CONFIG } from '@/config/afip';
-import { TokenAFIP } from '@/types/afip';
 
 export class AfipSoapClient {
   private wsaaUrl: string;
@@ -38,6 +35,8 @@ export class AfipSoapClient {
 
   /**
    * Crea el ticket de autenticación CMS
+   * Nota: Esta es una implementación simplificada. En un entorno real, se requiere 
+   * generar correctamente el mensaje PKCS#7/CMS usando una librería adecuada.
    */
   private async createCMS(): Promise<string> {
     try {
@@ -57,40 +56,29 @@ export class AfipSoapClient {
   <service>${AFIP_CONFIG.service}</service>
 </loginTicketRequest>`;
 
-      // Firmar TRA con certificado
+      // IMPORTANTE: Esta implementación es simplificada
+      // En producción, use node-forge u otra biblioteca para generar correctamente el mensaje CMS/PKCS#7
+      // lo que sigue es solo para propósitos de ejemplo y NO funcionará con AFIP:
+      
       const sign = crypto.createSign('sha256');
       sign.update(tra);
       sign.end();
-      const signature = sign.sign({ key: this.key, cert: this.cert });
-
-      // Crear CMS
-      const cms = crypto.createSigner('sha256');
-      cms.update(tra);
-      cms.end();
+      const signature = sign.sign({ key: this.key }, 'base64');
       
-      // Esta línea es simplificada, en la implementación real necesitarías una librería como node-forge
-      // o pkcs7 para crear adecuadamente el mensaje CMS (la librería afip.js tiene una implementación)
-      // Para propósitos del código, asumimos que esta función existe
-      const cmsTra = this.createCMSMessage(tra, signature, this.cert);
-      
-      return cmsTra;
+      // Simular el mensaje CMS (esto NO es correcto para uso real)
+      // Solo para fines demostrativos
+      return Buffer.from(tra).toString('base64');
     } catch (error) {
       console.error('Error creando CMS:', error);
       throw new Error('No se pudo crear el CMS para autenticación');
     }
   }
 
-  // Función mock que necesitaría implementarse usando una librería PKCS#7 real
-  private createCMSMessage(tra: string, signature: Buffer, cert: string): string {
-    // En una implementación real, se usaría node-forge, pkcs7 u otra librería
-    // para generar el mensaje CMS correctamente
-    return Buffer.from(tra).toString('base64');
-  }
-
   /**
    * Autentica con AFIP y obtiene token y sign
+   * NOTA: Esta es una implementación simplificada para desarrollo.
    */
-  private async authenticate(): Promise<TokenAFIP> {
+  private async authenticate(): Promise<{token: string; sign: string; expirationTime: Date}> {
     try {
       // Crear CMS
       const cms = await this.createCMS();
@@ -131,10 +119,15 @@ export class AfipSoapClient {
    */
   public async getAuth(): Promise<{ Token: string; Sign: string; Cuit: string }> {
     if (!this.isTokenValid()) {
-      const auth = await this.authenticate();
-      this.token = auth.token;
-      this.sign = auth.sign;
-      this.tokenExpiration = auth.expirationTime;
+      try {
+        const auth = await this.authenticate();
+        this.token = auth.token;
+        this.sign = auth.sign;
+        this.tokenExpiration = auth.expirationTime;
+      } catch (error) {
+        console.error('Error al obtener token AFIP:', error);
+        throw error;
+      }
     }
     
     return {
@@ -168,6 +161,9 @@ export class AfipSoapClient {
 
   /**
    * Crea una nueva factura electrónica
+   * Este método implementa la lógica para comunicarse con AFIP.
+   * En un entorno de producción real, deberás usar certificados válidos y
+   * modificar el código según la documentación oficial de AFIP.
    */
   public async createInvoice(params: {
     puntoVenta: number;
@@ -243,6 +239,12 @@ export class AfipSoapClient {
       
       // Procesar respuesta
       const response = result[0].FECAESolicitarResult;
+      
+      // Verificar si hay errores
+      if (response.Errors) {
+        throw new Error(`Error AFIP: ${JSON.stringify(response.Errors)}`);
+      }
+      
       const respDetalle = response.FeDetResp.FECAEDetResponse;
       
       return {

@@ -1,4 +1,5 @@
 // src/app/api/admin/configuracion/afip/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 import { authMiddleware } from '@/server/api/middlewares/auth';
 import { checkPermission } from '@/server/api/middlewares/authorization';
@@ -15,7 +16,12 @@ export async function GET(req: NextRequest) {
   try {
     const configuraciones = await prisma.configuracionAFIP.findMany({
       include: {
-        sucursal: true
+        sucursal: {
+          select: {
+            id: true,
+            nombre: true
+          }
+        }
       }
     });
     
@@ -66,6 +72,18 @@ export async function POST(req: NextRequest) {
     if (!sucursal) {
       return NextResponse.json(
         { error: 'La sucursal no existe' },
+        { status: 400 }
+      );
+    }
+    
+    // Verificar si ya existe configuración para esta sucursal
+    const existingConfig = await prisma.configuracionAFIP.findFirst({
+      where: { sucursalId }
+    });
+    
+    if (existingConfig) {
+      return NextResponse.json(
+        { error: 'Ya existe una configuración para esta sucursal' },
         { status: 400 }
       );
     }

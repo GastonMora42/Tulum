@@ -1,4 +1,5 @@
 // src/app/api/admin/configuracion/afip/[id]/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 import { authMiddleware } from '@/server/api/middlewares/auth';
 import { checkPermission } from '@/server/api/middlewares/authorization';
@@ -40,6 +41,35 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
       );
     }
     
+    // Verificar que existe la configuración
+    const existingConfig = await prisma.configuracionAFIP.findUnique({
+      where: { id }
+    });
+    
+    if (!existingConfig) {
+      return NextResponse.json(
+        { error: 'Configuración no encontrada' },
+        { status: 404 }
+      );
+    }
+    
+    // Si cambia la sucursal, verificar que no exista otra config para esa sucursal
+    if (sucursalId !== existingConfig.sucursalId) {
+      const otherConfig = await prisma.configuracionAFIP.findFirst({
+        where: {
+          sucursalId,
+          id: { not: id }
+        }
+      });
+      
+      if (otherConfig) {
+        return NextResponse.json(
+          { error: 'Ya existe una configuración para esta sucursal' },
+          { status: 400 }
+        );
+      }
+    }
+    
     // Actualizar configuración
     const config = await prisma.configuracionAFIP.update({
       where: { id },
@@ -47,6 +77,14 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
         sucursalId,
         cuit,
         puntoVenta
+      },
+      include: {
+        sucursal: {
+          select: {
+            id: true,
+            nombre: true
+          }
+        }
       }
     });
     
@@ -79,6 +117,30 @@ export async function DELETE(req: NextRequest, { params }: RouteParams) {
   
   try {
     const { id } = params;
+    
+    // Verificar que existe la configuración
+    const existingConfig = await prisma.configuracionAFIP.findUnique({
+      where: { id }
+    });
+    
+    if (!existingConfig) {
+      return NextResponse.json(
+        { error: 'Configuración no encontrada' },
+        { status: 404 }
+      );
+    }
+    
+    // Verificar si tiene facturas asociadas
+    const facturasCount = await prisma.facturaElectronica.count({
+      where: { sucursalId: existingConfig.sucursalId }
+    });
+    
+    if (facturasCount > 0) {
+      return NextResponse.json(
+        { error: `No se puede eliminar la configuración porque tiene ${facturasCount} facturas asociadas` },
+        { status: 400 }
+      );
+    }
     
     // Eliminar configuración
     await prisma.configuracionAFIP.delete({
