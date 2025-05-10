@@ -1,10 +1,11 @@
-// src/app/(pdv)/pdv/page.tsx
+// src/app/(pdv)/pdv/page.tsx (actualización para añadir escáner)
 'use client';
 
 import { useState, useEffect } from 'react';
 import { ProductSearch } from '@/components/pdv/ProductSearch';
 import { CartDisplay } from '@/components/pdv/CartDisplay';
 import { CheckoutModal } from '@/components/pdv/CheckoutModal';
+import { BarcodeScanner } from '@/components/pdv/BarcodeScanner';
 import { useCartStore } from '@/stores/cartStore';
 import { useOffline } from '@/hooks/useOffline';
 import { SucursalSetupModal } from '@/components/pdv/SucursalSetupModal';
@@ -13,11 +14,10 @@ import {
   AlertCircle, 
   CheckCircle, 
   X, 
-  Tag, 
-  Search,
+  QrCode,
   Package,
-  Layers,
-  Grid
+  Grid,
+  Layers
 } from 'lucide-react';
 import { Producto } from '@/types/models/producto';
 
@@ -31,11 +31,12 @@ export default function PDVPage() {
   const [productosPopulares, setProductosPopulares] = useState<Producto[]>([]);
   const [activeCategory, setActiveCategory] = useState<string>('todos');
   const [isMobileView, setIsMobileView] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
   
   const { addItem, items } = useCartStore();
   const { isOnline } = useOffline();
   
-  // Check if mobile view
+  // Verificar el tamaño de pantalla
   useEffect(() => {
     const checkMobile = () => {
       setIsMobileView(window.innerWidth < 768);
@@ -66,7 +67,7 @@ export default function PDVPage() {
           return;
         }
         
-        // Usar authenticatedFetch en lugar de fetch
+        // Verificar estado de la caja
         const response = await authenticatedFetch(`/api/pdv/cierre?sucursalId=${sucursalId}`);
         
         if (response.status === 404) {
@@ -105,14 +106,6 @@ export default function PDVPage() {
     checkCajaAbierta();
   }, [isOnline]);
 
-  const handleSucursalSetup = (sucursalId?: string) => {
-    setShowSucursalModal(false);
-    
-    if (sucursalId) {
-      window.location.reload();
-    }
-  };
-  
   // Función para abrir caja
   const handleAbrirCaja = async () => {
     try {
@@ -135,7 +128,7 @@ export default function PDVPage() {
         throw new Error('El monto inicial debe ser un número válido mayor o igual a cero');
       }
       
-      // Crear caja usando authenticatedFetch
+      // Crear caja
       const response = await authenticatedFetch('/api/pdv/cierre', {
         method: 'POST',
         headers: {
@@ -165,6 +158,57 @@ export default function PDVPage() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+  
+  // Manejar selección de producto por el escáner
+  const handleBarcodeScanned = async (code: string) => {
+    try {
+      const sucursalId = localStorage.getItem('sucursalId');
+      if (!sucursalId) {
+        throw new Error('No se ha definido una sucursal');
+      }
+      
+      // Buscar producto por código de barras
+      const response = await authenticatedFetch(`/api/productos/barcode?code=${encodeURIComponent(code)}&sucursalId=${sucursalId}`);
+      
+      if (!response.ok) {
+        throw new Error('Producto no encontrado');
+      }
+      
+      const producto = await response.json();
+      
+      // Verificar stock disponible
+      if (producto.stock <= 0) {
+        setNotification({
+          type: 'error',
+          message: `El producto "${producto.nombre}" no tiene stock disponible`
+        });
+        return;
+      }
+      
+      // Agregar al carrito
+      addItem(producto);
+      
+      setNotification({
+        type: 'success',
+        message: `"${producto.nombre}" agregado al carrito`
+      });
+      
+      // Auto-limpiar notificación después de 1.5 segundos
+      setTimeout(() => {
+        setNotification(null);
+      }, 1500);
+    } catch (error) {
+      console.error('Error al buscar producto por código de barras:', error);
+      setNotification({
+        type: 'error',
+        message: error instanceof Error ? error.message : 'Error al buscar producto'
+      });
+      
+      setTimeout(() => {
+        setNotification(null);
+      }, 3000);
     }
   };
   
@@ -296,23 +340,59 @@ export default function PDVPage() {
         </div>
       )}
       
-      {/* Área de productos - Responsive */}
-      <div className={`${isMobileView ? 'col-span-1' : 'lg:col-span-2'} ${isMobileView && items.length > 0 ? 'hidden' : 'block'} bg-white rounded-xl shadow-sm overflow-hidden flex flex-col`}>
-        <div className="p-4 border-b border-gray-100 bg-gray-50">
-          <h2 className="text-xl font-bold text-[#311716] mb-3">Productos</h2>
-          <ProductSearch onProductSelect={handleProductSelect} className="mt-3" />
+      {/* Modal de sucursal */}
+      <SucursalSetupModal
+        isOpen={showSucursalModal}
+        onClose={(sucursalId) => {
+          setShowSucursalModal(false);
+          if (sucursalId) window.location.reload();
+        }}
+      />
+      
+      {/* Área de productos y escáner */}
+      <div className={`${isMobileView ? 'col-span-1' : 'lg:col-span-2'} ${isMobileView && items.length > 0 ? 'hidden' : 'block'} flex flex-col gap-4`}>
+        {/* Escáner en la parte superior */}
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+            <h2 className="text-lg font-bold text-[#311716]">
+              {showScanner ? 'Escáner de Productos' : 'Búsqueda de Productos'}
+            </h2>
+            <button
+              onClick={() => setShowScanner(!showScanner)}
+              className={`p-2 rounded-lg ${
+                showScanner ? 'bg-gray-100 text-gray-700' : 'bg-[#311716] text-white'
+              } transition-colors`}
+              aria-label={showScanner ? 'Mostrar buscador' : 'Mostrar escáner'}
+            >
+              {showScanner ? <Grid size={20} /> : <QrCode size={20} />}
+            </button>
+          </div>
+          
+          <div className="p-4">
+            {showScanner ? (
+              <BarcodeScanner 
+                onScan={handleBarcodeScanned}
+                onError={(error) => {
+                  setNotification({
+                    type: 'error',
+                    message: error.message || 'Error en el escáner'
+                  });
+                }}
+              />
+            ) : (
+              <ProductSearch onProductSelect={handleProductSelect} className="w-full" />
+            )}
+          </div>
         </div>
-
-        <SucursalSetupModal
-          isOpen={showSucursalModal}
-          onClose={handleSucursalSetup}
-        />
         
-        <div className="flex-grow p-4 overflow-y-auto">
-          {/* Categorías */}
-          {categoriasProductos.length > 0 && (
-            <div className="mb-6 overflow-x-auto pb-2">
-              <div className="flex space-x-2 min-w-max">
+        {/* Lista de productos */}
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden flex-1">
+          <div className="p-4 border-b border-gray-100 bg-gray-50">
+            <h2 className="text-lg font-bold text-[#311716] mb-3">Productos</h2>
+            
+            {/* Categorías */}
+            {categoriasProductos.length > 0 && (
+              <div className="flex space-x-2 overflow-x-auto pb-2">
                 <button
                   onClick={() => setActiveCategory('todos')}
                   className={`${
@@ -332,21 +412,16 @@ export default function PDVPage() {
                       activeCategory === categoria.id 
                         ? 'bg-[#311716] text-white' 
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    } px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-150 flex items-center`}
+                    } px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-150 whitespace-nowrap`}
                   >
-                    <Tag size={14} className="mr-1" />
                     {categoria.nombre}
                   </button>
                 ))}
               </div>
-            </div>
-          )}
+            )}
+          </div>
           
-          {/* Productos */}
-          <div>
-            <h3 className="text-lg font-semibold text-[#311716] mb-4">
-              {activeCategory === 'todos' ? 'Productos Destacados' : 'Productos de la Categoría'}
-            </h3>
+          <div className="p-4 overflow-y-auto max-h-[calc(100vh-26rem)]">
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
               {filteredProducts.length > 0 ? (
                 filteredProducts.map((producto) => (
@@ -385,11 +460,11 @@ export default function PDVPage() {
         <CartDisplay onCheckout={handleCheckout} className="h-full bg-white rounded-xl shadow-sm" />
       </div>
 
-      {/* Mobile Toggle View Button */}
+      {/* Botón para intercambiar vistas en móvil */}
       {isMobileView && (
         <button
           onClick={() => {}}
-          className="fixed bottom-4 right-4 z-40 bg-[#311716] text-white p-3 rounded-full shadow-lg"
+          className="fixed bottom-16 right-4 z-40 bg-[#311716] text-white p-3 rounded-full shadow-lg"
         >
           {items.length === 0 ? (
             <Grid size={24} />

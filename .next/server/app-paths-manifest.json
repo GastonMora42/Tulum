@@ -1,14 +1,13 @@
 {
-  "/api/auth/me/route": "app/api/auth/me/route.js",
-  "/api/reportes/stock/bajo/route": "app/api/reportes/stock/bajo/route.js",
   "/_not-found/page": "app/_not-found/page.js",
-  "/api/contingencias/route": "app/api/contingencias/route.js",
-  "/api/admin/productos/route": "app/api/admin/productos/route.js",
   "/api/pdv/cierre/route": "app/api/pdv/cierre/route.js",
   "/api/admin/categorias/route": "app/api/admin/categorias/route.js",
   "/api/pdv/productos-disponibles/route": "app/api/pdv/productos-disponibles/route.js",
+  "/favicon.ico/route": "app/favicon.ico/route.js",
+  "/api/auth/me/route": "app/api/auth/me/route.js",
   "/page": "app/page.js",
   "/(auth)/login/page": "app/(auth)/login/page.js",
   "/(admin)/admin/page": "app/(admin)/admin/page.js",
-  "/(pdv)/pdv/page": "app/(pdv)/pdv/page.js"
+  "/(pdv)/pdv/page": "app/(pdv)/pdv/page.js",
+  "/(pdv)/pdv/ventas/page": "app/(pdv)/pdv/ventas/page.js"
 }

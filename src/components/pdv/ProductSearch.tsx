@@ -6,7 +6,7 @@ import { useOffline } from '@/hooks/useOffline';
 import { Search, Loader, Tag, Package, Camera } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
 import { Producto } from '@/types/models/producto';
-import { BarcodeScannerButton } from './BarcodeScanner';
+import { BarcodeScanner } from './BarcodeScanner';
 
 interface ProductSearchProps {
   onProductSelect: (product: Producto) => void;
@@ -143,7 +143,7 @@ export function ProductSearch({ onProductSelect, className = '' }: ProductSearch
           )}
         </div>
         
-        <BarcodeScannerButton onScan={handleBarcodeScan} />
+        <BarcodeScanner onScan={handleBarcodeScan} />
       </div>
 
       {showResults && results.length > 0 && (
