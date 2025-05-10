@@ -1,15 +1,21 @@
-// src/components/pdv/CheckoutModal.tsx (versión mejorada)
+// src/components/pdv/CheckoutModal.tsx - Actualizado para múltiples métodos de pago
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useCartStore } from '@/stores/cartStore';
-import { CreditCard, DollarSign, QrCode, Smartphone, X, Check, Loader } from 'lucide-react';
+import { CreditCard, DollarSign, QrCode, Smartphone, X, Check, Loader, Plus, Trash } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
 
 interface PaymentMethod {
   id: string;
   name: string;
   icon: React.ReactNode;
+}
+
+interface Payment {
+  method: string;
+  amount: number;
+  reference?: string;
 }
 
 interface CheckoutModalProps {
@@ -20,17 +26,17 @@ interface CheckoutModalProps {
 
 export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProps) {
   const { items, getTotal, clearCart } = useCartStore();
-  const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
-  const [amount, setAmount] = useState<number>(0);
+  const [payments, setPayments] = useState<Payment[]>([{ method: 'efectivo', amount: 0, reference: '' }]);
   const [amountTendered, setAmountTendered] = useState<string>('');
   const [change, setChange] = useState<number>(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const [facturar, setFacturar] = useState(false);
   const [clienteNombre, setClienteNombre] = useState('');
   const [clienteCuit, setClienteCuit] = useState('');
-  const [referencia, setReferencia] = useState('');
   const [currentStep, setCurrentStep] = useState(1);
   const [facturacionObligatoria, setFacturacionObligatoria] = useState(false);
+  const [remainingAmount, setRemainingAmount] = useState<number>(0);
+
   // Métodos de pago disponibles
   const paymentMethods: PaymentMethod[] = [
     { id: 'efectivo', name: 'Efectivo', icon: <DollarSign size={24} className="text-green-600" /> },
@@ -41,9 +47,14 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
   ];
   
   useEffect(() => {
-    // Lock body scroll when modal is open
     if (isOpen) {
       document.body.style.overflow = 'hidden';
+      
+      // Inicializar el primer método de pago con el total
+      const total = getTotal();
+      setPayments([{ method: 'efectivo', amount: total, reference: '' }]);
+      setAmountTendered(total.toFixed(2));
+      setRemainingAmount(0);
     } else {
       document.body.style.overflow = '';
     }
@@ -51,62 +62,184 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
     return () => {
       document.body.style.overflow = '';
     };
-  }, [isOpen]);
+  }, [isOpen, getTotal]);
   
-  useEffect(() => {
-    // Verificar si el método seleccionado requiere factura obligatoria
-    const esObligatoria = selectedMethod ? ['tarjeta_credito', 'tarjeta_debito', 'qr'].includes(selectedMethod) : false;
-    setFacturacionObligatoria(esObligatoria);
-    
-    // Si el pago es electrónico, establecer facturar a true
-    if (esObligatoria) {
-      setFacturar(true);
-    }
-  }, [selectedMethod]);
-
   // Actualizar monto cuando cambia el carrito
   useEffect(() => {
     const total = getTotal();
-    setAmount(total);
-    // Pre-llenar el monto exacto para efectivo
-    if (selectedMethod === 'efectivo') {
-      setAmountTendered(total.toFixed(2));
+    const paidAmount = payments.reduce((sum, payment) => sum + payment.amount, 0);
+    const remaining = Math.max(0, total - paidAmount);
+    setRemainingAmount(remaining);
+
+    // Si solo hay un método de pago, actualizar automáticamente su cantidad al total
+    if (payments.length === 1) {
+      setPayments([{ ...payments[0], amount: total }]);
+      if (payments[0].method === 'efectivo') {
+        setAmountTendered(total.toFixed(2));
+      }
     }
-  }, [getTotal, selectedMethod]);
+  }, [getTotal, payments.length]);
   
   // Calcular cambio cuando cambia el monto entregado
   useEffect(() => {
-    if (selectedMethod === 'efectivo' && amountTendered !== '') {
-      const tendered = parseFloat(amountTendered);
-      if (!isNaN(tendered)) {
-        setChange(Math.max(0, tendered - amount));
-      } else {
-        setChange(0);
+    if (payments.some(p => p.method === 'efectivo') && amountTendered !== '') {
+      const effectivePayment = payments.find(p => p.method === 'efectivo');
+      if (effectivePayment) {
+        const tendered = parseFloat(amountTendered);
+        if (!isNaN(tendered)) {
+          setChange(Math.max(0, tendered - effectivePayment.amount));
+        } else {
+          setChange(0);
+        }
       }
     } else {
       setChange(0);
     }
-  }, [amount, amountTendered, selectedMethod]);
+  }, [amountTendered, payments]);
 
   // Resetear cuando se cierra
   useEffect(() => {
     if (!isOpen) {
       setTimeout(() => {
-        setSelectedMethod(null);
+        setPayments([{ method: 'efectivo', amount: 0, reference: '' }]);
         setAmountTendered('');
         setFacturar(false);
         setClienteNombre('');
         setClienteCuit('');
-        setReferencia('');
         setCurrentStep(1);
+        setRemainingAmount(0);
       }, 300);
     }
   }, [isOpen]);
+
+  // Manejar cambio en método de pago
+  const handlePaymentMethodChange = (index: number, methodId: string) => {
+    const newPayments = [...payments];
+    newPayments[index] = { ...newPayments[index], method: methodId, reference: '' };
+    setPayments(newPayments);
+    
+    // Verificar si hay facturación obligatoria
+    const requiresInvoice = ['tarjeta_credito', 'tarjeta_debito', 'qr'].includes(methodId);
+    setFacturacionObligatoria(requiresInvoice);
+    if (requiresInvoice) setFacturar(true);
+  };
+
+  // Manejar cambio en monto de pago
+  const handlePaymentAmountChange = (index: number, value: string) => {
+    const amount = parseFloat(value);
+    if (isNaN(amount) || amount < 0) return;
+    
+    const total = getTotal();
+    const newPayments = [...payments];
+    newPayments[index] = { ...newPayments[index], amount };
+    
+    // Calcular restante
+    const paidAmount = newPayments.reduce((sum, payment, i) => i !== index ? sum + payment.amount : sum + amount, 0);
+    const remaining = Math.max(0, total - paidAmount);
+    
+    setRemainingAmount(remaining);
+    setPayments(newPayments);
+    
+    // Si es efectivo, actualizar también el monto entregado
+    if (newPayments[index].method === 'efectivo') {
+      setAmountTendered(amount.toFixed(2));
+    }
+  };
+
+  // Agregar método de pago adicional
+  const addPaymentMethod = () => {
+    if (payments.length < 2 && remainingAmount > 0) {
+      // Evitar duplicar el mismo método
+      const availableMethods = paymentMethods.filter(method => 
+        !payments.some(p => p.method === method.id)
+      );
+      
+      if (availableMethods.length > 0) {
+        const newPayments = [...payments];
+        newPayments.push({ 
+          method: availableMethods[0].id, 
+          amount: remainingAmount,
+          reference: '' 
+        });
+        setPayments(newPayments);
+        setRemainingAmount(0);
+      }
+    }
+  };
+
+  // Eliminar método de pago
+  const removePaymentMethod = (index: number) => {
+    if (payments.length > 1) {
+      const removedPayment = payments[index];
+      const newPayments = payments.filter((_, i) => i !== index);
+      
+      // Recalcular restante
+      const newRemainingAmount = remainingAmount + removedPayment.amount;
+      
+      setPayments(newPayments);
+      setRemainingAmount(newRemainingAmount);
+      
+      // Si el único pago restante es efectivo, actualizar su monto
+      if (newPayments.length === 1 && newPayments[0].method === 'efectivo') {
+        const totalAmount = getTotal();
+        newPayments[0].amount = totalAmount;
+        setAmountTendered(totalAmount.toFixed(2));
+        setRemainingAmount(0);
+      }
+    }
+  };
+
+  // Manejar cambio en referencia de pago
+  const handleReferenceChange = (index: number, value: string) => {
+    const newPayments = [...payments];
+    newPayments[index] = { ...newPayments[index], reference: value };
+    setPayments(newPayments);
+  };
   
   // Ir al siguiente paso
   const goToNextStep = () => {
-    if (currentStep === 1 && !selectedMethod) {
-      return; // No avanzar si no se seleccionó método de pago
+    if (currentStep === 1) {
+      // Validar que se han seleccionado métodos de pago
+      const totalPaid = payments.reduce((sum, payment) => sum + payment.amount, 0);
+      const total = getTotal();
+      
+      if (Math.abs(totalPaid - total) > 0.01) {
+        alert('El monto total de los pagos debe ser igual al total de la venta.');
+        return;
+      }
+      
+      // Validar que los pagos en efectivo tienen monto entregado
+      const effectivePayment = payments.find(p => p.method === 'efectivo');
+      if (effectivePayment) {
+        const tendered = parseFloat(amountTendered);
+        if (isNaN(tendered) || tendered < effectivePayment.amount) {
+          alert('El monto entregado en efectivo debe ser igual o mayor al monto a pagar.');
+          return;
+        }
+      }
+      
+      // Validar que los pagos con tarjeta tienen referencia
+      const cardPayments = payments.filter(p => 
+        p.method === 'tarjeta_credito' || p.method === 'tarjeta_debito'
+      );
+      
+      if (cardPayments.some(p => !p.reference)) {
+        alert('Debe ingresar un número de referencia para los pagos con tarjeta.');
+        return;
+      }
+    }
+    
+    if (currentStep === 2 && facturar) {
+      // Validar datos de facturación
+      if (!clienteNombre) {
+        alert('Debe ingresar el nombre del cliente para facturar.');
+        return;
+      }
+      
+      if (!clienteCuit) {
+        alert('Debe ingresar el CUIT/DNI del cliente para facturar.');
+        return;
+      }
     }
     
     setCurrentStep(currentStep + 1);
@@ -119,42 +252,16 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
   
   // Procesar pago
   const handleProcessPayment = async () => {
-    if (!selectedMethod) return;
-    
     setIsProcessing(true);
     
     try {
-      // Validaciones específicas según método de pago
-      if (selectedMethod === 'efectivo') {
-        const tendered = parseFloat(amountTendered);
-        if (isNaN(tendered) || tendered < amount) {
-          throw new Error('El monto entregado debe ser igual o mayor al total');
-        }
-      } else if (selectedMethod === 'tarjeta_credito' || selectedMethod === 'tarjeta_debito') {
-        if (!referencia) {
-          throw new Error('Ingrese el número de referencia de la tarjeta');
-        }
-      }
+      // Verificar montos de pago
+      const totalPaid = payments.reduce((sum, payment) => sum + payment.amount, 0);
+      const total = getTotal();
       
-      // Validar facturación
-      if (facturar) {
-        if (!clienteNombre) {
-          throw new Error('Ingrese el nombre del cliente para facturar');
-        }
-        if (!clienteCuit) {
-          throw new Error('Ingrese el CUIT/DNI del cliente para facturar');
-        }
+      if (Math.abs(totalPaid - total) > 0.01) {
+        throw new Error('El monto total de los pagos debe ser igual al total de la venta.');
       }
-      
-      // Crear datos de pago
-      const pagos = [{
-        medioPago: selectedMethod,
-        monto: amount,
-        referencia: referencia || undefined,
-        datosPago: selectedMethod === 'efectivo' 
-          ? { entregado: parseFloat(amountTendered), cambio: change } 
-          : {}
-      }];
       
       // Obtener sucursalId
       const sucursalId = localStorage.getItem('sucursalId');
@@ -171,12 +278,19 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
           precioUnitario: item.precio,
           descuento: item.descuento
         })),
-        total: amount,
+        total,
         descuento: 0, // Actualizar si hay descuento general
         facturar,
         clienteNombre: facturar ? clienteNombre : null,
         clienteCuit: facturar ? clienteCuit : null,
-        pagos
+        pagos: payments.map(payment => ({
+          medioPago: payment.method,
+          monto: payment.amount,
+          referencia: payment.reference || undefined,
+          datosPago: payment.method === 'efectivo' 
+            ? { entregado: parseFloat(amountTendered), cambio: change } 
+            : {}
+        }))
       };
       
       // Enviar la venta al servidor
@@ -214,6 +328,7 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
         success: false, 
         message: error instanceof Error ? error.message : 'Error al procesar el pago' 
       });
+    } finally {
       setIsProcessing(false);
     }
   };
@@ -246,22 +361,13 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
             >
               Método de Pago
             </div>
-            <div className="flex items-center mb-4">
-  <input
-    id="facturar"
-    type="checkbox"
-    checked={facturar || facturacionObligatoria}
-    onChange={(e) => setFacturar(e.target.checked)}
-    disabled={facturacionObligatoria}
-    className="h-4 w-4 text-[#311716] focus:ring-[#9c7561] border-gray-300 rounded"
-  />
-  <label htmlFor="facturar" className="ml-2 block text-gray-700">
-    {facturacionObligatoria 
-      ? 'Facturación obligatoria para pagos electrónicos' 
-      : 'Generar factura'
-    }
-  </label>
-</div>
+            <div 
+              className={`flex-1 border-b-2 pb-2 text-center ${
+                currentStep >= 2 ? 'border-[#9c7561] text-[#311716] font-medium' : 'border-gray-200 text-gray-400'
+              }`}
+            >
+              Datos Cliente
+            </div>
             <div 
               className={`flex-1 border-b-2 pb-2 text-center ${
                 currentStep >= 3 ? 'border-[#9c7561] text-[#311716] font-medium' : 'border-gray-200 text-gray-400'
@@ -276,39 +382,143 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
             <>
               <div className="mb-6">
                 <div className="font-medium text-gray-700 mb-2">Total a pagar:</div>
-                <div className="text-3xl font-bold text-[#311716]">${amount.toFixed(2)}</div>
+                <div className="text-3xl font-bold text-[#311716]">${getTotal().toFixed(2)}</div>
               </div>
               
-              <div className="mb-6">
-                <div className="font-medium text-gray-700 mb-2">Seleccione método de pago:</div>
-                <div className="grid grid-cols-2 gap-3 mb-4">
-                  {paymentMethods.map((method) => (
-                    <button
-                      key={method.id}
-                      onClick={() => setSelectedMethod(method.id)}
-                      className={`p-4 rounded-lg border flex flex-col items-center justify-center gap-2 transition-colors ${
-                        selectedMethod === method.id
-                          ? 'border-[#9c7561] bg-[#eeb077]/10 text-[#311716]'
-                          : 'border-gray-200 hover:bg-gray-50'
-                      }`}
-                    >
-                      {method.icon}
-                      <span className="font-medium">{method.name}</span>
-                    </button>
-                  ))}
-                </div>
+              {/* Mostrar métodos de pago seleccionados */}
+              <div className="space-y-4 mb-4">
+                {payments.map((payment, index) => (
+                  <div key={index} className="border rounded-lg p-4 bg-gray-50">
+                    <div className="flex justify-between items-center mb-3">
+                      <div className="font-medium text-gray-700">
+                        {index === 0 ? 'Método de pago' : 'Método adicional'}
+                      </div>
+                      
+                      {index > 0 && (
+                        <button 
+                          onClick={() => removePaymentMethod(index)}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <Trash size={16} />
+                        </button>
+                      )}
+                    </div>
+                    
+                    <div className="grid grid-cols-2 gap-3 mb-4">
+                      {paymentMethods.map((method) => (
+                        <button
+                          key={method.id}
+                          onClick={() => handlePaymentMethodChange(index, method.id)}
+                          className={`p-3 rounded-lg border flex items-center gap-2 transition-colors ${
+                            payment.method === method.id
+                              ? 'border-[#9c7561] bg-[#eeb077]/10 text-[#311716]'
+                              : 'border-gray-200 hover:bg-gray-50'
+                          }`}
+                          disabled={payments.some((p, i) => i !== index && p.method === method.id)}
+                        >
+                          {method.icon}
+                          <span className="font-medium text-sm">{method.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                    
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Monto a pagar con este método:
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={payment.amount}
+                          onChange={(e) => handlePaymentAmountChange(index, e.target.value)}
+                          className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#9c7561] focus:border-[#9c7561]"
+                        />
+                      </div>
+                      
+                      {payment.method === 'efectivo' && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Monto entregado:
+                          </label>
+                          <input
+                            type="text"
+                            value={amountTendered}
+                            onChange={(e) => setAmountTendered(e.target.value)}
+                            placeholder="0.00"
+                            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#9c7561] focus:border-[#9c7561]"
+                          />
+                          
+                          {change > 0 && (
+                            <div className="mt-2 p-2 bg-green-50 text-green-800 rounded-lg flex items-center justify-between">
+                              <span className="font-medium">Cambio a devolver:</span>
+                              <span className="text-lg font-bold">${change.toFixed(2)}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      
+                      {(payment.method === 'tarjeta_credito' || payment.method === 'tarjeta_debito') && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Número de referencia:
+                          </label>
+                          <input
+                            type="text"
+                            value={payment.reference}
+                            onChange={(e) => handleReferenceChange(index, e.target.value)}
+                            placeholder="Número de operación"
+                            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#9c7561] focus:border-[#9c7561]"
+                          />
+                        </div>
+                      )}
+                      
+                      {payment.method === 'transferencia' && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Número de transferencia:
+                          </label>
+                          <input
+                            type="text"
+                            value={payment.reference}
+                            onChange={(e) => handleReferenceChange(index, e.target.value)}
+                            placeholder="Número de operación"
+                            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#9c7561] focus:border-[#9c7561]"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
               
-              <div className="flex items-center mb-4">
+              {/* Mostrar botón para agregar método adicional */}
+              {payments.length < 2 && remainingAmount > 0 && (
+                <button
+                  onClick={addPaymentMethod}
+                  className="w-full py-2 px-4 border border-[#9c7561] text-[#311716] rounded-lg flex items-center justify-center hover:bg-[#eeb077]/10"
+                >
+                  <Plus size={18} className="mr-2" />
+                  Agregar método de pago adicional
+                </button>
+              )}
+              
+              {/* Opción de facturación */}
+              <div className="flex items-center mt-4 mb-4">
                 <input
                   id="facturar"
                   type="checkbox"
-                  checked={facturar}
+                  checked={facturar || facturacionObligatoria}
                   onChange={(e) => setFacturar(e.target.checked)}
+                  disabled={facturacionObligatoria}
                   className="h-4 w-4 text-[#311716] focus:ring-[#9c7561] border-gray-300 rounded"
                 />
                 <label htmlFor="facturar" className="ml-2 block text-gray-700">
-                  Generar factura
+                  {facturacionObligatoria 
+                    ? 'Facturación obligatoria para pagos electrónicos' 
+                    : 'Generar factura'
+                  }
                 </label>
               </div>
               
@@ -322,7 +532,14 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                 
                 <button
                   onClick={goToNextStep}
-                  disabled={!selectedMethod}
+                  disabled={
+                    payments.reduce((sum, p) => sum + p.amount, 0) !== getTotal() ||
+                    (payments.some(p => p.method === 'efectivo') && 
+                      (parseFloat(amountTendered) < payments.find(p => p.method === 'efectivo')?.amount || 0)) ||
+                    (payments.some(p => ['tarjeta_credito', 'tarjeta_debito'].includes(p.method)) && 
+                      payments.filter(p => ['tarjeta_credito', 'tarjeta_debito'].includes(p.method))
+                        .some(p => !p.reference))
+                  }
                   className="py-2 px-4 bg-[#311716] text-white rounded-lg hover:bg-[#462625] disabled:opacity-50 disabled:hover:bg-[#311716]"
                 >
                   Siguiente
@@ -331,44 +548,13 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
             </>
           )}
           
-          {/* Paso 2: Detalles según método o facturación */}
+          {/* Paso 2: Datos de cliente para facturación */}
           {currentStep === 2 && (
             <>
-              {selectedMethod === 'efectivo' && (
-                <div className="mb-6">
-                  <div className="font-medium text-gray-700 mb-2">Monto entregado:</div>
-                  <input
-                    type="text"
-                    value={amountTendered}
-                    onChange={(e) => setAmountTendered(e.target.value)}
-                    placeholder="0.00"
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#9c7561] focus:border-[#9c7561]"
-                  />
-                  
-                  {change > 0 && (
-                    <div className="mt-3 p-3 bg-green-50 text-green-800 rounded-lg flex items-center justify-between">
-                      <span className="font-medium">Cambio a devolver:</span>
-                      <span className="text-xl font-bold">${change.toFixed(2)}</span>
-                    </div>
-                  )}
-                </div>
-              )}
-              
-              {(selectedMethod === 'tarjeta_credito' || selectedMethod === 'tarjeta_debito') && (
-                <div className="mb-6">
-                  <div className="font-medium text-gray-700 mb-2">Número de referencia:</div>
-                  <input
-                    type="text"
-                    value={referencia}
-                    onChange={(e) => setReferencia(e.target.value)}
-                    placeholder="Número de operación"
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#9c7561] focus:border-[#9c7561]"
-                  />
-                </div>
-              )}
-              
-              {facturar && (
+              {facturar ? (
                 <div className="space-y-4">
+                  <p className="text-gray-700">Por favor ingrese los datos del cliente para la facturación:</p>
+                  
                   <div>
                     <label className="block text-gray-700 mb-1">Nombre/Razón Social:</label>
                     <input
@@ -389,30 +575,29 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                     />
                   </div>
                 </div>
+              ) : (
+                <div className="py-8 text-center">
+                  <p className="text-lg font-medium text-gray-700 mb-2">No se requiere facturación</p>
+                  <p className="text-gray-500">Haga clic en Continuar para proceder al pago.</p>
+                </div>
               )}
               
-              <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
-  <div className="bg-white rounded-xl shadow-xl w-full max-w-lg transform transition-all">
-    {/* Modal content... */}
-    
-    {/* Make buttons full width on mobile */}
-    <div className="flex flex-col sm:flex-row gap-3 mt-6">
-      <button
-        onClick={goToPreviousStep}
-        className="py-2 px-4 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 w-full sm:w-auto"
-      >
-        Atrás
-      </button>
-      
-      <button
-        onClick={goToNextStep}
-        className="py-2 px-4 bg-[#311716] text-white rounded-lg hover:bg-[#462625] w-full sm:w-auto"
-      >
-        Continuar
-      </button>
-    </div>
-  </div>
-</div>
+              <div className="flex justify-between gap-3 mt-6">
+                <button
+                  onClick={goToPreviousStep}
+                  className="py-2 px-4 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-100 w-full sm:w-auto"
+                >
+                  Atrás
+                </button>
+                
+                <button
+                  onClick={goToNextStep}
+                  disabled={facturar && (!clienteNombre || !clienteCuit)}
+                  className="py-2 px-4 bg-[#311716] text-white rounded-lg hover:bg-[#462625] w-full sm:w-auto disabled:opacity-50"
+                >
+                  Continuar
+                </button>
+              </div>
             </>
           )}
           
@@ -428,30 +613,29 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                     <span>{items.length} {items.length === 1 ? 'item' : 'items'}</span>
                   </div>
                   
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Método de pago:</span>
-                    <span>{paymentMethods.find(m => m.id === selectedMethod)?.name || selectedMethod}</span>
-                  </div>
+                  {payments.map((payment, index) => (
+                    <div key={index} className="flex justify-between text-sm">
+                      <span className="text-gray-600">
+                        {paymentMethods.find(m => m.id === payment.method)?.name || payment.method}:
+                      </span>
+                      <span>${payment.amount.toFixed(2)}</span>
+                    </div>
+                  ))}
                   
-                  {selectedMethod === 'efectivo' && (
+                  {payments.some(p => p.method === 'efectivo') && (
                     <>
                       <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Monto entregado:</span>
+                        <span className="text-gray-600">Monto entregado (efectivo):</span>
                         <span>${amountTendered}</span>
                       </div>
                       
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Cambio:</span>
-                        <span>${change.toFixed(2)}</span>
-                      </div>
+                      {change > 0 && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">Cambio:</span>
+                          <span>${change.toFixed(2)}</span>
+                        </div>
+                      )}
                     </>
-                  )}
-                  
-                  {(selectedMethod === 'tarjeta_credito' || selectedMethod === 'tarjeta_debito') && referencia && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Referencia:</span>
-                      <span>{referencia}</span>
-                    </div>
                   )}
                   
                   {facturar && (
@@ -470,7 +654,7 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                   
                   <div className="border-t border-gray-200 mt-2 pt-2 flex justify-between font-bold">
                     <span>Total:</span>
-                    <span className="text-[#311716]">${amount.toFixed(2)}</span>
+                    <span className="text-[#311716]">${getTotal().toFixed(2)}</span>
                   </div>
                 </div>
               </div>

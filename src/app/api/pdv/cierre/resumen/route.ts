@@ -58,19 +58,25 @@ export async function GET(req: NextRequest) {
       }
     });
     
-    // Calcular totales
+    // Calcular totales por medio de pago
     let ventasEfectivo = 0;
     let ventasTarjeta = 0;
     let ventasOtros = 0;
+    let cantidadEfectivo = 0;
+    let cantidadTarjeta = 0;
+    let cantidadOtros = 0;
     
     ventas.forEach(venta => {
       venta.pagos.forEach(pago => {
         if (pago.medioPago === 'efectivo') {
           ventasEfectivo += pago.monto;
-        } else if (pago.medioPago === 'tarjeta') {
+          cantidadEfectivo++;
+        } else if (pago.medioPago.includes('tarjeta')) {
           ventasTarjeta += pago.monto;
+          cantidadTarjeta++;
         } else {
           ventasOtros += pago.monto;
+          cantidadOtros++;
         }
       });
     });
@@ -87,6 +93,9 @@ export async function GET(req: NextRequest) {
       ventasOtros,
       totalVentas: ventasEfectivo + ventasTarjeta + ventasOtros,
       cantidadVentas: ventas.length,
+      cantidadEfectivo,
+      cantidadTarjeta,
+      cantidadOtros,
       efectivoEsperado
     });
   } catch (error: any) {

@@ -1,16 +1,17 @@
-// src/components/pdv/ProductSearch.tsx (mejorado)
+// src/components/pdv/ProductSearch.tsx - Con integración de escáner
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
 import { useOffline } from '@/hooks/useOffline';
-import { Search, Loader, Tag, Briefcase, Package } from 'lucide-react';
+import { Search, Loader, Tag, Package, Camera } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
 import { Producto } from '@/types/models/producto';
+import { BarcodeScannerButton } from './BarcodeScanner';
 
 interface ProductSearchProps {
-    onProductSelect: (product: Producto) => void;
-    className?: string;
-  }
+  onProductSelect: (product: Producto) => void;
+  className?: string;
+}
 
 export function ProductSearch({ onProductSelect, className = '' }: ProductSearchProps) {
   const [searchTerm, setSearchTerm] = useState('');
@@ -58,7 +59,7 @@ export function ProductSearch({ onProductSelect, className = '' }: ProductSearch
           
           if (!response.ok) throw new Error('Error al buscar productos');
           const data = await response.json();
-          setResults(data.data || []);
+          setResults(Array.isArray(data) ? data : (data.data || []));
         }
       } catch (error) {
         console.error('Error buscando productos:', error);
@@ -98,57 +99,55 @@ export function ProductSearch({ onProductSelect, className = '' }: ProductSearch
       setIsLoading(true);
       
       // Buscar producto por código de barras
-      const response = await authenticatedFetch(`/api/pdv/productos-disponibles?codigoBarras=${barcode}&sucursalId=${localStorage.getItem('sucursalId') || ''}`);
+      const response = await authenticatedFetch(`/api/pdv/productos-disponibles?codigoBarras=${encodeURIComponent(barcode)}&sucursalId=${localStorage.getItem('sucursalId') || ''}`);
       
       if (!response.ok) throw new Error('Error al buscar producto por código de barras');
       const data = await response.json();
       
-      if (data.data && data.data.length > 0) {
-        const product = data.data[0];
-        handleSelect(product);
+      if (Array.isArray(data) && data.length > 0) {
+        handleSelect(data[0]);
+      } else if (data.data && data.data.length > 0) {
+        handleSelect(data.data[0]);
       } else {
-        // No se encontró producto con ese código
-        console.log('No se encontró producto con el código de barras:', barcode);
+        // No se encontró producto
+        alert(`No se encontró producto con código: ${barcode}`);
       }
     } catch (error) {
       console.error('Error al escanear código de barras:', error);
+      alert('Error al procesar el código de barras');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Enfocar en el input cuando se monta el componente
-  useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.focus();
-    }
-  }, []);
-
   return (
-<div ref={searchRef} className="product-search relative w-full">
-  <div className="relative">
-    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-      <Search className="h-5 w-5 text-gray-400" />
-    </div>
-    <input
-      ref={inputRef}
-      type="text"
-      value={searchTerm}
-      onChange={(e) => setSearchTerm(e.target.value)}
-      placeholder="Buscar productos..."
-      className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#eeb077] focus:border-[#eeb077] text-gray-900 text-base"
-      aria-label="Buscar productos"
-    />
-    {isLoading && (
-      <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
-        <Loader className="h-5 w-5 text-gray-400 animate-spin" />
+    <div ref={searchRef} className={`product-search relative w-full ${className}`}>
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search className="h-5 w-5 text-gray-400" />
+          </div>
+          <input
+            ref={inputRef}
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Buscar productos..."
+            className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#eeb077] focus:border-[#eeb077] text-gray-900 text-base"
+            aria-label="Buscar productos"
+          />
+          {isLoading && (
+            <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+              <Loader className="h-5 w-5 text-gray-400 animate-spin" />
+            </div>
+          )}
+        </div>
+        
+        <BarcodeScannerButton onScan={handleBarcodeScan} />
       </div>
-    )}
-  </div>
 
-  {/* Make results take full width on mobile */}
-  {showResults && results.length > 0 && (
-    <div className="absolute mt-2 bg-white border border-gray-200 rounded-xl shadow-lg max-h-96 overflow-y-auto w-full z-10">
+      {showResults && results.length > 0 && (
+        <div className="absolute mt-2 bg-white border border-gray-200 rounded-xl shadow-lg max-h-96 overflow-y-auto w-full z-10">
           {results.map((product) => (
             <button
               key={product.id}

@@ -1,4 +1,4 @@
-// Versión mejorada de src/app/(pdv)/layout.tsx
+// src/app/(pdv)/layout.tsx - Versión mejorada
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -9,9 +9,7 @@ import { useOffline } from '@/hooks/useOffline';
 import { OfflineStatus } from '@/components/ui/OfflineStatus';
 import { 
   ShoppingCart, Tag, Home, Clock, Settings, LogOut, Menu, X,
-  Package,
-  AlertTriangle,
-  Archive
+  Package, AlertTriangle, Archive, Truck, FileText, Database
 } from 'lucide-react';
 
 export default function PDVLayout({
@@ -32,49 +30,35 @@ export default function PDVLayout({
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        // Verificar si hay token
         const token = localStorage.getItem('accessToken');
         if (!token) {
-          console.log('No hay token, redireccionando a login');
           router.push('/login');
           return;
         }
         
-        // Si no hay usuario en el store, intentar obtenerlo
         if (!user) {
           try {
             const response = await fetch('/api/auth/me', {
-              headers: {
-                'Authorization': `Bearer ${token}`
-              }
+              headers: { 'Authorization': `Bearer ${token}` }
             });
             
-            if (!response.ok) {
-              throw new Error('Error al obtener información del usuario');
-            }
+            if (!response.ok) throw new Error('Error al obtener información del usuario');
             
             const data = await response.json();
-            
-            if (data.user) {
-              setUser(data.user);
-            }
+            if (data.user) setUser(data.user);
           } catch (error) {
-            console.error('Error al obtener usuario:', error);
             router.push('/login');
             return;
           }
         }
         
-        // Si el usuario no tiene rol vendedor o admin, redirigir
         if (user && !hasRole('vendedor') && !hasRole('admin')) {
-          console.log('Usuario no tiene permisos para PDV, redirigiendo...');
           router.push('/');
           return;
         }
         
         setIsLoading(false);
       } catch (error) {
-        console.error('Error en verificación de autenticación:', error);
         router.push('/login');
       }
     };
@@ -158,6 +142,28 @@ export default function PDVLayout({
                     Dashboard
                   </span>
                 </Link>
+                <Link 
+                  href="/pdv/recepcion" 
+                  className={`${
+                    pathname.startsWith('/pdv/recepcion') ? 'bg-[#462625] text-white' : 'text-gray-200 hover:bg-[#462625] hover:text-white'
+                  } px-3 py-2 rounded-md text-sm font-medium transition-colors duration-150`}
+                >
+                  <span className="flex items-center">
+                    <Truck className="mr-2 h-4 w-4" />
+                    Recepción
+                  </span>
+                </Link>
+                <Link 
+                  href="/pdv/conciliacion" 
+                  className={`${
+                    pathname.startsWith('/pdv/conciliacion') ? 'bg-[#462625] text-white' : 'text-gray-200 hover:bg-[#462625] hover:text-white'
+                  } px-3 py-2 rounded-md text-sm font-medium transition-colors duration-150`}
+                >
+                  <span className="flex items-center">
+                    <Database className="mr-2 h-4 w-4" />
+                    Inventario
+                  </span>
+                </Link>
               </nav>
             </div>
             <div className="hidden md:flex items-center">
@@ -190,11 +196,7 @@ export default function PDVLayout({
               <span className="mr-4 font-medium">{user?.name}</span>
               <button 
                 onClick={() => {
-                  // Logout
-                  fetch('/api/auth/logout', {
-                    method: 'POST',
-                  }).then(() => {
-                    // Limpiar store
+                  fetch('/api/auth/logout', { method: 'POST' }).then(() => {
                     useAuthStore.getState().clearAuth();
                     router.push('/login');
                   });
@@ -274,46 +276,46 @@ export default function PDVLayout({
                 </span>
               </Link>
               <Link 
-    href="/pdv/recepcion" 
-    className={`${
-      pathname.startsWith('/pdv/recepcion') ? 'bg-[#462625] text-white' : 'text-gray-200 hover:bg-[#462625] hover:text-white'
-    } px-3 py-2 rounded-md text-sm font-medium transition-colors duration-150`}
-  >
-    <span className="flex items-center">
-      <Package className="mr-2 h-4 w-4" />
-      Recepción
-    </span>
-  </Link>
-  
-  <Link 
-    href="/pdv/contingencias" 
-    className={`${
-      pathname.startsWith('/pdv/contingencias') ? 'bg-[#462625] text-white' : 'text-gray-200 hover:bg-[#462625] hover:text-white'
-    } px-3 py-2 rounded-md text-sm font-medium transition-colors duration-150`}
-  >
-    <span className="flex items-center">
-      <AlertTriangle className="mr-2 h-4 w-4" />
-      Contingencias
-    </span>
-  </Link>
-  
-  <Link 
-    href="/pdv/conciliacion" 
-    className={`${
-      pathname.startsWith('/pdv/conciliacion') ? 'bg-[#462625] text-white' : 'text-gray-200 hover:bg-[#462625] hover:text-white'
-    } px-3 py-2 rounded-md text-sm font-medium transition-colors duration-150`}
-  >
-    <span className="flex items-center">
-      <Archive className="mr-2 h-4 w-4" />
-      Inventario
-    </span>
-  </Link>
+                href="/pdv/recepcion" 
+                className={`${
+                  pathname.startsWith('/pdv/recepcion') ? 'bg-[#462625] text-white' : 'text-gray-200 hover:bg-[#462625] hover:text-white'
+                } block px-3 py-2 rounded-md text-base font-medium transition-colors duration-150`}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <span className="flex items-center">
+                  <Truck className="mr-2 h-4 w-4" />
+                  Recepción
+                </span>
+              </Link>
+              <Link 
+                href="/pdv/contingencias" 
+                className={`${
+                  pathname.startsWith('/pdv/contingencias') ? 'bg-[#462625] text-white' : 'text-gray-200 hover:bg-[#462625] hover:text-white'
+                } block px-3 py-2 rounded-md text-base font-medium transition-colors duration-150`}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <span className="flex items-center">
+                  <AlertTriangle className="mr-2 h-4 w-4" />
+                  Contingencias
+                </span>
+              </Link>
+              <Link 
+                href="/pdv/conciliacion" 
+                className={`${
+                  pathname.startsWith('/pdv/conciliacion') ? 'bg-[#462625] text-white' : 'text-gray-200 hover:bg-[#462625] hover:text-white'
+                } block px-3 py-2 rounded-md text-base font-medium transition-colors duration-150`}
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <span className="flex items-center">
+                  <Database className="mr-2 h-4 w-4" />
+                  Inventario
+                </span>
+              </Link>
               <div className="border-t border-[#462625] pt-2 pb-1">
                 <div className="flex items-center justify-between px-3">
                   <span className="text-sm font-medium text-gray-200">{user?.name}</span>
                   <button 
                     onClick={() => {
-                      // Logout
                       fetch('/api/auth/logout', { method: 'POST' }).then(() => {
                         useAuthStore.getState().clearAuth();
                         router.push('/login');
@@ -339,7 +341,7 @@ export default function PDVLayout({
       </main>
 
       {/* Footer */}
-      <footer className="bg-white py-4 shadow-inner">
+      <footer className="bg-white py-3 shadow-inner mt-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
             <p className="text-gray-600 text-sm">
