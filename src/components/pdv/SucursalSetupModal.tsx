@@ -14,6 +14,7 @@ export function SucursalSetupModal({ isOpen, onClose }: SucursalSetupModalProps)
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
+  
   // Obtener el usuario actual
   const { user } = useAuthStore();
 
