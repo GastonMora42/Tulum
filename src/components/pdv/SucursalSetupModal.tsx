@@ -1,6 +1,7 @@
 // src/components/pdv/SucursalSetupModal.tsx
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
+import { useAuthStore } from '@/stores/authStore';
 
 interface SucursalSetupModalProps {
   isOpen: boolean;
@@ -12,6 +13,9 @@ export function SucursalSetupModal({ isOpen, onClose }: SucursalSetupModalProps)
   const [selectedSucursalId, setSelectedSucursalId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Obtener el usuario actual
+  const { user } = useAuthStore();
 
   // Cargar sucursales disponibles
   useEffect(() => {
@@ -32,7 +36,23 @@ export function SucursalSetupModal({ isOpen, onClose }: SucursalSetupModalProps)
         
         setSucursales(sucursalesActivas);
         
-        // Seleccionar la primera por defecto
+        // Verificar si el usuario tiene una sucursal asignada
+        if (user?.sucursalId) {
+          // Buscar la sucursal del usuario en las sucursales cargadas
+          const userSucursal = sucursalesActivas.find((s: any) => s.id === user.sucursalId);
+          
+          if (userSucursal) {
+            // Si encontramos la sucursal, guardar su ID y nombre
+            localStorage.setItem('sucursalId', user.sucursalId);
+            localStorage.setItem('sucursalNombre', userSucursal.nombre);
+            
+            // Cerrar el modal y pasar el ID de la sucursal
+            onClose(user.sucursalId);
+            return; // Salir temprano para evitar seleccionar otra sucursal
+          }
+        }
+        
+        // Si no hay sucursal asignada o no se encontró, seleccionar la primera por defecto
         if (sucursalesActivas.length > 0) {
           setSelectedSucursalId(sucursalesActivas[0].id);
         }
@@ -47,7 +67,7 @@ export function SucursalSetupModal({ isOpen, onClose }: SucursalSetupModalProps)
     if (isOpen) {
       loadSucursales();
     }
-  }, [isOpen]);
+  }, [isOpen, user, onClose]);
 
   // Guardar selección
   const handleSave = () => {

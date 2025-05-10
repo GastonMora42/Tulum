@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
   
   try {
     const body = await req.json();
-    const { id, productos, observaciones } = body;
+    const { id, productos, observaciones, sucursalId } = body;
     
     if (!id || !productos || !Array.isArray(productos)) {
       return NextResponse.json(
@@ -22,11 +22,7 @@ export async function POST(req: NextRequest) {
     
     // Obtener usuario
     const user = (req as any).user;
-    
-    // No podemos usar localStorage del lado del servidor
-    // Necesitamos obtener sucursalId del cuerpo de la solicitud o de las cookies
-    const sucursalId = body.sucursalId;
-    
+
     if (!sucursalId) {
       return NextResponse.json(
         { error: 'No se ha definido una sucursal' },

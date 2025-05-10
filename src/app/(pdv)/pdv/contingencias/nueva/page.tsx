@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuthStore } from '@/stores/authStore';
+import { authenticatedFetch } from '@/hooks/useAuth';
 
 // Interfaces
 interface Envio {
@@ -53,7 +54,7 @@ export default function NuevaContingenciaPDVPage() {
       
       try {
         setIsFetchingEnvios(true);
-        const response = await fetch(`/api/envios?destinoId=${user.sucursalId}&estado=recibido,en_transito`);
+        const response = await authenticatedFetch(`/api/envios?destinoId=${user.sucursalId}&estado=recibido,en_transito`);
         
         if (!response.ok) {
           throw new Error('Error al cargar envíos');
@@ -82,7 +83,7 @@ export default function NuevaContingenciaPDVPage() {
         origen: 'sucursal'
       };
       
-      const response = await fetch('/api/contingencias', {
+      const response = await authenticatedFetch('/api/contingencias', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

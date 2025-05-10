@@ -133,13 +133,20 @@ export default function ConciliacionPage() {
   
   const estadisticas = calcularEstadisticas();
   
-  // Guardar conciliación
   const handleSave = async () => {
     if (!conciliacion) return;
     
     try {
       setIsSaving(true);
       setError(null);
+      
+      // Obtener sucursalId
+      const sucursalId = localStorage.getItem('sucursalId');
+      
+      if (!sucursalId) {
+        setError('No se ha definido una sucursal para este punto de venta');
+        return;
+      }
       
       // Preparar datos
       const productos = conciliacion.productos.map(producto => ({
@@ -151,9 +158,10 @@ export default function ConciliacionPage() {
       const response = await authenticatedFetch('/api/pdv/conciliacion/guardar', {
         method: 'POST',
         body: JSON.stringify({
-          id: conciliacion.fecha, // Usar fecha como ID
+          id: conciliacion.fecha,
           productos,
-          observaciones
+          observaciones,
+          sucursalId  // Añadir sucursalId al body
         })
       });
       

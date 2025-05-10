@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { CierreCaja } from '@/components/pdv/CierreCaja';
+import { authenticatedFetch } from '@/hooks/useAuth';
 
 export default function CierreCajaPage() {
   const [cierreCajaId, setCierreCajaId] = useState<string | null>(null);
@@ -11,7 +12,6 @@ export default function CierreCajaPage() {
   
   const router = useRouter();
   
-  // Verificar si hay caja abierta
   useEffect(() => {
     const checkCajaAbierta = async () => {
       try {
@@ -21,22 +21,26 @@ export default function CierreCajaPage() {
         const sucursalId = localStorage.getItem('sucursalId');
         
         if (!sucursalId) {
-          // Si no hay sucursal, redirigir a configuración
-          router.push('/settings');
+          // Si no hay sucursal, mostrar mensaje y no redirigir automáticamente
+          setError('No se ha configurado una sucursal para este punto de venta');
+          setIsLoading(false);
           return;
         }
         
-        const response = await fetch(`/api/pdv/cierre?sucursalId=${sucursalId}`);
+        const response = await authenticatedFetch(`/api/pdv/cierre?sucursalId=${sucursalId}`);
         
         if (response.ok) {
           const data = await response.json();
           setCierreCajaId(data.cierreCaja.id);
-        } else if (response.status !== 404) {
-          // Si hay un error que no sea 404 (no encontrado)
+        } else if (response.status === 404) {
+          // No hay caja abierta, pero es un estado válido
+          setCierreCajaId(null);
+        } else {
           throw new Error('Error al verificar el estado de la caja');
         }
       } catch (error) {
         console.error('Error al verificar caja:', error);
+        setError(error instanceof Error ? error.message : 'Error desconocido');
       } finally {
         setIsLoading(false);
       }
@@ -85,4 +89,8 @@ export default function CierreCajaPage() {
       <CierreCaja id={cierreCajaId} onSuccess={handleCierreSuccess} />
     </div>
   );
+}
+
+function setError(arg0: string) {
+  throw new Error('Function not implemented.');
 }

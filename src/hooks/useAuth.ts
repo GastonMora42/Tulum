@@ -164,6 +164,27 @@ export function useAuth(): UseAuthReturn {
       }
       
       console.log('Sesión iniciada correctamente');
+
+      // En el método login, después de recibir la respuesta exitosa:
+if (data.user && data.user.sucursalId) {
+  localStorage.setItem('sucursalId', data.user.sucursalId);
+  
+  // Si también tenemos el nombre de la sucursal, guardarlo
+  if (data.user.sucursal) {
+    localStorage.setItem('sucursalNombre', data.user.sucursal.nombre);
+  } else {
+    // Obtener el nombre de la sucursal en una consulta adicional
+    try {
+      const sucursalResponse = await fetch(`/api/admin/ubicaciones/${data.user.sucursalId}`);
+      if (sucursalResponse.ok) {
+        const sucursalData = await sucursalResponse.json();
+        localStorage.setItem('sucursalNombre', sucursalData.nombre);
+      }
+    } catch (error) {
+      console.warn('No se pudo obtener el nombre de la sucursal', error);
+    }
+  }
+}
       
       // Guardar tokens
       localStorage.setItem('accessToken', data.accessToken);

@@ -1,11 +1,1 @@
-{
-  "/api/pdv/conciliacion/guardar/route": "app/api/pdv/conciliacion/guardar/route.js",
-  "/api/contingencias/route": "app/api/contingencias/route.js",
-  "/(pdv)/pdv/conciliacion/page": "app/(pdv)/pdv/conciliacion/page.js",
-  "/(pdv)/pdv/recepcion/page": "app/(pdv)/pdv/recepcion/page.js",
-  "/(pdv)/pdv/ventas/page": "app/(pdv)/pdv/ventas/page.js",
-  "/(pdv)/pdv/dashboard/page": "app/(pdv)/pdv/dashboard/page.js",
-  "/(pdv)/pdv/cierre/page": "app/(pdv)/pdv/cierre/page.js",
-  "/(pdv)/pdv/contingencias/page": "app/(pdv)/pdv/contingencias/page.js",
-  "/(pdv)/pdv/contingencias/nueva/page": "app/(pdv)/pdv/contingencias/nueva/page.js"
-}
+{}
