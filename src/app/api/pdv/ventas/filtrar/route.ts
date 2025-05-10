@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/server/db/client';
 import { authMiddleware } from '@/server/api/middlewares/auth';
 import { checkPermission } from '@/server/api/middlewares/authorization';
+import { Prisma } from '@prisma/client'; 
 
 export async function GET(req: NextRequest) {
   // Aplicar middleware de autenticación
@@ -156,10 +157,10 @@ export async function GET(req: NextRequest) {
           FROM "Pago"
           WHERE "ventaId" IN (
             SELECT "id" FROM "Venta" 
-            WHERE ${where.sucursalId ? prisma.Prisma.sql`"sucursalId" = ${where.sucursalId}` : prisma.Prisma.sql`1=1`}
-            ${where.fecha?.gte ? prisma.Prisma.sql`AND "fecha" >= ${where.fecha.gte}` : prisma.Prisma.sql``}
-            ${where.fecha?.lte ? prisma.Prisma.sql`AND "fecha" <= ${where.fecha.lte}` : prisma.Prisma.sql``}
-            ${where.facturada !== undefined ? prisma.Prisma.sql`AND "facturada" = ${where.facturada}` : prisma.Prisma.sql``}
+            WHERE ${where.sucursalId ? Prisma.sql`"sucursalId" = ${where.sucursalId}` : Prisma.sql`1=1`}
+            ${where.fecha?.gte ? Prisma.sql`AND "fecha" >= ${where.fecha.gte}` : Prisma.sql``}
+            ${where.fecha?.lte ? Prisma.sql`AND "fecha" <= ${where.fecha.lte}` : Prisma.sql``}
+            ${where.facturada !== undefined ? Prisma.sql`AND "facturada" = ${where.facturada}` : Prisma.sql``}
           )
           GROUP BY "medioPago"
         `

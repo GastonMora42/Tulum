@@ -2,8 +2,8 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { Camera, QrScanner, Box, Slash, RefreshCw, Zap } from 'lucide-react';
 import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from '@zxing/library';
+import { Camera, QrCode as QrScanner, Box, Slash, RefreshCw, Zap } from 'lucide-react';
 
 interface BarcodeScannerProps {
   onScan: (code: string) => void;
