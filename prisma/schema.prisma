@@ -26,8 +26,8 @@ model User {
   envios           Envio[]
   contingencias    Contingencia[]
   movimientosStock MovimientoStock[]
-  // Añadir esta nueva relación
   conciliaciones   Conciliacion[]
+  cajaEgresos      CajaEgreso[]
 }
 
 model Role {
@@ -299,6 +299,8 @@ model CierreCaja {
   diferencia      Float?
   estado          String // abierto, cerrado, con_contingencia
   observaciones   String?
+
+  egresos CajaEgreso[]
 }
 
 model Contingencia {
@@ -391,4 +393,16 @@ model ConfiguracionAFIP {
   activo     Boolean   @default(true)
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
+}
+
+model CajaEgreso {
+  id           String     @id @default(uuid())
+  cierreCajaId String
+  cierreCaja   CierreCaja @relation(fields: [cierreCajaId], references: [id])
+  monto        Float
+  motivo       String // "adelanto_sueldo", "compra_insumos", "libreria", "paqueteria", "otros"
+  detalles     String?
+  fecha        DateTime   @default(now())
+  usuarioId    String
+  usuario      User       @relation(fields: [usuarioId], references: [id])
 }

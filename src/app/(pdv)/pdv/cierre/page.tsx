@@ -1,4 +1,4 @@
-// src/app/(pdv)/pdv/cierre/page.tsx (actualizado)
+// src/app/(pdv)/pdv/cierre/page.tsx - versión corregida
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -9,6 +9,7 @@ import { authenticatedFetch } from '@/hooks/useAuth';
 export default function CierreCajaPage() {
   const [cierreCajaId, setCierreCajaId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
   const router = useRouter();
   
@@ -21,26 +22,30 @@ export default function CierreCajaPage() {
         const sucursalId = localStorage.getItem('sucursalId');
         
         if (!sucursalId) {
-          // Si no hay sucursal, mostrar mensaje y no redirigir automáticamente
-          setError('No se ha configurado una sucursal para este punto de venta');
+          setErrorMessage('No se ha configurado una sucursal para este punto de venta');
           setIsLoading(false);
           return;
         }
         
+        console.log("Verificando caja para sucursal:", sucursalId);
+        
         const response = await authenticatedFetch(`/api/pdv/cierre?sucursalId=${sucursalId}`);
+        console.log("Respuesta del API:", response.status);
         
         if (response.ok) {
           const data = await response.json();
+          console.log("Datos de caja:", data);
           setCierreCajaId(data.cierreCaja.id);
         } else if (response.status === 404) {
           // No hay caja abierta, pero es un estado válido
+          console.log("No hay caja abierta");
           setCierreCajaId(null);
         } else {
           throw new Error('Error al verificar el estado de la caja');
         }
       } catch (error) {
         console.error('Error al verificar caja:', error);
-        setError(error instanceof Error ? error.message : 'Error desconocido');
+        setErrorMessage(error instanceof Error ? error.message : 'Error desconocido');
       } finally {
         setIsLoading(false);
       }
@@ -67,6 +72,23 @@ export default function CierreCajaPage() {
     );
   }
   
+  // Si hay error
+  if (errorMessage) {
+    return (
+      <div className="text-center p-8">
+        <h2 className="text-2xl font-bold text-gray-800 mb-4">Error</h2>
+        <p className="text-red-600 mb-6">{errorMessage}</p>
+        
+        <button
+          onClick={() => router.push('/pdv')}
+          className="py-2 px-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+        >
+          Volver al PDV
+        </button>
+      </div>
+    );
+  }
+  
   // Si no hay caja abierta
   if (!cierreCajaId) {
     return (
@@ -89,8 +111,4 @@ export default function CierreCajaPage() {
       <CierreCaja id={cierreCajaId} onSuccess={handleCierreSuccess} />
     </div>
   );
-}
-
-function setError(arg0: string) {
-  throw new Error('Function not implemented.');
 }

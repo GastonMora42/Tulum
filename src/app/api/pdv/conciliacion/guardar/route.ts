@@ -48,17 +48,18 @@ export async function POST(req: NextRequest) {
         });
       }
     }
-    
-    // Proceso en transacción
+
     const resultado = await prisma.$transaction(async (tx) => {
-      // 1. Actualizar conciliación usando SQL directo en vez del modelo
-      await tx.$executeRaw`
-        UPDATE "Conciliacion"
-        SET "estado" = ${hayDiferencias ? 'con_contingencia' : 'completada'},
-            "detalles" = ${JSON.stringify(productos)},
-            "observaciones" = ${observaciones || ''}
-        WHERE "id" = ${id}
-      `;
+      // 1. Actualizar conciliación usando Prisma modelo en vez de SQL directo
+      // Esto evita el problema de casteo de JSON
+      await tx.conciliacion.update({
+        where: { id },
+        data: {
+          estado: hayDiferencias ? 'con_contingencia' : 'completada',
+          detalles: productos, // Prisma manejará la conversión a JSONB automáticamente
+          observaciones: observaciones || ''
+        }
+      });
       
       // 2. Si hay diferencias, crear contingencia
       if (hayDiferencias) {

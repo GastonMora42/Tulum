@@ -13,8 +13,7 @@ export function SucursalSetupModal({ isOpen, onClose }: SucursalSetupModalProps)
   const [selectedSucursalId, setSelectedSucursalId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
-  
+
   // Obtener el usuario actual
   const { user } = useAuthStore();
 

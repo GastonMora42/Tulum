@@ -11,8 +11,10 @@ import {
   Package, AlertTriangle, Archive, Truck, FileText, Database, BarChart2, User,
   WifiOff,
   Wifi,
-  RefreshCw
+  RefreshCw,
+  ArrowDownLeft
 } from 'lucide-react';
+import { authenticatedFetch } from '@/hooks/useAuth';
 
 export default function PDVLayout({
   children,
@@ -30,11 +32,17 @@ export default function PDVLayout({
   const { isOnline, pendingOperations, syncNow, isSyncing } = useOffline();
   const { setUser } = useAuthStore();
   const sidebarRef = useRef<HTMLDivElement>(null);
+  const [sucursalNombre, setSucursalNombre] = useState('');
   
-  const sucursalNombre = typeof localStorage !== 'undefined' 
-    ? localStorage.getItem('sucursalNombre') 
-    : '';
-
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedName = localStorage.getItem('sucursalNombre');
+      if (storedName) {
+        setSucursalNombre(storedName);
+      }
+    }
+  }, []);
+  
   // Detectar tamaño de pantalla
   useEffect(() => {
     const handleResize = () => {
@@ -75,7 +83,7 @@ export default function PDVLayout({
         
         if (!user) {
           try {
-            const response = await fetch('/api/auth/me', {
+            const response = await authenticatedFetch('/api/auth/me', {
               headers: { 'Authorization': `Bearer ${token}` }
             });
             
@@ -130,6 +138,7 @@ export default function PDVLayout({
     { href: '/pdv/dashboard', icon: <BarChart2 className="h-5 w-5" />, text: 'Dashboard' },
     { href: '/pdv/recepcion', icon: <Truck className="h-5 w-5" />, text: 'Recepción' },
     { href: '/pdv/conciliacion', icon: <Database className="h-5 w-5" />, text: 'Inventario' },
+    { href: '/pdv/egresos', icon: <ArrowDownLeft className="h-5 w-5" />, text: 'Salidas' },
     { href: '/pdv/contingencias', icon: <AlertTriangle className="h-5 w-5" />, text: 'Contingencias' }
   ];
 
