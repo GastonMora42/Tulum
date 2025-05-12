@@ -406,3 +406,12 @@ model CajaEgreso {
   usuarioId    String
   usuario      User       @relation(fields: [usuarioId], references: [id])
 }
+
+model TokenAFIP {
+  id           String   @id @default(uuid())
+  cuit         String
+  token        String   @db.Text
+  sign         String   @db.Text
+  expirationTime DateTime
+  createdAt    DateTime @default(now())
+}

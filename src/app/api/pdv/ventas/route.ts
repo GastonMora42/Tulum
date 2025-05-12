@@ -1,9 +1,10 @@
-// src/app/api/pdv/ventas/route.ts (continuación)
+// src/app/api/pdv/ventas/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/server/db/client';
 import { authMiddleware } from '@/server/api/middlewares/auth';
 import { checkPermission } from '@/server/api/middlewares/authorization';
 import { ventaService } from '@/server/services/venta/ventaService';
+import { getFacturacionService } from '@/server/services/facturacion/factoryService';
 
 // GET - Obtener ventas con filtros
 export async function GET(req: NextRequest) {
@@ -25,20 +26,147 @@ export async function GET(req: NextRequest) {
     const usuarioId = searchParams.get('usuarioId');
     const facturada = searchParams.get('facturada') === 'true' ? true : 
                      searchParams.get('facturada') === 'false' ? false : undefined;
+    const medioPago = searchParams.get('medioPago');
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
+    
+    // Verificar acceso a la sucursal
+    const user = (req as any).user;
+    if (sucursalId && user.sucursalId && user.sucursalId !== sucursalId && user.roleId !== 'role-admin') {
+      return NextResponse.json(
+        { error: 'No tiene permisos para ver ventas de esta sucursal' },
+        { status: 403 }
+      );
+    }
     
     // Construir objeto de filtros
-    const filtros: any = {};
+    const where: any = {};
     
-    if (sucursalId) filtros.sucursalId = sucursalId;
-    if (desde) filtros.desde = desde;
-    if (hasta) filtros.hasta = hasta;
-    if (usuarioId) filtros.usuarioId = usuarioId;
-    if (facturada !== undefined) filtros.facturada = facturada;
+    // Si no es admin y no especifica sucursal, mostrar solo su sucursal
+    if (!sucursalId && user.sucursalId && user.roleId !== 'role-admin') {
+      where.sucursalId = user.sucursalId;
+    } else if (sucursalId) {
+      where.sucursalId = sucursalId;
+    }
     
-    // Obtener ventas usando el servicio
-    const ventas = await ventaService.getVentas(filtros);
+    if (usuarioId) {
+      where.usuarioId = usuarioId;
+    }
     
-    return NextResponse.json(ventas);
+    if (facturada !== undefined) {
+      where.facturada = facturada;
+    }
+    
+    if (desde || hasta) {
+      where.fecha = {};
+      
+      if (desde) {
+        where.fecha.gte = desde;
+      }
+      
+      if (hasta) {
+        // Incluir todo el día
+        const hastaFinal = new Date(hasta);
+        hastaFinal.setHours(23, 59, 59, 999);
+        where.fecha.lte = hastaFinal;
+      }
+    }
+    
+    // Filtro por medio de pago
+    if (medioPago) {
+      where.pagos = {
+        some: { medioPago }
+      };
+    }
+    
+    // Contar total para paginación
+    const total = await prisma.venta.count({ where });
+    
+    // Obtener ventas
+    const ventas = await prisma.venta.findMany({
+      where,
+      include: {
+        items: {
+          include: {
+            producto: true
+          }
+        },
+        pagos: true,
+        sucursal: true,
+        usuario: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        },
+        facturaElectronica: {
+          select: {
+            id: true,
+            tipoComprobante: true,
+            numeroFactura: true,
+            cae: true,
+            estado: true
+          }
+        }
+      },
+      orderBy: {
+        fecha: 'desc'
+      },
+      skip: (page - 1) * limit,
+      take: limit
+    });
+    
+    // Calcular estadísticas
+    const totalVentas = await prisma.venta.aggregate({
+      where,
+      _sum: {
+        total: true
+      }
+    });
+    
+    const ventasFacturadas = await prisma.venta.aggregate({
+      where: {
+        ...where,
+        facturada: true
+      },
+      _sum: {
+        total: true
+      },
+      _count: true
+    });
+    
+    const pagosPorMedio = await prisma.pago.groupBy({
+      by: ['medioPago'],
+      where: {
+        venta: { ...where }
+      },
+      _sum: {
+        monto: true
+      },
+      _count: true
+    });
+    
+    return NextResponse.json({
+      data: ventas,
+      stats: {
+        total: totalVentas._sum.total || 0,
+        cantidadVentas: total,
+        totalFacturado: ventasFacturadas._sum.total || 0,
+        cantidadFacturadas: ventasFacturadas._count || 0,
+        pagosPorMedio: pagosPorMedio.map(p => ({
+          medioPago: p.medioPago,
+          total: p._sum.monto || 0,
+          cantidad: p._count
+        }))
+      },
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    });
   } catch (error: any) {
     console.error('Error al obtener ventas:', error);
     return NextResponse.json(
@@ -61,6 +189,29 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     
+    // Obtener usuario
+    const user = (req as any).user;
+    
+    // Si no se proporcionó sucursalId, usar la del usuario
+    let sucursalId = body.sucursalId;
+    if (!sucursalId) {
+      if (!user.sucursalId) {
+        return NextResponse.json(
+          { error: 'No se ha proporcionado sucursalId y el usuario no tiene sucursal asignada' },
+          { status: 400 }
+        );
+      }
+      sucursalId = user.sucursalId;
+    }
+    
+    // Verificar acceso a la sucursal
+    if (user.sucursalId && user.sucursalId !== sucursalId && user.roleId !== 'role-admin') {
+      return NextResponse.json(
+        { error: 'No tiene permisos para crear ventas en esta sucursal' },
+        { status: 403 }
+      );
+    }
+    
     // Validar que haya ítems
     if (!body.items || !Array.isArray(body.items) || body.items.length === 0) {
       return NextResponse.json(
@@ -78,7 +229,6 @@ export async function POST(req: NextRequest) {
     }
     
     // Verificar que hay una caja abierta
-    const sucursalId = body.sucursalId;
     const cajaAbierta = await prisma.cierreCaja.findFirst({
       where: {
         sucursalId,
@@ -93,9 +243,6 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    // Obtener usuario
-    const user = (req as any).user;
-    
     // Asegurarse que el total de pagos coincide con el total de la venta
     const totalPagos = body.pagos.reduce((sum: number, pago: any) => sum + pago.monto, 0);
     
@@ -106,65 +253,90 @@ export async function POST(req: NextRequest) {
       );
     }
     
-const venta = await ventaService.crearVenta({
-    sucursalId,
-    usuarioId: user.id,
-    items: body.items,
-    total: body.total,
-    descuento: body.descuento || 0,
-    codigoDescuento: body.codigoDescuento,
-    facturar: body.facturar || false,
-    clienteNombre: body.clienteNombre,
-    clienteCuit: body.clienteCuit,
-    pagos: body.pagos
-  });
-  
-  // Verificar que venta no sea nulo antes de acceder a sus propiedades
-  if (!venta) {
-    return NextResponse.json(
-      { error: 'Error al crear la venta' },
-      { status: 500 }
-    );
-  }
-  
-  // Ahora podemos acceder a venta.id con seguridad
-  console.log(`Integrando con ARCA para facturación de venta ${venta.id}`);
-    
-    // Si se requiere facturación, integrar con ARCA (sistema externo)
-    if (body.facturar && body.clienteCuit) {
-      try {
-        // Código para integración con ARCA
-        // Este es un placeholder para la integración real
-        console.log(`Integrando con ARCA para facturación de venta ${venta.id}`);
-        
-        // Placeholder para respuesta de ARCA
-        const arcaResponse = {
-          success: true,
-          numeroFactura: `A-0001-${Math.floor(Math.random() * 10000).toString().padStart(8, '0')}`,
-          fechaFactura: new Date().toISOString()
-        };
-        
-        // Actualizar la venta con número de factura
-        if (arcaResponse.success) {
-          await prisma.venta.update({
-            where: { id: venta.id },
-            data: {
-              numeroFactura: arcaResponse.numeroFactura
-            }
-          });
+    // Validar stock disponible para todos los items
+    for (const item of body.items) {
+      const stock = await prisma.stock.findFirst({
+        where: {
+          productoId: item.productoId,
+          ubicacionId: sucursalId
         }
-      } catch (facturacionError) {
-        console.error('Error en facturación con ARCA:', facturacionError);
-        // No fallamos la venta por error de facturación, pero lo registramos
+      });
+      
+      if (!stock || stock.cantidad < item.cantidad) {
+        return NextResponse.json({
+          error: `Stock insuficiente para el producto ${item.productoId}`,
+          producto: item.productoId,
+          stockDisponible: stock?.cantidad || 0,
+          stockRequerido: item.cantidad
+        }, { status: 400 });
+      }
+    }
+    
+    // Crear venta usando el servicio
+    const venta = await ventaService.crearVenta({
+      sucursalId,
+      usuarioId: user.id,
+      items: body.items,
+      total: body.total,
+      descuento: body.descuento || 0,
+      codigoDescuento: body.codigoDescuento,
+      facturar: body.facturar || false,
+      clienteNombre: body.clienteNombre,
+      clienteCuit: body.clienteCuit,
+      pagos: body.pagos
+    });
+    
+    // Si se solicitó facturación inmediata
+    if (body.facturar && venta) {
+      try {
+        // Verificar si el cliente tiene los datos adecuados para facturar
+        if (body.facturar === 'A' && (!body.clienteCuit || !body.clienteNombre)) {
+          throw new Error('Para facturas tipo A se requiere CUIT y nombre del cliente');
+        }
+        
+        // Obtener servicio de facturación
+        const facturacionService = await getFacturacionService(sucursalId);
+        
+        // Generar factura
+        const resultadoFactura = await facturacionService.generarFactura(venta.id);
+        
+        if (resultadoFactura.success) {
+          return NextResponse.json({
+            ...venta,
+            factura: {
+              id: resultadoFactura.facturaId,
+              cae: resultadoFactura.cae
+            },
+            message: 'Venta creada y facturada exitosamente'
+          }, { status: 201 });
+        } else {
+          // La venta se creó pero hubo error en facturación
+          return NextResponse.json({
+            ...venta,
+            facturaError: resultadoFactura.message,
+            message: 'Venta creada pero hubo un error en la facturación'
+          }, { status: 201 });
+        }
+      } catch (errorFactura) {
+        console.error('Error al facturar venta:', errorFactura);
+        
+        // Registrar contingencia
         await prisma.contingencia.create({
           data: {
             titulo: `Error de facturación en venta ${venta.id}`,
-            descripcion: `No se pudo generar la factura: ${facturacionError instanceof Error ? facturacionError.message : 'Error desconocido'}`,
-            origen: 'sucursal',
+            descripcion: errorFactura instanceof Error ? errorFactura.message : 'Error desconocido',
+            origen: 'pdv',
             creadoPor: user.id,
-            estado: 'pendiente'
+            estado: 'pendiente',
+            tipo: 'facturacion'
           }
         });
+        
+        return NextResponse.json({
+          ...venta,
+          facturaError: errorFactura instanceof Error ? errorFactura.message : 'Error desconocido',
+          message: 'Venta creada pero hubo un error en la facturación. Se ha registrado una contingencia.'
+        }, { status: 201 });
       }
     }
     

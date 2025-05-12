@@ -52,6 +52,7 @@ export class FacturacionService {
    * Procesa una venta para generar factura electrónica
    */
   public async generarFactura(ventaId: string): Promise<{
+    error: any;
     success: boolean;
     message?: string;
     facturaId?: string;

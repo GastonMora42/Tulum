@@ -20,27 +20,32 @@ export async function GET(req: NextRequest) {
       );
     }
     
-    // Use findFirst with custom table query since conciliacion might not be in the schema yet
-    const conciliacionActiva = await prisma.$queryRaw`
-      SELECT * FROM "Conciliacion" 
-      WHERE "sucursalId" = ${sucursalId} 
-      AND "estado" != 'completada' 
-      ORDER BY "fecha" DESC 
-      LIMIT 1
-    `;
+    // Verificar que el usuario tenga acceso a la sucursal
+    const user = (req as any).user;
+    if (user.sucursalId && user.sucursalId !== sucursalId && user.roleId !== 'role-admin') {
+      return NextResponse.json(
+        { error: 'No tiene permisos para acceder a esta sucursal' },
+        { status: 403 }
+      );
+    }
     
-    // If no reconciliation in process
-    if (!conciliacionActiva || (Array.isArray(conciliacionActiva) && conciliacionActiva.length === 0)) {
+    // Buscar conciliación activa
+    const conciliacionActiva = await prisma.conciliacion.findFirst({
+      where: { 
+        sucursalId, 
+        estado: { in: ['pendiente', 'en_proceso'] } 
+      },
+      orderBy: { fecha: 'desc' }
+    });
+    
+    if (!conciliacionActiva) {
       return NextResponse.json(
         { message: 'No hay conciliación activa' },
         { status: 404 }
       );
     }
     
-    // Get the active reconciliation (first item if array)
-    const conciliacion = Array.isArray(conciliacionActiva) ? conciliacionActiva[0] : conciliacionActiva;
-    
-    // Obtener datos de productos
+    // Obtener productos con stock en esta sucursal
     const productos = await prisma.stock.findMany({
       where: {
         ubicacionId: sucursalId,
@@ -51,39 +56,19 @@ export async function GET(req: NextRequest) {
       }
     });
     
-    // Explicitly declare diferenciasPorProducto as an array type
-    const diferenciasPorProducto: Array<{
-      id: string;
-      nombre: string;
-      stockTeorico: number;
-      stockFisico: number | null;
-      diferencia: number;
-    }> = [];
-    
-    // Formatear datos para la respuesta
+    // Preparar la respuesta con formato correcto
     const formattedData = {
-      fecha: conciliacion.fecha,
-      estado: conciliacion.estado,
-      usuario: conciliacion.usuarioId,
+      id: conciliacionActiva.id,
+      fecha: conciliacionActiva.fecha,
+      estado: conciliacionActiva.estado,
+      usuario: conciliacionActiva.usuarioId,
       productos: productos.map(stock => {
-        // Make sure stock.producto exists
-        if (!stock.producto) {
-          return {
-            id: stock.productoId || 'unknown',
-            nombre: 'Producto desconocido',
-            stockTeorico: stock.cantidad,
-            stockFisico: null,
-            diferencia: 0
-          };
-        }
-        
-        // Find stockFisico in detalles if it exists
+        // Verificar si hay datos previos en detalles
         let stockFisico = null;
-        if (conciliacion.detalles) {
-          // Ensure detalles is properly parsed
-          const detalles = typeof conciliacion.detalles === 'string' 
-            ? JSON.parse(conciliacion.detalles) 
-            : conciliacion.detalles;
+        if (conciliacionActiva.detalles) {
+          const detalles = typeof conciliacionActiva.detalles === 'string' 
+            ? JSON.parse(conciliacionActiva.detalles) 
+            : conciliacionActiva.detalles;
             
           const item = detalles.find((d: any) => d.productoId === stock.productoId);
           if (item) {
@@ -93,7 +78,7 @@ export async function GET(req: NextRequest) {
         
         return {
           id: stock.productoId || 'unknown',
-          nombre: stock.producto.nombre || 'Producto desconocido',
+          nombre: stock.producto?.nombre || 'Producto desconocido',
           stockTeorico: stock.cantidad,
           stockFisico: stockFisico,
           diferencia: stockFisico !== null ? stockFisico - stock.cantidad : 0
@@ -127,41 +112,33 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    // Obtener usuario
+    // Verificar que el usuario tenga acceso a esta sucursal
     const user = (req as any).user;
-    
-    // Check if a conciliation is already in progress using raw query
-    const conciliacionExistente = await prisma.$queryRaw`
-      SELECT * FROM "Conciliacion" 
-      WHERE "sucursalId" = ${sucursalId} 
-      AND "estado" != 'completada' 
-      LIMIT 1
-    `;
-    
-    if (conciliacionExistente && (
-      !Array.isArray(conciliacionExistente) || conciliacionExistente.length > 0
-    )) {
-      // Ya existe, retornar la existente
-      const conciliacion = Array.isArray(conciliacionExistente) 
-        ? conciliacionExistente[0] 
-        : conciliacionExistente;
-        
-      return NextResponse.json(conciliacion);
+    if (user.sucursalId && user.sucursalId !== sucursalId && user.roleId !== 'role-admin') {
+      return NextResponse.json(
+        { error: 'No tiene permisos para crear conciliaciones en esta sucursal' },
+        { status: 403 }
+      );
     }
     
-    // Create new conciliation using raw query if the table exists
-    const currentDate = new Date();
-    const formattedDate = format(currentDate, 'yyyy-MM-dd');
+    // Verificar si ya existe una conciliación activa
+    const conciliacionExistente = await prisma.conciliacion.findFirst({
+      where: {
+        sucursalId,
+        estado: { in: ['pendiente', 'en_proceso'] }
+      }
+    });
     
-    // Create a unique ID based on date
-    const id = `conciliacion-${formattedDate}-${sucursalId}`;
+    if (conciliacionExistente) {
+      return NextResponse.json({
+        id: conciliacionExistente.id,
+        fecha: conciliacionExistente.fecha,
+        estado: conciliacionExistente.estado,
+        message: 'Ya existe una conciliación en proceso'
+      });
+    }
     
-    await prisma.$executeRaw`
-      INSERT INTO "Conciliacion" ("id", "sucursalId", "fecha", "estado", "usuarioId", "detalles")
-      VALUES (${id}, ${sucursalId}, ${currentDate}, 'pendiente', ${user.id}, '[]')
-    `;
-    
-    // Get products for the conciliation
+    // Obtener productos para la conciliación
     const productos = await prisma.stock.findMany({
       where: {
         ubicacionId: sucursalId,
@@ -172,20 +149,26 @@ export async function POST(req: NextRequest) {
       }
     });
     
-    // Prepare empty diferenciasPorProducto array with correct type
-    const diferenciasPorProducto: Array<{
-      id: string;
-      nombre: string;
-      stockTeorico: number;
-      stockFisico: number | null;
-      diferencia: number;
-    }> = [];
+    // Crear nueva conciliación
+    const currentDate = new Date();
+    const conciliacionId = `conciliacion-${format(currentDate, 'yyyyMMdd')}-${sucursalId}`;
     
-    // Format response data
+    const nuevaConciliacion = await prisma.conciliacion.create({
+      data: {
+        id: conciliacionId,
+        sucursalId,
+        fecha: currentDate,
+        estado: 'pendiente',
+        usuarioId: user.id,
+        detalles: [] // Inicialmente vacío
+      }
+    });
+    
+    // Preparar la respuesta
     const formattedData = {
-      id,
-      fecha: currentDate,
-      estado: 'pendiente',
+      id: nuevaConciliacion.id,
+      fecha: nuevaConciliacion.fecha,
+      estado: nuevaConciliacion.estado,
       usuario: user.id,
       productos: productos.map(stock => ({
         id: stock.productoId || 'unknown',
