@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authMiddleware } from '@/server/api/middlewares/auth';
 import prisma from '@/server/db/client';
-import { facturasPdfService } from '@/server/services/facturacion/facturasPDFService';
+import { facturasPdfService } from '@/server/services/facturacion/facturasPdfService';
 
 interface RouteParams {
   params: {

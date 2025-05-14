@@ -1,10 +1,10 @@
 // src/lib/afip/afipSoapClient.ts
 import * as soap from 'soap';
 import * as crypto from 'crypto';
-import * as fs from 'fs';
 import { parseStringPromise } from 'xml2js';
 import { DOMParser } from 'xmldom';
 import * as forge from 'node-forge';
+import { v4 as uuidv4 } from 'uuid';
 import { AFIP_CONFIG } from '@/config/afip';
 import prisma from '@/server/db/client';
 
@@ -41,15 +41,20 @@ export class AfipSoapClient {
   /**
    * Crea el ticket de autenticación CMS firmado con el certificado
    */
-  private async createCMS(): Promise<string> {
-    try {
-      // Generar TRA XML
-      const ttl = AFIP_CONFIG.tokenDuration;
-      const uniqueId = Math.floor(Math.random() * 999999999);
-      const generationTime = new Date();
-      const expirationTime = new Date(generationTime.getTime() + ttl * 1000);
+// src/lib/afip/afipSoapClient.ts - Corregir errores de tipado
 
-      const tra = `<?xml version="1.0" encoding="UTF-8" ?>
+/**
+ * Crea el ticket de autenticación CMS firmado con el certificado
+ */
+private async createCMS(): Promise<string> {
+  try {
+    // Generar TRA XML
+    const ttl = AFIP_CONFIG.tokenDuration;
+    const uniqueId = Math.floor(Math.random() * 999999999);
+    const generationTime = new Date();
+    const expirationTime = new Date(generationTime.getTime() + ttl * 1000);
+
+    const tra = `<?xml version="1.0" encoding="UTF-8" ?>
 <loginTicketRequest version="1.0">
   <header>
     <uniqueId>${uniqueId}</uniqueId>
@@ -59,50 +64,51 @@ export class AfipSoapClient {
   <service>${AFIP_CONFIG.service}</service>
 </loginTicketRequest>`;
 
-      // Crear certificado PKCS#7/CMS
-      const p7 = forge.pkcs7.createSignedData();
-      p7.content = forge.util.createBuffer(tra, 'utf8');
-      
-      // Cargar certificado y clave privada
-      const certificate = forge.pki.certificateFromPem(this.cert);
-      const privateKey = forge.pki.privateKeyFromPem(this.key);
-      
-      // Agregar certificado
-      p7.addCertificate(certificate);
-      
-      // Añadir autenticado
-      p7.addSigner({
-        key: privateKey,
-        certificate: certificate,
-        digestAlgorithm: forge.pki.oids.sha256,
-        authenticatedAttributes: [{
-          type: forge.pki.oids.contentType,
-          value: forge.pki.oids.data
-        }, {
-          type: forge.pki.oids.messageDigest
-          // Valor generado automáticamente
-        }, {
-          type: forge.pki.oids.signingTime,
-          value: new Date()
-        }]
-      });
-      
-      // Firmar
-      p7.sign();
-      
-      // Encapsular contenido
-      p7.content = null;
-      
-      // Convertir a DER y luego a Base64
-      const der = forge.asn1.toDer(p7.toAsn1()).getBytes();
-      const base64 = Buffer.from(der, 'binary').toString('base64');
-      
-      return base64;
-    } catch (error) {
-      console.error('Error creando CMS:', error);
-      throw new Error('No se pudo crear el CMS para autenticación');
-    }
+    // Crear certificado PKCS#7/CMS
+    const p7 = forge.pkcs7.createSignedData();
+    p7.content = forge.util.createBuffer(tra, 'utf8');
+    
+    // Cargar certificado y clave privada
+    const certificate = forge.pki.certificateFromPem(this.cert);
+    const privateKey = forge.pki.privateKeyFromPem(this.key);
+    
+    // Agregar certificado
+    p7.addCertificate(certificate);
+    
+    // Añadir autenticado
+    p7.addSigner({
+      key: privateKey,
+      certificate: certificate,
+      digestAlgorithm: forge.pki.oids.sha256,
+      authenticatedAttributes: [{
+        type: forge.pki.oids.contentType,
+        value: forge.pki.oids.data
+      }, {
+        type: forge.pki.oids.messageDigest
+        // Valor generado automáticamente
+      }, {
+        type: forge.pki.oids.signingTime,
+        // Convertir Date a string ISO para corregir error de tipo
+        value: generationTime.toISOString()
+      }]
+    });
+    
+    // Firmar
+    p7.sign();
+    
+    // Encapsular contenido - corregimos el error de null
+    p7.content = undefined; // Usar undefined en lugar de null
+    
+    // Convertir a DER y luego a Base64
+    const der = forge.asn1.toDer(p7.toAsn1()).getBytes();
+    const base64 = Buffer.from(der, 'binary').toString('base64');
+    
+    return base64;
+  } catch (error) {
+    console.error('Error creando CMS:', error);
+    throw new Error('No se pudo crear el CMS para autenticación');
   }
+}
 
   /**
    * Autentica con AFIP y obtiene token y sign
@@ -160,21 +166,34 @@ export class AfipSoapClient {
    */
   private async saveTokenToDatabase(token: string, sign: string, expirationTime: Date): Promise<void> {
     try {
-      await prisma.tokenAFIP.upsert({
-        where: { cuit: this.cuit },
-        update: {
-          token,
-          sign,
-          expirationTime
-        },
-        create: {
-          cuit: this.cuit,
-          token,
-          sign,
-          expirationTime,
-          createdAt: new Date()
-        }
+      // Buscar token existente para este CUIT
+      const existingToken = await prisma.tokenAFIP.findFirst({
+        where: { cuit: this.cuit }
       });
+      
+      if (existingToken) {
+        // Si existe, actualizar
+        await prisma.tokenAFIP.update({
+          where: { id: existingToken.id },
+          data: {
+            token,
+            sign,
+            expirationTime
+          }
+        });
+      } else {
+        // Si no existe, crear nuevo
+        await prisma.tokenAFIP.create({
+          data: {
+            id: uuidv4(), // Usar UUID v4 para generar un ID único
+            cuit: this.cuit,
+            token,
+            sign,
+            expirationTime,
+            createdAt: new Date()
+          }
+        });
+      }
       console.log(`[AFIP] Token guardado en base de datos para CUIT ${this.cuit}`);
     } catch (error) {
       console.error('[AFIP] Error al guardar token en base de datos:', error);
@@ -187,7 +206,8 @@ export class AfipSoapClient {
    */
   private async loadTokenFromDatabase(): Promise<boolean> {
     try {
-      const tokenData = await prisma.tokenAFIP.findUnique({
+      // Buscar por CUIT usando findFirst
+      const tokenData = await prisma.tokenAFIP.findFirst({
         where: { cuit: this.cuit }
       });
       

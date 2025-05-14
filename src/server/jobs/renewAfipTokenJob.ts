@@ -10,6 +10,7 @@ export async function renewAfipTokens(): Promise<{
   success: boolean;
   renewed: number;
   errors: number;
+  details?: any[];
 }> {
   console.log('[AFIP] Iniciando renovación automática de tokens AFIP');
   
@@ -24,6 +25,7 @@ export async function renewAfipTokens(): Promise<{
     // Iniciar contador de resultados
     let renewed = 0;
     let errors = 0;
+    const details: any[] = [];
     
     // Procesar cada configuración
     for (const config of configuraciones) {
@@ -31,7 +33,7 @@ export async function renewAfipTokens(): Promise<{
         console.log(`[AFIP] Procesando CUIT ${config.cuit}`);
         
         // Buscar token existente
-        const tokenExistente = await prisma.tokenAFIP.findUnique({
+        const tokenExistente = await prisma.tokenAFIP.findFirst({
           where: { cuit: config.cuit }
         });
         
@@ -48,13 +50,39 @@ export async function renewAfipTokens(): Promise<{
           await client.getAuth();
           
           renewed++;
+          
+          // Registrar resultado
+          details.push({
+            cuit: config.cuit,
+            status: 'renovado',
+            sucursal: config.sucursalId,
+            timestamp: new Date()
+          });
+          
           console.log(`[AFIP] Token renovado exitosamente para CUIT ${config.cuit}`);
-        } else {
+        } else if (tokenExistente) {
           console.log(`[AFIP] Token para CUIT ${config.cuit} sigue vigente (expira: ${tokenExistente.expirationTime.toISOString()})`);
+          
+          // Registrar resultado
+          details.push({
+            cuit: config.cuit,
+            status: 'vigente',
+            sucursal: config.sucursalId,
+            expira: tokenExistente.expirationTime
+          });
         }
       } catch (error) {
         console.error(`[AFIP] Error renovando token para CUIT ${config.cuit}:`, error);
         errors++;
+        
+        // Registrar error
+        details.push({
+          cuit: config.cuit,
+          status: 'error',
+          sucursal: config.sucursalId,
+          error: error instanceof Error ? error.message : 'Error desconocido',
+          timestamp: new Date()
+        });
       }
     }
     
@@ -63,15 +91,55 @@ export async function renewAfipTokens(): Promise<{
     return {
       success: true,
       renewed,
-      errors
+      errors,
+      details
     };
   } catch (error) {
     console.error('[AFIP] Error general en renovación de tokens:', error);
     return {
       success: false,
       renewed: 0,
-      errors: 1
+      errors: 1,
+      details: [{
+        status: 'error_general',
+        error: error instanceof Error ? error.message : 'Error desconocido',
+        timestamp: new Date()
+      }]
     };
+  }
+}
+
+/**
+ * Verifica el estado de los tokens AFIP
+ * @returns Información sobre el estado de los tokens
+ */
+export async function checkAfipTokensStatus(): Promise<{
+  total: number;
+  valid: number;
+  expired: number;
+  tokens: any[];
+}> {
+  try {
+    // Buscar todos los tokens disponibles
+    const tokens = await prisma.tokenAFIP.findMany();
+    
+    const now = new Date();
+    const validTokens = tokens.filter(token => token.expirationTime > now);
+    
+    return {
+      total: tokens.length,
+      valid: validTokens.length,
+      expired: tokens.length - validTokens.length,
+      tokens: tokens.map(token => ({
+        cuit: token.cuit,
+        valid: token.expirationTime > now,
+        expiresIn: Math.round((token.expirationTime.getTime() - now.getTime()) / (1000 * 60)), // minutos
+        createdAt: token.createdAt
+      }))
+    };
+  } catch (error) {
+    console.error('[AFIP] Error al verificar estado de tokens:', error);
+    throw error;
   }
 }
 
