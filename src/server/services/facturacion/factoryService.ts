@@ -1,4 +1,4 @@
-// src/services/facturacion/factoryService.ts
+// src/server/services/facturacion/factoryService.ts
 import prisma from '@/server/db/client';
 import { FacturacionService } from './facturacionService';
 
@@ -30,4 +30,27 @@ export async function getFacturacionService(sucursalId: string): Promise<Factura
   serviceCache.set(sucursalId, service);
   
   return service;
+}
+
+/**
+ * Limpia la caché de servicios
+ */
+export function clearFacturacionServiceCache() {
+  serviceCache.clear();
+}
+
+/**
+ * Obtiene un servicio de facturación por CUIT
+ */
+export async function getFacturacionServiceByCuit(cuit: string): Promise<FacturacionService> {
+  // Buscar si ya existe en caché
+  for (const [_, service] of serviceCache.entries()) {
+    // Si es el mismo servicio (mismo CUIT), reutilizarlo
+    if ((service as any).cuit === cuit) {
+      return service;
+    }
+  }
+
+  // Crear servicio
+  return new FacturacionService(cuit);
 }

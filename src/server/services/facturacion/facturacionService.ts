@@ -1,9 +1,9 @@
 // src/server/services/facturacion/facturacionService.ts
-
 import { AfipSoapClient } from '@/lib/afip/afipSoapClient';
 import QRCode from 'qrcode';
 import prisma from '@/server/db/client';
 import { v4 as uuidv4 } from 'uuid';
+import { format } from 'date-fns';
 
 export class FacturacionService {
   private afipClient: AfipSoapClient;
@@ -52,11 +52,11 @@ export class FacturacionService {
    * Procesa una venta para generar factura electrónica
    */
   public async generarFactura(ventaId: string): Promise<{
-    error: any;
     success: boolean;
     message?: string;
     facturaId?: string;
     cae?: string;
+    error?: any;
   }> {
     try {
       // Verificar si ya existe factura para esta venta
@@ -69,7 +69,8 @@ export class FacturacionService {
           success: true,
           message: 'La venta ya tiene una factura asociada',
           facturaId: facturaExistente.id,
-          cae: facturaExistente.cae || undefined
+          cae: facturaExistente.cae || undefined,
+          error: null
         };
       }
 
@@ -123,27 +124,53 @@ export class FacturacionService {
 
       // Calcular totales
       const importeTotal = venta.total;
-      const importeNeto = importeTotal / 1.21; // Para IVA 21%
-      const importeIVA = importeTotal - importeNeto;
+      // Para facturas A, el neto no incluye IVA
+      // Para facturas B, el neto es igual al total (IVA incluido)
+      let importeNeto, importeIVA;
+      
+      if (tipoComprobanteLetra === 'A') {
+        importeNeto = venta.total / 1.21; // Para IVA 21%
+        importeIVA = venta.total - importeNeto;
+      } else {
+        // Para facturas B, el monto se informa con IVA incluido
+        importeNeto = venta.total;
+        importeIVA = 0;
+      }
 
       // Preparar items para la factura
-      const itemsFactura = venta.items.map(item => ({
-        descripcion: item.producto.nombre,
-        cantidad: item.cantidad,
-        precioUnitario: item.precioUnitario / 1.21, // Precio sin IVA
-        bonificacion: item.descuento || 0,
-        subtotal: (item.cantidad * item.precioUnitario) * (1 - (item.descuento || 0) / 100) / 1.21
-      }));
+      const itemsFactura = venta.items.map(item => {
+        let precioUnitarioNeto;
+        
+        if (tipoComprobanteLetra === 'A') {
+          precioUnitarioNeto = item.precioUnitario / 1.21; // Precio sin IVA
+        } else {
+          precioUnitarioNeto = item.precioUnitario; // Precio con IVA incluido
+        }
+        
+        const subtotal = (item.cantidad * precioUnitarioNeto) * (1 - (item.descuento || 0) / 100);
+        
+        return {
+          descripcion: item.producto.nombre,
+          cantidad: item.cantidad,
+          precioUnitario: precioUnitarioNeto,
+          bonificacion: item.descuento || 0,
+          subtotal
+        };
+      });
 
       // Preparar alícuotas de IVA
-      const iva = [{
-        Id: 5, // 5 = 21%
-        BaseImp: parseFloat(importeNeto.toFixed(2)),
-        Importe: parseFloat(importeIVA.toFixed(2))
-      }];
+      const iva = [];
+      
+      if (tipoComprobanteLetra === 'A') {
+        iva.push({
+          Id: 5, // 5 = 21%
+          BaseImp: parseFloat(importeNeto.toFixed(2)),
+          Importe: parseFloat(importeIVA.toFixed(2))
+        });
+      }
 
       // Fecha en formato YYYYMMDD
-      const fechaComprobante = new Date().toISOString().split('T')[0].replace(/-/g, '');
+      const fechaComprobante = format(new Date(), 'yyyyMMdd');
 
       try {
         // Crear factura en AFIP
@@ -211,11 +238,21 @@ export class FacturacionService {
           // No fallamos la operación completa si falla el QR
         }
 
+        // Marcar venta como facturada
+        await prisma.venta.update({
+          where: { id: venta.id },
+          data: {
+            facturada: true,
+            numeroFactura: `${configAFIP.puntoVenta.toString().padStart(5, '0')}-${respuestaAFIP.CbteNro.toString().padStart(8, '0')}`
+          }
+        });
+
         return {
           success: true,
           message: 'Factura generada correctamente',
           facturaId: factura.id,
-          cae: respuestaAFIP.CAE
+          cae: respuestaAFIP.CAE,
+          error: null
         };
       } catch (afipError) {
         // Si falla la comunicación con AFIP, marcamos la factura como error
@@ -231,7 +268,11 @@ export class FacturacionService {
       }
     } catch (error) {
       console.error('Error al generar factura:', error);
-      throw error;
+      return {
+        success: false,
+        message: error instanceof Error ? error.message : 'Error desconocido',
+        error
+      };
     }
   }
 
@@ -254,5 +295,110 @@ export class FacturacionService {
         }
       }
     });
+  }
+
+  /**
+   * Regenera el código QR para una factura
+   */
+  public async regenerarQR(facturaId: string): Promise<boolean> {
+    try {
+      const factura = await prisma.facturaElectronica.findUnique({
+        where: { id: facturaId },
+        include: {
+          venta: true
+        }
+      });
+
+      if (!factura || !factura.cae) {
+        return false;
+      }
+
+      const configAFIP = await prisma.configuracionAFIP.findFirst({
+        where: { sucursalId: factura.sucursalId }
+      });
+
+      if (!configAFIP) {
+        return false;
+      }
+
+      const datosFull = {
+        ...factura,
+        cuit: configAFIP.cuit
+      };
+
+      const qrData = await this.generarQR(datosFull);
+
+      await prisma.facturaElectronica.update({
+        where: { id: facturaId },
+        data: {
+          qrData
+        }
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Error al regenerar QR:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Verifica el estado del servicio AFIP
+   */
+  public async verificarEstadoServicio(): Promise<{
+    AppServer: string;
+    DbServer: string;
+    AuthServer: string;
+    status: boolean;
+  }> {
+    try {
+      const estado = await this.afipClient.getServerStatus();
+      return {
+        ...estado,
+        status: estado.AppServer === 'OK' && estado.DbServer === 'OK' && estado.AuthServer === 'OK'
+      };
+    } catch (error) {
+      console.error('Error al verificar estado del servicio AFIP:', error);
+      return {
+        AppServer: 'ERROR',
+        DbServer: 'ERROR',
+        AuthServer: 'ERROR',
+        status: false
+      };
+    }
+  }
+
+  /**
+   * Obtiene la información de tipos de comprobantes
+   */
+  public async obtenerTiposComprobantes() {
+    try {
+      return await this.afipClient.getInvoiceTypes();
+    } catch (error) {
+      console.error('Error al obtener tipos de comprobantes:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Verifica si una factura ya existe en AFIP
+   */
+  public async verificarFacturaExistente(
+    puntoVenta: number, 
+    comprobanteTipo: number, 
+    numeroComprobante: number
+  ): Promise<boolean> {
+    try {
+      const result = await this.afipClient.getInvoice(
+        puntoVenta,
+        comprobanteTipo,
+        numeroComprobante
+      );
+      
+      return !!result && !!result.ResultGet;
+    } catch (error) {
+      console.error('Error al verificar factura existente:', error);
+      return false;
+    }
   }
 }

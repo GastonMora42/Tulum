@@ -134,7 +134,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { ventaId } = body;
+    const { ventaId, tipoComprobante } = body;
 
     if (!ventaId) {
       return NextResponse.json({ 
@@ -182,7 +182,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Verificar que la venta tenga información de cliente para facturas A
-    if (body.tipoComprobante === 'A' && (!venta.clienteCuit || !venta.clienteNombre)) {
+    if (tipoComprobante === 'A' && (!venta.clienteCuit || !venta.clienteNombre)) {
       return NextResponse.json({ 
         error: 'Para facturas tipo A se requiere CUIT y nombre del cliente' 
       }, { status: 400 });
