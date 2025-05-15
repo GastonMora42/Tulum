@@ -77,7 +77,8 @@ export async function PATCH(
           {
             respuesta: body.respuesta,
             resueltoPor: user.id,
-            ajusteRealizado: body.ajusteRealizado
+            ajusteRealizado: body.ajusteRealizado,
+            eliminarArchivos: body.mantenerArchivos !== true // Por defecto elimina archivos
           }
         );
         break;
@@ -91,14 +92,18 @@ export async function PATCH(
             { status: 400 }
           );
         }
-        
         resultado = await contingenciaService.rechazarContingencia(
           id,
           {
             respuesta: body.respuesta,
-            resueltoPor: user.id
+            resueltoPor: user.id,
+            eliminarArchivos: body.mantenerArchivos !== true
           }
         );
+        break;
+        
+      case 'eliminar_archivo':
+        resultado = await contingenciaService.eliminarArchivoMultimedia(id);
         break;
         
       case 'en_revision':

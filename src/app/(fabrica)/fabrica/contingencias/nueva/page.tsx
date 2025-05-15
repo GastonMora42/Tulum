@@ -9,6 +9,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { authenticatedFetch } from '@/hooks/useAuth';
 import { ContrastEnhancer } from '@/components/ui/ContrastEnhancer';
 import { HCInput, HCSelect, HCTextarea, HCLabel, HCButton } from '@/components/ui/HighContrastComponents';
+import { MediaUploader } from '@/components/ui/MediaUploader';
 
 // Interfaces
 interface Produccion {
@@ -50,7 +51,9 @@ export default function NuevaContingenciaFabricaPage() {
   const [producciones, setProducciones] = useState<Produccion[]>([]);
   const [envios, setEnvios] = useState<Envio[]>([]);
   const router = useRouter();
-  
+  const [mediaUrl, setMediaUrl] = useState<string | null>(null);
+  const [mediaType, setMediaType] = useState<'image' | 'video'>('image');
+
   const { 
     register, 
     handleSubmit, 
@@ -106,15 +109,19 @@ export default function NuevaContingenciaFabricaPage() {
         origen: 'fabrica',
         // Asegurarse de que los valores vacíos sean null, no strings vacíos
         produccionId: data.produccionId || null,
-        envioId: data.envioId || null
+        envioId: data.envioId || null,
+        imagenUrl: mediaType === 'image' ? mediaUrl : undefined,
+        videoUrl: mediaType === 'video' ? mediaUrl : undefined,
+        mediaType: mediaUrl ? mediaType : undefined
       };
       
       console.log('Enviando contingencia:', payload);
       
       const response = await authenticatedFetch('/api/contingencias', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
-      });
+      });  
       
       if (!response.ok) {
         const errorData = await response.json();
@@ -231,6 +238,24 @@ export default function NuevaContingenciaFabricaPage() {
                 )}
               </HCSelect>
             </div>
+
+            <div className="space-y-2">
+  <HCLabel htmlFor="adjunto" className="block text-sm font-medium">
+    Archivo Adjunto (opcional)
+  </HCLabel>
+  <MediaUploader
+    type="contingency"
+    onMediaUpload={(url, type) => {
+      setMediaUrl(url);
+      setMediaType(type);
+      console.log(`Archivo ${type} recibido:`, url);
+    }}
+  />
+  <p className="text-xs text-gray-500">
+    Los archivos adjuntos se eliminarán automáticamente cuando se resuelva la contingencia
+    o después de 30 días si no se resuelve.
+  </p>
+</div>
             
             <div className="flex justify-end">
               <HCButton

@@ -57,11 +57,14 @@ export async function POST(req: NextRequest) {
     const user = (req as any).user;
     const body = await req.json();
     
-    // Limpiar datos
     const datosLimpios = {
       ...body,
       produccionId: body.produccionId || null,
-      envioId: body.envioId || null
+      envioId: body.envioId || null,
+      // Campos multimedia
+      imagenUrl: body.mediaType === 'image' ? body.imagenUrl : null,
+      videoUrl: body.mediaType === 'video' ? body.videoUrl || body.imagenUrl : null,
+      mediaType: body.mediaType || null
     };
     
     console.log("Datos recibidos en API para crear contingencia:", datosLimpios);

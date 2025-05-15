@@ -8,6 +8,8 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuthStore } from '@/stores/authStore';
 import { authenticatedFetch } from '@/hooks/useAuth';
+import { MediaUploader } from '@/components/ui/MediaUploader';
+import { HCLabel } from '@/components/ui/HighContrastComponents';
 
 // Interfaces
 interface Envio {
@@ -34,7 +36,9 @@ export default function NuevaContingenciaPDVPage() {
   const [envios, setEnvios] = useState<Envio[]>([]);
   const router = useRouter();
   const { user } = useAuthStore();
-  
+  const [mediaUrl, setMediaUrl] = useState<string | null>(null);
+  const [mediaType, setMediaType] = useState<'image' | 'video'>('image');
+
   const { 
     register, 
     handleSubmit, 
@@ -80,17 +84,18 @@ export default function NuevaContingenciaPDVPage() {
       // Añadir origen 'sucursal' automáticamente
       const payload = {
         ...data,
-        origen: 'sucursal'
+        origen: 'sucursal{user.sucursalId}',
+        imagenUrl: mediaType === 'image' ? mediaUrl : undefined,
+        videoUrl: mediaType === 'video' ? mediaUrl : undefined,
+        mediaType: mediaUrl ? mediaType : undefined
       };
       
       const response = await authenticatedFetch('/api/contingencias', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Error al crear contingencia');
@@ -180,6 +185,24 @@ export default function NuevaContingenciaPDVPage() {
               )}
             </select>
           </div>
+
+          <div className="space-y-2">
+  <HCLabel htmlFor="adjunto" className="block text-sm font-medium">
+    Archivo Adjunto (opcional)
+  </HCLabel>
+  <MediaUploader
+    type="contingency"
+    onMediaUpload={(url, type) => {
+      setMediaUrl(url);
+      setMediaType(type);
+      console.log(`Archivo ${type} recibido:`, url);
+    }}
+  />
+  <p className="text-xs text-gray-500">
+    Los archivos adjuntos se eliminarán automáticamente cuando se resuelva la contingencia
+    o después de 30 días si no se resuelve.
+  </p>
+</div>
           
           <div className="flex justify-end">
             <button

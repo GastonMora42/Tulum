@@ -1,0 +1,15 @@
+# .github/workflows/clean-expired-files.yml
+name: Limpiar Archivos Expirados
+
+on:
+  schedule:
+    - cron: '0 7 * * *'  # Ejecutar cada 7 dias a la 1 AM
+
+jobs:
+  clean:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Limpiar archivos expirados
+        run: |
+          curl -X POST ${{ secrets.API_URL }}/api/admin/jobs/clean-expired-files \
+            -H "Authorization: Bearer ${{ secrets.ADMIN_TOKEN }}"

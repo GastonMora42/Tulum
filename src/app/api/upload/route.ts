@@ -1,5 +1,4 @@
-// src/app/api/upload/route.ts - Versión corregida
-
+// src/app/api/upload/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { authMiddleware } from '@/server/api/middlewares/auth';
 import { v4 as uuidv4 } from 'uuid';
@@ -7,15 +6,7 @@ import { s3Service } from '@/server/services/storage/s3Service';
 import sharp from 'sharp';
 
 export async function POST(req: NextRequest) {
-
-  // Al inicio de la función POST
-console.log("[API] Iniciando upload de imagen");
-
-// Después de procesar la imagen
-console.log("[API] Imagen procesada correctamente");
-
-// Antes de llamar a S3
-console.log("[API] Intentando generar URL firmada de S3");
+  console.log("[API] Iniciando upload de archivo multimedia");
 
   // Verificar autenticación
   const authError = await authMiddleware(req);
@@ -26,6 +17,7 @@ console.log("[API] Intentando generar URL firmada de S3");
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
     const type = formData.get('type') as string | null;
+    const mediaType = formData.get('mediaType') as 'image' | 'video' | null;
     
     if (!file) {
       console.error('No se proporcionó archivo');
@@ -43,67 +35,70 @@ console.log("[API] Intentando generar URL firmada de S3");
       );
     }
     
-    console.log(`Procesando imagen de tipo ${type}, tamaño: ${file.size} bytes`);
+    console.log(`Procesando ${mediaType || 'archivo'} de tipo ${type}, tamaño: ${file.size} bytes`);
+    
+    // Definir la carpeta de destino según el tipo de contenido
+    let folder = type === 'product' ? 'productos' : 'contingencias';
+    let contentType = file.type;
+    let processedData: Buffer;
     
     // Leer el archivo como buffer
     const fileBuffer = Buffer.from(await file.arrayBuffer());
     
-    // Procesar imagen según el tipo
-    let processedImage;
-    let contentType;
-    let folder;
-    
-    if (type === 'product') {
-      // Para productos: mejor calidad, formato webp
-      processedImage = await sharp(fileBuffer)
-        .resize({ width: 800, height: 800, fit: 'inside' })
-        .webp({ quality: 80 })
-        .toBuffer();
-      contentType = 'image/webp';
-      folder = 'productos';
+    if (file.type.startsWith('image/')) {
+      // Para imágenes: procesar con sharp
+      if (type === 'product') {
+        // Para productos: mejor calidad, formato webp
+        processedData = await sharp(fileBuffer)
+          .resize({ width: 800, height: 800, fit: 'inside' })
+          .webp({ quality: 80 })
+          .toBuffer();
+        contentType = 'image/webp';
+        folder = 'productos';
+      } else {
+        // Para contingencias: compresión mayor, jpeg
+        processedData = await sharp(fileBuffer)
+          .resize({ width: 600, height: 600, fit: 'inside' })
+          .jpeg({ quality: 70 })
+          .toBuffer();
+        contentType = 'image/jpeg';
+        folder = 'contingencias/imagenes';
+      }
+    } else if (file.type.startsWith('video/')) {
+      // Para videos: guardar sin procesar
+      processedData = fileBuffer;
+      folder = 'contingencias/videos';
     } else {
-      // Para contingencias: compresión mayor, jpeg
-      processedImage = await sharp(fileBuffer)
-        .resize({ width: 600, height: 600, fit: 'inside' })
-        .jpeg({ quality: 70 })
-        .toBuffer();
-      contentType = 'image/jpeg';
-      folder = 'contingencias';
+      return NextResponse.json(
+        { error: 'Tipo de archivo no soportado' },
+        { status: 400 }
+      );
     }
     
     // Generar nombre único para archivo
-    const filename = `${folder}/${uuidv4()}.${type === 'product' ? 'webp' : 'jpg'}`;
+    const extension = file.type.startsWith('image/') 
+      ? (type === 'product' ? 'webp' : 'jpg')
+      : file.name.split('.').pop() || 'mp4';
+    
+    const filename = `${folder}/${uuidv4()}.${extension}`;
     console.log(`Nombre de archivo generado: ${filename}`);
     
     // Generar URL firmada de S3 para subida
     const uploadUrl = await s3Service.generatePresignedUploadUrl(filename, contentType);
     console.log(`URL de subida generada: ${uploadUrl.substring(0, 60)}...`);
     
-    // Subir imagen procesada a S3
+    // Subir archivo procesado a S3
     const uploadResponse = await fetch(uploadUrl, {
       method: 'PUT',
-      body: processedImage,
-      headers: { 'Content-Type': contentType }
+      body: processedData,
+      headers: {
+        'Content-Type': contentType
+      }
     });
     
     if (!uploadResponse.ok) {
-      const errorText = await uploadResponse.text();
-      console.error('[API Upload] Error al subir a S3:', uploadResponse.status, errorText);
-      
-      // Información más detallada en la respuesta de error
-      return NextResponse.json(
-        { 
-          error: 'Error al subir imagen a S3', 
-          status: uploadResponse.status, 
-          details: errorText.substring(0, 200) // Limitar para evitar logs enormes
-        },
-        { status: 500 }
-      );
-    }
-    
-    if (!uploadResponse.ok) {
       console.error('Error al subir a S3:', uploadResponse.status, await uploadResponse.text());
-      throw new Error('Error al subir imagen a S3');
+      throw new Error('Error al subir archivo a S3');
     }
     
     // Construir URL pública
@@ -116,23 +111,19 @@ console.log("[API] Intentando generar URL firmada de S3");
     if (type === 'contingency') {
       const expirationDate = new Date();
       expirationDate.setDate(expirationDate.getDate() + 30);
-      
-      // En un caso real, aquí guardaríamos esta información en la base de datos
-      console.log(`La imagen ${filename} expirará el ${expirationDate.toISOString()}`);
+      console.log(`El archivo ${filename} expirará el ${expirationDate.toISOString()}`);
     }
     
     return NextResponse.json({
       success: true,
-      imageUrl: publicUrl,
-      message: 'Imagen subida correctamente'
+      mediaUrl: publicUrl,
+      mediaType: file.type.startsWith('image/') ? 'image' : 'video',
+      message: 'Archivo subido correctamente'
     });
   } catch (error: any) {
-    console.error('[API Upload] Error al procesar imagen:', error);
+    console.error('Error al procesar archivo:', error);
     return NextResponse.json(
-      { 
-        error: error.message || 'Error al procesar imagen',
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-      },
+      { error: error.message || 'Error al procesar archivo' },
       { status: 500 }
     );
   }

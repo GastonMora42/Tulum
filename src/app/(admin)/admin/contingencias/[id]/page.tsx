@@ -21,6 +21,9 @@ interface Contingencia {
   ajusteRealizado: boolean;
   produccionId?: string;
   envioId?: string;
+  imagenUrl?: string | null;
+  videoUrl?: string | null;
+  mediaType?: string | null;
   usuario: {
     name: string;
   };
@@ -145,6 +148,42 @@ export default function DetalleContingenciaPage({ params }: { params: { id: stri
     }
   };
   
+const renderMedia = () => {
+  if (!contingencia) return null;
+  
+  if (contingencia.imagenUrl) {
+    return (
+      <div className="mt-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
+        <h4 className="text-sm font-medium mb-2">Imagen adjunta</h4>
+        <div className="flex justify-center">
+          <img 
+            src={contingencia.imagenUrl} 
+            alt="Imagen adjunta" 
+            className="max-w-full h-auto max-h-80 rounded-lg shadow-sm"
+          />
+        </div>
+      </div>
+    );
+  }
+  
+  if (contingencia.videoUrl) {
+    return (
+      <div className="mt-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
+        <h4 className="text-sm font-medium mb-2">Video adjunto</h4>
+        <div className="flex justify-center">
+          <video 
+            src={contingencia.videoUrl} 
+            controls 
+            className="max-w-full max-h-80 rounded-lg shadow-sm"
+          />
+        </div>
+      </div>
+    );
+  }
+  
+  return null;
+};
+
   // Determinar si el usuario actual puede resolver la contingencia
   const puedeResolver = user?.roleId === 'admin' || 
                          (contingencia?.origen === 'fabrica' && user?.roleId === 'fabrica') ||
@@ -271,6 +310,8 @@ export default function DetalleContingenciaPage({ params }: { params: { id: stri
                   </dd>
                 </div>
               )}
+
+              {renderMedia()}
               
               {contingencia.respuesta && (
                 <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">

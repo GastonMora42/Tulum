@@ -316,6 +316,9 @@ model Contingencia {
   produccion   Production? @relation(fields: [produccionId], references: [id])
   envioId      String?
   envio        Envio?      @relation(fields: [envioId], references: [id])
+  videoUrl       String?    // Nuevo campo para videos
+  mediaType      String?    // 'image' o 'video'
+  mediaExpiraEn  DateTime?  // Fecha de expiración unificada
 
   // Agregar campo tipo para mejor categorización
   tipo String? // producto, stock, caja, sistema, otro

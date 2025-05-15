@@ -9,6 +9,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { authenticatedFetch } from '@/hooks/useAuth';
 import { ImageUploader } from '@/components/ui/ImageUploader';
 import { HCLabel } from '@/components/ui/HighContrastComponents';
+import { MediaUploader } from '@/components/ui/MediaUploader';
 
 // Esquema de validación
 const contingenciaSchema = z.object({
@@ -28,7 +29,9 @@ export default function NuevaContingenciaPage() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const [imageUrl, setImageUrl] = useState<string | null>(null);
-
+  const [mediaUrl, setMediaUrl] = useState<string | null>(null);
+  const [mediaType, setMediaType] = useState<'image' | 'video'>('image');
+  
   const { 
     register, 
     handleSubmit, 
@@ -50,13 +53,19 @@ export default function NuevaContingenciaPage() {
       setIsLoading(true);
       setError(null);
       
+      // Añadir información multimedia
+      const payload = {
+        ...data,
+        imagenUrl: mediaType === 'image' ? mediaUrl : undefined,
+        videoUrl: mediaType === 'video' ? mediaUrl : undefined,
+        mediaType: mediaUrl ? mediaType : undefined
+      };
+      
       const response = await authenticatedFetch('/api/contingencias', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(data)
-      });
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });  
       
       if (!response.ok) {
         const errorData = await response.json();
@@ -137,6 +146,24 @@ export default function NuevaContingenciaPage() {
   />
   <p className="text-xs text-gray-500">
     Las imágenes de contingencias se eliminarán automáticamente después de 30 días.
+  </p>
+</div>
+
+<div className="space-y-2">
+  <HCLabel htmlFor="adjunto" className="block text-sm font-medium">
+    Archivo Adjunto (opcional)
+  </HCLabel>
+  <MediaUploader
+    type="contingency"
+    onMediaUpload={(url, type) => {
+      setMediaUrl(url);
+      setMediaType(type);
+      console.log(`Archivo ${type} recibido:`, url);
+    }}
+  />
+  <p className="text-xs text-gray-500">
+    Los archivos adjuntos se eliminarán automáticamente cuando se resuelva la contingencia
+    o después de 30 días si no se resuelve.
   </p>
 </div>
           
