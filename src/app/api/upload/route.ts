@@ -83,10 +83,23 @@ console.log("[API] Intentando generar URL firmada de S3");
     const uploadResponse = await fetch(uploadUrl, {
       method: 'PUT',
       body: processedImage,
-      headers: {
-        'Content-Type': contentType
-      }
+      headers: { 'Content-Type': contentType }
     });
+    
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text();
+      console.error('[API Upload] Error al subir a S3:', uploadResponse.status, errorText);
+      
+      // Información más detallada en la respuesta de error
+      return NextResponse.json(
+        { 
+          error: 'Error al subir imagen a S3', 
+          status: uploadResponse.status, 
+          details: errorText.substring(0, 200) // Limitar para evitar logs enormes
+        },
+        { status: 500 }
+      );
+    }
     
     if (!uploadResponse.ok) {
       console.error('Error al subir a S3:', uploadResponse.status, await uploadResponse.text());
@@ -114,9 +127,12 @@ console.log("[API] Intentando generar URL firmada de S3");
       message: 'Imagen subida correctamente'
     });
   } catch (error: any) {
-    console.error('Error al procesar imagen:', error);
+    console.error('[API Upload] Error al procesar imagen:', error);
     return NextResponse.json(
-      { error: error.message || 'Error al procesar imagen' },
+      { 
+        error: error.message || 'Error al procesar imagen',
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      },
       { status: 500 }
     );
   }

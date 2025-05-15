@@ -62,6 +62,7 @@ export function ImageUploader({
       formData.append('file', file);
       formData.append('type', type);
       
+      console.log(`Iniciando carga de imagen tipo ${type}, tamaño: ${file.size} bytes`);
       console.log(`Enviando imagen tipo: ${type}`);
       
       const response = await authenticatedFetch('/api/upload', {
@@ -79,11 +80,12 @@ export function ImageUploader({
       console.log('Respuesta de carga:', data);
       
       if (data.success && data.imageUrl) {
-        // Notificar al componente padre
+        console.log('URL de imagen recibida del servidor:', data.imageUrl);
+        setPreviewUrl(data.imageUrl); // Asegúrate de que la URL también se establezca como previewUrl
         onImageUpload(data.imageUrl);
-        console.log('URL de imagen devuelta:', data.imageUrl);
       } else {
-        throw new Error('Respuesta incompleta del servidor');
+        console.error('Respuesta inesperada del servidor:', data);
+        throw new Error('La respuesta del servidor no incluye la URL de la imagen');
       }
     } catch (error: any) {
       console.error('Error:', error);

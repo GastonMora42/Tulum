@@ -22,11 +22,11 @@ const nextConfig: NextConfig = {
 
   images: {
     domains: [
-      'arn:aws:s3:::tulum-bucket', // Reemplaza con tu dominio de S3
-      `${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com`
+      `${process.env.S3_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com`,
+      's3.amazonaws.com' // Para compatibilidad con URLs generadas por diferentes métodos
     ],
+    unoptimized: process.env.NODE_ENV === 'development' // Opcional: deshabilitar optimización en desarrollo
   },
-  // aquí van otras opciones de Next.js si las necesitas...
 }
 
 // @ts-ignore

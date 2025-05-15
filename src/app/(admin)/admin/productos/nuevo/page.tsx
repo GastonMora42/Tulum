@@ -47,7 +47,7 @@ const productoSchema = z.object({
 
 type ProductoFormData = z.infer<typeof productoSchema>;
 
-export default function NuevoProductoPage() {
+export default function NuevoProductoPage({ params }: { params: { id: string } }){
   const [producto, setProducto] = useState<Producto | null>(null);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -57,7 +57,7 @@ export default function NuevoProductoPage() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const router = useRouter();
   const [previewUrl, setPreviewUrl] = useState<string | null>(producto?.imagen || null);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(producto?.imagen || null);
 
   const { 
     register, 
@@ -132,21 +132,16 @@ export default function NuevoProductoPage() {
       setIsLoading(true);
       setError(null);
       
-      let imagenUrl = '';
-      
-      // Si hay una imagen, subirla primero
-      if (imageFile) {
-        imagenUrl = await uploadImage(imageFile);
-      }
-      
-      // Crear el producto con la URL de la imagen
+      // Para nuevos productos, usamos POST, no PATCH
       const productoData = {
         ...data,
-        imagen: imagenUrl || undefined
+        imagen: imageUrl // Usar directamente la URL de la imagen
       };
       
+      console.log('Enviando datos para nuevo producto:', productoData);
+      
       const response = await authenticatedFetch('/api/admin/productos', {
-        method: 'POST',
+        method: 'POST', // POST para crear nuevo
         body: JSON.stringify(productoData)
       });
       
@@ -316,8 +311,9 @@ export default function NuevoProductoPage() {
   <ImageUploader
   type="product"
   initialImage={producto?.imagen || null}
-  onImageUpload={(imageUrl) => {
-    setImageUrl(imageUrl);
+  onImageUpload={(newImageUrl) => {
+    setImageUrl(newImageUrl);
+    console.log('Nueva URL de imagen recibida:', newImageUrl);
   }}
 />
 </div>

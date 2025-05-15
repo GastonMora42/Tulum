@@ -59,7 +59,7 @@ export default function EditarProductoPage({ params }: { params: { id: string } 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const router = useRouter();
   const [previewUrl, setPreviewUrl] = useState<string | null>(producto?.imagen || null);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(producto?.imagen || null);
 
 const { 
   register, 
@@ -165,17 +165,10 @@ useEffect(() => {
       setIsLoading(true);
       setError(null);
       
-      let imagenUrl = producto?.imagen || '';
-      
-      // Si hay una nueva imagen, subirla primero
-      if (imageFile) {
-        imagenUrl = await uploadImage(imageFile);
-      }
-      
-      // Actualizar el producto con la URL de la imagen
+      // Usar la URL ya procesada por ImageUploader
       const productoData = {
         ...data,
-        imagen: imagenUrl || undefined
+        imagen: imageUrl || undefined  // Usa la URL establecida por onImageUpload
       };
       
       const response = await authenticatedFetch(`/api/admin/productos/${params.id}`, {
@@ -375,8 +368,9 @@ useEffect(() => {
   <ImageUploader
   type="product"
   initialImage={producto?.imagen || null}
-  onImageUpload={(imageUrl) => {
-    setImageUrl(imageUrl);
+  onImageUpload={(newImageUrl) => {
+    setImageUrl(newImageUrl);
+    console.log('Nueva URL de imagen recibida:', newImageUrl);
   }}
 />
 </div>

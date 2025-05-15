@@ -324,19 +324,20 @@ export default function ProductosPage() {
   <div className="flex items-center">
     {producto.imagen ? (
       <div className="flex-shrink-0 h-10 w-10 mr-4 relative">
-        {/* Usar Next.js Image para mejor manejo de imágenes externas */}
-        <Image 
-          src={producto.imagen}
-          alt={producto.nombre}
-          width={40}
-          height={40}
-          className="rounded-full object-cover"
-          unoptimized={true} // Importante para imágenes externas como S3
-          onError={() => {
-            console.error(`Error cargando imagen: ${producto.imagen}`);
-          }}
-        />
-      </div>
+  <Image 
+    src={producto.imagen || '/placeholder.png'} // Añadir imagen de respaldo
+    alt={producto.nombre}
+    width={40}
+    height={40}
+    className="rounded-full object-cover"
+    unoptimized={true}
+    onError={(e) => {
+      console.error(`Error cargando imagen: ${producto.imagen}`);
+      // Establecer imagen de respaldo en caso de error
+      (e.target as HTMLImageElement).src = '/placeholder.webp';
+    }}
+  />
+</div>
     ) : (
       <div className="flex-shrink-0 h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center mr-4">
         <Package className="h-6 w-6 text-gray-500" />
