@@ -187,28 +187,28 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
     }
   }, [amountTendered, payments]);
 
-  // Manejar cambio en método de pago
-  const handlePaymentMethodChange = (index: number, methodId: string) => {
-    // Validar límite de métodos de pago
-    if (payments.some(p => p.method === methodId) && methodId !== payments[index].method) {
-      setValidationErrors({
-        ...validationErrors,
-        payment: `El método de pago ${paymentMethods.find(m => m.id === methodId)?.name} ya está en uso`
-      });
-      return;
-    }
-    
-    setValidationErrors({ ...validationErrors, payment: '' });
-    
-    const newPayments = [...payments];
-    newPayments[index] = { ...newPayments[index], method: methodId, reference: '' };
-    setPayments(newPayments);
-    
-    // Verificar si hay facturación obligatoria
-    const requiresInvoice = ['tarjeta_credito', 'tarjeta_debito', 'qr', 'transferencia'].includes(methodId);
-    setFacturacionObligatoria(requiresInvoice);
-    if (requiresInvoice) setFacturar(true);
-  };
+// Manejar cambio en método de pago
+const handlePaymentMethodChange = (index: number, methodId: string) => {
+  // Validar límite de métodos de pago
+  if (payments.some(p => p.method === methodId) && methodId !== payments[index].method) {
+    setValidationErrors({
+      ...validationErrors,
+      payment: `El método de pago ${paymentMethods.find(m => m.id === methodId)?.name} ya está en uso`
+    });
+    return;
+  }
+  
+  setValidationErrors({ ...validationErrors, payment: '' });
+  
+  const newPayments = [...payments];
+  newPayments[index] = { ...newPayments[index], method: methodId, reference: '' };
+  setPayments(newPayments);
+  
+  // Verificar si hay facturación obligatoria
+  const requiresInvoice = ['tarjeta_credito', 'tarjeta_debito', 'qr', 'transferencia'].includes(methodId);
+  setFacturacionObligatoria(requiresInvoice);
+  if (requiresInvoice) setFacturar(true);
+};
 
   // Manejar cambio en monto de pago
   const handlePaymentAmountChange = (index: number, value: string) => {
@@ -807,77 +807,105 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                     }
                   </label>
                 </div>
-              </>
-            )}
+    {/* Agregar esta sección al final del Paso 1 */}
+    <div className="border-t border-gray-100 pt-4 mt-4">
+      <div className="flex items-center p-3 bg-gray-50 rounded-lg">
+        <input
+          id="facturar"
+          type="checkbox"
+          checked={facturar || facturacionObligatoria}
+          onChange={(e) => setFacturar(e.target.checked)}
+          disabled={facturacionObligatoria}
+          className="h-4 w-4 text-[#311716] focus:ring-[#9c7561] border-gray-300 rounded"
+        />
+        <label htmlFor="facturar" className="ml-2 block text-gray-700">
+          {facturacionObligatoria 
+            ? 'Facturación obligatoria para pagos electrónicos' 
+            : 'Generar factura electrónica'
+          }
+        </label>
+      </div>
+      
+      {facturacionObligatoria && (
+        <div className="mt-2 text-sm text-amber-600 bg-amber-50 p-2 rounded">
+          <span className="flex items-center">
+            <AlertCircle className="mr-1 h-4 w-4" />
+            Los pagos con tarjeta y transferencias requieren factura electrónica
+          </span>
+        </div>
+      )}
+    </div>
+  </>
+)}
             
-            {/* Paso 2: Datos de cliente para facturación */}
-            {currentStep === 2 && (
-              <>
-                {facturar ? (
-                  <div className="space-y-4 bg-gray-50 p-4 rounded-lg">
-                    <div className="flex items-center mb-2 text-[#311716]">
-                      <Receipt className="h-5 w-5 mr-2" />
-                      <h3 className="font-medium">Datos para facturación</h3>
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Nombre/Razón Social:
-                      </label>
-                      <div className="relative">
-                        <User className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-                        <input
-                          type="text"
-                          value={clienteNombre}
-                          onChange={(e) => setClienteNombre(e.target.value)}
-                          className={`w-full p-2 pl-10 border rounded-lg focus:ring-1 focus:ring-[#9c7561] focus:border-[#9c7561] ${
-                            validationErrors.clienteNombre ? 'border-red-300 bg-red-50' : 'border-gray-300'
-                          }`}
-                          placeholder="Ingrese nombre o razón social"
-                        />
-                      </div>
-                      {validationErrors.clienteNombre && (
-                        <p className="text-xs text-red-500 mt-1">{validationErrors.clienteNombre}</p>
-                      )}
-                    </div>
-                    
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        CUIT/DNI:
-                      </label>
-                      <input
-                        type="text"
-                        value={clienteCuit}
-                        onChange={(e) => setClienteCuit(e.target.value)}
-                        className={`w-full p-2 border rounded-lg focus:ring-1 focus:ring-[#9c7561] focus:border-[#9c7561] ${
-                          validationErrors.clienteCuit ? 'border-red-300 bg-red-50' : 'border-gray-300'
-                        }`}
-                        placeholder="Ingrese CUIT o DNI sin guiones"
-                      />
-                      {validationErrors.clienteCuit && (
-                        <p className="text-xs text-red-500 mt-1">{validationErrors.clienteCuit}</p>
-                      )}
-                    </div>
-                    
-                    <div className="bg-blue-50 p-3 rounded-lg text-blue-800 text-sm mt-2">
-                      <div className="flex items-start">
-                        <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 text-blue-500" />
-                        <p>
-                          Estos datos serán utilizados para generar la factura electrónica.
-                          Asegúrese de que sean correctos.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="py-8 text-center bg-gray-50 rounded-lg">
-                    <Receipt className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                    <p className="text-lg font-medium text-gray-700 mb-2">No se requiere facturación</p>
-                    <p className="text-gray-500">Continúe para finalizar la venta sin generar factura.</p>
-                  </div>
-                )}
-              </>
-            )}
+{/* Paso 2: Datos de cliente para facturación */}
+{currentStep === 2 && (
+  <>
+    {facturar ? (
+      <div className="space-y-4 bg-gray-50 p-4 rounded-lg">
+        <div className="flex items-center mb-2 text-[#311716]">
+          <Receipt className="h-5 w-5 mr-2" />
+          <h3 className="font-medium">Datos para facturación</h3>
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Nombre/Razón Social:
+          </label>
+          <div className="relative">
+            <User className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+            <input
+              type="text"
+              value={clienteNombre}
+              onChange={(e) => setClienteNombre(e.target.value)}
+              className={`w-full p-2 pl-10 border rounded-lg focus:ring-1 focus:ring-[#9c7561] focus:border-[#9c7561] ${
+                validationErrors.clienteNombre ? 'border-red-300 bg-red-50' : 'border-gray-300'
+              }`}
+              placeholder="Ingrese nombre o razón social"
+            />
+          </div>
+          {validationErrors.clienteNombre && (
+            <p className="text-xs text-red-500 mt-1">{validationErrors.clienteNombre}</p>
+          )}
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            CUIT/DNI:
+          </label>
+          <input
+            type="text"
+            value={clienteCuit}
+            onChange={(e) => setClienteCuit(e.target.value)}
+            className={`w-full p-2 border rounded-lg focus:ring-1 focus:ring-[#9c7561] focus:border-[#9c7561] ${
+              validationErrors.clienteCuit ? 'border-red-300 bg-red-50' : 'border-gray-300'
+            }`}
+            placeholder="Ingrese CUIT o DNI sin guiones"
+          />
+          {validationErrors.clienteCuit && (
+            <p className="text-xs text-red-500 mt-1">{validationErrors.clienteCuit}</p>
+          )}
+        </div>
+        
+        <div className="bg-blue-50 p-3 rounded-lg text-blue-800 text-sm mt-2">
+          <div className="flex items-start">
+            <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 text-blue-500" />
+            <p>
+              Estos datos serán utilizados para generar la factura electrónica.
+              Asegúrese de que sean correctos.
+            </p>
+          </div>
+        </div>
+      </div>
+    ) : (
+      <div className="py-8 text-center bg-gray-50 rounded-lg">
+        <Receipt className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+        <p className="text-lg font-medium text-gray-700 mb-2">No se requiere facturación</p>
+        <p className="text-gray-500">Continúe para finalizar la venta sin generar factura.</p>
+      </div>
+    )}
+  </>
+)}
             
             {/* Paso 3: Confirmación */}
             {currentStep === 3 && (
