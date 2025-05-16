@@ -1,4 +1,5 @@
 // src/app/(admin)/admin/conciliaciones/[id]/page.tsx
+"use client"
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
