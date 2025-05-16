@@ -7,6 +7,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { authenticatedFetch } from '@/hooks/useAuth';
 import { ContrastEnhancer } from '@/components/ui/ContrastEnhancer';
 import { HCLabel, HCTextarea } from '@/components/ui/HighContrastComponents';
+import { AlertCircle, CheckCircle, Loader, Camera, Video } from 'lucide-react';
 
 interface Contingencia {
   id: string;
@@ -60,6 +61,7 @@ export default function DetalleContingenciaPage({ params }: { params: { id: stri
         }
         
         const data = await response.json();
+        console.log("Contingencia cargada:", data);
         setContingencia(data);
       } catch (err) {
         console.error('Error:', err);
@@ -75,44 +77,58 @@ export default function DetalleContingenciaPage({ params }: { params: { id: stri
   const handleAction = async (accion: string) => {
     try {
       setIsSaving(true);
+      setError(null);
       
-      const body: any = { accion };
+      // Validar entrada según la acción
+      if ((accion === 'resolver' || accion === 'rechazar') && !respuesta.trim()) {
+        setError('Debe proporcionar una respuesta');
+        setIsSaving(false);
+        return;
+      }
+      
+      // Preparar datos según la acción
+      const payload: any = { accion };
       
       if (accion === 'resolver' || accion === 'rechazar') {
-        if (!respuesta.trim()) {
-          setError('Debe proporcionar una respuesta');
-          setIsSaving(false);
-          return;
-        }
-        
-        body.respuesta = respuesta;
+        payload.respuesta = respuesta;
         
         if (accion === 'resolver') {
-          body.ajusteRealizado = ajusteRealizado;
+          payload.ajusteRealizado = ajusteRealizado;
+          payload.mantenerArchivos = false; // Eliminar archivos por defecto
         }
       }
+      
+      // Ejecutar la acción
+      console.log(`Ejecutando acción "${accion}" en contingencia ${params.id}`, payload);
       
       const response = await authenticatedFetch(`/api/contingencias/${params.id}`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(body)
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
       });
       
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Error al actualizar contingencia');
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Error al ${accion === 'resolver' ? 'resolver' : accion === 'rechazar' ? 'rechazar' : 'actualizar'} contingencia`);
       }
       
-      // Actualizar contingencia en la UI
+      // Actualizar UI
       const updatedContingencia = await response.json();
       setContingencia(updatedContingencia);
+      
+      // Mostrar mensaje de éxito
+      alert(`Contingencia ${accion === 'resolver' ? 'resuelta' : accion === 'rechazar' ? 'rechazada' : 'actualizada'} correctamente`);
       
       // Limpiar formulario
       setRespuesta('');
       setAjusteRealizado(false);
       
+      // Redirigir a la lista después de resolver/rechazar
+      if (accion === 'resolver' || accion === 'rechazar') {
+        setTimeout(() => {
+          router.push('/admin/contingencias');
+        }, 1500);
+      }
     } catch (err: any) {
       console.error('Error:', err);
       setError(err.message || 'Error al procesar la acción');
@@ -121,52 +137,71 @@ export default function DetalleContingenciaPage({ params }: { params: { id: stri
     }
   };
 
-  // src/app/(admin)/admin/contingencias/[id]/page.tsx
-
-// Función para resolver contingencia
-const handleResolve = async () => {
-  try {
-    setIsSaving(true);
+  const renderMedia = () => {
+    if (!contingencia) return null;
     
-    if (!respuesta.trim()) {
-      setError('Debe proporcionar una respuesta');
-      setIsSaving(false);
-      return;
+    // Si hay imagen
+    if (contingencia.imagenUrl) {
+      return (
+        <div className="mt-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
+          <h4 className="text-sm font-medium mb-2 flex items-center">
+            <Camera className="w-4 h-4 mr-1" /> 
+            Imagen adjunta
+          </h4>
+          <div className="flex justify-center">
+            <img 
+              src={contingencia.imagenUrl} 
+              alt="Imagen adjunta" 
+              className="max-w-full h-auto max-h-80 rounded-lg shadow-sm"
+              onError={(e) => {
+                console.error('Error al cargar la imagen');
+                e.currentTarget.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2YxZjFmMSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiM5OTkiPkltYWdlbiBubyBkaXNwb25pYmxlPC90ZXh0Pjwvc3ZnPg==';
+              }}
+            />
+          </div>
+        </div>
+      );
     }
     
-    const response = await authenticatedFetch(`/api/contingencias/${params.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        accion: 'resolver',
-        respuesta,
-        ajusteRealizado,
-        mantenerArchivos: false // Eliminar archivos al resolver
-      })
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Error al resolver contingencia');
+    // Si hay video
+    if (contingencia.videoUrl) {
+      return (
+        <div className="mt-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
+          <h4 className="text-sm font-medium mb-2 flex items-center">
+            <Video className="w-4 h-4 mr-1" />
+            Video adjunto
+          </h4>
+          <div className="flex justify-center">
+            <video 
+              src={contingencia.videoUrl} 
+              controls 
+              className="max-w-full max-h-80 rounded-lg shadow-sm"
+              onError={(e) => {
+                console.error('Error al cargar el video');
+                // Mostrar un mensaje de error en lugar del video
+                const parent = e.currentTarget.parentElement;
+                if (parent) {
+                  parent.innerHTML = '<p class="text-red-500 p-4 bg-red-50 rounded text-center">No se pudo cargar el video</p>';
+                }
+              }}
+            />
+          </div>
+        </div>
+      );
     }
     
-    // Actualizar UI con la contingencia resuelta
-    const updatedContingencia = await response.json();
-    setContingencia(updatedContingencia);
+    // Si no hay archivos multimedia
+    if (contingencia.mediaType) {
+      return (
+        <div className="mt-4 bg-red-50 p-4 rounded-lg border border-red-200 text-center text-red-500">
+          <AlertCircle className="w-5 h-5 mx-auto mb-2" />
+          El archivo adjunto ya no está disponible o ha expirado
+        </div>
+      );
+    }
     
-    // Mostrar mensaje de éxito
-    alert('Contingencia resuelta correctamente');
-    
-    // Opcional: redireccionar a la lista
-    // router.push('/admin/contingencias');
-  } catch (error) {
-    console.error('Error al resolver contingencia:', error);
-    setError(error instanceof Error ? error.message : 'Error desconocido');
-  } finally {
-    setIsSaving(false);
-  }
-};
-
+    return null;
+  };
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return '-';
@@ -204,52 +239,17 @@ const handleResolve = async () => {
         return 'bg-gray-100 text-gray-800';
     }
   };
-  
-const renderMedia = () => {
-  if (!contingencia) return null;
-  
-  if (contingencia.imagenUrl) {
-    return (
-      <div className="mt-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
-        <h4 className="text-sm font-medium mb-2">Imagen adjunta</h4>
-        <div className="flex justify-center">
-          <img 
-            src={contingencia.imagenUrl} 
-            alt="Imagen adjunta" 
-            className="max-w-full h-auto max-h-80 rounded-lg shadow-sm"
-          />
-        </div>
-      </div>
-    );
-  }
-  
-  if (contingencia.videoUrl) {
-    return (
-      <div className="mt-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
-        <h4 className="text-sm font-medium mb-2">Video adjunto</h4>
-        <div className="flex justify-center">
-          <video 
-            src={contingencia.videoUrl} 
-            controls 
-            className="max-w-full max-h-80 rounded-lg shadow-sm"
-          />
-        </div>
-      </div>
-    );
-  }
-  
-  return null;
-};
 
   // Determinar si el usuario actual puede resolver la contingencia
-  const puedeResolver = user?.roleId === 'admin' || 
-                         (contingencia?.origen === 'fabrica' && user?.roleId === 'fabrica') ||
-                         (contingencia?.origen === 'sucursal' && user?.roleId === 'vendedor');
+  const puedeResolver = user?.roleId === 'role-admin' || 
+                        (contingencia?.origen === 'fabrica' && user?.roleId === 'role-fabrica') ||
+                        (contingencia?.origen === 'sucursal' && user?.roleId === 'role-vendedor');
 
   if (isLoading) {
     return (
       <ContrastEnhancer>
         <div className="text-center py-10">
+          <Loader className="h-8 w-8 animate-spin mx-auto mb-2 text-indigo-600" />
           <p className="text-lg text-black">Cargando contingencia...</p>
         </div>
       </ContrastEnhancer>
@@ -260,6 +260,7 @@ const renderMedia = () => {
     return (
       <ContrastEnhancer>
         <div className="text-center py-10">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-2" />
           <p className="text-red-500">{error}</p>
           <button
             onClick={() => router.back()}
@@ -276,6 +277,7 @@ const renderMedia = () => {
     return (
       <ContrastEnhancer>
         <div className="text-center py-10">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-2" />
           <p className="text-lg text-red-500">Contingencia no encontrada</p>
           <button
             onClick={() => router.back()}
@@ -304,6 +306,7 @@ const renderMedia = () => {
         {error && (
           <div className="rounded-md bg-red-50 p-4">
             <div className="flex">
+              <AlertCircle className="h-5 w-5 text-red-400" />
               <div className="ml-3">
                 <h3 className="text-sm font-medium text-red-800">Error</h3>
                 <div className="mt-2 text-sm text-red-700">
@@ -341,7 +344,7 @@ const renderMedia = () => {
             <dl>
               <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                 <dt className="text-sm font-medium text-black">Descripción</dt>
-                <dd className="mt-1 text-sm text-black sm:mt-0 sm:col-span-2">
+                <dd className="mt-1 text-sm text-black sm:mt-0 sm:col-span-2 whitespace-pre-line">
                   {contingencia.descripcion}
                 </dd>
               </div>
@@ -368,32 +371,40 @@ const renderMedia = () => {
                 </div>
               )}
 
-{contingencia.ubicacion && (
-  <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-    <dt className="text-sm font-medium text-black">Ubicación específica</dt>
-    <dd className="mt-1 text-sm text-black sm:mt-0 sm:col-span-2">
-      {contingencia.ubicacion.nombre}
-    </dd>
-  </div>
-)}
+              {contingencia.ubicacion && (
+                <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                  <dt className="text-sm font-medium text-black">Ubicación específica</dt>
+                  <dd className="mt-1 text-sm text-black sm:mt-0 sm:col-span-2">
+                    {contingencia.ubicacion.nombre}
+                  </dd>
+                </div>
+              )}
 
-{contingencia.conciliacionId && (
-  <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
-    <dt className="text-sm font-medium text-black">Conciliación relacionada</dt>
-    <dd className="mt-1 text-sm text-black sm:mt-0 sm:col-span-2">
-      <a href={`/admin/conciliaciones/${contingencia.conciliacionId}`} className="text-indigo-600 hover:text-indigo-900">
-        Ver conciliación
-      </a>
-    </dd>
-  </div>
-)}
+              {contingencia.conciliacionId && (
+                <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                  <dt className="text-sm font-medium text-black">Conciliación relacionada</dt>
+                  <dd className="mt-1 text-sm text-black sm:mt-0 sm:col-span-2">
+                    <a href={`/admin/conciliaciones/${contingencia.conciliacionId}`} className="text-indigo-600 hover:text-indigo-900">
+                      Ver conciliación
+                    </a>
+                  </dd>
+                </div>
+              )}
 
-              {renderMedia()}
+              {/* Renderizar archivos multimedia */}
+              {(contingencia.imagenUrl || contingencia.videoUrl || contingencia.mediaType) && (
+                <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+                  <dt className="text-sm font-medium text-black">Archivos adjuntos</dt>
+                  <dd className="mt-1 text-sm text-black sm:mt-0 sm:col-span-2">
+                    {renderMedia()}
+                  </dd>
+                </div>
+              )}
               
               {contingencia.respuesta && (
                 <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
                   <dt className="text-sm font-medium text-black">Respuesta</dt>
-                  <dd className="mt-1 text-sm text-black sm:mt-0 sm:col-span-2">
+                  <dd className="mt-1 text-sm text-black sm:mt-0 sm:col-span-2 whitespace-pre-line">
                     {contingencia.respuesta}
                   </dd>
                 </div>
@@ -465,39 +476,33 @@ const renderMedia = () => {
                     disabled={isSaving}
                     className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-black bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
                   >
-                    Marcar en revisión
+                    {isSaving ? 'Procesando...' : 'Marcar en revisión'}
                   </button>
+                  
                   <button
                     type="button"
                     onClick={() => handleAction('rechazar')}
                     disabled={isSaving || !respuesta.trim()}
                     className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
                   >
-                    Rechazar
+                    {isSaving ? 'Procesando...' : 'Rechazar contingencia'}
                   </button>
+                  
                   <button
                     type="button"
                     onClick={() => handleAction('resolver')}
                     disabled={isSaving || !respuesta.trim()}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
                   >
-                    Resolver
+                    {isSaving ? (
+                      <>
+                        <span className="animate-spin mr-2">⟳</span>
+                        Procesando...
+                      </>
+                    ) : (
+                      <>Resolver contingencia</>
+                    )}
                   </button>
-<button
-  type="button"
-  onClick={handleResolve}
-  disabled={isSaving || !respuesta.trim()}
-  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
->
-  {isSaving ? (
-    <>
-      <span className="animate-spin mr-2">⟳</span>
-      Procesando...
-    </>
-  ) : (
-    <>Marcar como Resuelta</>
-  )}
-</button>
                 </div>
               </div>
             </div>

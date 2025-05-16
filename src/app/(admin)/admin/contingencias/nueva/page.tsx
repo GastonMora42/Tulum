@@ -69,21 +69,25 @@ export default function NuevaContingenciaPage() {
     fetchUbicaciones();
   }, []);
   
- // Reemplazar la función onSubmit
 const onSubmit = async (data: ContingenciaFormData) => {
   try {
     setIsLoading(true);
     setError(null);
     
-    // Añadir información multimedia
+    // Crear un payload más robusto con la información multimedia
     const payload = {
       ...data,
+      // Normalizar campos multimedia
+      mediaType: mediaType,
+      mediaUrl: mediaUrl, // Campo adicional para compatibilidad
       imagenUrl: mediaType === 'image' ? mediaUrl : undefined,
-      videoUrl: mediaType === 'video' ? mediaUrl : undefined,
-      mediaType: mediaUrl ? mediaType : undefined
+      videoUrl: mediaType === 'video' ? mediaUrl : undefined
     };
     
-    console.log("Enviando payload de contingencia:", payload);
+    console.log("Enviando payload de contingencia:", {
+      ...payload,
+      descripcion: payload.descripcion?.substring(0, 30) + '...'
+    });
     
     const response = await authenticatedFetch('/api/contingencias', {
       method: 'POST',
@@ -91,19 +95,21 @@ const onSubmit = async (data: ContingenciaFormData) => {
       body: JSON.stringify(payload)
     });  
     
+    const responseData = await response.json();
+    
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Error al crear contingencia');
+      console.error("Error al crear contingencia:", responseData);
+      throw new Error(responseData.error || 'Error al crear contingencia');
     }
     
-    // Confirmar éxito
-    alert('Contingencia creada correctamente');
+    // Confirmar éxito con más información
+    alert(`Contingencia creada correctamente con ID: ${responseData.id}`);
     
     // Redirigir a la lista de contingencias
     router.push('/admin/contingencias');
     router.refresh();
   } catch (err: any) {
-    console.error('Error:', err);
+    console.error('Error detallado:', err);
     setError(err.message || 'Error al crear contingencia');
   } finally {
     setIsLoading(false);

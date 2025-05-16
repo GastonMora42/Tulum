@@ -33,7 +33,10 @@ export class ContingenciaService {
     urgente?: boolean;
     tipo?: string;
   }): Promise<Contingencia> {
-    console.log('[ContingenciaService] Creando contingencia:', datos);
+    console.log('[ContingenciaService] Creando contingencia:', {
+      ...datos,
+      descripcion: datos.descripcion?.substring(0, 30) + '...'
+    });
     
     // Validar que los IDs de relaciones existan si no son nulos o vacíos
     if (datos.envioId) {
@@ -79,62 +82,58 @@ export class ContingenciaService {
       }
     }
     
-    // Calcular fecha de expiración para imágenes (30 días)
-    let imagenExpiraEn = null;
-    if (datos.imagenUrl) {
-      const fechaExpiracion = new Date();
-      fechaExpiracion.setDate(fechaExpiracion.getDate() + 30);
-      imagenExpiraEn = fechaExpiracion;
-    }
-
-    let mediaExpiraEn = null;
-    if (datos.imagenUrl || datos.videoUrl) {
-      const fechaExpiracion = new Date();
-      fechaExpiracion.setDate(fechaExpiracion.getDate() + 30);
-      mediaExpiraEn = fechaExpiracion;
-    }
-    
-    let imagenUrl = null;
-    let videoUrl = null;
-    
-    if (datos.mediaType === 'image' && datos.imagenUrl) {
-      imagenUrl = datos.imagenUrl;
-    } else if (datos.mediaType === 'video' && (datos.videoUrl || datos.imagenUrl)) {
-      videoUrl = datos.videoUrl || datos.imagenUrl;
-    }
-    
-    // Para evitar errores de clave foránea, asegurarnos de que valores vacíos sean null
-    const datosLimpios = {
-      ...datos,
-      envioId: datos.envioId || null,
-      produccionId: datos.produccionId || null,
-      tipo: datos.tipo || null,
-      urgente: datos.urgente || false
-    };
-    
-    // Crear la contingencia si las validaciones pasan
-    return prisma.contingencia.create({
+  let mediaExpiraEn = null;
+  if (datos.imagenUrl || datos.videoUrl) {
+    const fechaExpiracion = new Date();
+    fechaExpiracion.setDate(fechaExpiracion.getDate() + 30);
+    mediaExpiraEn = fechaExpiracion;
+    console.log(`[ContingenciaService] Archivos multimedia expirarán en: ${mediaExpiraEn}`);
+  }
+  
+  // Determinar el tipo de archivo multimedia
+  let imagenUrl = null;
+  let videoUrl = null;
+  
+  if (datos.mediaType === 'image' && datos.imagenUrl) {
+    imagenUrl = datos.imagenUrl;
+    console.log(`[ContingenciaService] Guardando imagen: ${imagenUrl}`);
+  } else if (datos.mediaType === 'video' && (datos.videoUrl || datos.imagenUrl)) {
+    videoUrl = datos.videoUrl || datos.imagenUrl;
+    console.log(`[ContingenciaService] Guardando video: ${videoUrl}`);
+  }
+  
+  // Crear la contingencia con datos limpios
+  try {
+    const contingencia = await prisma.contingencia.create({
       data: {
         titulo: datos.titulo,
         descripcion: datos.descripcion,
         origen: datos.origen,
-        produccionId: datos.produccionId || null,
-        envioId: datos.envioId || null,
+        produccionId: datos.produccionId || null, // Convertir undefined a null para Prisma
+        envioId: datos.envioId || null, // Convertir undefined a null para Prisma
         tipo: datos.tipo || null,
         urgente: datos.urgente || false,
         ubicacionId: datos.ubicacionId || null,
         conciliacionId: datos.conciliacionId || null,
-        imagenUrl: imagenUrl,
-        videoUrl: videoUrl,
+        imagenUrl: datos.imagenUrl || null,
+        videoUrl: datos.videoUrl || null,
         mediaType: datos.mediaType || null,
-        mediaExpiraEn: mediaExpiraEn,
+        mediaExpiraEn: (datos.imagenUrl || datos.videoUrl) ? 
+                      new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : null,
         estado: 'pendiente',
         fechaCreacion: new Date(),
         creadoPor: datos.creadoPor,
         ajusteRealizado: false
       }
     });
-  }  
+    
+    console.log(`[ContingenciaService] Contingencia creada con ID: ${contingencia.id}`);
+    return contingencia;
+  } catch (error) {
+    console.error('[ContingenciaService] Error al crear contingencia:', error);
+    throw error;
+  }
+}
 
   async listarContingencias(filtros?: {
     estado?: string;

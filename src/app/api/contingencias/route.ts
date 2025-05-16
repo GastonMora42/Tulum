@@ -9,8 +9,15 @@ const crearContingenciaSchema = z.object({
   titulo: z.string().min(5, { message: 'El título debe tener al menos 5 caracteres' }),
   descripcion: z.string().min(10, { message: 'La descripción debe tener al menos 10 caracteres' }),
   origen: z.enum(['fabrica', 'sucursal', 'oficina']),
-  produccionId: z.string().nullable().optional(),
-  envioId: z.string().nullable().optional()
+  produccionId: z.string().optional(),
+  envioId: z.string().optional(),
+  ubicacionId: z.string().optional(),
+  conciliacionId: z.string().optional(),
+  imagenUrl: z.string().optional(),
+  videoUrl: z.string().optional(),
+  mediaType: z.string().optional(),
+  urgente: z.boolean().optional(),
+  tipo: z.string().optional()
 });
 
 export async function GET(req: NextRequest) {
@@ -68,21 +75,57 @@ export async function POST(req: NextRequest) {
     const user = (req as any).user;
     const body = await req.json();
     
-    const datosLimpios = {
-      ...body,
-      produccionId: body.produccionId || null,
-      envioId: body.envioId || null,
+    console.log("[API] Datos originales recibidos para contingencia:", {
+      titulo: body.titulo,
+      descripcion: body.descripcion?.substring(0, 20) + '...',
+      origen: body.origen,
+      mediaType: body.mediaType,
+      tieneImagen: !!body.imagenUrl,
+      tieneVideo: !!body.videoUrl,
+      produccionId: body.produccionId || 'no definido',
+      envioId: body.envioId || 'no definido',
+      ubicacionId: body.ubicacionId || 'no definido',
+      conciliacionId: body.conciliacionId || 'no definido'
+    });
+    
+    // Normalizamos los datos para el servicio - IMPORTANTE: usar undefined, no null
+    const datosNormalizados = {
+      titulo: body.titulo,
+      descripcion: body.descripcion,
+      origen: body.origen || 'sucursal', // Valor predeterminado
+      
+      // Convertir null/string vacía a undefined para campos opcionales
+      produccionId: body.produccionId || undefined,
+      envioId: body.envioId || undefined,
+      ubicacionId: body.ubicacionId || undefined,
+      conciliacionId: body.conciliacionId || undefined,
+      
       // Campos multimedia
-      imagenUrl: body.mediaType === 'image' ? body.imagenUrl : null,
-      videoUrl: body.mediaType === 'video' ? body.videoUrl || body.imagenUrl : null,
-      mediaType: body.mediaType || null
+      imagenUrl: body.mediaType === 'image' ? (body.imagenUrl || body.mediaUrl || undefined) : undefined,
+      videoUrl: body.mediaType === 'video' ? (body.videoUrl || body.imagenUrl || body.mediaUrl || undefined) : undefined,
+      mediaType: body.mediaType || undefined,
+      
+      // Otros campos opcionales
+      tipo: body.tipo || undefined,
+      urgente: body.urgente || false
     };
     
-    console.log("Datos recibidos en API para crear contingencia:", datosLimpios);
+    console.log("[API] Datos normalizados para contingencia:", {
+      titulo: datosNormalizados.titulo,
+      origen: datosNormalizados.origen,
+      tieneImagen: !!datosNormalizados.imagenUrl,
+      tieneVideo: !!datosNormalizados.videoUrl,
+      mediaType: datosNormalizados.mediaType,
+      produccionId: datosNormalizados.produccionId || 'undefined',
+      envioId: datosNormalizados.envioId || 'undefined',
+      ubicacionId: datosNormalizados.ubicacionId || 'undefined',
+      conciliacionId: datosNormalizados.conciliacionId || 'undefined'
+    });
     
     // Validar datos
-    const validation = crearContingenciaSchema.safeParse(datosLimpios);
+    const validation = crearContingenciaSchema.safeParse(datosNormalizados);
     if (!validation.success) {
+      console.error("[API] Error de validación:", validation.error.errors);
       return NextResponse.json(
         { error: 'Datos inválidos', details: validation.error.errors },
         { status: 400 }
@@ -90,16 +133,16 @@ export async function POST(req: NextRequest) {
     }
     
     try {
+      // Crear la contingencia
       const contingencia = await contingenciaService.crearContingencia({
         ...validation.data,
-        produccionId: validation.data.produccionId || undefined,
-        envioId: validation.data.envioId || undefined,
         creadoPor: user.id
       });
       
+      console.log(`[API] Contingencia creada exitosamente con ID: ${contingencia.id}`);
       return NextResponse.json(contingencia, { status: 201 });
     } catch (serviceError: any) {
-      console.error('Error específico del servicio:', serviceError);
+      console.error('[API] Error específico del servicio:', serviceError);
       
       return NextResponse.json(
         { error: serviceError.message || 'Error al procesar la contingencia' },
@@ -107,7 +150,7 @@ export async function POST(req: NextRequest) {
       );
     }
   } catch (error) {
-    console.error('Error al crear contingencia:', error);
+    console.error('[API] Error general al crear contingencia:', error);
     return NextResponse.json(
       { error: 'Error al crear contingencia' },
       { status: 500 }

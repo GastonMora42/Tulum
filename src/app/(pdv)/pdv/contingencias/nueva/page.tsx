@@ -105,18 +105,27 @@ export default function NuevaContingenciaPDVPage() {
     fetchUbicaciones();
   }, []);
   
-// Reemplazar la función onSubmit
 const onSubmit = async (data: ContingenciaFormData) => {
   try {
     setIsLoading(true);
     setError(null);
     
-    // Añadir información multimedia
+    // Mejora del manejo de campos
     const payload = {
       ...data,
-      imagenUrl: mediaType === 'image' ? mediaUrl : undefined,
-      videoUrl: mediaType === 'video' ? mediaUrl : undefined,
-      mediaType: mediaUrl ? mediaType : undefined
+      origen: 'sucursal', // Asegurar origen correcto para PDV
+      
+      // Mejor manejo de campos opcionales
+      produccionId: data.produccionId || undefined, // Evita enviar string vacío
+      envioId: data.envioId || undefined,
+      ubicacionId: data.ubicacionId || undefined,
+      conciliacionId: data.conciliacionId || undefined,
+      
+      // Campos multimedia mejorados
+      mediaUrl: mediaUrl, // Campo adicional para compatibilidad
+      mediaType: mediaUrl ? mediaType : undefined,
+      imagenUrl: mediaType === 'image' && mediaUrl ? mediaUrl : undefined,
+      videoUrl: mediaType === 'video' && mediaUrl ? mediaUrl : undefined
     };
     
     console.log("Enviando payload de contingencia:", payload);
@@ -127,19 +136,21 @@ const onSubmit = async (data: ContingenciaFormData) => {
       body: JSON.stringify(payload)
     });  
     
+    const responseData = await response.json();
+    
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Error al crear contingencia');
+      console.error("Error al crear contingencia:", responseData);
+      throw new Error(responseData.error || 'Error al crear contingencia');
     }
     
-    // Confirmar éxito
-    alert('Contingencia creada correctamente');
+    // Confirmar éxito con ID
+    alert(`Contingencia creada correctamente (ID: ${responseData.id})`);
     
-    // Redirigir a la lista de contingencias
-    router.push('/admin/contingencias');
+    // Redirigir a la lista de contingencias DE PDV (no admin)
+    router.push('/pdv/contingencias');
     router.refresh();
   } catch (err: any) {
-    console.error('Error:', err);
+    console.error('Error detallado:', err);
     setError(err.message || 'Error al crear contingencia');
   } finally {
     setIsLoading(false);

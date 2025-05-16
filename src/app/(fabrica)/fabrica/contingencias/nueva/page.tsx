@@ -122,63 +122,89 @@ export default function NuevaContingenciaFabricaPage() {
   }, []);
   
 
-  const onSubmit = async (data: ContingenciaFormData) => {
-    try {
-      setIsLoading(true);
-      setError(null);
+// src/app/(fabrica)/fabrica/contingencias/nueva/page.tsx
+// Actualizar la función onSubmit
+
+const onSubmit = async (data: ContingenciaFormData) => {
+  try {
+    setIsLoading(true);
+    setError(null);
+    
+    // Mejora del manejo de campos
+    const payload = {
+      ...data,
+      origen: 'fabrica', // Asegurar origen correcto para fábrica
       
-      // Limpiar datos vacíos para evitar errores de clave foránea
-      const payload = {
-        ...data,
-        origen: 'fabrica',
-        // Asegurarse de que los valores vacíos sean null, no strings vacíos
-        produccionId: data.produccionId || null,
-        envioId: data.envioId || null,
-        imagenUrl: mediaType === 'image' ? mediaUrl : undefined,
-        videoUrl: mediaType === 'video' ? mediaUrl : undefined,
-        mediaType: mediaUrl ? mediaType : undefined
-      };
+      // Mejor manejo de campos opcionales
+      produccionId: data.produccionId || undefined, // Evita enviar string vacío
+      envioId: data.envioId || undefined,
+      ubicacionId: data.ubicacionId || undefined,
+      conciliacionId: data.conciliacionId || undefined,
       
-      console.log('Enviando contingencia:', payload);
-      
-      const response = await authenticatedFetch('/api/contingencias', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });  
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al crear contingencia');
-      }
-      
-      // Si hay producción o envío relacionado, actualizar su estado
-      if (data.produccionId) {
+      // Campos multimedia mejorados
+      mediaUrl: mediaUrl, // Campo adicional para compatibilidad
+      mediaType: mediaUrl ? mediaType : undefined,
+      imagenUrl: mediaType === 'image' && mediaUrl ? mediaUrl : undefined,
+      videoUrl: mediaType === 'video' && mediaUrl ? mediaUrl : undefined
+    };
+    
+    console.log('Enviando contingencia:', payload);
+    
+    const response = await authenticatedFetch('/api/contingencias', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });  
+    
+    const responseData = await response.json();
+    
+    if (!response.ok) {
+      console.error("Error al crear contingencia:", responseData);
+      throw new Error(responseData.error || 'Error al crear contingencia');
+    }
+    
+    // Si hay producción o envío relacionado, actualizar su estado
+    if (data.produccionId) {
+      try {
         await authenticatedFetch(`/api/fabrica/produccion/${data.produccionId}/estado`, {
           method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ estado: 'con_contingencia' })
         });
+        console.log("Producción marcada con contingencia");
+      } catch (error) {
+        console.error("Error al actualizar producción:", error);
+        // Continuar aunque falle la actualización del estado
       }
-      
-      if (data.envioId) {
+    }
+    
+    if (data.envioId) {
+      try {
         await authenticatedFetch(`/api/fabrica/envios/${data.envioId}/estado`, {
           method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ estado: 'con_contingencia' })
         });
+        console.log("Envío marcado con contingencia");
+      } catch (error) {
+        console.error("Error al actualizar envío:", error);
+        // Continuar aunque falle la actualización del estado
       }
-          // Confirmar éxito
-    alert('Contingencia creada correctamente');
-      
-      // Redirigir a la lista de contingencias
-      router.push('/fabrica/contingencias');
-      router.refresh();
-    } catch (err: any) {
-      console.error('Error:', err);
-      setError(err.message || 'Error al crear contingencia');
-    } finally {
-      setIsLoading(false);
     }
-  };
+    
+    // Confirmar éxito con ID
+    alert(`Contingencia creada correctamente (ID: ${responseData.id})`);
+    
+    // Redirigir a la lista de contingencias
+    router.push('/fabrica/contingencias');
+    router.refresh();
+  } catch (err: any) {
+    console.error('Error detallado:', err);
+    setError(err.message || 'Error al crear contingencia');
+  } finally {
+    setIsLoading(false);
+  }
+};
   
   return (
     <ContrastEnhancer>
