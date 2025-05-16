@@ -11,6 +11,8 @@ import { ContrastEnhancer } from '@/components/ui/ContrastEnhancer';
 import { HCLabel, HCSelect, HCTable, HCTh, HCTd } from '@/components/ui/HighContrastComponents';
 
 interface Contingencia {
+  conciliacionId: any;
+  ubicacion: any;
   id: string;
   titulo: string;
   descripcion: string;
@@ -29,19 +31,38 @@ export default function ContingenciasPage() {
   const [filtroEstado, setFiltroEstado] = useState<string>('');
   const [filtroOrigen, setFiltroOrigen] = useState<string>('');
   const router = useRouter();
+  const [ubicaciones, setUbicaciones] = useState<{id: string; nombre: string}[]>([]);
+  const [filtroUbicacion, setFiltroUbicacion] = useState<string>('');
+
+  useEffect(() => {
+    const fetchUbicaciones = async () => {
+      try {
+        const response = await authenticatedFetch('/api/admin/ubicaciones');
+        if (response.ok) {
+          const data = await response.json();
+          setUbicaciones(data);
+        }
+      } catch (error) {
+        console.error('Error al cargar ubicaciones:', error);
+      }
+    };
+    
+    fetchUbicaciones();
+  }, []);
 
   useEffect(() => {
     const fetchContingencias = async () => {
       try {
         setIsLoading(true);
         
-        // Construir query params
-        const params = new URLSearchParams();
-        if (filtroEstado) params.append('estado', filtroEstado);
-        if (filtroOrigen) params.append('origen', filtroOrigen);
-        
-        const response = await authenticatedFetch(`/api/contingencias?${params.toString()}`);
-        
+    // Construir query params
+    const params = new URLSearchParams();
+    if (filtroEstado) params.append('estado', filtroEstado);
+    if (filtroOrigen) params.append('origen', filtroOrigen);
+    if (filtroUbicacion) params.append('ubicacionId', filtroUbicacion);
+    
+    const response = await authenticatedFetch(`/api/contingencias?${params.toString()}`);
+    
         if (!response.ok) {
           throw new Error('Error al cargar contingencias');
         }
@@ -95,6 +116,32 @@ export default function ContingenciasPage() {
     }
   };
 
+const getOrigenWithUbicacionBadge = (contingencia: any) => {
+  // Color base según origen
+  const baseClass = getOrigenBadge(contingencia.origen);
+  
+  // Si tiene ubicación específica, mostrarla
+  if (contingencia.ubicacion) {
+    return (
+      <div>
+        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${baseClass}`}>
+          {contingencia.origen === 'fabrica' ? 'Fábrica' : 
+           contingencia.origen === 'sucursal' ? 'Sucursal' : 'Oficina'}
+        </span>
+        <span className="ml-1 text-xs text-gray-500">{contingencia.ubicacion.nombre}</span>
+      </div>
+    );
+  }
+  
+  // Si no tiene ubicación específica, mostrar solo el origen
+  return (
+    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${baseClass}`}>
+      {contingencia.origen === 'fabrica' ? 'Fábrica' : 
+       contingencia.origen === 'sucursal' ? 'Sucursal' : 'Oficina'}
+    </span>
+  );
+};
+
   return (
     <ContrastEnhancer>
       <div className="space-y-6">
@@ -144,6 +191,22 @@ export default function ContingenciasPage() {
                 <option value="oficina">Oficina</option>
               </HCSelect>
             </div>
+            <div>
+  <HCLabel htmlFor="filtroUbicacion" className="block text-sm font-medium mb-1">
+    Filtrar por ubicación
+  </HCLabel>
+  <HCSelect
+    id="filtroUbicacion"
+    value={filtroUbicacion}
+    onChange={(e) => setFiltroUbicacion(e.target.value)}
+    className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md"
+  >
+    <option value="">Todas las ubicaciones</option>
+    {ubicaciones.map(ubicacion => (
+      <option key={ubicacion.id} value={ubicacion.id}>{ubicacion.nombre}</option>
+    ))}
+  </HCSelect>
+</div>
           </div>
         </div>
   
@@ -177,6 +240,9 @@ export default function ContingenciasPage() {
                   >
                     Origen
                   </HCTh>
+                  <HCTh scope="col" className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider">
+  Ubicación
+</HCTh>
                   <HCTh
                     scope="col"
                     className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider"
@@ -215,6 +281,18 @@ export default function ContingenciasPage() {
                          contingencia.origen === 'sucursal' ? 'Sucursal' : 'Oficina'}
                       </span>
                     </HCTd>
+                    <HCTd className="px-6 py-4 whitespace-nowrap">
+  {contingencia.ubicacion ? (
+    <span className="text-sm text-gray-900">{contingencia.ubicacion.nombre}</span>
+  ) : (
+    <span className="text-sm text-gray-500">General</span>
+  )}
+</HCTd>
+{contingencia.conciliacionId && (
+  <span className="ml-1 px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+    Conciliación
+  </span>
+)}
                     <HCTd className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getEstadoBadge(contingencia.estado)}`}>
                         {contingencia.estado === 'pendiente' ? 'Pendiente' : 

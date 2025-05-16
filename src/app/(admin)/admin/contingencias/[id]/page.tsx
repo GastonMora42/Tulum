@@ -21,6 +21,16 @@ interface Contingencia {
   ajusteRealizado: boolean;
   produccionId?: string;
   envioId?: string;
+  ubicacionId?: string;
+  ubicacion?: {
+    id: string;
+    nombre: string;
+  };
+  conciliacionId?: string;
+  conciliacion?: {
+    id: string;
+    fecha: string;
+  }
   imagenUrl?: string | null;
   videoUrl?: string | null;
   mediaType?: string | null;
@@ -110,6 +120,53 @@ export default function DetalleContingenciaPage({ params }: { params: { id: stri
       setIsSaving(false);
     }
   };
+
+  // src/app/(admin)/admin/contingencias/[id]/page.tsx
+
+// Función para resolver contingencia
+const handleResolve = async () => {
+  try {
+    setIsSaving(true);
+    
+    if (!respuesta.trim()) {
+      setError('Debe proporcionar una respuesta');
+      setIsSaving(false);
+      return;
+    }
+    
+    const response = await authenticatedFetch(`/api/contingencias/${params.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        accion: 'resolver',
+        respuesta,
+        ajusteRealizado,
+        mantenerArchivos: false // Eliminar archivos al resolver
+      })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Error al resolver contingencia');
+    }
+    
+    // Actualizar UI con la contingencia resuelta
+    const updatedContingencia = await response.json();
+    setContingencia(updatedContingencia);
+    
+    // Mostrar mensaje de éxito
+    alert('Contingencia resuelta correctamente');
+    
+    // Opcional: redireccionar a la lista
+    // router.push('/admin/contingencias');
+  } catch (error) {
+    console.error('Error al resolver contingencia:', error);
+    setError(error instanceof Error ? error.message : 'Error desconocido');
+  } finally {
+    setIsSaving(false);
+  }
+};
+
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return '-';
@@ -311,6 +368,26 @@ const renderMedia = () => {
                 </div>
               )}
 
+{contingencia.ubicacion && (
+  <div className="bg-white px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+    <dt className="text-sm font-medium text-black">Ubicación específica</dt>
+    <dd className="mt-1 text-sm text-black sm:mt-0 sm:col-span-2">
+      {contingencia.ubicacion.nombre}
+    </dd>
+  </div>
+)}
+
+{contingencia.conciliacionId && (
+  <div className="bg-gray-50 px-4 py-5 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-6">
+    <dt className="text-sm font-medium text-black">Conciliación relacionada</dt>
+    <dd className="mt-1 text-sm text-black sm:mt-0 sm:col-span-2">
+      <a href={`/admin/conciliaciones/${contingencia.conciliacionId}`} className="text-indigo-600 hover:text-indigo-900">
+        Ver conciliación
+      </a>
+    </dd>
+  </div>
+)}
+
               {renderMedia()}
               
               {contingencia.respuesta && (
@@ -406,6 +483,21 @@ const renderMedia = () => {
                   >
                     Resolver
                   </button>
+<button
+  type="button"
+  onClick={handleResolve}
+  disabled={isSaving || !respuesta.trim()}
+  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+>
+  {isSaving ? (
+    <>
+      <span className="animate-spin mr-2">⟳</span>
+      Procesando...
+    </>
+  ) : (
+    <>Marcar como Resuelta</>
+  )}
+</button>
                 </div>
               </div>
             </div>

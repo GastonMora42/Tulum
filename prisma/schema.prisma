@@ -202,6 +202,7 @@ model Ubicacion {
 
   // Añadir esta nueva relación
   conciliaciones Conciliacion[]
+  contingencias Contingencia[]
 }
 
 // Distribución
@@ -338,6 +339,13 @@ model Contingencia {
 
   imagenUrl      String?
   imagenExpiraEn DateTime?
+
+  ubicacionId     String?
+  ubicacion       Ubicacion?     @relation(fields: [ubicacionId], references: [id])
+  
+  // Referencia a conciliación
+  conciliacionId  String?
+  conciliacion    Conciliacion?  @relation(fields: [conciliacionId], references: [id])
 }
 
 // Codigos de descuento
@@ -364,6 +372,7 @@ model Conciliacion {
   usuario       User      @relation(fields: [usuarioId], references: [id])
   detalles      Json? // Array de productos y cantidades
   observaciones String?
+  contingencias Contingencia[]
 }
 
 model FacturaElectronica {

@@ -25,6 +25,8 @@ export class ContingenciaService {
     produccionId?: string;
     envioId?: string;
     creadoPor: string;
+    ubicacionId?: string; 
+    conciliacionId?: string;  
     imagenUrl?: string;
     videoUrl?: string;
     mediaType?: 'image' | 'video';
@@ -53,6 +55,27 @@ export class ContingenciaService {
       if (!produccionExiste) {
         console.error(`[ContingenciaService] Error: La producción con ID ${datos.produccionId} no existe`);
         throw new Error(`La producción con ID ${datos.produccionId} no existe`);
+      }
+    }
+
+    if (datos.ubicacionId) {
+      const ubicacionExiste = await prisma.ubicacion.findUnique({
+        where: { id: datos.ubicacionId }
+      });
+      
+      if (!ubicacionExiste) {
+        throw new Error(`La ubicación con ID ${datos.ubicacionId} no existe`);
+      }
+    }
+    
+    // Validar si la conciliación existe cuando se proporciona
+    if (datos.conciliacionId) {
+      const conciliacionExiste = await prisma.conciliacion.findUnique({
+        where: { id: datos.conciliacionId }
+      });
+      
+      if (!conciliacionExiste) {
+        throw new Error(`La conciliación con ID ${datos.conciliacionId} no existe`);
       }
     }
     
@@ -99,6 +122,8 @@ export class ContingenciaService {
         envioId: datos.envioId || null,
         tipo: datos.tipo || null,
         urgente: datos.urgente || false,
+        ubicacionId: datos.ubicacionId || null,
+        conciliacionId: datos.conciliacionId || null,
         imagenUrl: imagenUrl,
         videoUrl: videoUrl,
         mediaType: datos.mediaType || null,
@@ -115,6 +140,8 @@ export class ContingenciaService {
     estado?: string;
     origen?: string;
     creadoPor?: string;
+    ubicacionId?: string;        // Nuevo filtro
+    conciliacionId?: string;     // Nuevo filtro
     tipo?: string;
     urgente?: boolean;
   }): Promise<Contingencia[]> {
@@ -127,6 +154,14 @@ export class ContingenciaService {
     if (filtros?.origen) {
       where.origen = filtros.origen;
     }
+
+      if (filtros?.ubicacionId) {
+    where.ubicacionId = filtros.ubicacionId;
+  }
+  
+  if (filtros?.conciliacionId) {
+    where.conciliacionId = filtros.conciliacionId;
+  }
 
     if (filtros?.creadoPor) {
       where.creadoPor = filtros.creadoPor;
@@ -145,7 +180,9 @@ export class ContingenciaService {
       include: {
         usuario: true,
         produccion: true,
-        envio: true
+        envio: true,
+        ubicacion: true,         // Incluir ubicación
+        conciliacion: true       // Incluir conciliación
       },
       orderBy: [
         { urgente: 'desc' }, // Contingencias urgentes primero

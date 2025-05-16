@@ -22,16 +22,27 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     
     const filtros: {
+      ubicacionId: string;
+      conciliacionId: string;
       estado?: string;
       origen?: string;
       creadoPor?: string;
-    } = {};
+    } = {
+      ubicacionId: '',
+      conciliacionId: ''
+    };
     
     const estado = searchParams.get('estado');
     if (estado) filtros.estado = estado;
     
     const origen = searchParams.get('origen');
     if (origen) filtros.origen = origen;
+
+    const ubicacionId = searchParams.get('ubicacionId');
+    if (ubicacionId) filtros.ubicacionId = ubicacionId;
+    
+    const conciliacionId = searchParams.get('conciliacionId');
+    if (conciliacionId) filtros.conciliacionId = conciliacionId;
     
     const creadoPor = searchParams.get('creadoPor');
     if (creadoPor) filtros.creadoPor = creadoPor;

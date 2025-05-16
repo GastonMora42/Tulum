@@ -1,7 +1,7 @@
 // src/app/(admin)/admin/contingencias/nueva/page.tsx
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -11,17 +11,21 @@ import { ImageUploader } from '@/components/ui/ImageUploader';
 import { HCLabel } from '@/components/ui/HighContrastComponents';
 import { MediaUploader } from '@/components/ui/MediaUploader';
 
-// Esquema de validación
 const contingenciaSchema = z.object({
   titulo: z.string().min(5, { message: 'El título debe tener al menos 5 caracteres' }),
   descripcion: z.string().min(10, { message: 'La descripción debe tener al menos 10 caracteres' }),
   origen: z.enum(['fabrica', 'sucursal', 'oficina'], {
     message: 'Debe seleccionar un origen válido'
   }),
+  // Añadir nuevos campos
+  ubicacionId: z.string().optional(),
+  conciliacionId: z.string().optional(),
+  // Campos existentes
   produccionId: z.string().optional(),
   envioId: z.string().optional()
 });
 
+// Actualizar el tipo
 type ContingenciaFormData = z.infer<typeof contingenciaSchema>;
 
 export default function NuevaContingenciaPage() {
@@ -31,7 +35,8 @@ export default function NuevaContingenciaPage() {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [mediaType, setMediaType] = useState<'image' | 'video'>('image');
-  
+  const [ubicaciones, setUbicaciones] = useState<{id: string; nombre: string}[]>([]);
+
   const { 
     register, 
     handleSubmit, 
@@ -47,6 +52,22 @@ export default function NuevaContingenciaPage() {
   });
   
   const selectedOrigen = watch('origen');
+
+  useEffect(() => {
+    const fetchUbicaciones = async () => {
+      try {
+        const response = await authenticatedFetch('/api/admin/ubicaciones');
+        if (response.ok) {
+          const data = await response.json();
+          setUbicaciones(data);
+        }
+      } catch (error) {
+        console.error('Error al cargar ubicaciones:', error);
+      }
+    };
+    
+    fetchUbicaciones();
+  }, []);
   
   const onSubmit = async (data: ContingenciaFormData) => {
     try {
@@ -134,18 +155,24 @@ export default function NuevaContingenciaPage() {
             )}
           </div>
 
-          <div className="space-y-2">
-  <HCLabel htmlFor="imagen" className="block text-sm font-medium">
-    Imagen (opcional)
-  </HCLabel>
-  <ImageUploader
-    type="contingency"
-    onImageUpload={(imageUrl) => {
-      setImageUrl(imageUrl);
-    }}
-  />
-  <p className="text-xs text-gray-500">
-    Las imágenes de contingencias se eliminarán automáticamente después de 30 días.
+          <div>
+  <label htmlFor="ubicacionId" className="block text-sm font-medium text-gray-700">
+    Ubicación específica (opcional)
+  </label>
+  <select
+    id="ubicacionId"
+    {...register('ubicacionId')}
+    className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+  >
+    <option value="">-- Seleccionar ubicación --</option>
+    {ubicaciones.map(ubicacion => (
+      <option key={ubicacion.id} value={ubicacion.id}>
+        {ubicacion.nombre}
+      </option>
+    ))}
+  </select>
+  <p className="mt-1 text-xs text-gray-500">
+    Si no selecciona ninguna, se considerará una contingencia general
   </p>
 </div>
 
