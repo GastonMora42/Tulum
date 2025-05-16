@@ -65,6 +65,7 @@ export default function NuevoEnvioPage() {
     name: "items"
   });
   
+  
   // Obtener productos y destinos disponibles
   useEffect(() => {
     const fetchData = async () => {
@@ -80,7 +81,7 @@ export default function NuevoEnvioPage() {
         setSucursales(sucursalesData);
         
         // Obtener productos con stock
-        const productosResponse = await authenticatedFetch('/api/fabrica/stock?ubicacionId=ubicacion-fabrica&tipo=producto');
+const productosResponse = await authenticatedFetch('/api/stock?ubicacionId=ubicacion-fabrica&tipo=producto');
         if (!productosResponse.ok) {
           throw new Error('Error al cargar productos');
         }

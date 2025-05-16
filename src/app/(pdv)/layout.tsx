@@ -12,7 +12,8 @@ import {
   WifiOff,
   Wifi,
   RefreshCw,
-  ArrowDownLeft
+  ArrowDownLeft,
+  Factory
 } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
 
@@ -288,6 +289,34 @@ export default function PDVLayout({
           </div>
         </main>
       </div>
+
+
+      {/* Botones de navegación rápida para administrador */}
+{user?.roleId === 'role-admin' && (
+  <div className="fixed bottom-6 right-6 flex gap-2 z-50">
+    <Link 
+      href="/admin" 
+      className="bg-[#311716] text-white p-3 rounded-full hover:bg-[#4a292a] transition-colors shadow-lg"
+      title="Admin"
+    >
+      <Settings className="h-5 w-5" />
+    </Link>
+    <Link 
+      href="/fabrica" 
+      className="bg-[#311716] text-white p-3 rounded-full hover:bg-[#4a292a] transition-colors shadow-lg"
+      title="Fábrica"
+    >
+      <Factory className="h-5 w-5" />
+    </Link>
+    <Link 
+      href="/pdv" 
+      className="bg-[#311716] text-white p-3 rounded-full hover:bg-[#4a292a] transition-colors shadow-lg"
+      title="Punto de Venta"
+    >
+      <ShoppingCart className="h-5 w-5" />
+    </Link>
+  </div>
+)}
 
       {/* Footer con estado offline */}
       <footer className="fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 z-20 h-10">

@@ -1,13 +1,8 @@
 {
-  "/api/admin/productos/route": "app/api/admin/productos/route.js",
-  "/api/admin/categorias/route": "app/api/admin/categorias/route.js",
-  "/api/admin/insumos/route": "app/api/admin/insumos/route.js",
-  "/api/admin/ubicaciones/route": "app/api/admin/ubicaciones/route.js",
-  "/api/stock/route": "app/api/stock/route.js",
+  "/_not-found/page": "app/_not-found/page.js",
   "/(auth)/login/page": "app/(auth)/login/page.js",
+  "/(fabrica)/fabrica/contingencias/page": "app/(fabrica)/fabrica/contingencias/page.js",
+  "/(pdv)/pdv/page": "app/(pdv)/pdv/page.js",
   "/(admin)/admin/page": "app/(admin)/admin/page.js",
-  "/(admin)/admin/productos/page": "app/(admin)/admin/productos/page.js",
-  "/(admin)/admin/productos/nuevo/page": "app/(admin)/admin/productos/nuevo/page.js",
-  "/(admin)/admin/insumos/page": "app/(admin)/admin/insumos/page.js",
-  "/(admin)/admin/stock/page": "app/(admin)/admin/stock/page.js"
+  "/(fabrica)/fabrica/contingencias/nueva/page": "app/(fabrica)/fabrica/contingencias/nueva/page.js"
 }

@@ -24,9 +24,9 @@ export async function POST(
   // Extraer ID después de la autenticación
   const id = context.params.id;
   
-  // Verificar permiso - MODIFICAMOS PARA USAR produccion:crear EN LUGAR DE produccion:editar
-  const permissionError = await checkPermission('produccion:crear')(req);
-  if (permissionError) return permissionError;
+// Verificar permiso - MODIFICAMOS PARA USAR produccion:crear EN LUGAR DE produccion:editar
+const permissionError = await checkPermission('produccion:crear')(req);
+if (permissionError) return permissionError;
   
   try {
     const body = await req.json();

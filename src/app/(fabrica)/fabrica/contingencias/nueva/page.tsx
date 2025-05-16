@@ -166,6 +166,8 @@ export default function NuevaContingenciaFabricaPage() {
           body: JSON.stringify({ estado: 'con_contingencia' })
         });
       }
+          // Confirmar éxito
+    alert('Contingencia creada correctamente');
       
       // Redirigir a la lista de contingencias
       router.push('/fabrica/contingencias');

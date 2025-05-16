@@ -150,7 +150,7 @@ export default function AdminLayout({
     },
     { href: '/admin/usuarios', label: 'Usuarios', icon: <Users className="w-5 h-5" /> },
     { href: '/admin/contingencias', label: 'Contingencias', icon: <AlertTriangle className="w-5 h-5" /> },
-    { href: '/admin/conciliaciones', label: 'Conciliaciones', icon: <AlertTriangle className="w-5 h-5" /> },
+    { href: '/admin/conciliaciones/', label: 'Conciliaciones', icon: <BarChart2 className="w-5 h-5" /> },
     { href: '/admin/descuentos', label: 'Códigos de Descuento', icon: <Tag className="w-5 h-5" /> },
     { href: '/admin/reportes', label: 'Reportes', icon: <BarChart2 className="w-5 h-5" /> },
     { href: '/admin/configuracion/afip', label: 'ARCA', icon: <BarChart2 className="w-5 h-5" /> },
@@ -351,13 +351,13 @@ export default function AdminLayout({
         </main>
       </div>
       
-      {/* Mobile Overlay - Corregido para no ser completamente negro */}
-      {sidebarOpen && isMobile && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-30 backdrop-blur-sm z-40 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
+{/* Mobile Overlay - Corregido para no ser completamente negro */}
+{sidebarOpen && isMobile && (
+  <div 
+    className="fixed inset-0 bg-opacity-10 backdrop-blur-sm z-40 lg:hidden"
+    onClick={() => setSidebarOpen(false)}
+  />
+)}
     </div>
   );
 }

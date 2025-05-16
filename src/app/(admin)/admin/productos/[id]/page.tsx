@@ -80,11 +80,11 @@ const {
 });
 
 
-// Cargar producto y categorías
+// Reemplazar el código del useEffect
 useEffect(() => {
   const fetchData = async () => {
     try {
-      setIsFetching(true);
+      setIsLoading(true);
       console.log("Cargando producto con ID:", params.id);
       
       // Cargar producto
@@ -128,12 +128,14 @@ useEffect(() => {
       console.error('Error detallado:', err);
       setError('Error al cargar datos del producto');
     } finally {
-      setIsFetching(false);
+      setIsLoading(false);
     }
   };
 
-  fetchData();
-}, [params.id, reset]);
+  if (params.id) {
+    fetchData();
+  }
+}, [params.id]); // Eliminar reset de las dependencias
 
   // Manejar carga de imagen
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {

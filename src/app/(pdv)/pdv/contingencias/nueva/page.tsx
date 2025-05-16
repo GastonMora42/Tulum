@@ -105,42 +105,46 @@ export default function NuevaContingenciaPDVPage() {
     fetchUbicaciones();
   }, []);
   
-  const onSubmit = async (data: ContingenciaFormData) => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      // Añadir origen 'sucursal' automáticamente
-      const payload = {
-        ...data,
-        origen: 'sucursal{user.sucursalId}',
-        ubicacionId: sucursalId, // Usar la sucursal del usuario
-        imagenUrl: mediaType === 'image' ? mediaUrl : undefined,
-        videoUrl: mediaType === 'video' ? mediaUrl : undefined,
-        mediaType: mediaUrl ? mediaType : undefined
-      };
-      
-      const response = await authenticatedFetch('/api/contingencias', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al crear contingencia');
-      }
-      
-      // Redirigir a la lista de contingencias
-      router.push('/pdv/contingencias');
-      router.refresh();
-    } catch (err: any) {
-      console.error('Error:', err);
-      setError(err.message || 'Error al crear contingencia');
-    } finally {
-      setIsLoading(false);
+// Reemplazar la función onSubmit
+const onSubmit = async (data: ContingenciaFormData) => {
+  try {
+    setIsLoading(true);
+    setError(null);
+    
+    // Añadir información multimedia
+    const payload = {
+      ...data,
+      imagenUrl: mediaType === 'image' ? mediaUrl : undefined,
+      videoUrl: mediaType === 'video' ? mediaUrl : undefined,
+      mediaType: mediaUrl ? mediaType : undefined
+    };
+    
+    console.log("Enviando payload de contingencia:", payload);
+    
+    const response = await authenticatedFetch('/api/contingencias', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });  
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Error al crear contingencia');
     }
-  };
+    
+    // Confirmar éxito
+    alert('Contingencia creada correctamente');
+    
+    // Redirigir a la lista de contingencias
+    router.push('/admin/contingencias');
+    router.refresh();
+  } catch (err: any) {
+    console.error('Error:', err);
+    setError(err.message || 'Error al crear contingencia');
+  } finally {
+    setIsLoading(false);
+  }
+};
   
   return (
     <div className="space-y-6">

@@ -24,9 +24,9 @@ export async function POST(
   const authError = await authMiddleware(req);
   if (authError) return authError;
   
-  // Verificar permiso - USAMOS 'stock:ajustar' EN LUGAR DE 'fabrica:recibir-envios'
-  const permissionError = await checkPermission('stock:ajustar')(req);
-  if (permissionError) return permissionError;
+// Verificar permiso - USAMOS 'stock:ajustar' EN LUGAR DE 'fabrica:recibir-envios'
+const permissionError = await checkPermission('envio:recibir')(req);
+if (permissionError) return permissionError;
   
   try {
     const body = await req.json();
