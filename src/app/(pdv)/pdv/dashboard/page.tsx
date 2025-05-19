@@ -20,7 +20,15 @@ import {
   Archive,
   ReceiptText,
   Coins,
-  WifiOff
+  WifiOff,
+  Truck,
+  Package,
+  Users,
+  Calendar,
+  TrendingUp,
+  Loader,
+  CreditCard,
+  RefreshCw
 } from 'lucide-react';
 
 interface DashboardStats {
@@ -51,6 +59,7 @@ interface DashboardStats {
     total: number;
     medioPago: string;
   }>;
+  enviosPendientes?: number;
 }
 
 export default function PDVDashboard() {
@@ -60,11 +69,13 @@ export default function PDVDashboard() {
   const { user } = useAuthStore();
   const { isOnline, pendingOperations } = useOffline();
   const sucursalNombre = typeof localStorage !== 'undefined' ? localStorage.getItem('sucursalNombre') : '';
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
         setIsLoading(true);
+        setError(null);
 
         // Si estamos offline, cargar datos simulados
         if (!isOnline) {
@@ -90,40 +101,68 @@ export default function PDVDashboard() {
             ventasRecientes: [
               {id: 'vnt1', fecha: new Date().toISOString(), total: 800, medioPago: 'efectivo'},
               {id: 'vnt2', fecha: new Date(Date.now() - 3600000).toISOString(), total: 1200, medioPago: 'tarjeta_credito'}
-            ]
+            ],
+            enviosPendientes: 0
           });
           return;
         }
 
-        // Cargar estado de caja
+        // Obtener ID de sucursal
         const sucursalId = localStorage.getItem('sucursalId');
         if (!sucursalId) {
           throw new Error('No se ha configurado una sucursal');
         }
         
-        const cajaResponse = await authenticatedFetch(`/api/pdv/cierre/resumen?sucursalId=${sucursalId}`);
-        const cajaData = await cajaResponse.json();
+        console.log('Cargando estadísticas para sucursal:', sucursalId);
         
-        // Cargar ventas recientes
-        const ventasResponse = await authenticatedFetch(`/api/pdv/ventas?sucursalId=${sucursalId}&limit=5`);
-        const ventasData = await ventasResponse.json();
+        // Cargar datos en paralelo para mejor rendimiento
+        const [cajaResponse, ventasResponse, stockResponse, contingenciasResponse, enviosResponse] = await Promise.all([
+          authenticatedFetch(`/api/pdv/cierre/resumen?sucursalId=${sucursalId}`),
+          authenticatedFetch(`/api/pdv/ventas?sucursalId=${sucursalId}`),
+          authenticatedFetch(`/api/reportes/stock/bajo?sucursalId=${sucursalId}`), 
+          authenticatedFetch(`/api/contingencias?estado=pendiente&origen=sucursal&ubicacionId=${sucursalId}`),
+          authenticatedFetch(`/api/envios?destinoId=${sucursalId}&estado=pendiente,enviado,en_transito`)
+        ]);
         
-        // Cargar stock bajo
-        const stockResponse = await authenticatedFetch(`/api/reportes/stock/bajo?sucursalId=${sucursalId}`);
-        const stockData = await stockResponse.json();
+        // Verificar cada respuesta individualmente para mejor manejo de errores
+        if (!cajaResponse.ok) console.warn('Error al cargar datos de caja:', await cajaResponse.text());
+        if (!ventasResponse.ok) console.warn('Error al cargar ventas:', await ventasResponse.text());
+        if (!stockResponse.ok) console.warn('Error al cargar stock bajo:', await stockResponse.text());
+        if (!contingenciasResponse.ok) console.warn('Error al cargar contingencias:', await contingenciasResponse.text());
+        if (!enviosResponse.ok) console.warn('Error al cargar envíos:', await enviosResponse.text());
         
-        // Cargar contingencias
-        const contingenciasResponse = await authenticatedFetch('/api/contingencias?estado=pendiente&origen=sucursal');
-        const contingenciasData = await contingenciasResponse.json();
+        // Procesar respuestas
+        const cajaData = cajaResponse.ok ? await cajaResponse.json() : { abierto: false };
+        const ventasData = ventasResponse.ok ? await ventasResponse.json() : [];
+        const stockData = stockResponse.ok ? await stockResponse.json() : [];
+        const contingenciasData = contingenciasResponse.ok ? await contingenciasResponse.json() : [];
+        const enviosData = enviosResponse.ok ? await enviosResponse.json() : [];
         
-        // Formatear datos
+        // Extraer datos de ventas según la estructura
+        const ventas = Array.isArray(ventasData) ? ventasData : 
+                      (ventasData.data ? ventasData.data : []);
+        
+        // Calcular métricas de ventas
+        const hoy = new Date().toDateString();
+        const fechaSemanaAtras = new Date();
+        fechaSemanaAtras.setDate(fechaSemanaAtras.getDate() - 7);
+        
+        const ventasHoy = ventas.filter((v: any) => 
+          new Date(v.fecha).toDateString() === hoy
+        ).length;
+        
+        const ventasSemana = ventas.filter((v: any) => 
+          new Date(v.fecha) > fechaSemanaAtras
+        ).length;
+
+        console.log(`Datos cargados - Ventas: ${ventas.length}, Stock bajo: ${stockData.length}, Contingencias: ${contingenciasData.length}, Envíos pendientes: ${enviosData.length}`);
+        
+        // Formatear datos para el state
         setStats({
           ventas: {
-            total: ventasData.length || 0,
-            hoy: ventasData.filter((v: any) => 
-              new Date(v.fecha).toDateString() === new Date().toDateString()).length || 0,
-            semana: ventasData.filter((v: any) => 
-              new Date(v.fecha) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)).length || 0
+            total: ventas.length || 0,
+            hoy: ventasHoy || 0,
+            semana: ventasSemana || 0
           },
           caja: cajaData.abierto ? {
             estado: 'abierta',
@@ -134,15 +173,16 @@ export default function PDVDashboard() {
           } : { estado: 'cerrada' },
           stock: {
             bajosProductos: stockData.filter((item: any) => 
-              item.sucursalId === sucursalId).slice(0, 3) || []
+              item.sucursalId === sucursalId || item.ubicacionId === sucursalId).slice(0, 5) || []
           },
           contingenciasPendientes: contingenciasData.length || 0,
-          ventasRecientes: ventasData.slice(0, 5).map((v: any) => ({
+          ventasRecientes: ventas.slice(0, 5).map((v: any) => ({
             id: v.id,
             fecha: v.fecha,
             total: v.total,
-            medioPago: v.pagos[0]?.medioPago || 'efectivo'
-          })) || []
+            medioPago: v.pagos && v.pagos.length > 0 ? v.pagos[0].medioPago : 'efectivo'
+          })) || [],
+          enviosPendientes: enviosData.length || 0
         });
       } catch (err) {
         console.error('Error al cargar estadísticas:', err);
@@ -171,7 +211,8 @@ export default function PDVDashboard() {
           ventasRecientes: [
             {id: 'vnt1', fecha: new Date().toISOString(), total: 800, medioPago: 'efectivo'},
             {id: 'vnt2', fecha: new Date(Date.now() - 3600000).toISOString(), total: 1200, medioPago: 'tarjeta_credito'}
-          ]
+          ],
+          enviosPendientes: 0
         });
       } finally {
         setIsLoading(false);
@@ -179,12 +220,19 @@ export default function PDVDashboard() {
     };
 
     fetchStats();
-  }, [isOnline]);
+  }, [isOnline, refreshTrigger]);
+
+  const handleRefresh = () => {
+    setRefreshTrigger(prev => prev + 1);
+  };
 
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-96">
-        <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+        <div className="flex flex-col items-center">
+          <div className="w-12 h-12 border-4 border-[#311716] border-t-transparent rounded-full animate-spin mb-4"></div>
+          <p className="text-gray-600">Cargando datos del punto de venta...</p>
+        </div>
       </div>
     );
   }
@@ -192,14 +240,24 @@ export default function PDVDashboard() {
   if (error && !stats) {
     return (
       <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-        <span className="block sm:inline">{error}</span>
+        <div className="flex items-center">
+          <AlertTriangle className="h-5 w-5 mr-2" />
+          <span className="block sm:inline">{error}</span>
+        </div>
+        <button 
+          onClick={handleRefresh}
+          className="mt-3 bg-red-100 hover:bg-red-200 text-red-800 font-medium py-2 px-4 rounded flex items-center"
+        >
+          <RefreshCw className="h-4 w-4 mr-2" />
+          Reintentar
+        </button>
       </div>
     );
   }
 
   return (
     <div className="space-y-8">
-      {/* Header Section */}
+      {/* Header Section with Refresh Button */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-800">Punto de Venta</h1>
@@ -208,219 +266,333 @@ export default function PDVDashboard() {
             Bienvenido al centro de ventas
           </p>
         </div>
-        <div className="bg-white px-6 py-3 rounded-lg border border-blue-100 shadow-sm">
-          <p className="text-sm font-medium text-gray-800">
-            Hola, <span className="text-blue-600 font-bold">{user?.name}</span>
-          </p>
+        <div className="flex gap-2">
+          <button
+            onClick={handleRefresh}
+            className="bg-[#311716] text-white px-3 py-2 rounded-lg hover:bg-[#462625] transition-colors flex items-center text-sm"
+          >
+            <RefreshCw className="h-4 w-4 mr-1" />
+            Actualizar
+          </button>
+          <div className="bg-white px-4 py-2 rounded-lg border border-blue-100 shadow-sm">
+            <p className="text-sm font-medium text-gray-800">
+              Hola, <span className="text-[#311716] font-bold">{user?.name}</span>
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Quick Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Total ventas */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden transform hover:shadow-md transition-all">
-          <div className="p-6 flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-medium text-gray-800">Total Ventas</h3>
-              <p className="text-3xl font-bold text-gray-800 mt-2">{stats?.ventas.total || 0}</p>
-            </div>
-            <div className="bg-blue-50 p-3 rounded-lg">
-              <ShoppingBag className="h-8 w-8 text-blue-500" />
-            </div>
+      {/* Estado de Caja y Ventas */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Estado de Caja */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100 bg-[#f8f5f3] flex items-center">
+            <DollarSign className="h-5 w-5 text-[#9c7561] mr-2" />
+            <h2 className="text-lg font-medium text-gray-900">Estado de Caja</h2>
           </div>
-          <div className="px-6 py-2 bg-blue-50 grid grid-cols-2 gap-2 text-center text-xs">
-            <div>
-              <span className="block text-gray-600 font-semibold">Hoy</span>
-              <span className="font-bold text-gray-800">{stats?.ventas.hoy || 0}</span>
+          
+          <div className="p-6">
+            <div className="flex justify-between items-center mb-6">
+              <span className="text-gray-700 font-medium">Estado actual:</span>
+              {stats?.caja.estado === 'abierta' ? (
+                <span className="bg-green-100 text-green-800 text-sm font-medium px-3 py-1 rounded-full flex items-center">
+                  <Check className="h-4 w-4 mr-1" />
+                  Caja abierta
+                </span>
+              ) : (
+                <span className="bg-red-100 text-red-800 text-sm font-medium px-3 py-1 rounded-full flex items-center">
+                  <AlertTriangle className="h-4 w-4 mr-1" />
+                  Caja cerrada
+                </span>
+              )}
             </div>
-            <div>
-              <span className="block text-gray-600 font-semibold">Esta semana</span>
-              <span className="font-bold text-gray-800">{stats?.ventas.semana || 0}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Estado caja */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden transform hover:shadow-md transition-all">
-          <div className="p-6 flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-medium text-gray-800">Caja</h3>
-              <p className="text-3xl font-bold text-gray-800 mt-2">
-                {stats?.caja.estado === 'abierta' ? (
-                  <span className="text-green-600">Abierta</span>
-                ) : (
-                  <span className="text-red-600">Cerrada</span>
-                )}
-              </p>
-            </div>
-            <div className="bg-blue-50 p-3 rounded-lg">
-              <DollarSign className="h-8 w-8 text-blue-500" />
-            </div>
-          </div>
-          {stats?.caja.estado === 'abierta' && (
-            <div className="px-6 py-2 bg-blue-50 grid grid-cols-2 gap-2 text-center text-xs">
-              <div>
-                <span className="block text-gray-600 font-semibold">Efectivo</span>
-                <span className="font-bold text-gray-800">${stats?.caja.ventasEfectivo?.toFixed(2) || 0}</span>
-              </div>
-              <div>
-                <span className="block text-gray-600 font-semibold">Digital</span>
-                <span className="font-bold text-gray-800">${stats?.caja.ventasDigital?.toFixed(2) || 0}</span>
-              </div>
-            </div>
-          )}
-          {stats?.caja.estado === 'cerrada' && (
-            <Link 
-              href="/pdv"
-              className="flex items-center justify-center gap-2 px-6 py-2 bg-blue-50 text-blue-600 font-medium hover:bg-blue-100 transition-colors"
-            >
-              Abrir Caja
-            </Link>
-          )}
-        </div>
-
-        {/* Alertas Stock */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden transform hover:shadow-md transition-all">
-          <div className="p-6 flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-medium text-gray-800">Alertas Stock</h3>
-              <p className="text-3xl font-bold text-gray-800 mt-2">
-                {stats?.stock.bajosProductos.length || 0}
-              </p>
-            </div>
-            <div className="bg-blue-50 p-3 rounded-lg">
-              <AlertTriangle className="h-8 w-8 text-blue-500" />
-            </div>
-          </div>
-          <Link 
-            href="/pdv/stock"
-            className="flex items-center justify-center gap-2 px-6 py-2 bg-blue-50 text-blue-600 font-medium hover:bg-blue-100 transition-colors"
-          >
-            Ver stock
-            <ArrowUpRight className="h-4 w-4" />
-          </Link>
-        </div>
-
-        {/* Contingencias */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden transform hover:shadow-md transition-all">
-          <div className="p-6 flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-medium text-gray-800">Contingencias</h3>
-              <p className="text-3xl font-bold text-gray-800 mt-2">{stats?.contingenciasPendientes || 0}</p>
-            </div>
-            <div className="bg-blue-50 p-3 rounded-lg">
-              <AlertTriangle className="h-8 w-8 text-blue-500" />
-            </div>
-          </div>
-          <Link 
-            href="/pdv/contingencias" 
-            className="flex items-center justify-center gap-2 px-6 py-2 bg-blue-50 text-blue-600 font-medium hover:bg-blue-100 transition-colors"
-          >
-            Ver contingencias
-            <ArrowUpRight className="h-4 w-4" />
-          </Link>
-        </div>
-      </div>
-
-      {/* Main Dashboard Sections */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Ventas Recientes */}
-        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100">
-          <div className="px-6 py-4 border-b border-gray-100 bg-blue-50 flex justify-between items-center">
-            <h3 className="text-lg font-semibold text-gray-800">Ventas Recientes</h3>
-            <Link 
-              href="/pdv/ventas" 
-              className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
-            >
-              Ver todas <ArrowUpRight className="h-4 w-4 ml-1"/>
-            </Link>
-          </div>
-          <div className="divide-y divide-gray-100">
-            {stats?.ventasRecientes && stats.ventasRecientes.length > 0 ? (
-              stats.ventasRecientes.map((venta) => (
-                <Link key={venta.id} href={`/pdv/ventas/${venta.id}`}>
-                  <div className="px-6 py-4 hover:bg-gray-50 flex justify-between items-center transition-colors">
-                    <div>
-                      <span className={`px-2 py-1 text-xs rounded-full font-medium mr-2 ${
-                        venta.medioPago === 'efectivo' ? 'bg-green-100 text-green-800' : 
-                        venta.medioPago === 'tarjeta_credito' ? 'bg-blue-100 text-blue-800' : 
-                        'bg-purple-100 text-purple-800'
-                      }`}>
-                        {venta.medioPago === 'efectivo' ? 'Efectivo' : 
-                         venta.medioPago === 'tarjeta_credito' ? 'Tarjeta' : 
-                         venta.medioPago === 'tarjeta_debito' ? 'Débito' : 'Otro'}
-                      </span>
-                      <span className="font-medium text-gray-800">Venta #{venta.id.slice(-6)}</span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-sm text-blue-600 font-bold">${venta.total.toFixed(2)}</span>
-                      <span className="text-xs text-gray-500 block">{new Date(venta.fecha).toLocaleDateString()} {new Date(venta.fecha).toLocaleTimeString().substring(0, 5)}</span>
-                    </div>
+            
+            {stats?.caja.estado === 'abierta' ? (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-[#f8f5f3] p-3 rounded-lg">
+                    <p className="text-xs text-gray-500 mb-1">Monto Inicial</p>
+                    <p className="text-xl font-bold">${stats.caja.montoInicial?.toFixed(2)}</p>
                   </div>
+                  <div className="bg-[#f8f5f3] p-3 rounded-lg">
+                    <p className="text-xs text-gray-500 mb-1">Total Ventas</p>
+                    <p className="text-xl font-bold">${stats.caja.totalVentas?.toFixed(2)}</p>
+                  </div>
+                </div>
+                
+                <div className="bg-[#f8f5f3] p-3 rounded-lg flex justify-between items-center">
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Efectivo</p>
+                    <p className="text-lg font-bold">${stats.caja.ventasEfectivo?.toFixed(2)}</p>
+                  </div>
+                  <div className="h-8 border-r border-gray-300"></div>
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Digital</p>
+                    <p className="text-lg font-bold">${stats.caja.ventasDigital?.toFixed(2)}</p>
+                  </div>
+                </div>
+                
+                <Link 
+                  href="/pdv/cierre" 
+                  className="w-full mt-4 bg-[#311716] text-white py-2 px-4 rounded-lg hover:bg-[#462625] transition-colors flex items-center justify-center"
+                >
+                  <Clock className="h-4 w-4 mr-2" />
+                  Ir a Cierre de Caja
                 </Link>
-              ))
+              </div>
             ) : (
-              <div className="py-8 text-center">
-                <ShoppingBag className="w-12 h-12 text-gray-300 mx-auto mb-2" />
-                <p className="text-gray-500">No hay ventas recientes</p>
+              <div className="text-center py-6">
+                <p className="text-gray-500 mb-4">No hay una caja abierta actualmente</p>
+                <Link 
+                  href="/pdv" 
+                  className="bg-[#311716] text-white py-2 px-4 rounded-lg hover:bg-[#462625] transition-colors inline-flex items-center"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Abrir Caja
+                </Link>
               </div>
             )}
           </div>
         </div>
-
-        {/* Sección Stock Bajo */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100">
-          <div className="px-6 py-4 border-b border-gray-100 bg-blue-50">
-            <h3 className="text-lg font-semibold text-gray-800">Stock Crítico</h3>
+        
+        {/* Resumen de Ventas */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100 bg-[#f8f5f3] flex items-center">
+            <BarChart2 className="h-5 w-5 text-[#9c7561] mr-2" />
+            <h2 className="text-lg font-medium text-gray-900">Resumen de Ventas</h2>
           </div>
-          <div className="divide-y divide-gray-100">
-            {stats?.stock && stats.stock.bajosProductos.length > 0 ? (
-              <div className="px-6 py-4">
+          
+          <div className="p-6">
+            <div className="grid grid-cols-3 gap-4 mb-6">
+              <div className="bg-[#f8f5f3] p-3 rounded-lg text-center">
+                <p className="text-xs text-gray-500 mb-1">Hoy</p>
+                <p className="text-xl font-bold">{stats?.ventas.hoy}</p>
+                <p className="text-xs text-[#9c7561]">ventas</p>
+              </div>
+              <div className="bg-[#f8f5f3] p-3 rounded-lg text-center">
+                <p className="text-xs text-gray-500 mb-1">Semana</p>
+                <p className="text-xl font-bold">{stats?.ventas.semana}</p>
+                <p className="text-xs text-[#9c7561]">ventas</p>
+              </div>
+              <div className="bg-[#f8f5f3] p-3 rounded-lg text-center">
+                <p className="text-xs text-gray-500 mb-1">Total</p>
+                <p className="text-xl font-bold">{stats?.ventas.total}</p>
+                <p className="text-xs text-[#9c7561]">ventas</p>
+              </div>
+            </div>
+            
+            <div className="flex justify-between items-center">
+              <span className="text-gray-700 font-medium">Métodos de pago:</span>
+            </div>
+            
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              <div className="bg-[#f8f5f3] p-3 rounded-lg flex items-center justify-between">
+                <span className="flex items-center text-gray-700">
+                  <DollarSign className="h-4 w-4 text-green-600 mr-1" />
+                  Efectivo
+                </span>
+                <span className="font-medium">${stats?.caja.ventasEfectivo?.toFixed(2) || "0.00"}</span>
+              </div>
+              
+              <div className="bg-[#f8f5f3] p-3 rounded-lg flex items-center justify-between">
+                <span className="flex items-center text-gray-700">
+                  <CreditCard className="h-4 w-4 text-blue-600 mr-1" />
+                  Digital
+                </span>
+                <span className="font-medium">${stats?.caja.ventasDigital?.toFixed(2) || "0.00"}</span>
+              </div>
+            </div>
+            
+            <Link 
+              href="/pdv/ventas" 
+              className="w-full mt-6 border border-[#311716] text-[#311716] py-2 px-4 rounded-lg hover:bg-[#f8f5f3] transition-colors flex items-center justify-center"
+            >
+              <Book className="h-4 w-4 mr-2" />
+              Ver Historial de Ventas
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Estado de Stock y Alertas */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Stock Crítico */}
+        <div className="md:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100 bg-[#f8f5f3] flex items-center justify-between">
+            <div className="flex items-center">
+              <Package className="h-5 w-5 text-[#9c7561] mr-2" />
+              <h2 className="text-lg font-medium text-gray-900">Stock Crítico</h2>
+            </div>
+            <Link 
+              href="/pdv/conciliacion" 
+              className="text-[#311716] hover:text-[#9c7561] text-sm flex items-center"
+            >
+              Ver Inventario <ArrowUpRight className="h-3 w-3 ml-1" />
+            </Link>
+          </div>
+          
+          <div className="p-6">
+            {stats?.stock.bajosProductos && stats.stock.bajosProductos.length > 0 ? (
+              <div className="space-y-3">
                 {stats.stock.bajosProductos.map(producto => (
-                  <div key={producto.id} className="mb-3 bg-red-50 rounded-lg p-3 border border-red-100">
+                  <div key={producto.id} className="bg-amber-50 rounded-lg p-3 border border-amber-100">
                     <div className="flex justify-between mb-1">
                       <span className="font-medium text-gray-800">{producto.nombre}</span>
-                      <span className="text-red-700 text-sm">
+                      <span className="text-amber-700 text-sm">
                         {producto.cantidad} / {producto.stockMinimo} unidades
                       </span>
                     </div>
-                    <div className="w-full bg-red-200 rounded-full h-2">
+                    <div className="w-full bg-amber-200 rounded-full h-2">
                       <div 
-                        className="bg-red-500 h-2 rounded-full" 
+                        className="bg-amber-500 h-2 rounded-full" 
                         style={{ width: `${Math.min(100, (producto.cantidad / producto.stockMinimo) * 100)}%` }}
                       ></div>
                     </div>
                   </div>
                 ))}
                 
-                <Link 
-                  href="/pdv/stock" 
-                  className="mt-2 inline-flex w-full items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  <Archive className="mr-2 h-4 w-4" />
-                  Gestionar stock
-                </Link>
+                <div className="pt-3 border-t border-gray-100 mt-4">
+                  <div className="flex justify-between items-center mb-4">
+                    <span className="text-gray-700">Envíos pendientes:</span>
+                    <span className="bg-blue-100 text-blue-800 text-sm font-medium px-3 py-1 rounded-full">
+                      {stats.enviosPendientes || 0}
+                    </span>
+                  </div>
+                  
+                  <Link 
+                    href="/pdv/recepcion" 
+                    className="w-full bg-[#311716] text-white py-2 px-4 rounded-lg hover:bg-[#462625] transition-colors flex items-center justify-center"
+                  >
+                    <Truck className="h-4 w-4 mr-2" />
+                    Recibir Envíos
+                  </Link>
+                </div>
               </div>
             ) : (
-              <div className="py-8 text-center">
-                <Check className="w-12 h-12 text-green-300 mx-auto mb-2" />
-                <p className="text-gray-500">No hay alertas de stock</p>
+              <div className="text-center py-8">
+                <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <Check className="h-8 w-8 text-green-600" />
+                </div>
+                <h3 className="text-lg font-medium text-gray-800 mb-2">Stock Adecuado</h3>
+                <p className="text-gray-500 mb-6">Todos los productos tienen stock suficiente</p>
+                
+                <Link 
+                  href="/pdv/recepcion" 
+                  className="inline-flex items-center text-[#311716] hover:text-[#9c7561]"
+                >
+                  <Truck className="h-4 w-4 mr-1" />
+                  Verificar envíos pendientes ({stats?.enviosPendientes || 0})
+                </Link>
               </div>
             )}
           </div>
+        </div>
+        
+        {/* Alertas y Contingencias */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100 bg-[#f8f5f3] flex items-center justify-between">
+            <div className="flex items-center">
+              <AlertTriangle className="h-5 w-5 text-[#9c7561] mr-2" />
+              <h2 className="text-lg font-medium text-gray-900">Alertas</h2>
+            </div>
+            <span className="bg-red-100 text-red-800 text-sm font-medium px-3 py-1 rounded-full">
+              {stats?.contingenciasPendientes || 0}
+            </span>
+          </div>
+          
+          <div className="p-6">
+            <div className="bg-[#f8f5f3] p-4 rounded-lg mb-4">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-gray-700 font-medium">Contingencias:</span>
+                <span className="text-red-600 font-bold">{stats?.contingenciasPendientes}</span>
+              </div>
+              <p className="text-sm text-gray-600">
+                {stats?.contingenciasPendientes 
+                  ? `Tienes ${stats.contingenciasPendientes} contingencias pendientes que requieren atención.` 
+                  : 'No hay contingencias pendientes.'}
+              </p>
+            </div>
+            
+            <Link 
+              href="/pdv/contingencias" 
+              className="w-full mb-3 bg-amber-100 text-amber-800 border border-amber-200 py-2 px-4 rounded-lg hover:bg-amber-200 transition-colors flex items-center justify-center"
+            >
+              <AlertTriangle className="h-4 w-4 mr-2" />
+              Ver Contingencias
+            </Link>
+            
+            <Link 
+              href="/pdv/contingencias/nueva" 
+              className="w-full bg-[#311716] text-white py-2 px-4 rounded-lg hover:bg-[#462625] transition-colors flex items-center justify-center"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Reportar Nueva
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Últimas Ventas */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-100 bg-[#f8f5f3] flex items-center justify-between">
+          <div className="flex items-center">
+            <ShoppingBag className="h-5 w-5 text-[#9c7561] mr-2" />
+            <h2 className="text-lg font-medium text-gray-900">Últimas Ventas</h2>
+          </div>
+          <Link 
+            href="/pdv/ventas" 
+            className="text-[#311716] hover:text-[#9c7561] text-sm flex items-center"
+          >
+            Ver todas <ArrowUpRight className="h-3 w-3 ml-1" />
+          </Link>
+        </div>
+        
+        <div className="divide-y divide-gray-100">
+          {stats?.ventasRecientes && stats.ventasRecientes.length > 0 ? (
+            stats.ventasRecientes.map((venta) => (
+              <Link key={venta.id} href={`/pdv/ventas/${venta.id}`} className="block hover:bg-gray-50">
+                <div className="px-6 py-4 flex justify-between items-center">
+                  <div>
+                    <span className={`px-2 py-1 text-xs rounded-full font-medium mr-2 ${
+                      venta.medioPago === 'efectivo' ? 'bg-green-100 text-green-800' : 
+                      venta.medioPago === 'tarjeta_credito' ? 'bg-blue-100 text-blue-800' : 
+                      'bg-purple-100 text-purple-800'
+                    }`}>
+                      {venta.medioPago === 'efectivo' ? 'Efectivo' : 
+                       venta.medioPago === 'tarjeta_credito' ? 'Tarjeta' : 
+                       venta.medioPago === 'tarjeta_debito' ? 'Débito' : 'Otro'}
+                    </span>
+                    <span className="font-medium text-gray-800">Venta #{venta.id.slice(-6)}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-sm text-[#9c7561] font-bold">${venta.total.toFixed(2)}</span>
+                    <span className="text-xs text-gray-500 block">{new Date(venta.fecha).toLocaleDateString()} {new Date(venta.fecha).toLocaleTimeString().substring(0, 5)}</span>
+                  </div>
+                </div>
+              </Link>
+            ))
+          ) : (
+            <div className="py-8 text-center">
+              <ShoppingBag className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+              <p className="text-gray-500">No hay ventas recientes</p>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Acciones Rápidas */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">Acciones Rápidas</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center">
+          <Coins className="h-5 w-5 text-[#9c7561] mr-2" />
+          Acciones Rápidas
+        </h3>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <Link
             href="/pdv"
-            className="flex items-center gap-3 p-4 rounded-lg border border-gray-100 hover:border-blue-300 hover:bg-blue-50 transition-colors group"
+            className="flex items-center gap-3 p-4 rounded-lg border border-gray-200 hover:border-[#9c7561] hover:bg-[#f8f5f3] transition-colors group"
           >
-            <div className="bg-blue-50 p-3 rounded-lg group-hover:bg-white transition-colors">
-              <ShoppingCart className="h-6 w-6 text-blue-600" />
+            <div className="bg-[#f8f5f3] p-3 rounded-lg group-hover:bg-white transition-colors">
+              <ShoppingCart className="h-6 w-6 text-[#311716]" />
             </div>
             <div>
               <span className="font-medium text-gray-800 block">Nueva</span>
@@ -430,10 +602,10 @@ export default function PDVDashboard() {
           
           <Link
             href="/pdv/cierre"
-            className="flex items-center gap-3 p-4 rounded-lg border border-gray-100 hover:border-blue-300 hover:bg-blue-50 transition-colors group"
+            className="flex items-center gap-3 p-4 rounded-lg border border-gray-200 hover:border-[#9c7561] hover:bg-[#f8f5f3] transition-colors group"
           >
-            <div className="bg-blue-50 p-3 rounded-lg group-hover:bg-white transition-colors">
-              <ReceiptText className="h-6 w-6 text-blue-600" />
+            <div className="bg-[#f8f5f3] p-3 rounded-lg group-hover:bg-white transition-colors">
+              <ReceiptText className="h-6 w-6 text-[#311716]" />
             </div>
             <div>
               <span className="font-medium text-gray-800 block">Cierre</span>
@@ -443,14 +615,27 @@ export default function PDVDashboard() {
           
           <Link
             href="/pdv/contingencias/nueva"
-            className="flex items-center gap-3 p-4 rounded-lg border border-gray-100 hover:border-blue-300 hover:bg-blue-50 transition-colors group"
+            className="flex items-center gap-3 p-4 rounded-lg border border-gray-200 hover:border-[#9c7561] hover:bg-[#f8f5f3] transition-colors group"
           >
-            <div className="bg-blue-50 p-3 rounded-lg group-hover:bg-white transition-colors">
-              <AlertTriangle className="h-6 w-6 text-blue-600" />
+            <div className="bg-[#f8f5f3] p-3 rounded-lg group-hover:bg-white transition-colors">
+              <AlertTriangle className="h-6 w-6 text-[#311716]" />
             </div>
             <div>
               <span className="font-medium text-gray-800 block">Reportar</span>
               <span className="text-sm text-gray-600">Contingencia</span>
+            </div>
+          </Link>
+          
+          <Link
+            href="/pdv/conciliacion"
+            className="flex items-center gap-3 p-4 rounded-lg border border-gray-200 hover:border-[#9c7561] hover:bg-[#f8f5f3] transition-colors group"
+          >
+            <div className="bg-[#f8f5f3] p-3 rounded-lg group-hover:bg-white transition-colors">
+              <Archive className="h-6 w-6 text-[#311716]" />
+            </div>
+            <div>
+              <span className="font-medium text-gray-800 block">Control</span>
+              <span className="text-sm text-gray-600">Inventario</span>
             </div>
           </Link>
         </div>

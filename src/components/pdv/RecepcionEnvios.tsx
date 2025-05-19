@@ -50,32 +50,40 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
   
   // Cargar envíos pendientes
   useEffect(() => {
-    const loadEnvios = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        
-        const sucursalId = localStorage.getItem('sucursalId');
-        if (!sucursalId) {
-          throw new Error('No se ha definido una sucursal');
-        }
-        
-        // Obtener envíos pendientes de recepción
-        const response = await authenticatedFetch(`/api/envios?destinoId=${sucursalId}&estado=enviado,en_transito`);
-        
-        if (!response.ok) {
-          throw new Error('Error al cargar envíos pendientes');
-        }
-        
-        const data = await response.json();
-        setEnvios(data);
-      } catch (err) {
-        console.error('Error:', err);
-        setError('No se pudieron cargar los envíos pendientes');
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const loadEnvios = async () => {
+  try {
+    setIsLoading(true);
+    setError(null);
+    
+    const sucursalId = localStorage.getItem('sucursalId');
+    if (!sucursalId) {
+      throw new Error('No se ha definido una sucursal');
+    }
+    
+    console.log(`Cargando envíos para sucursal: ${sucursalId}`);
+    
+    // Obtener envíos pendientes de recepción - Estado ampliado para capturar más casos
+    const response = await authenticatedFetch(`/api/envios?destinoId=${sucursalId}&estado=pendiente,enviado,en_transito`);
+    
+    if (!response.ok) {
+      throw new Error('Error al cargar envíos pendientes');
+    }
+    
+    const data = await response.json();
+    console.log(`Envíos recibidos: ${data.length}`, data);
+    
+    setEnvios(data);
+    
+    if (data.length === 0) {
+      console.log('No se encontraron envíos pendientes para esta sucursal');
+    }
+  } catch (err) {
+    console.error('Error al cargar envíos:', err);
+    setError('No se pudieron cargar los envíos pendientes');
+  } finally {
+    setIsLoading(false);
+  }
+};
     
     loadEnvios();
   }, []);
@@ -211,15 +219,19 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
     );
   }
 
-  if (envios.length === 0 && !selectedEnvio) {
-    return (
-      <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-        <Truck className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">No hay envíos pendientes</h3>
-        <p className="text-gray-600">No tienes envíos pendientes de recepción en este momento</p>
+if (envios.length === 0 && !selectedEnvio) {
+  return (
+    <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+      <Truck className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+      <h3 className="text-lg font-medium text-gray-900 mb-2">No hay envíos pendientes</h3>
+      <p className="text-gray-600 mb-4">No tienes envíos pendientes de recepción en este momento</p>
+      <div className="p-4 bg-blue-50 border-l-4 border-blue-400 text-blue-700 text-sm">
+        <p>Recuerda que los envíos deben ser <strong>marcados como enviados</strong> desde la fábrica para aparecer aquí.</p>
+        <p className="mt-2">Contacta con el administrador si crees que debería haber envíos pendientes.</p>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
   return (
     <div className="bg-white rounded-lg shadow-sm">

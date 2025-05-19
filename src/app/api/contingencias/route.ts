@@ -28,16 +28,7 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     
-    const filtros: {
-      ubicacionId: string;
-      conciliacionId: string;
-      estado?: string;
-      origen?: string;
-      creadoPor?: string;
-    } = {
-      ubicacionId: '',
-      conciliacionId: ''
-    };
+    const filtros: any = {};
     
     const estado = searchParams.get('estado');
     if (estado) filtros.estado = estado;
@@ -54,6 +45,8 @@ export async function GET(req: NextRequest) {
     const creadoPor = searchParams.get('creadoPor');
     if (creadoPor) filtros.creadoPor = creadoPor;
 
+    console.log('Filtros de contingencias:', filtros);
+    
     const contingencias = await contingenciaService.listarContingencias(filtros);
     return NextResponse.json(contingencias);
   } catch (error) {

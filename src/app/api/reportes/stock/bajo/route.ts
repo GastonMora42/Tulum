@@ -10,6 +10,20 @@ export async function GET(req: NextRequest) {
   if (authResponse) return authResponse;
   
   try {
+    const { searchParams } = new URL(req.url);
+    const sucursalId = searchParams.get('sucursalId');
+    
+    console.log(`Generando reporte de stock bajo para sucursal: ${sucursalId || 'todas'}`);
+    
+    // Si no se proporciona sucursalId, obtener todas las ubicaciones activas
+    const ubicaciones = sucursalId ? 
+      [await prisma.ubicacion.findUnique({ where: { id: sucursalId } })] :
+      await prisma.ubicacion.findMany({ where: { activo: true, tipo: 'sucursal' } });
+    
+    if (ubicaciones.length === 0 || (sucursalId && !ubicaciones[0])) {
+      return NextResponse.json([]);
+    }
+    
     // Obtener todos los productos con su stock mínimo
     const productos = await prisma.producto.findMany({
       where: {
@@ -22,34 +36,32 @@ export async function GET(req: NextRequest) {
       }
     });
     
-    // Obtener todas las ubicaciones activas (sucursales)
-    const ubicaciones = await prisma.ubicacion.findMany({
-      where: {
-        activo: true,
-        tipo: 'sucursal'
-      },
-      select: {
-        id: true,
-        nombre: true
-      }
-    });
-    
-    // Para cada producto y ubicación, verificar si el stock está por debajo del mínimo
     const stockBajo = [];
     
-    for (const producto of productos) {
-      for (const ubicacion of ubicaciones) {
-        // Obtener stock actual
-        const stock = await prisma.stock.findFirst({
-          where: {
-            productoId: producto.id,
-            ubicacionId: ubicacion.id
+    // Para cada ubicación seleccionada, verificar productos con stock bajo
+    for (const ubicacion of ubicaciones) {
+      if (!ubicacion) continue;
+      
+      // Consultar stock de productos en esta ubicación
+      const stocks = await prisma.stock.findMany({
+        where: {
+          ubicacionId: ubicacion.id,
+          productoId: { 
+            in: productos.map(p => p.id) 
           }
-        });
+        }
+      });
+      
+      // Crear map para acceso rápido
+      const stockMap = new Map();
+      stocks.forEach(stock => {
+        stockMap.set(stock.productoId, stock.cantidad);
+      });
+      
+      // Para cada producto, verificar si su stock está bajo el mínimo
+      for (const producto of productos) {
+        const stockActual = stockMap.get(producto.id) || 0;
         
-        const stockActual = stock?.cantidad || 0;
-        
-        // Si está por debajo del mínimo, agregarlo al resultado
         if (stockActual < producto.stockMinimo) {
           stockBajo.push({
             id: `${producto.id}-${ubicacion.id}`,
