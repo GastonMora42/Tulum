@@ -15,7 +15,7 @@ async function actualizarPermisoVendedor() {
     
     console.log('Permisos actuales:', rolVendedor.permissions);
     
-    // Obtener permisos actuales
+    // Obtener permisos actualess
     let permisos = rolVendedor.permissions;
     if (typeof permisos === 'string') {
       permisos = JSON.parse(permisos);
