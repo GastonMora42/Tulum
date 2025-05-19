@@ -7,3 +7,5 @@ node_modules
 out/
 *.hot-update.js
 *.hot-update.json
+.afip_certificados/
+afip_certificados/
