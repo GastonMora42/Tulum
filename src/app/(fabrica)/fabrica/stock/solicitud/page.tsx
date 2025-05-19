@@ -115,7 +115,7 @@ export default function SolicitudInsumosPage() {
       const response = await authenticatedFetch('/api/admin/envios-insumos', {
         method: 'POST',
         body: JSON.stringify({
-          origenId: 'ubicacion-sucursal1', // ID de la oficina o almacén central
+          origenId: 'ubicacion-admin', // ID de la oficina
           destinoId: 'ubicacion-fabrica', // La fábrica es el destino
           observaciones: data.observaciones,
           items: data.items
