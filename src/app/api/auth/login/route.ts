@@ -1,6 +1,7 @@
 // src/app/api/auth/login/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { authService } from '@/server/services/auth/authService';
+import prisma from '@/server/db/client';
 import { z } from 'zod';
 import { UserWithRole } from '@/types/user';
 
@@ -50,10 +51,21 @@ export async function POST(req: NextRequest) {
         );
       }
 
+      // Obtener información completa del usuario incluyendo sucursal
+      const fullUserData = await prisma.user.findUnique({
+        where: { id: result.user.id },
+        include: {
+          role: true,
+          sucursal: true
+        }
+      });
+
+      // Construir respuesta con datos completos
       return NextResponse.json({
         user: {
           ...result.user,
-          roleName: result.user.roleId, // Usar roleId en lugar de role.name
+          sucursal: fullUserData?.sucursal || null,
+          roleName: fullUserData?.role?.name || result.user.roleId
         },
         accessToken: result.accessToken,
         refreshToken: result.refreshToken,

@@ -165,20 +165,24 @@ export function useAuth(): UseAuthReturn {
       
       console.log('Sesión iniciada correctamente');
 
-      // En el método login, después de recibir la respuesta exitosa:
-if (data.user && data.user.sucursalId) {
-  localStorage.setItem('sucursalId', data.user.sucursalId);
-  
-  // Si también tenemos el nombre de la sucursal, guardarlo
+if (data.user) {
+  // Si tenemos información de sucursal incluida en la respuesta
   if (data.user.sucursal) {
+    localStorage.setItem('sucursalId', data.user.sucursal.id);
     localStorage.setItem('sucursalNombre', data.user.sucursal.nombre);
-  } else {
-    // Obtener el nombre de la sucursal en una consulta adicional
+    console.log(`Sucursal guardada: ${data.user.sucursal.nombre} (${data.user.sucursal.id})`);
+  } 
+  // Si solo tenemos ID de sucursal pero no el objeto completo
+  else if (data.user.sucursalId) {
+    localStorage.setItem('sucursalId', data.user.sucursalId);
+    
+    // Obtener nombre de la sucursal mediante una llamada API adicional
     try {
       const sucursalResponse = await fetch(`/api/admin/ubicaciones/${data.user.sucursalId}`);
       if (sucursalResponse.ok) {
         const sucursalData = await sucursalResponse.json();
         localStorage.setItem('sucursalNombre', sucursalData.nombre);
+        console.log(`Nombre de sucursal obtenido: ${sucursalData.nombre}`);
       }
     } catch (error) {
       console.warn('No se pudo obtener el nombre de la sucursal', error);

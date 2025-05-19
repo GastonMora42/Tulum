@@ -61,7 +61,7 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
         }
         
         // Obtener envíos pendientes de recepción
-        const response = await authenticatedFetch(`/api/envios?destinoId=${sucursalId}&estado=enviado`);
+        const response = await authenticatedFetch(`/api/envios?destinoId=${sucursalId}&estado=enviado,en_transito`);
         
         if (!response.ok) {
           throw new Error('Error al cargar envíos pendientes');

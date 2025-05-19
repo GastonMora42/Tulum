@@ -1,7 +1,13 @@
 {
-  "/api/auth/me/route": "app/api/auth/me/route.js",
-  "/api/admin/insumos/route": "app/api/admin/insumos/route.js",
-  "/api/stock/route": "app/api/stock/route.js",
-  "/api/admin/envios-insumos/route": "app/api/admin/envios-insumos/route.js",
-  "/(fabrica)/fabrica/stock/solicitud/page": "app/(fabrica)/fabrica/stock/solicitud/page.js"
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/pdv/conciliacion/route": "app/api/pdv/conciliacion/route.js",
+  "/api/pdv/cierre/resumen/route": "app/api/pdv/cierre/resumen/route.js",
+  "/api/pdv/ventas/route": "app/api/pdv/ventas/route.js",
+  "/api/reportes/stock/bajo/route": "app/api/reportes/stock/bajo/route.js",
+  "/api/contingencias/route": "app/api/contingencias/route.js",
+  "/(auth)/login/page": "app/(auth)/login/page.js",
+  "/(pdv)/pdv/page": "app/(pdv)/pdv/page.js",
+  "/(pdv)/pdv/conciliacion/page": "app/(pdv)/pdv/conciliacion/page.js",
+  "/(pdv)/pdv/recepcion/page": "app/(pdv)/pdv/recepcion/page.js",
+  "/(pdv)/pdv/dashboard/page": "app/(pdv)/pdv/dashboard/page.js"
 }

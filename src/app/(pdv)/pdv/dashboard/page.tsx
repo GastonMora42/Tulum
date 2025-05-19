@@ -109,7 +109,7 @@ export default function PDVDashboard() {
         const ventasData = await ventasResponse.json();
         
         // Cargar stock bajo
-        const stockResponse = await authenticatedFetch(`/api/reportes/stock/bajo`);
+        const stockResponse = await authenticatedFetch(`/api/reportes/stock/bajo?sucursalId=${sucursalId}`);
         const stockData = await stockResponse.json();
         
         // Cargar contingencias
