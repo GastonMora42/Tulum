@@ -15,6 +15,7 @@ export async function GET(req: NextRequest) {
     const estado = searchParams.get('estado');
     const limit = parseInt(searchParams.get('limit') || '20');
     
+    
     // Construir consulta
     const where: any = {};
     
