@@ -8,10 +8,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "seed": "node prisma/seed.js"
+    "seed": "node prisma/seed2.js"
   },
   "prisma": {
-    "seed": "node prisma/seed.js"
+    "seed": "node prisma/seed2.js"
   },
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.782.0",

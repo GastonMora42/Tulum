@@ -1,8 +1,12 @@
 {
   "/_not-found/page": "app/_not-found/page.js",
-  "/(auth)/login/page": "app/(auth)/login/page.js",
-  "/(fabrica)/fabrica/contingencias/page": "app/(fabrica)/fabrica/contingencias/page.js",
+  "/api/admin/categorias/route": "app/api/admin/categorias/route.js",
+  "/api/pdv/cierre/route": "app/api/pdv/cierre/route.js",
+  "/api/pdv/productos-disponibles/route": "app/api/pdv/productos-disponibles/route.js",
+  "/api/auth/me/route": "app/api/auth/me/route.js",
   "/(pdv)/pdv/page": "app/(pdv)/pdv/page.js",
   "/(admin)/admin/page": "app/(admin)/admin/page.js",
-  "/(fabrica)/fabrica/contingencias/nueva/page": "app/(fabrica)/fabrica/contingencias/nueva/page.js"
+  "/(admin)/admin/usuarios/page": "app/(admin)/admin/usuarios/page.js",
+  "/(pdv)/pdv/conciliacion/page": "app/(pdv)/pdv/conciliacion/page.js",
+  "/(pdv)/pdv/dashboard/page": "app/(pdv)/pdv/dashboard/page.js"
 }
