@@ -79,10 +79,10 @@ export function ImageUploader({
       const data = await response.json();
       console.log('Respuesta de carga:', data);
       
-      if (data.success && data.imageUrl) {
-        console.log('URL de imagen recibida del servidor:', data.imageUrl);
-        setPreviewUrl(data.imageUrl); // Asegúrate de que la URL también se establezca como previewUrl
-        onImageUpload(data.imageUrl);
+      if (data.success && data.mediaUrl) {
+        console.log('URL de imagen recibida del servidor:', data.mediaUrl);
+        setPreviewUrl(data.mediaUrl); // Asegúrate de que la URL también se establezca como previewUrl
+        onImageUpload(data.mediaUrl);
       } else {
         console.error('Respuesta inesperada del servidor:', data);
         throw new Error('La respuesta del servidor no incluye la URL de la imagen');

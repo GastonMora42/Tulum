@@ -320,7 +320,6 @@ export default function ProductosPage() {
                   {productos.map(producto => (
                     <tr key={producto.id} className="hover:bg-gray-50">
 <td className="px-6 py-4 whitespace-nowrap">
-<td className="px-6 py-4 whitespace-nowrap">
   <div className="flex items-center">
     {producto.imagen ? (
       <div className="flex-shrink-0 h-10 w-10 mr-4 relative">
@@ -352,7 +351,6 @@ export default function ProductosPage() {
       )}
     </div>
   </div>
-</td>
 </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         ${producto.precio.toFixed(2)}

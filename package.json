@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "seed": "node prisma/seed2.js"
+    "seed": "node prisma/seed2.js",
+    "sucursales": "node scprits/sucursales-init.js"
   },
   "prisma": {
     "seed": "node prisma/seed2.js"
