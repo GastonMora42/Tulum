@@ -111,19 +111,6 @@ export default function NuevaProduccionPage() {
     fetchData();
   }, [searchParams, setValue]);
 
-  // Cargar stock de insumos cuando cambia la receta
-  useEffect(() => {
-    if (recetaId) {
-      const receta = recetas.find(r => r.id === recetaId);
-      setSelectedReceta(receta || null);
-      
-      if (receta) {
-        fetchInsumosStock(receta.id);
-      }
-    }
-  }, [recetaId, recetas]);
-  
-
   const fetchInsumosStock = async (recetaId: string) => {
     try {
       const receta = recetas.find(r => r.id === recetaId);
@@ -176,17 +163,15 @@ export default function NuevaProduccionPage() {
     
     return true;
   };
-  
-  // En src/app/(fabrica)/fabrica/produccion/nueva/page.tsx
+
   const fetchStockEficiente = async (recetaId: string) => {
     try {
       const receta = recetas.find(r => r.id === recetaId);
       if (!receta) return;
       
-      // Extraer todos los IDs de insumos
       const insumoIds = receta.items.map(item => item.insumoId).join(',');
       
-      // Hacer una sola llamada API para todos los insumos
+      setIsLoading(true); // Agregar indicador de carga
       const response = await authenticatedFetch(`/api/stock/batch?ubicacionId=ubicacion-fabrica&insumoIds=${insumoIds}`);
       
       if (!response.ok) {
@@ -194,7 +179,14 @@ export default function NuevaProduccionPage() {
       }
       
       const stockData = await response.json();
+      console.log("Datos recibidos de la API:", stockData); // Para debug
       
+      // Verificar que stockData sea un array
+      if (!Array.isArray(stockData)) {
+        console.error("La respuesta de la API no es un array:", stockData);
+        throw new Error('Formato de respuesta inesperado');
+      }
+
       // Crear un mapa para búsqueda rápida
       const stockMap = new Map();
       stockData.forEach((stock: { insumoId: any; }) => {
@@ -215,6 +207,9 @@ export default function NuevaProduccionPage() {
       setInsumosStock(stockResults);
     } catch (err) {
       console.error('Error al cargar stock de insumos:', err);
+      setError('Error al cargar inventario de insumos'); // Mostrar error visual
+    } finally {
+      setIsLoading(false);
     }
   };
 
