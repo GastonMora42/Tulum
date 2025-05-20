@@ -35,6 +35,9 @@ interface Factura {
 
 interface FacturasTableProps {
   sucursalId?: string;
+  onViewFactura?: (facturaId: string) => void;
+  onRetryFactura?: (facturaId: string) => void;
+  refreshKey?: number;
 }
 
 export default function FacturasTable({ sucursalId }: FacturasTableProps) {
@@ -316,6 +319,7 @@ export default function FacturasTable({ sucursalId }: FacturasTableProps) {
   PDF
 </Button>
                         )}
+                        
                       </div>
                     </td>
                   </tr>

@@ -312,9 +312,9 @@ export function useAuth(): UseAuthReturn {
   };
 }
 
-// Función para hacer peticiones autenticadas
+// Modificar la función authenticatedFetch para manejar 401 automáticamente
 export const authenticatedFetch = async (url: string, options: RequestInit = {}): Promise<Response> => {
-  // Preparar headers
+  // Preparar headers con token actual
   const headers = new Headers(options.headers || {});
   const token = localStorage.getItem('accessToken');
   
@@ -322,89 +322,33 @@ export const authenticatedFetch = async (url: string, options: RequestInit = {})
     headers.set('Authorization', `Bearer ${token}`);
   }
   
-  if (!headers.has('Content-Type') && !(options.body instanceof FormData)) {
-    headers.set('Content-Type', 'application/json');
-  }
+  // Realizar la petición
+  let response = await fetch(url, {
+    ...options,
+    headers
+  });
   
-  try {
-    // Realizar la petición
-    let response = await fetch(url, {
-      ...options,
-      headers
-    });
+  // Si recibimos 401, intentar refrescar token y reintentar
+  if (response.status === 401) {
+    console.log('Token expirado, intentando renovar...');
+    const refreshed = await refreshTokenFn();
     
-    // Si recibimos un 401, intentar refrescar el token y reintentar
-    if (response.status === 401) {
-      console.log('Token expirado, intentando refrescar...');
+    if (refreshed) {
+      // Obtener nuevo token y reintentar petición
+      const newToken = localStorage.getItem('accessToken');
+      headers.set('Authorization', `Bearer ${newToken}`);
       
-      // Verificar que el email existe antes de intentar refrescar
-      const email = localStorage.getItem('userEmail');
-      if (!email) {
-        console.warn("No hay email para refresh, intentando recuperarlo...");
-        const accessToken = localStorage.getItem('accessToken');
-        if (accessToken) {
-          try {
-            const parts = accessToken.split('.');
-            if (parts.length === 3) {
-              const payload = JSON.parse(atob(parts[1]));
-              if (payload.email) {
-                localStorage.setItem('userEmail', payload.email);
-                console.log('Email recuperado del token para futuros refreshes:', payload.email);
-              }
-            }
-          } catch (error) {
-            console.error('Error al extraer email del token:', error);
-          }
-        }
-      }
-      
-      const refreshed = await refreshTokenFn();
-      
-      if (refreshed) {
-        // Obtener el nuevo token
-        const newToken = localStorage.getItem('accessToken');
-        
-        if (newToken) {
-          // Actualizar el header de autorización
-          headers.set('Authorization', `Bearer ${newToken}`);
-          
-          // Reintentar la petición original
-          console.log('Reintentando petición con nuevo token...');
-          response = await fetch(url, {
-            ...options,
-            headers
-          });
-        }
-      } else {
-        // Si no se pudo refrescar, redirigir a login
-        console.error('No se pudo refrescar el token, redirigiendo a login...');
-        
-        // Limpiar tokens
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('idToken');
-        
-        // Limpiar store
-        if (useAuthStore.getState()) {
-          useAuthStore.getState().clearAuth();
-        }
-        
-        // Redirigir a login
-        if (typeof window !== 'undefined') {
-          window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
-        }
+      response = await fetch(url, {
+        ...options,
+        headers
+      });
+    } else {
+      // Redirigir a login si no se pudo refrescar
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login';
       }
     }
-    
-    return response;
-  } catch (error) {
-    console.error('Error en la solicitud:', error);
-    // Crear una respuesta de error controlada
-    return new Response(JSON.stringify({ error: 'Error de red' }), {
-      status: 500,
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
   }
+  
+  return response;
 };

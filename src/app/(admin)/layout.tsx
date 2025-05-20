@@ -22,7 +22,8 @@ import {
   ShoppingCart,
   Box,
   Clock,
-  Tag
+  Tag,
+  FileText
 } from 'lucide-react';
 
 export default function AdminLayout({
@@ -151,6 +152,7 @@ export default function AdminLayout({
     { href: '/admin/usuarios', label: 'Usuarios', icon: <Users className="w-5 h-5" /> },
     { href: '/admin/contingencias', label: 'Contingencias', icon: <AlertTriangle className="w-5 h-5" /> },
     { href: '/admin/conciliaciones/', label: 'Conciliaciones', icon: <BarChart2 className="w-5 h-5" /> },
+    { href: '/pdv/facturas', icon: <FileText className="h-5 w-5" />, text: 'Facturas' },
     { href: '/admin/descuentos', label: 'Códigos de Descuento', icon: <Tag className="w-5 h-5" /> },
     { href: '/admin/reportes', label: 'Reportes', icon: <BarChart2 className="w-5 h-5" /> },
     { href: '/admin/configuracion/afip', label: 'ARCA', icon: <BarChart2 className="w-5 h-5" /> },

@@ -133,13 +133,14 @@ export default function PDVLayout({
 
   // Definición de los enlaces de navegación
   const navLinks = [
-    { href: '/pdv', icon: <ShoppingCart className="h-5 w-5" />, text: 'Venta', exact: true },
-    { href: '/pdv/cierre', icon: <Clock className="h-5 w-5" />, text: 'Cierre' },
-    { href: '/pdv/ventas', icon: <Tag className="h-5 w-5" />, text: 'Historial' },
     { href: '/pdv/dashboard', icon: <BarChart2 className="h-5 w-5" />, text: 'Dashboard' },
+    { href: '/pdv', icon: <ShoppingCart className="h-5 w-5" />, text: 'Venta', exact: true },
     { href: '/pdv/recepcion', icon: <Truck className="h-5 w-5" />, text: 'Recepción' },
     { href: '/pdv/conciliacion', icon: <Database className="h-5 w-5" />, text: 'Inventario' },
+    { href: '/pdv/cierre', icon: <Clock className="h-5 w-5" />, text: 'Cierre' },
+    { href: '/pdv/ventas', icon: <Tag className="h-5 w-5" />, text: 'Historial' },
     { href: '/pdv/egresos', icon: <ArrowDownLeft className="h-5 w-5" />, text: 'Salidas' },
+    { href: '/pdv/facturas', icon: <FileText className="h-5 w-5" />, text: 'Facturas' },
     { href: '/pdv/contingencias', icon: <AlertTriangle className="h-5 w-5" />, text: 'Contingencias' }
   ];
 
