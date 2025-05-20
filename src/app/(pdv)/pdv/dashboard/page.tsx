@@ -70,6 +70,7 @@ export default function PDVDashboard() {
   const { isOnline, pendingOperations } = useOffline();
   const sucursalNombre = typeof localStorage !== 'undefined' ? localStorage.getItem('sucursalNombre') : '';
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -226,6 +227,62 @@ export default function PDVDashboard() {
     setRefreshTrigger(prev => prev + 1);
   };
 
+ // Función para abrir caja
+const handleAbrirCaja = async () => {
+  try {
+    setIsLoading(true); // Si tienes un estado de carga
+    
+    const sucursalId = localStorage.getItem('sucursalId');
+    
+    if (!sucursalId) {
+      // Usa una alerta si no tienes acceso a setNotification
+      alert('No se ha definido una sucursal para este punto de venta');
+      return;
+    }
+    
+    // Solicitar monto inicial
+    const montoInicial = prompt('Ingrese el monto inicial de la caja:');
+    
+    if (montoInicial === null) return; // Usuario canceló
+    
+    const montoInicialNum = parseFloat(montoInicial);
+    
+    if (isNaN(montoInicialNum) || montoInicialNum < 0) {
+      alert('El monto inicial debe ser un número válido mayor o igual a cero');
+      return;
+    }
+    
+    // Crear caja
+    const response = await authenticatedFetch('/api/pdv/cierre', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        sucursalId,
+        montoInicial: montoInicialNum
+      })
+    });
+    
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || 'Error al abrir la caja');
+    }
+    
+    alert('Caja abierta correctamente');
+    
+    // Refrescar la página para mostrar el estado actualizado
+    setTimeout(() => {
+      setRefreshTrigger(prev => prev + 1);
+    }, 1500);
+  } catch (error) {
+    console.error('Error al abrir caja:', error);
+    alert('Error al abrir la caja: ' + (error instanceof Error ? error.message : 'Error desconocido'));
+  } finally {
+    setIsLoading(false); // Si tienes un estado de carga
+  }
+};
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-96">
@@ -343,13 +400,13 @@ export default function PDVDashboard() {
             ) : (
               <div className="text-center py-6">
                 <p className="text-gray-500 mb-4">No hay una caja abierta actualmente</p>
-                <Link 
-                  href="/pdv" 
-                  className="bg-[#311716] text-white py-2 px-4 rounded-lg hover:bg-[#462625] transition-colors inline-flex items-center"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Abrir Caja
-                </Link>
+                <button 
+  onClick={handleAbrirCaja}
+  className="bg-[#311716] text-white py-2 px-4 rounded-lg hover:bg-[#462625] transition-colors inline-flex items-center"
+>
+  <Plus className="h-4 w-4 mr-2" />
+  Abrir Caja
+</button>
               </div>
             )}
           </div>

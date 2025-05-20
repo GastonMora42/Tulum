@@ -73,7 +73,7 @@ class VentaService {
       throw new Error(`El total de pagos (${totalPagos}) no coincide con el total de la venta (${total})`);
     }
     
-    // Crear venta en transacción
+    // Crear venta en transacción con timeout aumentado
     return prisma.$transaction(async tx => {
       // Crear venta
       const venta = await tx.venta.create({
@@ -88,44 +88,60 @@ class VentaService {
           clienteCuit: facturar ? clienteCuit : null,
         }
       });
-
       
+      // Preparar operaciones para ejecutar en batch
+      const itemCreations = [];
+      const stockAjustes = [];
+      const pagoCreations = [];
       
-      // Crear items de venta
+      // Preparar items de venta
       for (const item of items) {
-        await tx.itemVenta.create({
-          data: {
-            ventaId: venta.id,
-            productoId: item.productoId,
-            cantidad: item.cantidad,
-            precioUnitario: item.precioUnitario,
-            descuento: item.descuento || 0
-          }
-        });
+        itemCreations.push(
+          tx.itemVenta.create({
+            data: {
+              ventaId: venta.id,
+              productoId: item.productoId,
+              cantidad: item.cantidad,
+              precioUnitario: item.precioUnitario,
+              descuento: item.descuento || 0
+            }
+          })
+        );
         
-        // Descontar del stock
-        await stockService.ajustarStock({
-          productoId: item.productoId,
-          ubicacionId: sucursalId,
-          cantidad: -item.cantidad, // Negativo para descontar
-          motivo: `Venta #${venta.id}`,
-          usuarioId,
-          ventaId: venta.id
-        });
+        // Preparar ajustes de stock
+        stockAjustes.push(
+          stockService.ajustarStock({
+            productoId: item.productoId,
+            ubicacionId: sucursalId,
+            cantidad: -item.cantidad, // Negativo para descontar
+            motivo: `Venta #${venta.id}`,
+            usuarioId,
+            ventaId: venta.id
+          })
+        );
       }
       
-      // Registrar pagos
+      // Preparar pagos
       for (const pago of pagos) {
-        await tx.pago.create({
-          data: {
-            ventaId: venta.id,
-            medioPago: pago.medioPago,
-            monto: pago.monto,
-            referencia: pago.referencia,
-            datosPago: pago.datosPago
-          }
-        });
+        pagoCreations.push(
+          tx.pago.create({
+            data: {
+              ventaId: venta.id,
+              medioPago: pago.medioPago,
+              monto: pago.monto,
+              referencia: pago.referencia,
+              datosPago: pago.datosPago
+            }
+          })
+        );
       }
+      
+      // Ejecutar operaciones en paralelo
+      await Promise.all([
+        ...itemCreations,
+        ...stockAjustes,
+        ...pagoCreations
+      ]);
       
       // Si hay código de descuento, incrementar usos
       if (codigoDescuento) {
@@ -156,7 +172,9 @@ class VentaService {
           usuario: true
         }
       });
-    });
+    }, {
+      timeout: 15000 // Aumentar el timeout a 15 segundos
+    }); // Aumentamos el timeout a 15 segundos
   }
   
   // Obtener ventas con filtros

@@ -62,19 +62,10 @@ export default function CierreCajaPage() {
     }, 2000);
   };
   
-  // Mostrar pantalla de carga
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-        <span className="ml-3 text-lg">Cargando...</span>
-      </div>
-    );
-  }
-  
-  // Si hay error
-  if (errorMessage) {
-    return (
+return (
+  <div className="container mx-auto px-4 py-6">
+    {/* Si hay error */}
+    {errorMessage && (
       <div className="text-center p-8">
         <h2 className="text-2xl font-bold text-gray-800 mb-4">Error</h2>
         <p className="text-red-600 mb-6">{errorMessage}</p>
@@ -86,12 +77,18 @@ export default function CierreCajaPage() {
           Volver al PDV
         </button>
       </div>
-    );
-  }
-  
-  // Si no hay caja abierta
-  if (!cierreCajaId) {
-    return (
+    )}
+    
+    {/* Si está cargando */}
+    {isLoading && (
+      <div className="flex items-center justify-center h-full">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        <span className="ml-3 text-lg">Cargando...</span>
+      </div>
+    )}
+    
+    {/* Si no hay caja abierta */}
+    {!isLoading && !errorMessage && cierreCajaId === null && (
       <div className="text-center p-8">
         <h2 className="text-2xl font-bold text-gray-800 mb-4">No hay una caja abierta</h2>
         <p className="text-gray-600 mb-6">Debe abrir una caja antes de realizar un cierre</p>
@@ -103,12 +100,12 @@ export default function CierreCajaPage() {
           Volver al PDV
         </button>
       </div>
-    );
-  }
-  
-  return (
-    <div className="container mx-auto px-4 py-6">
+    )}
+    
+    {/* Solo mostrar el componente CierreCaja si tenemos un ID válido */}
+    {!isLoading && !errorMessage && cierreCajaId && (
       <CierreCaja id={cierreCajaId} onSuccess={handleCierreSuccess} />
-    </div>
-  );
+    )}
+  </div>
+);
 }

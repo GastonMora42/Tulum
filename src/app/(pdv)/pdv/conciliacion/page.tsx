@@ -10,6 +10,7 @@ import {
 import { authenticatedFetch } from '@/hooks/useAuth';
 
 interface Conciliacion {
+  id: string; 
   fecha: string;
   estado: 'pendiente' | 'completada' | 'con_contingencia';
   usuario?: string;
@@ -158,10 +159,10 @@ export default function ConciliacionPage() {
       const response = await authenticatedFetch('/api/pdv/conciliacion/guardar', {
         method: 'POST',
         body: JSON.stringify({
-          id: conciliacion.fecha,
+          id: conciliacion.id,
           productos,
           observaciones,
-          sucursalId  // Añadir sucursalId al body
+          sucursalId
         })
       });
       

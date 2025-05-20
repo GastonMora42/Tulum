@@ -1,5 +1,4 @@
-// src/components/pdv/CierreCaja.tsx
-'use client';
+// src/components/pdv/CierreCaja.tsx - Parte relevante
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -47,19 +46,36 @@ export function CierreCaja({ id, onSuccess }: CierreCajaProps) {
         
         const data = await response.json();
         
+        // Verificar que la respuesta contiene los datos esperados
+        if (!data.cierreCaja) {
+          throw new Error('Datos de cierre de caja incompletos o inválidos');
+        }
+        
         setCierreCaja(data.cierreCaja);
-        setVentasResumen(data.ventasResumen);
         
-        // Buscar el monto en efectivo para pre-llenarlo
-        const efectivo = data.ventasResumen.detallesPorMedioPago.find(
-          (item: any) => item.medioPago === 'efectivo'
-        );
-        
-        if (efectivo) {
-          // Sumar monto inicial + ventas en efectivo
-          const montoEfectivoEsperado = data.cierreCaja.montoInicial + efectivo.monto;
-          setMontoFinal(montoEfectivoEsperado.toFixed(2));
+        if (data.ventasResumen) {
+          setVentasResumen(data.ventasResumen);
+          
+          // Buscar el monto en efectivo para pre-llenarlo
+          const efectivo = data.ventasResumen.detallesPorMedioPago.find(
+            (item: any) => item.medioPago === 'efectivo'
+          );
+          
+          if (efectivo) {
+            // Sumar monto inicial + ventas en efectivo
+            const montoEfectivoEsperado = data.cierreCaja.montoInicial + efectivo.monto;
+            setMontoFinal(montoEfectivoEsperado.toFixed(2));
+          } else {
+            setMontoFinal(data.cierreCaja.montoInicial.toFixed(2));
+          }
         } else {
+          setVentasResumen({
+            detallesPorMedioPago: [],
+            total: 0,
+            cantidadVentas: 0,
+            ventasEfectivo: 0,
+            ventasDigital: 0
+          });
           setMontoFinal(data.cierreCaja.montoInicial.toFixed(2));
         }
       } catch (error) {
