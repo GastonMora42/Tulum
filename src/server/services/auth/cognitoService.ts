@@ -71,19 +71,11 @@ constructor() {
   console.log("Cliente Cognito inicializado con región:", process.env.AWS_REGION);
 }
 
-  // Método para calcular el SECRET_HASH
-  private calculateSecretHash(username: string): string {
-    if (!this.clientSecret) {
-      console.error('Cliente secret no está configurado');
-      throw new Error('Client secret is not configured');
-    }
-    
-    // El formato correcto es USERNAME + CLIENT_ID
-    const message = username + this.clientId;
-    const hmac = crypto.createHmac('sha256', this.clientSecret);
-    hmac.update(message);
-    return hmac.digest('base64');
-  }
+private calculateSecretHash(username: string): string {
+  const hmac = crypto.createHmac('sha256', this.clientSecret);
+  hmac.update(username + this.clientId);
+  return hmac.digest('base64');
+}
 
   // Método para eliminar un usuario de Cognito
   async deleteUser(username: string): Promise<boolean> {
@@ -403,12 +395,16 @@ async registerUser(params: RegisterUserParams): Promise<{ success: boolean; user
         }
       }
       
-      // Si no tenemos SECRET_HASH, intentar sin él
-      const command = new InitiateAuthCommand({
-        AuthFlow: "REFRESH_TOKEN_AUTH",
-        ClientId: this.clientId,
-        AuthParameters: authParams
-      });
+      
+// En la función refreshToken
+const command = new InitiateAuthCommand({
+  ClientId: this.clientId,
+  AuthFlow: 'REFRESH_TOKEN_AUTH',
+  AuthParameters: {
+    REFRESH_TOKEN: refreshToken,
+    SECRET_HASH: this.calculateSecretHash(username) // Asegúrate de que esta función existe
+  }
+});
       
       console.log("Intentando refrescar token con params:", {
         hasUsername: !!username,

@@ -32,68 +32,108 @@ interface UseAuthReturn {
   isAuthenticated: boolean;
 }
 
-// Función para refrescar token que se puede usar desde fuera del hook
 export const refreshTokenFn = async (): Promise<boolean> => {
-  const refreshToken = localStorage.getItem('refreshToken');
-  const email = localStorage.getItem('userEmail');
+  console.log("### INICIANDO REFRESH TOKEN ###");
   
+  // 1. Obtener refresh token
+  const refreshToken = localStorage.getItem('refreshToken');
   if (!refreshToken) {
-    console.warn('No hay refresh token disponible');
+    console.error("No hay refresh token disponible");
     return false;
   }
   
+  // 2. SOLUCIÓN CRÍTICA: Obtener email - usar múltiples fuentes
+  // Primero intentar obtenerlo directamente de localStorage
+  let email = localStorage.getItem('userEmail');
+  console.log(`Email encontrado en localStorage: ${email ? 'SÍ' : 'NO'}`);
+  
+  // Si no está en localStorage, buscarlo en el token JWT
+  if (!email) {
+    try {
+      const accessToken = localStorage.getItem('accessToken');
+      if (accessToken && accessToken.split('.').length === 3) {
+        const payload = JSON.parse(atob(accessToken.split('.')[1]));
+        console.log("Contenido del token JWT:", Object.keys(payload));
+        
+        // Intentar todas las propiedades posibles donde podría estar el email
+        email = String(payload.email || payload.sub || payload.username || '');
+        
+        if (email) {
+          console.log(`Email recuperado del token: ${email}`);
+          localStorage.setItem('userEmail', email);
+        }
+      }
+    } catch (e) {
+      console.error("Error al extraer email del token:", e);
+    }
+  }
+  
+  // 3. MEDIDA EXTREMA: Si aún no tenemos email, usar un valor por defecto temporal
+  // Esto es muy importante: si no tenemos email, intentar usar el último usuario conocido
+  if (!email) {
+    console.warn("### ADVERTENCIA: NO SE PUDO OBTENER EMAIL, USANDO VALOR DE RESPALDO ###");
+    
+    // Verificar si hay algún usuario en la store
+    const user = useAuthStore.getState().user;
+    if (user && user.email) {
+      email = user.email;
+      console.log(`Usando email del store: ${email}`);
+      localStorage.setItem('userEmail', email);
+    } else {
+      // Si todo falla, redireccionar al login
+      console.error("NO SE PUDO RECUPERAR EL EMAIL, REDIRIGIENDO A LOGIN");
+      localStorage.clear();
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login?error=missing_email';
+      }
+      return false;
+    }
+  }
+  
+  // 4. Ahora que tenemos email garantizado, hacer la petición
   try {
-    console.log('Intentando refrescar token con email:', email);
+    console.log(`Enviando refresh con email: ${email}`);
     
     const response = await fetch('/api/auth/refresh', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         refreshToken,
-        email // Asegurar que se envía el email
+        email       // Este email ya está garantizado que es string y no null
       })
     });
     
     if (!response.ok) {
-      console.error('Error al refrescar token:', response.status);
+      console.error(`Error en refresh: ${response.status}`);
       
-      // Si el error es de autenticación, limpiar tokens y redirigir a login
       if (response.status === 401) {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('idToken');
-        if (typeof window !== 'undefined') {
-          window.location.href = '/login';
-        }
+        localStorage.clear();
+        window.location.href = '/login';
       }
       
       return false;
     }
     
-    const data: RefreshResponse = await response.json();
+    const data = await response.json();
     
-    // Actualizar tokens en localStorage
+    // Guardar tokens
     localStorage.setItem('accessToken', data.accessToken);
     localStorage.setItem('idToken', data.idToken);
     if (data.refreshToken) {
       localStorage.setItem('refreshToken', data.refreshToken);
     }
     
-    // Actualizar tokens en el store global
-    if (useAuthStore.getState()) {
-      useAuthStore.getState().setTokens({
-        accessToken: data.accessToken,
-        idToken: data.idToken,
-        refreshToken: data.refreshToken || refreshToken // Mantener el actual si no viene uno nuevo
-      });
-    }
+    // Actualizar store
+    useAuthStore.getState().setTokens({
+      accessToken: data.accessToken,
+      idToken: data.idToken,
+      refreshToken: data.refreshToken || refreshToken
+    });
     
-    console.log('Token refrescado exitosamente');
+    console.log("Token refrescado exitosamente");
     return true;
   } catch (error) {
-    console.error('Error al refrescar token:', error);
+    console.error("Error en refresh:", error);
     return false;
   }
 };
@@ -121,14 +161,17 @@ export function useAuth(): UseAuthReturn {
       
       // Verificar si el token está próximo a expirar
       try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        const expirationTime = payload.exp * 1000; // Convertir a milisegundos
-        const currentTime = Date.now();
-        
-        // Si el token expira en menos de 5 minutos, refrescarlo
-        if (expirationTime - currentTime < 5 * 60 * 1000) {
-          console.log('Token próximo a expirar, refrescando...');
-          await refreshTokenFn();
+        const parts = token.split('.');
+        if (parts.length === 3) {
+          const payload = JSON.parse(atob(parts[1]));
+          const expirationTime = payload.exp * 1000; // Convertir a milisegundos
+          const currentTime = Date.now();
+          
+          // Si el token expira en menos de 5 minutos, refrescarlo
+          if (expirationTime - currentTime < 5 * 60 * 1000) {
+            console.log('Token próximo a expirar, refrescando...');
+            await refreshTokenFn();
+          }
         }
       } catch (error) {
         console.error('Error al verificar expiración del token:', error);
@@ -165,30 +208,30 @@ export function useAuth(): UseAuthReturn {
       
       console.log('Sesión iniciada correctamente');
 
-if (data.user) {
-  // Si tenemos información de sucursal incluida en la respuesta
-  if (data.user.sucursal) {
-    localStorage.setItem('sucursalId', data.user.sucursal.id);
-    localStorage.setItem('sucursalNombre', data.user.sucursal.nombre);
-    console.log(`Sucursal guardada: ${data.user.sucursal.nombre} (${data.user.sucursal.id})`);
-  } 
-  // Si solo tenemos ID de sucursal pero no el objeto completo
-  else if (data.user.sucursalId) {
-    localStorage.setItem('sucursalId', data.user.sucursalId);
-    
-    // Obtener nombre de la sucursal mediante una llamada API adicional
-    try {
-      const sucursalResponse = await fetch(`/api/admin/ubicaciones/${data.user.sucursalId}`);
-      if (sucursalResponse.ok) {
-        const sucursalData = await sucursalResponse.json();
-        localStorage.setItem('sucursalNombre', sucursalData.nombre);
-        console.log(`Nombre de sucursal obtenido: ${sucursalData.nombre}`);
+      if (data.user) {
+        // Si tenemos información de sucursal incluida en la respuesta
+        if (data.user.sucursal) {
+          localStorage.setItem('sucursalId', data.user.sucursal.id);
+          localStorage.setItem('sucursalNombre', data.user.sucursal.nombre);
+          console.log(`Sucursal guardada: ${data.user.sucursal.nombre} (${data.user.sucursal.id})`);
+        } 
+        // Si solo tenemos ID de sucursal pero no el objeto completo
+        else if (data.user.sucursalId) {
+          localStorage.setItem('sucursalId', data.user.sucursalId);
+          
+          // Obtener nombre de la sucursal mediante una llamada API adicional
+          try {
+            const sucursalResponse = await fetch(`/api/admin/ubicaciones/${data.user.sucursalId}`);
+            if (sucursalResponse.ok) {
+              const sucursalData = await sucursalResponse.json();
+              localStorage.setItem('sucursalNombre', sucursalData.nombre);
+              console.log(`Nombre de sucursal obtenido: ${sucursalData.nombre}`);
+            }
+          } catch (error) {
+            console.warn('No se pudo obtener el nombre de la sucursal', error);
+          }
+        }
       }
-    } catch (error) {
-      console.warn('No se pudo obtener el nombre de la sucursal', error);
-    }
-  }
-}
       
       // Guardar tokens
       localStorage.setItem('accessToken', data.accessToken);
@@ -269,7 +312,7 @@ if (data.user) {
   };
 }
 
-// En src/hooks/useAuth.ts
+// Función para hacer peticiones autenticadas
 export const authenticatedFetch = async (url: string, options: RequestInit = {}): Promise<Response> => {
   // Preparar headers
   const headers = new Headers(options.headers || {});
@@ -294,21 +337,44 @@ export const authenticatedFetch = async (url: string, options: RequestInit = {})
     if (response.status === 401) {
       console.log('Token expirado, intentando refrescar...');
       
+      // Verificar que el email existe antes de intentar refrescar
+      const email = localStorage.getItem('userEmail');
+      if (!email) {
+        console.warn("No hay email para refresh, intentando recuperarlo...");
+        const accessToken = localStorage.getItem('accessToken');
+        if (accessToken) {
+          try {
+            const parts = accessToken.split('.');
+            if (parts.length === 3) {
+              const payload = JSON.parse(atob(parts[1]));
+              if (payload.email) {
+                localStorage.setItem('userEmail', payload.email);
+                console.log('Email recuperado del token para futuros refreshes:', payload.email);
+              }
+            }
+          } catch (error) {
+            console.error('Error al extraer email del token:', error);
+          }
+        }
+      }
+      
       const refreshed = await refreshTokenFn();
       
       if (refreshed) {
         // Obtener el nuevo token
         const newToken = localStorage.getItem('accessToken');
         
-        // Actualizar el header de autorización
-        headers.set('Authorization', `Bearer ${newToken}`);
-        
-        // Reintentar la petición original
-        console.log('Reintentando petición con nuevo token...');
-        response = await fetch(url, {
-          ...options,
-          headers
-        });
+        if (newToken) {
+          // Actualizar el header de autorización
+          headers.set('Authorization', `Bearer ${newToken}`);
+          
+          // Reintentar la petición original
+          console.log('Reintentando petición con nuevo token...');
+          response = await fetch(url, {
+            ...options,
+            headers
+          });
+        }
       } else {
         // Si no se pudo refrescar, redirigir a login
         console.error('No se pudo refrescar el token, redirigiendo a login...');
