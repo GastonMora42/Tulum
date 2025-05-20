@@ -567,6 +567,7 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
                 Atrás
               </button>
               
+              
               <button
                 onClick={handleRecibirEnvio}
                 disabled={isSaving}
