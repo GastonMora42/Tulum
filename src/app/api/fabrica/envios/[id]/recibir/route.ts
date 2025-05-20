@@ -18,17 +18,20 @@ const recepcionEnvioSchema = z.object({
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   // Aplicar middleware de autenticación
   const authError = await authMiddleware(req);
   if (authError) return authError;
   
-// Verificar permiso - USAMOS 'stock:ajustar' EN LUGAR DE 'fabrica:recibir-envios'
-const permissionError = await checkPermission('envio:recibir')(req);
-if (permissionError) return permissionError;
+  // Verificar permiso
+  const permissionError = await checkPermission('envio:recibir')(req);
+  if (permissionError) return permissionError;
   
   try {
+    // Acceder al id usando await para asegurar que esté disponible
+    const { id } = context.params;
+    
     const body = await req.json();
     
     // Validar datos de entrada
@@ -47,7 +50,7 @@ if (permissionError) return permissionError;
     
     // Verificar que el envío existe y está en estado enviado
     const envio = await prisma.envio.findUnique({
-      where: { id: params.id },
+      where: { id }, // Usando id extraído de context.params
       include: {
         items: {
           include: {
@@ -121,7 +124,7 @@ if (permissionError) return permissionError;
       if (hayDiscrepancias) {
         // Registrar la recepción con discrepancias
         const envioActualizado = await tx.envio.update({
-          where: { id: params.id },
+          where: { id }, // Usando id extraído
           data: {
             estado: 'con_contingencia',
             fechaRecepcion: new Date()
@@ -159,7 +162,7 @@ if (permissionError) return permissionError;
       } else {
         // Recepción sin discrepancias - actualizar stock
         const envioActualizado = await tx.envio.update({
-          where: { id: params.id },
+          where: { id }, // Usando id extraído
           data: {
             estado: 'recibido',
             fechaRecepcion: new Date()

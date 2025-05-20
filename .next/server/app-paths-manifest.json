@@ -1,12 +1,9 @@
 {
-  "/api/pdv/cierre/route": "app/api/pdv/cierre/route.js",
-  "/api/auth/me/route": "app/api/auth/me/route.js",
   "/api/productos/cache/route": "app/api/productos/cache/route.js",
-  "/api/admin/categorias/route": "app/api/admin/categorias/route.js",
   "/api/auth/refresh/route": "app/api/auth/refresh/route.js",
-  "/api/pdv/productos-disponibles/route": "app/api/pdv/productos-disponibles/route.js",
+  "/api/envios/marcar/route": "app/api/envios/marcar/route.js",
   "/api/envios/route": "app/api/envios/route.js",
-  "/api/fabrica/envios/[id]/recibir/route": "app/api/fabrica/envios/[id]/recibir/route.js",
-  "/(pdv)/pdv/page": "app/(pdv)/pdv/page.js",
-  "/(pdv)/pdv/recepcion/page": "app/(pdv)/pdv/recepcion/page.js"
+  "/(auth)/login/page": "app/(auth)/login/page.js",
+  "/(pdv)/pdv/recepcion/page": "app/(pdv)/pdv/recepcion/page.js",
+  "/(pdv)/pdv/page": "app/(pdv)/pdv/page.js"
 }

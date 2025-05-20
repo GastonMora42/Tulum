@@ -106,29 +106,45 @@ class EnvioService {
     });
   }
   
-  // Marcar envío como enviado
-  async marcarEnviado(envioId: string, usuarioId: string) {
-    const envio = await prisma.envio.findUnique({
-      where: { id: envioId }
-    });
-    
-    if (!envio) {
-      throw new Error('El envío no existe');
+async marcarEnviado(envioId: string, usuarioId: string) {
+  const envio = await prisma.envio.findUnique({
+    where: { id: envioId },
+    include: {
+      origen: true,
+      destino: true
     }
-    
-    if (envio.estado !== 'pendiente') {
-      throw new Error('El envío no está en estado pendiente');
-    }
-    
-    return prisma.envio.update({
-      where: { id: envioId },
-      data: {
-        estado: 'en_transito',
-        fechaEnvio: new Date()
-      }
-    });
+  });
+  
+  if (!envio) {
+    throw new Error('El envío no existe');
   }
   
+  // Si ya está enviado, simplemente retornar el envío sin error
+  if (envio.estado === 'enviado' || envio.estado === 'en_transito') {
+    console.log(`El envío ${envioId} ya está marcado como enviado o en tránsito`);
+    return envio;
+  }
+  
+  // Solo permitir marcar como enviado desde estado pendiente
+  if (envio.estado !== 'pendiente') {
+    throw new Error(`No se puede marcar como enviado un envío en estado ${envio.estado}`);
+  }
+  
+  console.log(`Marcando envío ${envioId} como enviado`);
+  
+  return prisma.envio.update({
+    where: { id: envioId },
+    data: {
+      estado: 'enviado',
+      fechaEnvio: new Date()
+    },
+    include: {
+      origen: true,
+      destino: true,
+      items: true
+    }
+  });
+} 
   // Recibir envío
   async recibirEnvio(params: RecibirEnvioParams) {
     const { envioId, usuarioId, items, observaciones } = params;
@@ -182,16 +198,15 @@ class EnvioService {
           }
         });
         
-        // Incrementar stock en destino
         await stockService.ajustarStock({
-          productoId: itemEnvio.productoId,
+          productoId: itemEnvio.productoId || undefined,
           ubicacionId: envio.destinoId,
           cantidad: itemRecibido.cantidadRecibida,
           motivo: `Recepción de envío #${envioId}`,
           usuarioId,
           envioId
         });
-        
+
         // Si hay discrepancia, crear contingencia
         if (itemRecibido.cantidadRecibida !== itemEnvio.cantidad) {
           await tx.contingencia.create({

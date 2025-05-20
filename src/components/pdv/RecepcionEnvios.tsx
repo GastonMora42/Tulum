@@ -8,10 +8,11 @@ import { authenticatedFetch } from '@/hooks/useAuth';
 import { useOffline } from '@/hooks/useOffline';
 
 interface Envio {
+  fechaCreacion: string;
   id: string;
   origen: { nombre: string };
   destino: { nombre: string };
-  fechaEnvio: string;
+  fechaEnvio?: string; // Opcional para manejar casos donde no existe
   estado: string;
   items: EnvioItem[];
 }
@@ -50,40 +51,40 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
   
   // Cargar envíos pendientes
   useEffect(() => {
-  const loadEnvios = async () => {
-  try {
-    setIsLoading(true);
-    setError(null);
-    
-    const sucursalId = localStorage.getItem('sucursalId');
-    if (!sucursalId) {
-      throw new Error('No se ha definido una sucursal');
-    }
-    
-    console.log(`Cargando envíos para sucursal: ${sucursalId}`);
-    
-    // Obtener envíos pendientes de recepción - Estado ampliado para capturar más casos
-    const response = await authenticatedFetch(`/api/envios?destinoId=${sucursalId}&estado=pendiente,enviado,en_transito`);
-    
-    if (!response.ok) {
-      throw new Error('Error al cargar envíos pendientes');
-    }
-    
-    const data = await response.json();
-    console.log(`Envíos recibidos: ${data.length}`, data);
-    
-    setEnvios(data);
-    
-    if (data.length === 0) {
-      console.log('No se encontraron envíos pendientes para esta sucursal');
-    }
-  } catch (err) {
-    console.error('Error al cargar envíos:', err);
-    setError('No se pudieron cargar los envíos pendientes');
-  } finally {
-    setIsLoading(false);
-  }
-};
+    const loadEnvios = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        const sucursalId = localStorage.getItem('sucursalId');
+        if (!sucursalId) {
+          throw new Error('No se ha definido una sucursal');
+        }
+        
+        console.log(`Cargando envíos para sucursal: ${sucursalId}`);
+        
+        // Obtener envíos pendientes de recepción - Estado ampliado para capturar más casos
+        const response = await authenticatedFetch(`/api/envios?destinoId=${sucursalId}&estado=pendiente,enviado,en_transito`);
+        
+        if (!response.ok) {
+          throw new Error('Error al cargar envíos pendientes');
+        }
+        
+        const data = await response.json();
+        console.log(`Envíos recibidos: ${data.length}`, data);
+        
+        setEnvios(data);
+        
+        if (data.length === 0) {
+          console.log('No se encontraron envíos pendientes para esta sucursal');
+        }
+      } catch (err) {
+        console.error('Error al cargar envíos:', err);
+        setError('No se pudieron cargar los envíos pendientes');
+      } finally {
+        setIsLoading(false);
+      }
+    };
     
     loadEnvios();
   }, []);
@@ -201,6 +202,54 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
     }
   };
   
+  // Función para marcar como enviado
+  const handleMarcarEnviado = async (envioId: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const response = await authenticatedFetch(`/api/envios/marcar`, {
+        method: 'POST',
+        body: JSON.stringify({ envioId })
+      });
+      
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Error al marcar envío como enviado');
+      }
+      
+      const responseData = await response.json();
+      
+      // Actualizar la lista de envíos usando los datos del servidor si es posible
+      if (responseData && responseData.envio) {
+        setEnvios(prevEnvios => prevEnvios.map(e => 
+          e.id === envioId ? responseData.envio : e
+        ));
+      } else {
+        // Fallback a actualización manual si no hay datos del servidor
+        setEnvios(prevEnvios => prevEnvios.map(e => 
+          e.id === envioId ? { 
+            ...e,  // Mantener todas las propiedades originales
+            estado: 'enviado' 
+          } : e
+        ));
+      }
+      
+      setSuccessMessage('Envío marcado como enviado correctamente');
+      
+      // Recargar completamente los envíos después para asegurar datos frescos
+      setTimeout(() => {
+        if (onSuccess) onSuccess();
+      }, 1500);
+      
+    } catch (err) {
+      console.error('Error:', err);
+      setError(err instanceof Error ? err.message : 'Error al marcar envío');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
   // Cancelar recepción
   const handleCancel = () => {
     setSelectedEnvio(null);
@@ -219,19 +268,19 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
     );
   }
 
-if (envios.length === 0 && !selectedEnvio) {
-  return (
-    <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-      <Truck className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-      <h3 className="text-lg font-medium text-gray-900 mb-2">No hay envíos pendientes</h3>
-      <p className="text-gray-600 mb-4">No tienes envíos pendientes de recepción en este momento</p>
-      <div className="p-4 bg-blue-50 border-l-4 border-blue-400 text-blue-700 text-sm">
-        <p>Recuerda que los envíos deben ser <strong>marcados como enviados</strong> desde la fábrica para aparecer aquí.</p>
-        <p className="mt-2">Contacta con el administrador si crees que debería haber envíos pendientes.</p>
+  if (envios.length === 0 && !selectedEnvio) {
+    return (
+      <div className="bg-white rounded-lg shadow-sm p-8 text-center">
+        <Truck className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-gray-900 mb-2">No hay envíos pendientes</h3>
+        <p className="text-gray-600 mb-4">No tienes envíos pendientes de recepción en este momento</p>
+        <div className="p-4 bg-blue-50 border-l-4 border-blue-400 text-blue-700 text-sm">
+          <p>Recuerda que los envíos deben ser <strong>marcados como enviados</strong> desde la fábrica para aparecer aquí.</p>
+          <p className="mt-2">Contacta con el administrador si crees que debería haber envíos pendientes.</p>
+        </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
   return (
     <div className="bg-white rounded-lg shadow-sm">
@@ -263,11 +312,7 @@ if (envios.length === 0 && !selectedEnvio) {
           
           <div className="divide-y divide-gray-200">
             {envios.map(envio => (
-              <div 
-                key={envio.id}
-                className="p-4 hover:bg-gray-50 cursor-pointer"
-                onClick={() => handleSelectEnvio(envio)}
-              >
+              <div key={envio.id} className="p-4 hover:bg-gray-50 border-b border-gray-200">
                 <div className="flex justify-between items-start mb-2">
                   <div>
                     <h3 className="text-md font-medium text-gray-900">
@@ -279,16 +324,38 @@ if (envios.length === 0 && !selectedEnvio) {
                   </div>
                   <div className="text-sm text-right">
                     <p className="font-medium text-gray-900">
-                      {format(new Date(envio.fechaEnvio), 'dd/MM/yyyy')}
+                      {format(new Date(envio.fechaEnvio || envio.fechaCreacion), 'dd/MM/yyyy')}
                     </p>
-                    <p className="text-gray-600">
-                      {format(new Date(envio.fechaEnvio), 'HH:mm')}
-                    </p>
+                    <span className={`inline-flex px-2 py-1 text-xs rounded-full ${
+                      envio.estado === 'enviado' ? 'bg-green-100 text-green-800' : 
+                      'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {envio.estado === 'enviado' ? 'Listo para recibir' : 'Pendiente de envío'}
+                    </span>
                   </div>
                 </div>
                 
-                <div className="text-sm text-gray-700">
-                  <span className="font-medium">{envio.items.length}</span> productos/insumos
+                <div className="text-sm text-gray-700 mb-3">
+                  <span className="font-medium">{envio.items?.length || 0}</span> productos/insumos
+                </div>
+                
+                {/* Botones de acción según estado */}
+                <div className="flex justify-end gap-2">
+                  {envio.estado === 'enviado' ? (
+                    <button 
+                      onClick={() => handleSelectEnvio(envio)}
+                      className="px-3 py-1 bg-[#311716] text-white rounded hover:bg-[#462625] text-sm"
+                    >
+                      Recibir envío
+                    </button>
+                  ) : (
+                    <button 
+                      onClick={() => handleMarcarEnviado(envio.id)}
+                      className="px-3 py-1 bg-amber-600 text-white rounded hover:bg-amber-700 text-sm"
+                    >
+                      Marcar como enviado
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -324,7 +391,7 @@ if (envios.length === 0 && !selectedEnvio) {
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Fecha de envío:</span>
                 <span className="font-medium">
-                  {format(new Date(selectedEnvio.fechaEnvio), 'dd/MM/yyyy HH:mm')}
+                  {format(new Date(selectedEnvio.fechaEnvio || selectedEnvio.fechaCreacion), 'dd/MM/yyyy HH:mm')}
                 </span>
               </div>
             </div>
@@ -353,10 +420,10 @@ if (envios.length === 0 && !selectedEnvio) {
                     {selectedEnvio.items.map(item => (
                       <tr key={item.id}>
                         <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {item.producto ? item.producto.nombre : item.insumo?.nombre}
+                          {item.producto ? item.producto.nombre : item.insumo?.nombre || 'Producto/Insumo'}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 text-center">
-                          {item.cantidad} {item.insumo?.unidadMedida}
+                          {item.cantidad} {item.insumo?.unidadMedida || ''}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-center">
                           <input
@@ -454,7 +521,7 @@ if (envios.length === 0 && !selectedEnvio) {
                       return (
                         <tr key={item.id}>
                           <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {item.producto ? item.producto.nombre : item.insumo?.nombre}
+                            {item.producto ? item.producto.nombre : item.insumo?.nombre || 'Producto/Insumo'}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 text-center">
                             {item.cantidad}
