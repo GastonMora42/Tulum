@@ -210,7 +210,6 @@ const response = await authenticatedFetch(`/api/fabrica/envios/${selectedEnvio.i
     }
   };
   
-  // Función para marcar como enviado
   const handleMarcarEnviado = async (envioId: string) => {
     try {
       setIsLoading(true);
@@ -228,28 +227,27 @@ const response = await authenticatedFetch(`/api/fabrica/envios/${selectedEnvio.i
       
       const responseData = await response.json();
       
-      // Actualizar la lista de envíos usando los datos del servidor si es posible
+      // Actualizar la lista de envíos usando los datos del servidor
       if (responseData && responseData.envio) {
         setEnvios(prevEnvios => prevEnvios.map(e => 
           e.id === envioId ? responseData.envio : e
         ));
       } else {
-        // Fallback a actualización manual si no hay datos del servidor
+        // Actualizar manualmente si no hay datos del servidor
         setEnvios(prevEnvios => prevEnvios.map(e => 
           e.id === envioId ? { 
-            ...e,  // Mantener todas las propiedades originales
-            estado: 'enviado' 
+            ...e,
+            estado: 'en_transito' // Cambiado de 'enviado' a 'en_transito' 
           } : e
         ));
       }
       
       setSuccessMessage('Envío marcado como enviado correctamente');
       
-      // Recargar completamente los envíos después para asegurar datos frescos
+      // Recargar completamente los envíos después
       setTimeout(() => {
         if (onSuccess) onSuccess();
       }, 1500);
-      
     } catch (err) {
       console.error('Error:', err);
       setError(err instanceof Error ? err.message : 'Error al marcar envío');
@@ -349,21 +347,21 @@ const response = await authenticatedFetch(`/api/fabrica/envios/${selectedEnvio.i
                 
                 {/* Botones de acción según estado */}
                 <div className="flex justify-end gap-2">
-                  {envio.estado === 'enviado' ? (
-                    <button 
-                      onClick={() => handleSelectEnvio(envio)}
-                      className="px-3 py-1 bg-[#311716] text-white rounded hover:bg-[#462625] text-sm"
-                    >
-                      Recibir envío
-                    </button>
-                  ) : (
-                    <button 
-                      onClick={() => handleMarcarEnviado(envio.id)}
-                      className="px-3 py-1 bg-amber-600 text-white rounded hover:bg-amber-700 text-sm"
-                    >
-                      Marcar como enviado
-                    </button>
-                  )}
+                {envio.estado === 'enviado' || envio.estado === 'en_transito' ? (
+  <button 
+    onClick={() => handleSelectEnvio(envio)}
+    className="px-3 py-1 bg-[#311716] text-white rounded hover:bg-[#462625] text-sm"
+  >
+    Recibir envío
+  </button>
+) : (
+  <button 
+    onClick={() => handleMarcarEnviado(envio.id)}
+    className="px-3 py-1 bg-amber-600 text-white rounded hover:bg-amber-700 text-sm"
+  >
+    Marcar como enviado
+  </button>
+)}
                 </div>
               </div>
             ))}
