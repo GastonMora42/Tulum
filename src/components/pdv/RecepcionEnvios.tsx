@@ -148,14 +148,22 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
       }));
       
       if (isOnline) {
-        // Procesar online
-        const response = await authenticatedFetch(`/api/fabrica/envios/${selectedEnvio.id}/recibir`, {
-          method: 'POST',
-          body: JSON.stringify({
-            items,
-            observaciones
-          })
-        });
+// En RecepcionEnvios.tsx
+const itemsCompletos = items.map(item => {
+  const envioItem = selectedEnvio.items.find(i => i.id === item.itemEnvioId);
+  return {
+    ...item,
+    productoId: envioItem?.producto?.id  // Incluir el ID de producto
+  };
+});
+
+const response = await authenticatedFetch(`/api/fabrica/envios/${selectedEnvio.id}/recibir`, {
+  method: 'POST',
+  body: JSON.stringify({
+    items: itemsCompletos,
+    observaciones
+  })
+});
         
         if (!response.ok) {
           const data = await response.json();
@@ -567,7 +575,7 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
                 Atrás
               </button>
               
-              
+
               <button
                 onClick={handleRecibirEnvio}
                 disabled={isSaving}
