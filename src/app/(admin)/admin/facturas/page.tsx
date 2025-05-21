@@ -3,13 +3,16 @@
 import { useState, useEffect } from 'react';
 import { authenticatedFetch } from '@/hooks/useAuth';
 import { FacturaViewer } from '@/components/pdv/FacturaViewer';
+import { FacturaReintentoHistorial } from '@/components/admin/FacturaReintentoHistorial';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { 
   Printer, Eye, Download, Search, Calendar, X, FileText, 
   ChevronLeft, ChevronRight, RefreshCw, Filter, CreditCard,
   DollarSign, QrCode, Smartphone, Check, AlertTriangle,
-  BarChart2, PieChart, ArrowDownToLine, UploadCloud
+  BarChart2, PieChart, ArrowDownToLine, UploadCloud,
+  CheckCircle, History,
+  Clock
 } from 'lucide-react';
 
 export default function AdminFacturasPage() {
@@ -33,6 +36,23 @@ export default function AdminFacturasPage() {
   const [isViewerOpen, setIsViewerOpen] = useState(false);
   const [stats, setStats] = useState<any>({});
   const [tabActiva, setTabActiva] = useState('todas'); // 'todas', 'pendientes', 'error'
+  
+  // Nuevos estados para funcionalidades de reintento
+  const [retryingFacturaId, setRetryingFacturaId] = useState<string | null>(null);
+  const [showHistorialFacturaId, setShowHistorialFacturaId] = useState<string | null>(null);
+  
+  // Estado para el diálogo modal
+  const [dialogData, setDialogData] = useState<{
+    title: string;
+    content: React.ReactNode;
+    isOpen: boolean;
+    actions?: React.ReactNode;
+  }>({
+    title: '',
+    content: null,
+    isOpen: false,
+    actions: null
+  });
   
   // Cargar sucursales para filtro
   useEffect(() => {
@@ -113,38 +133,143 @@ export default function AdminFacturasPage() {
     fetchFacturas();
   }, [page, filtros, tabActiva]);
   
-  // Reintentar factura con error
+  // Función mejorada para reintentar factura
   const handleRetryFactura = async (facturaId: string) => {
+    if (!confirm('¿Desea reintentar la factura? El proceso se ejecutará en segundo plano.')) {
+      return;
+    }
+
     try {
-      setLoading(true);
+      setRetryingFacturaId(facturaId);
       
-      const response = await authenticatedFetch(`/api/admin/facturas/retry/${facturaId}`, {
-        method: 'POST'
+      // Mostrar diálogo de reintento avanzado
+      setDialogData({
+        title: 'Reintentando Factura',
+        content: (
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <RefreshCw className="animate-spin h-5 w-5 text-blue-600" />
+              <p>Iniciando reintento de factura...</p>
+            </div>
+            <div className="bg-gray-100 p-3 rounded text-xs font-mono h-32 overflow-auto">
+              <p>[LOG] Iniciando proceso de reintento para factura {facturaId}</p>
+              <p>[LOG] Enviando solicitud al servidor...</p>
+            </div>
+          </div>
+        ),
+        isOpen: true
+      });
+      
+      const response = await authenticatedFetch(`/api/pdv/facturas/retry/${facturaId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          motivo: 'Reintento manual desde panel de administración'
+        })
       });
       
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Error al reintentar factura');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al reintentar factura');
       }
       
-      // Actualizar la lista
+      const result = await response.json();
+      
+      // Actualizar diálogo con resultado
+      setDialogData({
+        title: result.success ? 'Reintento Exitoso' : 'Reintento Fallido',
+        content: (
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2">
+              {result.success ? (
+                <CheckCircle className="h-5 w-5 text-green-600" />
+              ) : (
+                <AlertTriangle className="h-5 w-5 text-red-600" />
+              )}
+              <p>{result.message || (result.success ? 'Factura generada correctamente' : 'Error al generar factura')}</p>
+            </div>
+            {result.success && result.cae && (
+              <div className="bg-green-50 p-3 rounded border border-green-200">
+                <p className="font-medium">CAE obtenido: {result.cae}</p>
+              </div>
+            )}
+            <div className="bg-gray-100 p-3 rounded text-xs font-mono h-48 overflow-auto">
+              <p>[LOG] Reintento {result.success ? 'exitoso' : 'fallido'} para factura {facturaId}</p>
+              {result.success ? (
+                <p>[LOG] CAE obtenido: {result.cae}</p>
+              ) : (
+                <>
+                  <p>[LOG] Error: {result.error || 'Error desconocido'}</p>
+                  {result.details && <p>[LOG] Detalles: {result.details}</p>}
+                </>
+              )}
+              <p>[LOG] ID de reintento: {result.reintentoId || 'No disponible'}</p>
+              <p>[LOG] Fecha: {new Date().toISOString()}</p>
+              <p>[LOG] Para ver logs completos, consulte la consola del servidor</p>
+            </div>
+          </div>
+        ),
+        isOpen: true,
+        actions: (
+          <div className="flex justify-end space-x-2">
+            <button
+              onClick={() => setDialogData({ ...dialogData, isOpen: false })}
+              className="px-4 py-2 bg-gray-200 rounded-md text-gray-800 hover:bg-gray-300"
+            >
+              Cerrar
+            </button>
+            {result.success && (
+              <button
+                onClick={() => window.open(`/api/pdv/facturas/${facturaId}/pdf`, '_blank')}
+                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+              >
+                Ver Factura
+              </button>
+            )}
+          </div>
+        )
+      });
+      
+      // Actualizar la lista después de un momento
       const updatedFacturas = [...facturas];
       const index = updatedFacturas.findIndex(f => f.id === facturaId);
       if (index !== -1) {
-        updatedFacturas[index].estado = 'procesando';
+        updatedFacturas[index].estado = result.success ? 'completada' : 'error';
         setFacturas(updatedFacturas);
       }
       
-      // Refrescar después de un momento
-      setTimeout(() => {
-        setPage(page); // Esto fuerza la recarga de la página actual
-      }, 2000);
-      
     } catch (err) {
-      console.error('Error:', err);
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+      console.error('Error al reintentar factura:', err);
+      
+      setDialogData({
+        title: 'Error en Reintento',
+        content: (
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
+              <p>{err instanceof Error ? err.message : 'Error desconocido al reintentar factura'}</p>
+            </div>
+            <div className="bg-red-50 p-3 rounded border border-red-200 text-xs font-mono h-32 overflow-auto">
+              <p>[LOG] Error en reintento para factura {facturaId}</p>
+              <p>[LOG] {err instanceof Error ? err.message : 'Error desconocido'}</p>
+              <p>[LOG] Fecha: {new Date().toISOString()}</p>
+            </div>
+          </div>
+        ),
+        isOpen: true,
+        actions: (
+          <button
+            onClick={() => setDialogData({ ...dialogData, isOpen: false })}
+            className="px-4 py-2 bg-gray-200 rounded-md text-gray-800"
+          >
+            Cerrar
+          </button>
+        )
+      });
     } finally {
-      setLoading(false);
+      setRetryingFacturaId(null);
     }
   };
   
@@ -176,9 +301,9 @@ export default function AdminFacturasPage() {
         window.location.reload();
       }, 3000);
       
-    } catch (err) {
-      console.error('Error:', err);
-      setError(err instanceof Error ? err.message : 'Error desconocido');
+    } catch (error) {
+      console.error('Error:', error);
+      setError(error instanceof Error ? error.message : 'Error desconocido');
     } finally {
       setLoading(false);
     }
@@ -205,9 +330,9 @@ export default function AdminFacturasPage() {
       // Descargar archivo
       window.open(url, '_blank');
       
-    } catch (err) {
-      console.error('Error:', err);
-      setError(err instanceof Error ? err.message : 'Error al generar reporte');
+    } catch (error) {
+      console.error('Error:', error);
+      setError(error instanceof Error ? error.message : 'Error al generar reporte');
     } finally {
       setLoading(false);
     }
@@ -534,7 +659,7 @@ export default function AdminFacturasPage() {
                         </span>
                       ) : (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                          <RefreshCw className="w-3 h-3 mr-1" />
+                          <Clock className="w-3 h-3 mr-1" />
                           {factura.estado === 'pendiente' ? 'Pendiente' : 'Procesando'}
                         </span>
                       )}
@@ -566,11 +691,20 @@ export default function AdminFacturasPage() {
                           <button
                             onClick={() => handleRetryFactura(factura.id)}
                             className="text-amber-600 hover:text-amber-900"
-                            title="Reintentar"
+                            disabled={retryingFacturaId === factura.id}
+                            title="Reintentar generación"
                           >
-                            <RefreshCw size={18} />
+                            <RefreshCw size={18} className={retryingFacturaId === factura.id ? 'animate-spin' : ''} />
                           </button>
                         )}
+                        
+                        <button
+                          onClick={() => setShowHistorialFacturaId(factura.id)}
+                          className="text-blue-600 hover:text-blue-900"
+                          title="Ver historial de reintentos"
+                        >
+                          <History size={18} />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -670,6 +804,33 @@ export default function AdminFacturasPage() {
           facturaId={selectedFacturaId} 
           onClose={() => setIsViewerOpen(false)} 
         />
+      )}
+      
+      {/* Historial de reintentos */}
+      {showHistorialFacturaId && (
+        <FacturaReintentoHistorial 
+          facturaId={showHistorialFacturaId}
+          onClose={() => setShowHistorialFacturaId(null)}
+        />
+      )}
+      
+      {/* Diálogo Modal */}
+      {dialogData.isOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full">
+            <div className="p-6 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">{dialogData.title}</h3>
+            </div>
+            <div className="p-6">
+              {dialogData.content}
+            </div>
+            {dialogData.actions && (
+              <div className="px-6 py-4 bg-gray-50 border-t rounded-b-lg">
+                {dialogData.actions}
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

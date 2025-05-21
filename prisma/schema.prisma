@@ -28,6 +28,7 @@ model User {
   movimientosStock MovimientoStock[]
   conciliaciones   Conciliacion[]
   cajaEgresos      CajaEgreso[]
+  reintentos       FacturaReintento[]
 }
 
 model Role {
@@ -392,8 +393,10 @@ model FacturaElectronica {
   respuestaAFIP   Json? // Respuesta completa de AFIP
   error           String?
   qrData          String? // Datos para el código QR de AFIP
+  logs            String?   @db.Text // Añadir este campo para almacenar logs extensos
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
+  reintentos      FacturaReintento[]
 }
 
 model ConfiguracionAFIP {
@@ -426,4 +429,20 @@ model TokenAFIP {
   sign         String   @db.Text
   expirationTime DateTime
   createdAt    DateTime @default(now())
+}
+
+model FacturaReintento {
+  id             String    @id @default(uuid())
+  facturaId      String
+  factura        FacturaElectronica @relation(fields: [facturaId], references: [id])
+  usuarioId      String
+  usuario        User      @relation(fields: [usuarioId], references: [id])
+  estadoAnterior String
+  motivo         String?
+  resultado      String    // 'iniciado', 'exitoso', 'fallido'
+  error          String?   @db.Text
+  logs           String?   @db.Text
+  cae            String?
+  iniciadoEn     DateTime  @default(now())
+  completadoEn   DateTime?
 }
