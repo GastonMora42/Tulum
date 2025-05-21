@@ -4,7 +4,7 @@ import prisma from '@/server/db/client';
 import { authMiddleware } from '@/server/api/middlewares/auth';
 import { checkPermission } from '@/server/api/middlewares/authorization';
 import { ventaService } from '@/server/services/venta/ventaService';
-import { getFacturacionService } from '@/server/services/facturacion/factoryService';
+import { v4 as uuidv4 } from 'uuid';
 
 // GET - Obtener ventas con filtros
 export async function GET(req: NextRequest) {
@@ -286,7 +286,7 @@ export async function POST(req: NextRequest) {
       pagos: body.pagos
     });
     
-    // Si se solicitó facturación inmediata
+    // Si se solicitó facturación
     if (body.facturar && venta) {
       try {
         // Verificar si el cliente tiene los datos adecuados para facturar
@@ -294,36 +294,79 @@ export async function POST(req: NextRequest) {
           throw new Error('Para facturas tipo A se requiere CUIT y nombre del cliente');
         }
         
-        // Obtener servicio de facturación
-        const facturacionService = await getFacturacionService(sucursalId);
+        // Verificar configuración AFIP
+        const configAFIP = await prisma.configuracionAFIP.findFirst({
+          where: {
+            sucursalId,
+            activo: true
+          }
+        });
         
-        // Generar factura
-        const resultadoFactura = await facturacionService.generarFactura(venta.id);
-        
-        if (resultadoFactura.success) {
-          return NextResponse.json({
-            ...venta,
-            factura: {
-              id: resultadoFactura.facturaId,
-              cae: resultadoFactura.cae
-            },
-            message: 'Venta creada y facturada exitosamente'
-          }, { status: 201 });
-        } else {
-          // La venta se creó pero hubo error en facturación
-          return NextResponse.json({
-            ...venta,
-            facturaError: resultadoFactura.message,
-            message: 'Venta creada pero hubo un error en la facturación'
-          }, { status: 201 });
+        if (!configAFIP) {
+          throw new Error('No hay configuración AFIP activa para esta sucursal');
         }
-      } catch (errorFactura) {
-        console.error('Error al facturar venta:', errorFactura);
         
-        // Registrar contingencia
+        // CAMBIO IMPORTANTE: Crear factura en estado pendiente
+        const facturaId = uuidv4();
+        await prisma.facturaElectronica.create({
+          data: {
+            id: facturaId,
+            ventaId: venta.id,
+            sucursalId,
+            tipoComprobante: body.facturar === 'A' ? 'A' : 'B',
+            puntoVenta: configAFIP.puntoVenta,
+            numeroFactura: 0, // Se actualizará cuando se procese
+            fechaEmision: new Date(),
+            estado: 'pendiente' // Inicialmente pendiente
+          }
+        });
+        
+        // Marcar venta como facturada
+        await prisma.venta.update({
+          where: { id: venta.id },
+          data: { facturada: true }
+        });
+        
+        // CAMBIO IMPORTANTE: Iniciar procesamiento asíncrono
+        // Sin await para no bloquear la respuesta
+        const apiUrl = process.env.API_URL || '';
+        const adminToken = process.env.ADMIN_TOKEN || '';
+        
+        fetch(`${apiUrl}/api/admin/jobs/process-invoice`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${adminToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ facturaId })
+        }).catch(err => {
+          console.error('Error al iniciar proceso de facturación:', err);
+          // Registrar contingencia si falla el inicio del proceso
+          prisma.contingencia.create({
+            data: {
+              titulo: `Error al iniciar facturación de venta ${venta.id}`,
+              descripcion: err instanceof Error ? err.message : 'Error desconocido',
+              origen: 'pdv',
+              creadoPor: user.id,
+              estado: 'pendiente',
+              tipo: 'facturacion'
+            }
+          }).catch(console.error);
+        });
+        
+        // Responder inmediatamente sin esperar la facturación
+        return NextResponse.json({
+          ...venta,
+          facturaId,
+          message: 'Venta creada. La facturación se procesará en segundo plano.'
+        }, { status: 201 });
+      } catch (errorFactura) {
+        console.error('Error al preparar facturación:', errorFactura);
+        
+        // Registrar contingencia para problemas en la preparación
         await prisma.contingencia.create({
           data: {
-            titulo: `Error de facturación en venta ${venta.id}`,
+            titulo: `Error al preparar facturación para venta ${venta.id}`,
             descripcion: errorFactura instanceof Error ? errorFactura.message : 'Error desconocido',
             origen: 'pdv',
             creadoPor: user.id,
@@ -335,11 +378,12 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
           ...venta,
           facturaError: errorFactura instanceof Error ? errorFactura.message : 'Error desconocido',
-          message: 'Venta creada pero hubo un error en la facturación. Se ha registrado una contingencia.'
+          message: 'Venta creada pero hubo un error al preparar la facturación.'
         }, { status: 201 });
       }
     }
     
+    // Si no se solicita facturación, retornar la venta normalmente
     return NextResponse.json(venta, { status: 201 });
   } catch (error: any) {
     console.error('Error al crear venta:', error);
