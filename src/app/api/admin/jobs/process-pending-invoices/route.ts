@@ -4,8 +4,6 @@ import prisma from '@/server/db/client';
 import { authMiddleware } from '@/server/api/middlewares/auth';
 import { getFacturacionService } from '@/server/services/facturacion/factoryService';
 
-export const maxDuration = 300; // 5 minutos para Vercel
-
 export async function POST(req: NextRequest) {
   // Verificar autenticación
   const authError = await authMiddleware(req);
