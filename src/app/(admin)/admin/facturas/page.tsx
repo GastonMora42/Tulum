@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { authenticatedFetch } from '@/hooks/useAuth';
 import { FacturaViewer } from '@/components/pdv/FacturaViewer';
 import { FacturaReintentoHistorial } from '@/components/admin/FacturaReintentoHistorial';
@@ -11,8 +11,7 @@ import {
   ChevronLeft, ChevronRight, RefreshCw, Filter, CreditCard,
   DollarSign, QrCode, Smartphone, Check, AlertTriangle,
   BarChart2, PieChart, ArrowDownToLine, UploadCloud,
-  CheckCircle, History,
-  Clock
+  CheckCircle, History, Clock, List, Grid, Menu, Info
 } from 'lucide-react';
 
 export default function AdminFacturasPage() {
@@ -36,8 +35,11 @@ export default function AdminFacturasPage() {
   const [isViewerOpen, setIsViewerOpen] = useState(false);
   const [stats, setStats] = useState<any>({});
   const [tabActiva, setTabActiva] = useState('todas'); // 'todas', 'pendientes', 'error'
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const [showInvoiceDetails, setShowInvoiceDetails] = useState(false);
   
-  // Nuevos estados para funcionalidades de reintento
+  // Estados para funcionalidades de reintento
   const [retryingFacturaId, setRetryingFacturaId] = useState<string | null>(null);
   const [showHistorialFacturaId, setShowHistorialFacturaId] = useState<string | null>(null);
   
@@ -89,49 +91,49 @@ export default function AdminFacturasPage() {
   }, []);
   
   // Cargar facturas con filtros
-  useEffect(() => {
-    const fetchFacturas = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        // Construir URL con parámetros
-        let url = `/api/admin/facturas?page=${page}&limit=${limit}`;
-        
-        // Filtro por tab activa
-        if (tabActiva === 'pendientes') {
-          url += '&estado=pendiente,procesando';
-        } else if (tabActiva === 'error') {
-          url += '&estado=error';
-        }
-        
-        // Añadir filtros adicionales
-        if (filtros.sucursalId) url += `&sucursalId=${filtros.sucursalId}`;
-        if (filtros.desde) url += `&desde=${filtros.desde}`;
-        if (filtros.hasta) url += `&hasta=${filtros.hasta}`;
-        if (filtros.estado && tabActiva === 'todas') url += `&estado=${filtros.estado}`;
-        if (filtros.search) url += `&search=${encodeURIComponent(filtros.search)}`;
-        
-        const response = await authenticatedFetch(url);
-        
-        if (!response.ok) {
-          throw new Error('Error al cargar facturas');
-        }
-        
-        const data = await response.json();
-        setFacturas(data.data);
-        setTotal(data.pagination.total);
-        setTotalPages(data.pagination.totalPages);
-      } catch (err) {
-        console.error('Error al cargar facturas:', err);
-        setError(err instanceof Error ? err.message : 'Error al cargar facturas');
-      } finally {
-        setLoading(false);
+  const fetchFacturas = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Construir URL con parámetros
+      let url = `/api/admin/facturas?page=${page}&limit=${limit}`;
+      
+      // Filtro por tab activa
+      if (tabActiva === 'pendientes') {
+        url += '&estado=pendiente,procesando';
+      } else if (tabActiva === 'error') {
+        url += '&estado=error';
       }
-    };
-    
+      
+      // Añadir filtros adicionales
+      if (filtros.sucursalId) url += `&sucursalId=${filtros.sucursalId}`;
+      if (filtros.desde) url += `&desde=${filtros.desde}`;
+      if (filtros.hasta) url += `&hasta=${filtros.hasta}`;
+      if (filtros.estado && tabActiva === 'todas') url += `&estado=${filtros.estado}`;
+      if (filtros.search) url += `&search=${encodeURIComponent(filtros.search)}`;
+      
+      const response = await authenticatedFetch(url);
+      
+      if (!response.ok) {
+        throw new Error('Error al cargar facturas');
+      }
+      
+      const data = await response.json();
+      setFacturas(data.facturas || data.data || []);
+      setTotal(data.pagination.total);
+      setTotalPages(data.pagination.totalPages);
+    } catch (err) {
+      console.error('Error al cargar facturas:', err);
+      setError(err instanceof Error ? err.message : 'Error al cargar facturas');
+    } finally {
+      setLoading(false);
+    }
+  }, [page, filtros, tabActiva, limit]);
+  
+  useEffect(() => {
     fetchFacturas();
-  }, [page, filtros, tabActiva]);
+  }, [fetchFacturas]);
   
   // Función mejorada para reintentar factura
   const handleRetryFactura = async (facturaId: string) => {
@@ -207,7 +209,6 @@ export default function AdminFacturasPage() {
               )}
               <p>[LOG] ID de reintento: {result.reintentoId || 'No disponible'}</p>
               <p>[LOG] Fecha: {new Date().toISOString()}</p>
-              <p>[LOG] Para ver logs completos, consulte la consola del servidor</p>
             </div>
           </div>
         ),
@@ -215,7 +216,10 @@ export default function AdminFacturasPage() {
         actions: (
           <div className="flex justify-end space-x-2">
             <button
-              onClick={() => setDialogData({ ...dialogData, isOpen: false })}
+              onClick={() => {
+                setDialogData({ ...dialogData, isOpen: false });
+                fetchFacturas(); // Refrescar la lista después de cerrar
+              }}
               className="px-4 py-2 bg-gray-200 rounded-md text-gray-800 hover:bg-gray-300"
             >
               Cerrar
@@ -231,14 +235,6 @@ export default function AdminFacturasPage() {
           </div>
         )
       });
-      
-      // Actualizar la lista después de un momento
-      const updatedFacturas = [...facturas];
-      const index = updatedFacturas.findIndex(f => f.id === facturaId);
-      if (index !== -1) {
-        updatedFacturas[index].estado = result.success ? 'completada' : 'error';
-        setFacturas(updatedFacturas);
-      }
       
     } catch (err) {
       console.error('Error al reintentar factura:', err);
@@ -261,7 +257,10 @@ export default function AdminFacturasPage() {
         isOpen: true,
         actions: (
           <button
-            onClick={() => setDialogData({ ...dialogData, isOpen: false })}
+            onClick={() => {
+              setDialogData({ ...dialogData, isOpen: false });
+              fetchFacturas(); // Refrescar la lista después de cerrar
+            }}
             className="px-4 py-2 bg-gray-200 rounded-md text-gray-800"
           >
             Cerrar
@@ -292,18 +291,58 @@ export default function AdminFacturasPage() {
       }
       
       const result = await response.json();
-      alert(`Proceso iniciado. ${result.count} facturas en procesamiento.`);
       
-      // Refrescar después de un momento
-      setTimeout(() => {
-        setPage(1); // Volver a la primera página
-        // Forzar recarga
-        window.location.reload();
-      }, 3000);
+      setDialogData({
+        title: 'Proceso Iniciado',
+        content: (
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <CheckCircle className="h-5 w-5 text-green-600" />
+              <p>Proceso iniciado correctamente</p>
+            </div>
+            <div className="bg-green-50 p-3 rounded border border-green-200">
+              <p>Se están procesando {result.count} facturas en segundo plano. Este proceso puede tomar algunos minutos.</p>
+            </div>
+          </div>
+        ),
+        isOpen: true,
+        actions: (
+          <button
+            onClick={() => {
+              setDialogData({ ...dialogData, isOpen: false });
+              setTimeout(() => fetchFacturas(), 3000); // Refrescar después de un momento
+            }}
+            className="px-4 py-2 bg-[#311716] text-white rounded-md"
+          >
+            Aceptar
+          </button>
+        )
+      });
       
     } catch (error) {
       console.error('Error:', error);
       setError(error instanceof Error ? error.message : 'Error desconocido');
+      
+      setDialogData({
+        title: 'Error',
+        content: (
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
+              <p>{error instanceof Error ? error.message : 'Error desconocido'}</p>
+            </div>
+          </div>
+        ),
+        isOpen: true,
+        actions: (
+          <button
+            onClick={() => setDialogData({ ...dialogData, isOpen: false })}
+            className="px-4 py-2 bg-gray-200 rounded-md text-gray-800"
+          >
+            Cerrar
+          </button>
+        )
+      });
     } finally {
       setLoading(false);
     }
@@ -342,6 +381,7 @@ export default function AdminFacturasPage() {
   const handleFiltrar = (e: React.FormEvent) => {
     e.preventDefault();
     setPage(1); // Volver a la primera página
+    fetchFacturas();
   };
   
   // Resetear filtros
@@ -354,6 +394,33 @@ export default function AdminFacturasPage() {
       search: ''
     });
     setPage(1);
+    // No llamamos a fetchFacturas aquí, se llamará por efecto al cambiar los filtros
+  };
+  
+  // Ver detalles de una factura específica
+  const handleVerDetallesFactura = async (factura: any) => {
+    try {
+      setLoading(true);
+      const response = await authenticatedFetch(`/api/pdv/facturas/${factura.id}`);
+      
+      if (!response.ok) {
+        throw new Error('Error al cargar detalles de factura');
+      }
+      
+      const data = await response.json();
+      setSelectedInvoice(data);
+      setShowInvoiceDetails(true);
+    } catch (error) {
+      console.error('Error:', error);
+      setError(error instanceof Error ? error.message : 'Error al cargar detalles');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const closeInvoiceDetails = () => {
+    setShowInvoiceDetails(false);
+    setSelectedInvoice(null);
   };
   
   return (
@@ -361,7 +428,7 @@ export default function AdminFacturasPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-gray-800">Administración de Facturas Electrónicas</h1>
         
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => setMostrarFiltros(!mostrarFiltros)}
             className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center"
@@ -387,6 +454,23 @@ export default function AdminFacturasPage() {
             <UploadCloud size={16} className="mr-1" />
             Regenerar Pendientes
           </button>
+          
+          <div className="flex border rounded-lg overflow-hidden">
+            <button
+              onClick={() => setViewMode('list')}
+              className={`p-2 ${viewMode === 'list' ? 'bg-gray-200' : 'bg-white'}`}
+              title="Vista de lista"
+            >
+              <List size={16} />
+            </button>
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`p-2 ${viewMode === 'grid' ? 'bg-gray-200' : 'bg-white'}`}
+              title="Vista de cuadrícula"
+            >
+              <Grid size={16} />
+            </button>
+          </div>
         </div>
       </div>
       
@@ -406,7 +490,7 @@ export default function AdminFacturasPage() {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-sm text-gray-500 mb-1">Completadas</p>
-              <p className="text-2xl font-bold">{stats.completadas || 0}</p>
+              <p className="text-2xl font-bold text-green-600">{stats.completadas || 0}</p>
             </div>
             <Check className="text-green-500 h-8 w-8" />
           </div>
@@ -416,9 +500,9 @@ export default function AdminFacturasPage() {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-sm text-gray-500 mb-1">Pendientes</p>
-              <p className="text-2xl font-bold">{stats.pendientes || 0}</p>
+              <p className="text-2xl font-bold text-amber-600">{stats.pendientes || 0}</p>
             </div>
-            <FileText className="text-amber-500 h-8 w-8" />
+            <Clock className="text-amber-500 h-8 w-8" />
           </div>
         </div>
         
@@ -426,7 +510,7 @@ export default function AdminFacturasPage() {
           <div className="flex justify-between items-start">
             <div>
               <p className="text-sm text-gray-500 mb-1">Con Error</p>
-              <p className="text-2xl font-bold">{stats.error || 0}</p>
+              <p className="text-2xl font-bold text-red-600">{stats.error || 0}</p>
             </div>
             <AlertTriangle className="text-red-500 h-8 w-8" />
           </div>
@@ -578,7 +662,7 @@ export default function AdminFacturasPage() {
         </div>
       )}
       
-      {/* Tabla de facturas */}
+      {/* Vista de facturas - Lista o Cuadrícula */}
       <div className="bg-white rounded-lg shadow-sm overflow-hidden">
         {loading && facturas.length === 0 ? (
           <div className="flex justify-center items-center h-64">
@@ -591,7 +675,8 @@ export default function AdminFacturasPage() {
             <p className="text-gray-500 text-lg">No se encontraron facturas</p>
             <p className="text-gray-400 text-sm">Prueba con otros filtros</p>
           </div>
-        ) : (
+        ) : viewMode === 'list' ? (
+          // Vista de Lista
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
@@ -644,7 +729,7 @@ export default function AdminFacturasPage() {
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      ${factura.venta?.total.toFixed(2)}
+                      ${typeof factura.venta?.total === 'number' ? factura.venta.total.toFixed(2) : '0.00'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {factura.estado === 'completada' ? (
@@ -665,7 +750,7 @@ export default function AdminFacturasPage() {
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {factura.sucursal}
+                      {factura.sucursal?.nombre || 'Desconocida'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex justify-end space-x-2">
@@ -705,12 +790,112 @@ export default function AdminFacturasPage() {
                         >
                           <History size={18} />
                         </button>
+                        
+                        <button
+                          onClick={() => handleVerDetallesFactura(factura)}
+                          className="text-gray-600 hover:text-gray-900"
+                          title="Ver información detallada"
+                        >
+                          <Info size={18} />
+                        </button>
                       </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+        ) : (
+          // Vista de Cuadrícula
+          <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {facturas.map((factura) => (
+              <div key={factura.id} className="border rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                <div className={`p-2 ${
+                  factura.estado === 'completada' ? 'bg-green-100' :
+                  factura.estado === 'error' ? 'bg-red-100' : 'bg-yellow-100'
+                }`}>
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium text-sm">{factura.tipoComprobante} {factura.puntoVenta.toString().padStart(5, '0')}-{factura.numeroFactura.toString().padStart(8, '0')}</span>
+                    {factura.estado === 'completada' ? (
+                      <Check className="w-4 h-4 text-green-600" />
+                    ) : factura.estado === 'error' ? (
+                      <AlertTriangle className="w-4 h-4 text-red-600" />
+                    ) : (
+                      <Clock className="w-4 h-4 text-yellow-600" />
+                    )}
+                  </div>
+                </div>
+                
+                <div className="p-3 space-y-2">
+                  <div className="flex justify-between">
+                    <div className="text-xs text-gray-500">
+                      {format(new Date(factura.fechaEmision), 'dd/MM/yyyy', { locale: es })}
+                    </div>
+                    <div className="text-sm font-medium">
+                      ${typeof factura.venta?.total === 'number' ? factura.venta.total.toFixed(2) : '0.00'}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <div className="text-sm truncate">
+                      {factura.venta?.clienteNombre || 'Consumidor Final'}
+                    </div>
+                    {factura.venta?.clienteCuit && (
+                      <div className="text-xs text-gray-500 truncate">
+                        CUIT: {factura.venta.clienteCuit}
+                      </div>
+                    )}
+                  </div>
+                  
+                  {factura.cae && (
+                    <div className="text-xs text-gray-500 truncate">
+                      CAE: {factura.cae}
+                    </div>
+                  )}
+                  
+                  <div className="text-xs text-gray-500 truncate">
+                    Sucursal: {factura.sucursal?.nombre || 'Desconocida'}
+                  </div>
+                </div>
+                
+                <div className="px-3 py-2 bg-gray-50 border-t flex justify-between">
+                  <button
+                    onClick={() => handleVerDetalle(factura.id)}
+                    className="text-xs text-indigo-600 hover:text-indigo-900 flex items-center"
+                  >
+                    <Eye size={14} className="mr-1" />
+                    Ver
+                  </button>
+                  
+                  {factura.estado === 'completada' ? (
+                    <button
+                      onClick={() => window.open(`/api/pdv/facturas/${factura.id}/pdf`, '_blank')}
+                      className="text-xs text-green-600 hover:text-green-900 flex items-center"
+                    >
+                      <FileText size={14} className="mr-1" />
+                      PDF
+                    </button>
+                  ) : factura.estado === 'error' || factura.estado === 'pendiente' ? (
+                    <button
+                      onClick={() => handleRetryFactura(factura.id)}
+                      className="text-xs text-amber-600 hover:text-amber-900 flex items-center"
+                      disabled={retryingFacturaId === factura.id}
+                    >
+                      <RefreshCw size={14} className={`mr-1 ${retryingFacturaId === factura.id ? 'animate-spin' : ''}`} />
+                      Reintentar
+                    </button>
+                  ) : (
+                    <button
+                      className="text-xs text-gray-400 cursor-not-allowed flex items-center"
+                      disabled={true}
+                    >
+                      <Clock size={14} className="mr-1" />
+                      Procesando
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         )}
         
@@ -829,6 +1014,136 @@ export default function AdminFacturasPage() {
                 {dialogData.actions}
               </div>
             )}
+          </div>
+        </div>
+      )}
+      
+      {/* Detalles de Factura */}
+      {showInvoiceDetails && selectedInvoice && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full">
+            <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Detalles de Factura {selectedInvoice.tipoComprobante} {selectedInvoice.puntoVenta?.toString().padStart(5, '0')}-{selectedInvoice.numeroFactura?.toString().padStart(8, '0')}
+              </h3>
+              <button onClick={closeInvoiceDetails} className="text-gray-400 hover:text-gray-500">
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto max-h-[70vh]">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div>
+                  <h4 className="text-sm font-medium text-gray-500 mb-1">Información General</h4>
+                  <div className="bg-gray-50 p-4 rounded-md space-y-2">
+                    <p><span className="font-medium">Estado:</span> {selectedInvoice.estado}</p>
+                    <p><span className="font-medium">Fecha Emisión:</span> {format(new Date(selectedInvoice.fechaEmision), 'dd/MM/yyyy HH:mm:ss', { locale: es })}</p>
+                    <p><span className="font-medium">CAE:</span> {selectedInvoice.cae || 'Sin CAE'}</p>
+                    {selectedInvoice.vencimientoCae && (
+                      <p><span className="font-medium">Vencimiento CAE:</span> {format(new Date(selectedInvoice.vencimientoCae), 'dd/MM/yyyy', { locale: es })}</p>
+                    )}
+                    <p><span className="font-medium">Sucursal:</span> {selectedInvoice.sucursal?.nombre || 'Desconocida'}</p>
+                  </div>
+                </div>
+                
+                <div>
+                  <h4 className="text-sm font-medium text-gray-500 mb-1">Cliente</h4>
+                  <div className="bg-gray-50 p-4 rounded-md space-y-2">
+                    <p><span className="font-medium">Nombre:</span> {selectedInvoice.venta?.clienteNombre || 'Consumidor Final'}</p>
+                    <p><span className="font-medium">CUIT/DNI:</span> {selectedInvoice.venta?.clienteCuit || 'N/A'}</p>
+                    <p><span className="font-medium">Total:</span> ${typeof selectedInvoice.venta?.total === 'number' ? selectedInvoice.venta.total.toFixed(2) : '0.00'}</p>
+                  </div>
+                </div>
+              </div>
+              
+              {selectedInvoice.venta?.items && selectedInvoice.venta.items.length > 0 && (
+                <div className="mb-6">
+                  <h4 className="text-sm font-medium text-gray-500 mb-1">Detalle de Productos</h4>
+                  <div className="bg-gray-50 p-4 rounded-md overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-100">
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-medium text-gray-500">Producto</th>
+                          <th className="px-4 py-2 text-center text-xs font-medium text-gray-500">Cantidad</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Precio Unit.</th>
+                          <th className="px-4 py-2 text-right text-xs font-medium text-gray-500">Subtotal</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {selectedInvoice.venta.items.map((item: any) => (
+                          <tr key={item.id}>
+                            <td className="px-4 py-2 text-sm">{item.producto?.nombre || 'Producto desconocido'}</td>
+                            <td className="px-4 py-2 text-sm text-center">{item.cantidad}</td>
+                            <td className="px-4 py-2 text-sm text-right">${item.precioUnitario.toFixed(2)}</td>
+                            <td className="px-4 py-2 text-sm text-right font-medium">${(item.cantidad * item.precioUnitario).toFixed(2)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot className="bg-gray-50">
+                        <tr>
+                          <td colSpan={3} className="px-4 py-2 text-sm font-medium text-right">Total:</td>
+                          <td className="px-4 py-2 text-sm font-bold text-right">${selectedInvoice.venta.total.toFixed(2)}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                </div>
+              )}
+              
+              {selectedInvoice.logs && (
+                <div>
+                  <h4 className="text-sm font-medium text-gray-500 mb-1">Logs de Procesamiento</h4>
+                  <div className="bg-gray-50 p-4 rounded-md">
+                    <pre className="text-xs font-mono whitespace-pre-wrap max-h-60 overflow-y-auto">{selectedInvoice.logs}</pre>
+                  </div>
+                </div>
+              )}
+              
+              {selectedInvoice.error && (
+                <div className="mt-4">
+                  <h4 className="text-sm font-medium text-red-500 mb-1">Error</h4>
+                  <div className="bg-red-50 p-4 rounded-md border border-red-200">
+                    <pre className="text-xs font-mono whitespace-pre-wrap text-red-800">{selectedInvoice.error}</pre>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div className="px-6 py-4 bg-gray-50 border-t flex justify-between">
+              {selectedInvoice.estado === 'completada' ? (
+                <button
+                  onClick={() => window.open(`/api/pdv/facturas/${selectedInvoice.id}/pdf`, '_blank')}
+                  className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 flex items-center"
+                >
+                  <FileText size={16} className="mr-2" />
+                  Ver PDF
+                </button>
+              ) : (
+                <div></div>
+              )}
+              
+              <div className="space-x-2">
+                {(selectedInvoice.estado === 'error' || selectedInvoice.estado === 'pendiente') && (
+                  <button
+                    onClick={() => {
+                      closeInvoiceDetails();
+                      handleRetryFactura(selectedInvoice.id);
+                    }}
+                    className="px-4 py-2 bg-amber-600 text-white rounded hover:bg-amber-700 flex items-center"
+                  >
+                    <RefreshCw size={16} className="mr-2" />
+                    Reintentar Factura
+                  </button>
+                )}
+                
+                <button
+                  onClick={closeInvoiceDetails}
+                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

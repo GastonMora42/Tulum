@@ -1,7 +1,15 @@
 {
-  "/api/auth/refresh/route": "app/api/auth/refresh/route.js",
+  "/api/auth/login/route": "app/api/auth/login/route.js",
+  "/api/reportes/stock/bajo/route": "app/api/reportes/stock/bajo/route.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/auth/me/route": "app/api/auth/me/route.js",
+  "/api/contingencias/route": "app/api/contingencias/route.js",
+  "/api/admin/productos/route": "app/api/admin/productos/route.js",
+  "/api/admin/ubicaciones/route": "app/api/admin/ubicaciones/route.js",
+  "/api/admin/facturas/stats/route": "app/api/admin/facturas/stats/route.js",
+  "/api/admin/facturas/route": "app/api/admin/facturas/route.js",
   "/page": "app/page.js",
   "/(auth)/login/page": "app/(auth)/login/page.js",
-  "/(admin)/admin/facturas/page": "app/(admin)/admin/facturas/page.js",
-  "/(admin)/admin/page": "app/(admin)/admin/page.js"
+  "/(admin)/admin/page": "app/(admin)/admin/page.js",
+  "/(admin)/admin/facturas/page": "app/(admin)/admin/facturas/page.js"
 }
