@@ -1,15 +1,44 @@
-# .github/workflows/renew-afip-tokens.yml
+# .github/workflows/renew-afip-tokens.yml - VERSIÓN MEJORADA
 name: Renovar Tokens AFIP
 
 on:
   schedule:
-    - cron: '0 */6 * * *'  # Cada 6 horas
+    - cron: '0 */6 * * *'  # Cada 5 horas (correcto para tokens de 24h)
+  workflow_dispatch:        # Permite ejecución manual desde GitHub
 
 jobs:
   renew:
     runs-on: ubuntu-latest
     steps:
-      - name: Renovar tokens
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verificar estado actual de tokens
+        run: |
+          curl -X GET ${{ secrets.API_URL }}/api/admin/jobs/afip-status \
+            -H "Authorization: Bearer ${{ secrets.ADMIN_TOKEN }}" \
+            -H "Content-Type: application/json"
+
+      - name: Renovar tokens AFIP
         run: |
           curl -X POST ${{ secrets.API_URL }}/api/admin/jobs/renew-afip-tokens \
-            -H "Authorization: Bearer ${{ secrets.ADMIN_TOKEN }}"
+            -H "Authorization: Bearer ${{ secrets.ADMIN_TOKEN }}" \
+            -H "Content-Type: application/json" \
+            --max-time 300 \
+            --retry 3 \
+            --retry-delay 30
+
+      - name: Verificar resultado
+        if: always()
+        run: |
+          curl -X GET ${{ secrets.API_URL }}/api/admin/jobs/afip-status \
+            -H "Authorization: Bearer ${{ secrets.ADMIN_TOKEN }}" \
+            -H "Content-Type: application/json"

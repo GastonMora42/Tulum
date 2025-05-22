@@ -2,10 +2,7 @@
 import { AfipSoapClient } from '@/lib/afip/afipSoapClient';
 import prisma from '@/server/db/client';
 
-/**
- * Job para renovar tokens de AFIP automáticamente
- * Debe ejecutarse periódicamente (cada 6 horas)
- */
+// Asegúrate de que esta función esté correctamente exportada
 export async function renewAfipTokens(): Promise<{
   success: boolean;
   renewed: number;
@@ -22,7 +19,15 @@ export async function renewAfipTokens(): Promise<{
     
     console.log(`[AFIP] Encontradas ${configuraciones.length} configuraciones activas`);
     
-    // Iniciar contador de resultados
+    if (configuraciones.length === 0) {
+      return {
+        success: true,
+        renewed: 0,
+        errors: 0,
+        details: [{ message: 'No hay configuraciones AFIP activas' }]
+      };
+    }
+    
     let renewed = 0;
     let errors = 0;
     const details: any[] = [];
@@ -47,35 +52,47 @@ export async function renewAfipTokens(): Promise<{
           
           // Crear cliente AFIP y forzar autenticación
           const client = new AfipSoapClient(config.cuit);
-          await client.getAuth();
+          
+          // Intentar obtener auth (esto fuerza la renovación)
+          const auth = await client.getAuth();
+          
+          // Verificar que se obtuvo correctamente
+          if (!auth.Token || !auth.Sign) {
+            throw new Error('No se pudo obtener token o sign válidos');
+          }
           
           renewed++;
           
-          // Registrar resultado
           details.push({
             cuit: config.cuit,
             status: 'renovado',
             sucursal: config.sucursalId,
-            timestamp: new Date()
+            timestamp: new Date(),
+            tokenLength: auth.Token.length,
+            signLength: auth.Sign.length
           });
           
           console.log(`[AFIP] Token renovado exitosamente para CUIT ${config.cuit}`);
-        } else if (tokenExistente) {
-          console.log(`[AFIP] Token para CUIT ${config.cuit} sigue vigente (expira: ${tokenExistente.expirationTime.toISOString()})`);
           
-          // Registrar resultado
+          // Pequeña pausa entre renovaciones para no sobrecargar AFIP
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+        } else if (tokenExistente) {
+          const hoursUntilExpiry = (tokenExistente.expirationTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+          console.log(`[AFIP] Token para CUIT ${config.cuit} sigue vigente (expira en ${hoursUntilExpiry.toFixed(1)} horas)`);
+          
           details.push({
             cuit: config.cuit,
             status: 'vigente',
             sucursal: config.sucursalId,
-            expira: tokenExistente.expirationTime
+            expira: tokenExistente.expirationTime,
+            horasRestantes: Math.round(hoursUntilExpiry)
           });
         }
       } catch (error) {
         console.error(`[AFIP] Error renovando token para CUIT ${config.cuit}:`, error);
         errors++;
         
-        // Registrar error
         details.push({
           cuit: config.cuit,
           status: 'error',
@@ -86,14 +103,16 @@ export async function renewAfipTokens(): Promise<{
       }
     }
     
-    console.log(`[AFIP] Renovación completada. Renovados: ${renewed}, Errores: ${errors}`);
-    
-    return {
-      success: true,
+    const result = {
+      success: errors === 0,
       renewed,
       errors,
       details
     };
+    
+    console.log(`[AFIP] Renovación completada. Renovados: ${renewed}, Errores: ${errors}`);
+    
+    return result;
   } catch (error) {
     console.error('[AFIP] Error general en renovación de tokens:', error);
     return {
@@ -109,10 +128,7 @@ export async function renewAfipTokens(): Promise<{
   }
 }
 
-/**
- * Verifica el estado de los tokens AFIP
- * @returns Información sobre el estado de los tokens
- */
+// También exportar la función de verificación de estado
 export async function checkAfipTokensStatus(): Promise<{
   total: number;
   valid: number;
@@ -141,11 +157,4 @@ export async function checkAfipTokensStatus(): Promise<{
     console.error('[AFIP] Error al verificar estado de tokens:', error);
     throw error;
   }
-}
-
-// Para ejecutar manualmente este job en desarrollo:
-if (process.env.NODE_ENV === 'development' && process.env.RUN_TOKEN_JOB === 'true') {
-  renewAfipTokens()
-    .then(result => console.log('[AFIP] Resultado de renovación manual:', result))
-    .catch(error => console.error('[AFIP] Error en renovación manual:', error));
 }

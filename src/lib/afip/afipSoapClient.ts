@@ -38,11 +38,6 @@ export class AfipSoapClient {
     return !!this.token && !!this.sign && this.tokenExpiration > tenMinutesFromNow;
   }
 
-  /**
-   * Crea el ticket de autenticación CMS firmado con el certificado
-   */
-// src/lib/afip/afipSoapClient.ts - Corregir errores de tipado
-
 /**
  * Crea el ticket de autenticación CMS firmado con el certificado
  */
