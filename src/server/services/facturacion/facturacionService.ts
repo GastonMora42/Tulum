@@ -1,4 +1,4 @@
-// src/server/services/facturacion/facturacionService.ts - VERSIÓN COMPLETA ACTUALIZADA
+// src/server/services/facturacion/facturacionService.ts - VERSIÓN COMPLETA MEJORADA
 import { AfipSoapClient } from '@/lib/afip/afipSoapClient';
 import QRCode from 'qrcode';
 import prisma from '@/server/db/client';
@@ -57,20 +57,32 @@ export class FacturacionService {
     error?: any;
   }> {
     const logMessages: string[] = [];
+    const sessionId = uuidv4().substring(0, 8);
     const logTime = new Date().toISOString();
-    const logPrefix = `[${logTime}]`;
 
-    const log = (message: string) => {
-      const formattedMessage = `${logPrefix} ${message}`;
+    const log = (message: string, level: 'INFO' | 'ERROR' | 'WARN' | 'SUCCESS' = 'INFO') => {
+      const emoji = {
+        'INFO': '📋',
+        'ERROR': '❌',
+        'WARN': '⚠️',
+        'SUCCESS': '✅'
+      }[level];
+      
+      const formattedMessage = `[${logTime}][${sessionId}] ${emoji} ${message}`;
       logMessages.push(formattedMessage);
       console.log(formattedMessage);
     };
 
-    log(`🚀 Iniciando generación de factura para venta: ${ventaId}`);
+    log(`Iniciando generación de factura para venta: ${ventaId}`, 'INFO');
+
+    // Variables para tracking
+    let factura: any = null;
+    let facturaId: string | null = null;
 
     try {
       // 1. Verificar si ya existe factura para esta venta
-      log(`🔍 Verificando si la venta ${ventaId} ya tiene factura asociada`);
+      log(`Verificando si la venta ${ventaId} ya tiene factura asociada`);
+      
       const facturaExistente = await prisma.facturaElectronica.findFirst({
         where: { 
           ventaId, 
@@ -79,7 +91,7 @@ export class FacturacionService {
       });
 
       if (facturaExistente) {
-        log(`✅ La venta ${ventaId} ya tiene factura asociada: ${facturaExistente.id} (Estado: ${facturaExistente.estado})`);
+        log(`La venta ${ventaId} ya tiene factura: ${facturaExistente.id} (Estado: ${facturaExistente.estado})`, 'SUCCESS');
         return {
           success: true,
           message: 'La venta ya tiene una factura asociada',
@@ -89,7 +101,8 @@ export class FacturacionService {
       }
 
       // 2. Obtener datos completos de la venta
-      log(`📊 Obteniendo datos de la venta ${ventaId}`);
+      log(`Obteniendo datos completos de la venta ${ventaId}`);
+      
       const venta = await prisma.venta.findUnique({
         where: { id: ventaId },
         include: {
@@ -104,12 +117,12 @@ export class FacturacionService {
       });
 
       if (!venta) {
-        const errorMsg = `❌ Venta no encontrada con ID: ${ventaId}`;
-        log(errorMsg);
+        const errorMsg = `Venta no encontrada con ID: ${ventaId}`;
+        log(errorMsg, 'ERROR');
         throw new Error(errorMsg);
       }
 
-      log(`📍 Venta encontrada:`);
+      log(`Venta encontrada:`, 'SUCCESS');
       log(`   - Sucursal: ${venta.sucursal.nombre} (${venta.sucursalId})`);
       log(`   - Total: $${venta.total}`);
       log(`   - Cliente: ${venta.clienteNombre || 'Consumidor Final'}`);
@@ -118,7 +131,8 @@ export class FacturacionService {
       log(`   - Pagos: ${venta.pagos.length}`);
 
       // 3. Obtener configuración AFIP para esta sucursal
-      log(`⚙️ Obteniendo configuración AFIP para sucursal ${venta.sucursalId}`);
+      log(`Obteniendo configuración AFIP para sucursal ${venta.sucursalId}`);
+      
       const configAFIP = await prisma.configuracionAFIP.findFirst({
         where: {
           sucursalId: venta.sucursalId,
@@ -127,12 +141,12 @@ export class FacturacionService {
       });
 
       if (!configAFIP) {
-        const errorMsg = `❌ No hay configuración AFIP activa para la sucursal ${venta.sucursalId}`;
-        log(errorMsg);
+        const errorMsg = `No hay configuración AFIP activa para la sucursal ${venta.sucursalId}`;
+        log(errorMsg, 'ERROR');
         throw new Error(errorMsg);
       }
 
-      log(`🔧 Configuración AFIP encontrada:`);
+      log(`Configuración AFIP encontrada:`, 'SUCCESS');
       log(`   - CUIT: ${configAFIP.cuit}`);
       log(`   - Punto de Venta: ${configAFIP.puntoVenta}`);
 
@@ -150,20 +164,20 @@ export class FacturacionService {
         tipoComprobanteLetra = 'B';
       }
 
-      log(`📄 Tipo de comprobante determinado: ${tipoComprobanteLetra} (código ${comprobanteTipo})`);
+      log(`Tipo de comprobante determinado: ${tipoComprobanteLetra} (código ${comprobanteTipo})`, 'SUCCESS');
 
       // 5. Validar topes para consumidor final
       if (tipoComprobanteLetra === 'B' && venta.total >= 15380) {
-        const errorMsg = `❌ Para facturas B de $${venta.total}, se requiere identificar al cliente con CUIT/DNI (tope actual: $15.380)`;
-        log(errorMsg);
+        const errorMsg = `Para facturas B de $${venta.total}, se requiere identificar al cliente con CUIT/DNI (tope actual: $15.380)`;
+        log(errorMsg, 'ERROR');
         throw new Error(errorMsg);
       }
 
       // 6. Crear factura en estado procesando
-      const facturaId = uuidv4();
-      log(`💾 Creando registro de factura con ID: ${facturaId}`);
+      facturaId = uuidv4();
+      log(`Creando registro de factura con ID: ${facturaId}`);
       
-      const factura = await prisma.facturaElectronica.create({
+      factura = await prisma.facturaElectronica.create({
         data: {
           id: facturaId,
           ventaId: venta.id,
@@ -177,7 +191,7 @@ export class FacturacionService {
         }
       });
 
-      log(`✅ Factura creada en estado 'procesando'`);
+      log(`Factura creada en estado 'procesando'`, 'SUCCESS');
 
       // 7. Calcular totales según tipo de factura
       let importeNeto: number;
@@ -188,12 +202,12 @@ export class FacturacionService {
         // Factura A: separar neto e IVA (21%)
         importeNeto = Number((importeTotal / 1.21).toFixed(2));
         importeIVA = Number((importeTotal - importeNeto).toFixed(2));
-        log(`💰 Factura A - Neto: $${importeNeto}, IVA (21%): $${importeIVA}, Total: $${importeTotal}`);
+        log(`Factura A - Neto: $${importeNeto}, IVA (21%): $${importeIVA}, Total: $${importeTotal}`);
       } else {
         // Factura B: todo incluido
         importeNeto = importeTotal;
         importeIVA = 0;
-        log(`💰 Factura B - Total con IVA incluido: $${importeTotal}`);
+        log(`Factura B - Total con IVA incluido: $${importeTotal}`);
       }
 
       // 8. Preparar alícuotas de IVA
@@ -204,7 +218,7 @@ export class FacturacionService {
           BaseImp: importeNeto,
           Importe: importeIVA
         });
-        log(`📊 Alícuota IVA agregada: ID 5 (21%), Base: $${importeNeto}, Importe: $${importeIVA}`);
+        log(`Alícuota IVA agregada: ID 5 (21%), Base: $${importeNeto}, Importe: $${importeIVA}`);
       }
 
       // 9. Determinar tipo y número de documento
@@ -216,9 +230,9 @@ export class FacturacionService {
         ? venta.clienteCuit.trim() 
         : '0';
 
-      log(`📋 Documento cliente: Tipo ${docTipo}, Número: ${docNro}`);
+      log(`Documento cliente: Tipo ${docTipo}, Número: ${docNro}`);
 
-      // 10. Preparar items para AFIP (opcional, no requerido para WSFEv1)
+      // 10. Preparar items para AFIP
       const itemsFactura = venta.items.map((item, index) => {
         const precioUnitario = tipoComprobanteLetra === 'A' 
           ? Number((item.precioUnitario / 1.21).toFixed(2))
@@ -226,7 +240,7 @@ export class FacturacionService {
           
         const subtotal = Number((item.cantidad * precioUnitario * (1 - (item.descuento || 0) / 100)).toFixed(2));
         
-        log(`   📦 Item ${index + 1}: ${item.producto.nombre} - Cant: ${item.cantidad}, P.Unit: $${precioUnitario}, Subtotal: $${subtotal}`);
+        log(`   Item ${index + 1}: ${item.producto.nombre} - Cant: ${item.cantidad}, P.Unit: $${precioUnitario}, Subtotal: $${subtotal}`);
         
         return {
           descripcion: item.producto.nombre.substring(0, 40), // Límite AFIP
@@ -239,7 +253,7 @@ export class FacturacionService {
 
       // 11. Preparar fecha en formato AFIP
       const fechaComprobante = format(new Date(), 'yyyyMMdd');
-      log(`📅 Fecha comprobante: ${fechaComprobante}`);
+      log(`Fecha comprobante: ${fechaComprobante}`);
 
       try {
         // 12. Actualizar logs antes de comunicarse con AFIP
@@ -252,8 +266,8 @@ export class FacturacionService {
         });
         
         // 13. Enviar solicitud a AFIP
-        log(`🌐 Enviando solicitud de CAE a AFIP...`);
-        log(`📤 Parámetros de facturación:`);
+        log(`Enviando solicitud de CAE a AFIP...`);
+        log(`Parámetros de facturación:`);
         log(`   - Punto de Venta: ${configAFIP.puntoVenta}`);
         log(`   - Tipo Comprobante: ${comprobanteTipo}`);
         log(`   - Concepto: ${AFIP_CONFIG.defaultValues.conceptos.productos} (Productos)`);
@@ -276,27 +290,41 @@ export class FacturacionService {
           items: itemsFactura
         });
 
-        log(`📥 Respuesta recibida de AFIP:`);
+        log(`Respuesta recibida de AFIP:`, 'SUCCESS');
         log(`   - Resultado: ${respuestaAFIP.Resultado}`);
         log(`   - CAE: ${respuestaAFIP.CAE || 'No obtenido'}`);
         log(`   - Número: ${respuestaAFIP.CbteNro || 'No asignado'}`);
 
-        // 14. Verificar resultado
+        // 14. Verificación estricta de la respuesta
+        if (!respuestaAFIP) {
+          throw new Error('AFIP devolvió respuesta nula o indefinida');
+        }
+
         if (respuestaAFIP.Resultado !== 'A') {
-          const errorDetails = respuestaAFIP.Errores || respuestaAFIP.Observaciones || 'Sin detalles';
-          const errorMsg = `❌ AFIP rechazó la factura. Resultado: ${respuestaAFIP.Resultado}. Detalles: ${JSON.stringify(errorDetails)}`;
-          log(errorMsg);
-          throw new Error(errorMsg);
+          const errorDetails = {
+            resultado: respuestaAFIP.Resultado,
+            errores: respuestaAFIP.Errores,
+            observaciones: respuestaAFIP.Observaciones
+          };
+          log(`AFIP rechazó la factura: ${JSON.stringify(errorDetails, null, 2)}`, 'ERROR');
+          throw new Error(`AFIP rechazó la factura. Resultado: ${respuestaAFIP.Resultado}. Detalles: ${JSON.stringify(errorDetails)}`);
         }
 
-        if (!respuestaAFIP.CAE) {
-          const errorMsg = `❌ AFIP no devolvió CAE en la respuesta`;
-          log(errorMsg);
-          throw new Error(errorMsg);
+        if (!respuestaAFIP.CAE || respuestaAFIP.CAE.trim() === '') {
+          log(`CAE vacío o nulo en respuesta de AFIP`, 'ERROR');
+          log(`Respuesta completa para debug: ${JSON.stringify(respuestaAFIP, null, 2)}`, 'ERROR');
+          throw new Error('AFIP no devolvió CAE válido en la respuesta');
         }
 
-        log(`✅ CAE obtenido exitosamente: ${respuestaAFIP.CAE}`);
-        log(`📅 Vencimiento CAE: ${respuestaAFIP.CAEFchVto}`);
+        if (!respuestaAFIP.CbteNro) {
+          log(`Número de comprobante vacío o nulo en respuesta de AFIP`, 'ERROR');
+          throw new Error('AFIP no devolvió número de comprobante en la respuesta');
+        }
+
+        log(`VALIDACIONES AFIP EXITOSAS:`, 'SUCCESS');
+        log(`   - CAE válido: ${respuestaAFIP.CAE}`);
+        log(`   - Número válido: ${respuestaAFIP.CbteNro}`);
+        log(`   - Fecha vencimiento: ${respuestaAFIP.CAEFchVto}`);
 
         // 15. Procesar fecha de vencimiento CAE
         const fechaVencimiento = new Date(
@@ -305,72 +333,104 @@ export class FacturacionService {
           parseInt(respuestaAFIP.CAEFchVto.substring(6, 8))
         );
 
-        log(`📅 Fecha vencimiento CAE procesada: ${fechaVencimiento.toISOString()}`);
+        log(`Fecha vencimiento CAE procesada: ${fechaVencimiento.toISOString()}`);
 
-        // 16. Actualizar factura con respuesta de AFIP
-        log(`💾 Actualizando factura con datos de AFIP...`);
-        const facturaActualizada = await prisma.facturaElectronica.update({
-          where: { id: factura.id },
-          data: {
-            numeroFactura: respuestaAFIP.CbteNro,
-            cae: respuestaAFIP.CAE,
-            vencimientoCae: fechaVencimiento,
-            estado: 'completada',
-            respuestaAFIP: respuestaAFIP,
-            logs: logMessages.join('\n'),
-            updatedAt: new Date()
-          },
-          include: {
-            venta: true
-          }
-        });
-
-        // 17. Generar QR code
-        try {
-          log(`🔲 Generando código QR para la factura...`);
-          const datosFull = {
-            ...facturaActualizada,
-            cuit: configAFIP.cuit
-          };
+        // 16. Usar transacción atómica para garantizar consistencia
+        log(`Iniciando transacción para actualizar factura...`);
+        
+        const facturaActualizada = await prisma.$transaction(async (tx) => {
+          log(`Actualizando factura con CAE: ${respuestaAFIP.CAE}`);
           
-          const qrData = await this.generarQR(datosFull);
-          
-          // Guardar QR
-          await prisma.facturaElectronica.update({
+          const facturaUpdate = await tx.facturaElectronica.update({
             where: { id: factura.id },
             data: {
-              qrData: qrData
+              numeroFactura: parseInt(respuestaAFIP.CbteNro),
+              cae: respuestaAFIP.CAE.trim(),
+              vencimientoCae: fechaVencimiento,
+              estado: 'completada',
+              respuestaAFIP: respuestaAFIP,
+              logs: logMessages.join('\n'),
+              updatedAt: new Date()
+            },
+            include: {
+              venta: true
             }
           });
-          
-          log(`✅ Código QR generado y guardado`);
-        } catch (qrError) {
-          log(`⚠️ Error al generar QR (no crítico): ${qrError instanceof Error ? qrError.message : 'Error desconocido'}`);
-          console.error('Error al generar QR:', qrError);
-          // No fallamos la operación completa si falla el QR
-        }
 
-        // 18. Marcar venta como facturada
-        log(`💾 Marcando venta ${venta.id} como facturada...`);
-        await prisma.venta.update({
-          where: { id: venta.id },
-          data: {
-            facturada: true,
-            numeroFactura: `${configAFIP.puntoVenta.toString().padStart(5, '0')}-${respuestaAFIP.CbteNro.toString().padStart(8, '0')}`
-          }
+          log(`Factura actualizada en BD con ID: ${facturaUpdate.id}`, 'SUCCESS');
+          log(`CAE guardado: ${facturaUpdate.cae}`, 'SUCCESS');
+          log(`Estado: ${facturaUpdate.estado}`, 'SUCCESS');
+          log(`Número factura: ${facturaUpdate.numeroFactura}`, 'SUCCESS');
+
+          // Marcar venta como facturada en la misma transacción
+          log(`Marcando venta ${venta.id} como facturada...`);
+          
+          await tx.venta.update({
+            where: { id: venta.id },
+            data: {
+              facturada: true,
+              numeroFactura: `${configAFIP.puntoVenta.toString().padStart(5, '0')}-${respuestaAFIP.CbteNro.toString().padStart(8, '0')}`
+            }
+          });
+
+          log(`Venta marcada como facturada`, 'SUCCESS');
+          
+          return facturaUpdate;
+        }, {
+          timeout: 15000 // 15 segundos de timeout
         });
 
-        log(`🎉 PROCESO COMPLETADO EXITOSAMENTE`);
+        // 17. Verificación post-transacción
+        log(`Verificando factura actualizada en BD...`);
+        
+        const verificacion = await prisma.facturaElectronica.findUnique({
+          where: { id: factura.id },
+          select: { id: true, cae: true, estado: true, numeroFactura: true }
+        });
+
+        if (!verificacion) {
+          throw new Error('No se pudo verificar la factura después de la actualización');
+        }
+
+        if (!verificacion.cae || verificacion.estado !== 'completada') {
+          log(`Verificación falló: CAE=${verificacion.cae}, Estado=${verificacion.estado}`, 'ERROR');
+          throw new Error(`Factura no se actualizó correctamente. Estado: ${verificacion.estado}, CAE: ${verificacion.cae}`);
+        }
+
+        log(`VERIFICACIÓN EXITOSA:`, 'SUCCESS');
+        log(`   - ID: ${verificacion.id}`);
+        log(`   - CAE: ${verificacion.cae}`);
+        log(`   - Estado: ${verificacion.estado}`);
+        log(`   - Número: ${verificacion.numeroFactura}`);
+
+        // 18. Generar QR (no crítico)
+        try {
+          log(`Generando código QR...`);
+          const qrData = await this.generarQR({
+            ...facturaActualizada,
+            cuit: configAFIP.cuit
+          });
+          
+          await prisma.facturaElectronica.update({
+            where: { id: factura.id },
+            data: { qrData }
+          });
+          
+          log(`Código QR generado`, 'SUCCESS');
+        } catch (qrError) {
+          log(`Error al generar QR (no crítico): ${qrError instanceof Error ? qrError.message : 'Error desconocido'}`, 'WARN');
+        }
+
+        // 19. RESULTADO FINAL
+        log(`PROCESO COMPLETADO EXITOSAMENTE`, 'SUCCESS');
         log(`   - Factura ID: ${factura.id}`);
         log(`   - CAE: ${respuestaAFIP.CAE}`);
         log(`   - Número: ${configAFIP.puntoVenta.toString().padStart(5, '0')}-${respuestaAFIP.CbteNro.toString().padStart(8, '0')}`);
 
-        // 19. Guardar logs finales
+        // Guardar logs finales
         await prisma.facturaElectronica.update({
           where: { id: factura.id },
-          data: {
-            logs: logMessages.join('\n')
-          }
+          data: { logs: logMessages.join('\n') }
         });
 
         return {
@@ -381,57 +441,59 @@ export class FacturacionService {
         };
 
       } catch (afipError) {
-        log(`❌ ERROR en comunicación con AFIP: ${afipError instanceof Error ? afipError.message : 'Error desconocido'}`);
+        log(`ERROR en procesamiento con AFIP: ${afipError instanceof Error ? afipError.message : 'Error desconocido'}`, 'ERROR');
         
         if (afipError instanceof Error && afipError.stack) {
-          log(`📚 Stack trace: ${afipError.stack}`);
+          log(`Stack trace: ${afipError.stack}`, 'ERROR');
         }
         
-        // Determinar tipo de error para mensaje más específico
-        let errorMessage = afipError instanceof Error ? afipError.message : 'Error desconocido en AFIP';
-        
-        if (typeof afipError === 'object' && afipError !== null) {
-          try {
-            const errorDetallado = JSON.stringify(afipError, null, 2);
-            log(`📄 Detalles del error: ${errorDetallado}`);
-          } catch (jsonError) {
-            log(`⚠️ Error al serializar detalles del error`);
-          }
+        // Actualizar factura con error específico
+        if (factura?.id) {
+          await prisma.facturaElectronica.update({
+            where: { id: factura.id },
+            data: {
+              estado: 'error',
+              error: afipError instanceof Error ? afipError.message : 'Error en procesamiento con AFIP',
+              logs: logMessages.join('\n'),
+              updatedAt: new Date()
+            }
+          });
         }
-        
-        // Actualizar factura con estado de error
-        log(`💾 Actualizando factura ${factura.id} a estado 'error'`);
-        await prisma.facturaElectronica.update({
-          where: { id: factura.id },
-          data: {
-            estado: 'error',
-            error: errorMessage,
-            logs: logMessages.join('\n'),
-            updatedAt: new Date()
-          }
-        });
         
         throw afipError;
       }
 
     } catch (error) {
-      log(`💥 ERROR GENERAL al generar factura: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+      log(`ERROR GENERAL al generar factura: ${error instanceof Error ? error.message : 'Error desconocido'}`, 'ERROR');
       
       if (error instanceof Error && error.stack) {
-        log(`📚 Stack trace: ${error.stack}`);
+        log(`Stack trace: ${error.stack}`, 'ERROR');
       }
       
       // Intentar guardar logs en la base de datos
       try {
-        await prisma.facturaElectronica.updateMany({
-          where: { ventaId },
-          data: {
-            logs: logMessages.join('\n'),
-            updatedAt: new Date()
-          }
-        });
+        if (facturaId) {
+          await prisma.facturaElectronica.update({
+            where: { id: facturaId },
+            data: {
+              logs: logMessages.join('\n'),
+              updatedAt: new Date(),
+              estado: 'error',
+              error: error instanceof Error ? error.message : 'Error desconocido'
+            }
+          });
+        } else {
+          // Si no se pudo crear la factura, intentar actualizar por ventaId
+          await prisma.facturaElectronica.updateMany({
+            where: { ventaId },
+            data: {
+              logs: logMessages.join('\n'),
+              updatedAt: new Date()
+            }
+          });
+        }
       } catch (dbError) {
-        log(`⚠️ Error al guardar logs en BD: ${dbError instanceof Error ? dbError.message : 'Error desconocido'}`);
+        log(`Error al guardar logs en BD: ${dbError instanceof Error ? dbError.message : 'Error desconocido'}`, 'WARN');
       }
       
       console.error('Error al generar factura:', error);
@@ -591,49 +653,6 @@ export class FacturacionService {
     ultimoComprobante: boolean;
     errores: string[];
   }> {
-    const errores: string[] = [];
-    let servidor = false;
-    let autenticacion = false;
-    let ultimoComprobante = false;
-
-    try {
-      // Test 1: Estado del servidor
-      const estadoServidor = await this.afipClient.getServerStatus();
-      servidor = estadoServidor.AppServer === 'OK';
-      if (!servidor) {
-        errores.push(`Servidor AFIP no disponible: ${JSON.stringify(estadoServidor)}`);
-      }
-    } catch (error) {
-      errores.push(`Error al consultar servidor AFIP: ${error instanceof Error ? error.message : 'Error desconocido'}`);
-    }
-
-    try {
-      // Test 2: Autenticación
-      const auth = await this.afipClient.getAuth();
-      autenticacion = !!(auth.Token && auth.Sign);
-      if (!autenticacion) {
-        errores.push('No se pudo obtener token de autenticación');
-      }
-    } catch (error) {
-      errores.push(`Error en autenticación: ${error instanceof Error ? error.message : 'Error desconocido'}`);
-    }
-
-    try {
-      // Test 3: Consulta de último comprobante
-      const ultimoNumero = await this.afipClient.getLastInvoiceNumber(1, 6);
-      ultimoComprobante = typeof ultimoNumero === 'number';
-      if (!ultimoComprobante) {
-        errores.push('No se pudo consultar último comprobante');
-      }
-    } catch (error) {
-      errores.push(`Error al consultar último comprobante: ${error instanceof Error ? error.message : 'Error desconocido'}`);
-    }
-
-    return {
-      servidor,
-      autenticacion,
-      ultimoComprobante,
-      errores
-    };
+    return await this.afipClient.verificarConectividad();
   }
 }

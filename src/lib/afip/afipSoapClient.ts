@@ -1,4 +1,4 @@
-// src/lib/afip/afipSoapClient.ts - VERSIÓN COMPLETA SIN ERRORES
+// src/lib/afip/afipSoapClient.ts - VERSIÓN COMPLETA MEJORADA
 import * as soap from 'soap';
 import * as crypto from 'crypto';
 import { parseStringPromise } from 'xml2js';
@@ -363,7 +363,7 @@ export class AfipSoapClient {
   }
 
   /**
-   * Crea una nueva factura electrónica
+   * Crea una nueva factura electrónica - VERSIÓN MEJORADA CON VALIDACIONES
    */
   public async createInvoice(params: {
     puntoVenta: number;
@@ -392,13 +392,19 @@ export class AfipSoapClient {
     }>;
   }): Promise<any> {
     try {
+      console.log(`[AFIP] 🚀 Iniciando createInvoice con parámetros:`);
+      console.log(`[AFIP]    - Punto Venta: ${params.puntoVenta}`);
+      console.log(`[AFIP]    - Tipo Comprobante: ${params.comprobanteTipo}`);
+      console.log(`[AFIP]    - Doc Tipo: ${params.docTipo}, Doc Nro: ${params.docNro}`);
+      console.log(`[AFIP]    - Importes: Total ${params.importeTotal}, Neto ${params.importeNeto}, IVA ${params.importeIVA}`);
+
       const auth = await this.getAuth();
       
       // Obtener último número de comprobante
       const ultimoNumero = await this.getLastInvoiceNumber(params.puntoVenta, params.comprobanteTipo);
       const nuevoNumero = ultimoNumero + 1;
       
-      console.log(`[AFIP] Generando factura: Pto. Venta ${params.puntoVenta}, Tipo ${params.comprobanteTipo}, Número ${nuevoNumero}`);
+      console.log(`[AFIP] 📊 Último número: ${ultimoNumero}, Nuevo número: ${nuevoNumero}`);
       
       // Crear cliente SOAP
       const client = await soap.createClientAsync(this.wsfeUrl + '?WSDL');
@@ -453,8 +459,8 @@ export class AfipSoapClient {
         }
       };
       
-      // Log de los parámetros importantes para debug
-      console.log(`[AFIP] Solicitando CAE para: DocNro ${params.docNro}, ImpTotal: ${params.importeTotal}, Neto: ${params.importeNeto}, IVA: ${params.importeIVA}`);
+      console.log(`[AFIP] 📤 Enviando solicitud a AFIP...`);
+      console.log(`[AFIP] 📤 Request estructura:`, JSON.stringify(request, null, 2));
       
       // Llamar al método FECAESolicitar con retry
       let result;
@@ -466,7 +472,7 @@ export class AfipSoapClient {
           break;
         } catch (soapError) {
           retries--;
-          console.error(`[AFIP] Error en FECAESolicitar (intentos restantes: ${retries}):`, soapError);
+          console.error(`[AFIP] ❌ Error en FECAESolicitar (intentos restantes: ${retries}):`, soapError);
           
           if (retries === 0) {
             throw soapError;
@@ -476,41 +482,106 @@ export class AfipSoapClient {
         }
       }
       
-      // Procesar respuesta
+      // ✅ MEJORA: Logging detallado de la respuesta completa
+      console.log(`[AFIP] 📥 Respuesta cruda completa de AFIP:`);
+      console.log(JSON.stringify(result, null, 2));
+      
+      if (!result || !result[0]) {
+        throw new Error('AFIP devolvió respuesta vacía o nula');
+      }
+
       const response = result[0].FECAESolicitarResult;
       
-      // Verificar si hay errores
-      if (response.Errors && response.Errors.Err && response.Errors.Err.length > 0) {
-        console.error(`[AFIP] Errores en respuesta AFIP:`, response.Errors);
-        throw new Error(`Error AFIP: ${JSON.stringify(response.Errors)}`);
+      if (!response) {
+        throw new Error('AFIP devolvió FECAESolicitarResult vacío');
       }
-      
+
+      console.log(`[AFIP] 📋 Estructura de respuesta analizada:`);
+      console.log(`[AFIP]    - Tiene Errors: ${!!response.Errors}`);
+      console.log(`[AFIP]    - Tiene FeDetResp: ${!!response.FeDetResp}`);
+      console.log(`[AFIP]    - Tiene FECAEDetResponse: ${!!(response.FeDetResp && response.FeDetResp.FECAEDetResponse)}`);
+
+      // Verificar errores globales primero
+      if (response.Errors && response.Errors.Err && response.Errors.Err.length > 0) {
+        console.error(`[AFIP] ❌ Errores globales en respuesta:`, JSON.stringify(response.Errors, null, 2));
+        throw new Error(`Error AFIP Global: ${JSON.stringify(response.Errors)}`);
+      }
+
+      // Verificar que existe el detalle de respuesta
+      if (!response.FeDetResp || !response.FeDetResp.FECAEDetResponse) {
+        console.error(`[AFIP] ❌ Respuesta sin detalle válido:`, JSON.stringify(response, null, 2));
+        throw new Error('AFIP no devolvió detalle de respuesta válido');
+      }
+
       const respDetalle = response.FeDetResp.FECAEDetResponse;
       
-      // Verificar que el resultado sea exitoso
+      // ✅ MEJORA: Logging completo del detalle
+      console.log(`[AFIP] 📄 Detalle completo de respuesta:`);
+      console.log(JSON.stringify(respDetalle, null, 2));
+
+      // ✅ MEJORA: Verificaciones más estrictas
+      console.log(`[AFIP] 🔍 Verificando resultado: ${respDetalle.Resultado}`);
+      
       if (respDetalle.Resultado !== 'A') {
-        console.error(`[AFIP] Resultado no exitoso:`, respDetalle);
-        throw new Error(`AFIP rechazó la factura. Resultado: ${respDetalle.Resultado}. Observaciones: ${JSON.stringify(respDetalle.Observaciones)}`);
+        const errorInfo = {
+          resultado: respDetalle.Resultado,
+          observaciones: respDetalle.Observaciones || 'Sin observaciones',
+          errores: respDetalle.Errors || 'Sin errores específicos'
+        };
+        
+        console.error(`[AFIP] ❌ Resultado no exitoso:`, JSON.stringify(errorInfo, null, 2));
+        throw new Error(`AFIP rechazó la factura. Resultado: ${respDetalle.Resultado}. Detalles: ${JSON.stringify(errorInfo)}`);
       }
+
+      // ✅ MEJORA: Validación estricta del CAE
+      console.log(`[AFIP] 🔍 Verificando CAE: "${respDetalle.CAE}" (tipo: ${typeof respDetalle.CAE})`);
       
-      if (!respDetalle.CAE) {
-        throw new Error('AFIP no devolvió CAE en la respuesta');
+      if (!respDetalle.CAE || typeof respDetalle.CAE !== 'string' || respDetalle.CAE.trim() === '') {
+        console.error(`[AFIP] ❌ CAE inválido o vacío:`, {
+          cae: respDetalle.CAE,
+          tipo: typeof respDetalle.CAE,
+          longitud: respDetalle.CAE ? respDetalle.CAE.length : 0
+        });
+        throw new Error('AFIP no devolvió CAE válido en la respuesta');
       }
-      
-      console.log(`[AFIP] Respuesta exitosa, CAE: ${respDetalle.CAE}, Vencimiento: ${respDetalle.CAEFchVto}`);
-      
-      return {
+
+      // ✅ MEJORA: Validación de otros campos críticos
+      if (!respDetalle.CbteDesde && respDetalle.CbteDesde !== 0) {
+        console.error(`[AFIP] ❌ Número de comprobante inválido:`, respDetalle.CbteDesde);
+        throw new Error('AFIP no devolvió número de comprobante válido');
+      }
+
+      if (!respDetalle.CAEFchVto) {
+        console.error(`[AFIP] ❌ Fecha de vencimiento CAE inválida:`, respDetalle.CAEFchVto);
+        throw new Error('AFIP no devolvió fecha de vencimiento CAE válida');
+      }
+
+      // ✅ RESULTADO VALIDADO
+      const resultadoFinal = {
         Resultado: respDetalle.Resultado,
-        CAE: respDetalle.CAE,
+        CAE: respDetalle.CAE.trim(),
         CAEFchVto: respDetalle.CAEFchVto,
         CbteNro: respDetalle.CbteDesde,
         Observaciones: respDetalle.Observaciones,
         Errores: response.Errors
       };
+
+      console.log(`[AFIP] ✅ Respuesta válida procesada exitosamente:`);
+      console.log(`[AFIP]    - CAE: ${resultadoFinal.CAE}`);
+      console.log(`[AFIP]    - Número: ${resultadoFinal.CbteNro}`);
+      console.log(`[AFIP]    - Vencimiento: ${resultadoFinal.CAEFchVto}`);
+
+      return resultadoFinal;
+
     } catch (error) {
-      console.error('[AFIP] Error creando factura en AFIP:', error);
+      console.error('[AFIP] ❌ Error detallado en createInvoice:', error);
       
-      // Mejorar el mensaje de error
+      if (error instanceof Error) {
+        console.error('[AFIP] ❌ Message:', error.message);
+        console.error('[AFIP] ❌ Stack:', error.stack);
+      }
+      
+      // Mejorar el mensaje de error según el tipo
       let errorMessage = 'No se pudo crear la factura en AFIP';
       
       if (error instanceof Error) {
