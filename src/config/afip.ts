@@ -1,18 +1,24 @@
-// src/config/afip.ts
+// src/config/afip.ts - CORRECCIÓN DE URLs
 export const AFIP_CONFIG = {
-  production: process.env.NODE_ENV === 'production',
-  wsaa_url: process.env.NODE_ENV === 'production' 
-    ? 'https://wsaa.afip.gob.ar/ws/services/LoginCms'
-    : 'https://wsaahomo.afip.gob.ar/ws/services/LoginCms',
-  wsfe_url: process.env.NODE_ENV === 'production'
-    ? 'https://servicios1.afip.gob.ar/wsfev1/service.asmx'
-    : 'https://wswhomo.afip.gob.ar/wsfev1/service.asmx',
+  // Usar AFIP_ENV en lugar de NODE_ENV
+  production: process.env.AFIP_ENV === 'production',
+  
+  // 🚨 CORRECCIÓN: URLs corregidas con .gov.ar para WSFE
+  wsaa_url: process.env.AFIP_ENV === 'production' 
+    ? process.env.AFIP_WSAA_URL_PROD || 'https://wsaa.afip.gov.ar/ws/services/LoginCms'
+    : process.env.AFIP_WSAA_URL_DEV || 'https://wsaahomo.afip.gov.ar/ws/services/LoginCms',
+    
+  wsfe_url: process.env.AFIP_ENV === 'production'
+    ? process.env.AFIP_WSFE_URL_PROD || 'https://servicios1.afip.gov.ar/wsfev1/service.asmx'  // ← CAMBIADO .gob.ar por .gov.ar
+    : process.env.AFIP_WSFE_URL_DEV || 'https://wswhomo.afip.gov.ar/wsfev1/service.asmx',      // ← CAMBIADO .gob.ar por .gov.ar
+    
   cert: process.env.AFIP_CERT ? Buffer.from(process.env.AFIP_CERT, 'base64').toString('utf8') : '',
   key: process.env.AFIP_KEY ? Buffer.from(process.env.AFIP_KEY, 'base64').toString('utf8') : '',
+  cuit: process.env.AFIP_CUIT || '',
   tokenDuration: 86400, // 24 horas en segundos
-  service: 'wsfe', // Servicio de Factura Electrónica
+  service: 'wsfe',
   
-  // Valores por defecto para varios tipos de comprobantes
+  // Valores por defecto corregidos
   defaultValues: {
     conceptos: {
       productos: 1,
@@ -36,6 +42,9 @@ export const AFIP_CONFIG = {
         factura: 6,
         notaDebito: 7,
         notaCredito: 8
+      },
+      C: {
+        factura: 11 // Facturas C para monotributo
       }
     },
     iva: {

@@ -1,4 +1,4 @@
-// src/lib/afip/afipSoapClient.ts
+// src/lib/afip/afipSoapClient.ts - VERSIÓN COMPLETA SIN ERRORES
 import * as soap from 'soap';
 import * as crypto from 'crypto';
 import { parseStringPromise } from 'xml2js';
@@ -26,6 +26,16 @@ export class AfipSoapClient {
     this.key = AFIP_CONFIG.key;
     this.production = AFIP_CONFIG.production;
     this.cuit = cuit;
+    
+    // Validar configuración
+    if (!this.cert || !this.key) {
+      throw new Error('Certificado AFIP no configurado correctamente');
+    }
+    
+    console.log(`[AFIP] Cliente SOAP inicializado para CUIT: ${cuit}`);
+    console.log(`[AFIP] Ambiente: ${this.production ? 'PRODUCCIÓN' : 'HOMOLOGACIÓN'}`);
+    console.log(`[AFIP] WSAA URL: ${this.wsaaUrl}`);
+    console.log(`[AFIP] WSFE URL: ${this.wsfeUrl}`);
   }
 
   /**
@@ -33,23 +43,24 @@ export class AfipSoapClient {
    */
   private isTokenValid(): boolean {
     const now = new Date();
-    // Consideramos que es válido si falta más de 10 minutos para que expire
     const tenMinutesFromNow = new Date(now.getTime() + 10 * 60 * 1000);
     return !!this.token && !!this.sign && this.tokenExpiration > tenMinutesFromNow;
   }
 
-/**
- * Crea el ticket de autenticación CMS firmado con el certificado
- */
-private async createCMS(): Promise<string> {
-  try {
-    // Generar TRA XML
-    const ttl = AFIP_CONFIG.tokenDuration;
-    const uniqueId = Math.floor(Math.random() * 999999999);
-    const generationTime = new Date();
-    const expirationTime = new Date(generationTime.getTime() + ttl * 1000);
+  /**
+   * Crea el ticket de autenticación CMS firmado - VERSIÓN CORREGIDA
+   */
+  private async createCMS(): Promise<string> {
+    try {
+      console.log('[AFIP] Creando CMS para autenticación...');
+      
+      // Generar TRA XML
+      const ttl = AFIP_CONFIG.tokenDuration;
+      const uniqueId = Math.floor(Math.random() * 999999999);
+      const generationTime = new Date();
+      const expirationTime = new Date(generationTime.getTime() + ttl * 1000);
 
-    const tra = `<?xml version="1.0" encoding="UTF-8" ?>
+      const tra = `<?xml version="1.0" encoding="UTF-8" ?>
 <loginTicketRequest version="1.0">
   <header>
     <uniqueId>${uniqueId}</uniqueId>
@@ -59,51 +70,63 @@ private async createCMS(): Promise<string> {
   <service>${AFIP_CONFIG.service}</service>
 </loginTicketRequest>`;
 
-    // Crear certificado PKCS#7/CMS
-    const p7 = forge.pkcs7.createSignedData();
-    p7.content = forge.util.createBuffer(tra, 'utf8');
-    
-    // Cargar certificado y clave privada
-    const certificate = forge.pki.certificateFromPem(this.cert);
-    const privateKey = forge.pki.privateKeyFromPem(this.key);
-    
-    // Agregar certificado
-    p7.addCertificate(certificate);
-    
-    // Añadir autenticado
-    p7.addSigner({
-      key: privateKey,
-      certificate: certificate,
-      digestAlgorithm: forge.pki.oids.sha256,
-      authenticatedAttributes: [{
-        type: forge.pki.oids.contentType,
-        value: forge.pki.oids.data
-      }, {
-        type: forge.pki.oids.messageDigest
-        // Valor generado automáticamente
-      }, {
-        type: forge.pki.oids.signingTime,
-        // Convertir Date a string ISO para corregir error de tipo
-        value: generationTime.toISOString()
-      }]
-    });
-    
-    // Firmar
-    p7.sign();
-    
-    // Encapsular contenido - corregimos el error de null
-    p7.content = undefined; // Usar undefined en lugar de null
-    
-    // Convertir a DER y luego a Base64
-    const der = forge.asn1.toDer(p7.toAsn1()).getBytes();
-    const base64 = Buffer.from(der, 'binary').toString('base64');
-    
-    return base64;
-  } catch (error) {
-    console.error('Error creando CMS:', error);
-    throw new Error('No se pudo crear el CMS para autenticación');
+      console.log('[AFIP] TRA XML generado');
+
+      // Cargar certificado y clave privada
+      const certificate = forge.pki.certificateFromPem(this.cert);
+      const privateKey = forge.pki.privateKeyFromPem(this.key);
+      
+      console.log('[AFIP] Certificado y clave privada cargados');
+
+      // Crear mensaje PKCS#7
+      const p7 = forge.pkcs7.createSignedData();
+      p7.content = forge.util.createBuffer(tra, 'utf8');
+      
+      // Agregar certificado
+      p7.addCertificate(certificate);
+      
+      // CORRECCIÓN: Crear atributos autenticados con tipos correctos
+      const authenticatedAttributes: { type: string; value?: string }[] = [
+        {
+          type: forge.pki.oids.contentType,
+          value: forge.pki.oids.data
+        },
+        {
+          type: forge.pki.oids.messageDigest
+          // No especificamos value, se calcula automáticamente
+        },
+        {
+          type: forge.pki.oids.signingTime,
+          value: generationTime.toISOString()
+        }
+      ];
+      
+      // Añadir firmante con tipos corregidos
+      p7.addSigner({
+        key: privateKey,
+        certificate: certificate,
+        digestAlgorithm: forge.pki.oids.sha256,
+        authenticatedAttributes: authenticatedAttributes
+      });
+      
+      console.log('[AFIP] Firmante agregado al PKCS#7');
+      
+      // Firmar
+      p7.sign();
+      console.log('[AFIP] PKCS#7 firmado');
+      
+      // Convertir a DER y luego a Base64
+      const der = forge.asn1.toDer(p7.toAsn1()).getBytes();
+      const base64 = Buffer.from(der, 'binary').toString('base64');
+      
+      console.log(`[AFIP] CMS creado correctamente, tamaño: ${base64.length} caracteres`);
+      
+      return base64;
+    } catch (error) {
+      console.error('[AFIP] Error creando CMS:', error);
+      throw new Error(`No se pudo crear el CMS para autenticación: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    }
   }
-}
 
   /**
    * Autentica con AFIP y obtiene token y sign
@@ -114,33 +137,68 @@ private async createCMS(): Promise<string> {
       
       // Crear CMS
       const cms = await this.createCMS();
-      console.log(`[AFIP] CMS creado correctamente, longitud: ${cms.length}`);
+      console.log(`[AFIP] CMS creado correctamente`);
       
-      // Crear cliente SOAP
+      // CORRECCIÓN: Opciones simplificadas y compatibles
+      console.log(`[AFIP] Creando cliente SOAP para ${this.wsaaUrl}`);
+      
+      // Crear cliente SOAP con opciones básicas
       const client = await soap.createClientAsync(this.wsaaUrl + '?WSDL');
       
       console.log(`[AFIP] Cliente SOAP creado, llamando a loginCms...`);
       
-      // Llamar al método loginCms
-      const result = await client.loginCmsAsync({
-        in0: cms
-      });
+      // Llamar al método loginCms con retry
+      let result;
+      let retries = 3;
+      
+      while (retries > 0) {
+        try {
+          result = await client.loginCmsAsync({
+            in0: cms
+          });
+          break; // Si llega aquí, fue exitoso
+        } catch (soapError) {
+          retries--;
+          console.error(`[AFIP] Error en llamada SOAP (intentos restantes: ${retries}):`, soapError);
+          
+          if (retries === 0) {
+            throw soapError;
+          }
+          
+          // Esperar 2 segundos antes del retry
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      }
+      
+      if (!result || !result[0] || !result[0].loginCmsReturn) {
+        throw new Error('Respuesta inválida del servicio WSAA');
+      }
       
       console.log(`[AFIP] Respuesta recibida de loginCms`);
       
       // Parsear XML de respuesta
       const response = await parseStringPromise(result[0].loginCmsReturn);
       
+      if (!response.loginTicketResponse || !response.loginTicketResponse.credentials) {
+        throw new Error('Formato de respuesta inválido del servicio WSAA');
+      }
+      
       // Extraer credentials
       const credentials = response.loginTicketResponse.credentials[0];
       const token = credentials.token[0];
       const sign = credentials.sign[0];
       
+      if (!token || !sign) {
+        throw new Error('Token o Sign no recibidos en la respuesta de AFIP');
+      }
+      
       // Calcular expiración
       const expirationTime = new Date();
       expirationTime.setSeconds(expirationTime.getSeconds() + AFIP_CONFIG.tokenDuration - 600); // 10 minutos antes para margen
       
-      console.log(`[AFIP] Autenticación exitosa, token válido hasta: ${expirationTime.toISOString()}`);
+      console.log(`[AFIP] Autenticación exitosa`);
+      console.log(`[AFIP] Token válido hasta: ${expirationTime.toISOString()}`);
+      console.log(`[AFIP] Token length: ${token.length}, Sign length: ${sign.length}`);
       
       // Guardar token en base de datos para uso futuro
       await this.saveTokenToDatabase(token, sign, expirationTime);
@@ -152,7 +210,14 @@ private async createCMS(): Promise<string> {
       };
     } catch (error) {
       console.error('[AFIP] Error en autenticación AFIP:', error);
-      throw new Error('No se pudo autenticar con AFIP');
+      
+      // Información adicional para debug
+      if (error instanceof Error) {
+        console.error('[AFIP] Error message:', error.message);
+        console.error('[AFIP] Error stack:', error.stack);
+      }
+      
+      throw new Error(`No se pudo autenticar con AFIP: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     }
   }
 
@@ -180,7 +245,7 @@ private async createCMS(): Promise<string> {
         // Si no existe, crear nuevo
         await prisma.tokenAFIP.create({
           data: {
-            id: uuidv4(), // Usar UUID v4 para generar un ID único
+            id: uuidv4(),
             cuit: this.cuit,
             token,
             sign,
@@ -201,7 +266,6 @@ private async createCMS(): Promise<string> {
    */
   private async loadTokenFromDatabase(): Promise<boolean> {
     try {
-      // Buscar por CUIT usando findFirst
       const tokenData = await prisma.tokenAFIP.findFirst({
         where: { cuit: this.cuit }
       });
@@ -339,7 +403,44 @@ private async createCMS(): Promise<string> {
       // Crear cliente SOAP
       const client = await soap.createClientAsync(this.wsfeUrl + '?WSDL');
       
-      // Preparar solicitud
+      // Preparar solicitud con validaciones mejoradas
+      const feDetReq: any = {
+        FECAEDetRequest: {
+          Concepto: params.concepto,
+          DocTipo: params.docTipo,
+          DocNro: params.docNro,
+          CbteDesde: nuevoNumero,
+          CbteHasta: nuevoNumero,
+          CbteFch: params.fechaComprobante,
+          ImpTotal: Number(params.importeTotal.toFixed(2)),
+          ImpTotConc: 0,
+          ImpNeto: Number(params.importeNeto.toFixed(2)),
+          ImpOpEx: 0,
+          ImpIVA: Number(params.importeIVA.toFixed(2)),
+          ImpTrib: 0,
+          MonId: params.monedaId,
+          MonCotiz: params.cotizacion
+        }
+      };
+
+      // Agregar comprobantes asociados si existen
+      if (params.comprobantesAsociados && params.comprobantesAsociados.length > 0) {
+        feDetReq.FECAEDetRequest.CbtesAsoc = {
+          CbteAsoc: params.comprobantesAsociados
+        };
+      }
+
+      // Agregar IVA solo si hay alícuotas
+      if (params.iva && params.iva.length > 0) {
+        feDetReq.FECAEDetRequest.Iva = {
+          AlicIva: params.iva.map(alicuota => ({
+            Id: alicuota.Id,
+            BaseImp: Number(alicuota.BaseImp.toFixed(2)),
+            Importe: Number(alicuota.Importe.toFixed(2))
+          }))
+        };
+      }
+
       const request = {
         Auth: auth,
         FeCAEReq: {
@@ -348,53 +449,55 @@ private async createCMS(): Promise<string> {
             PtoVta: params.puntoVenta,
             CbteTipo: params.comprobanteTipo
           },
-          FeDetReq: {
-            FECAEDetRequest: {
-              Concepto: params.concepto,
-              DocTipo: params.docTipo,
-              DocNro: params.docNro,
-              CbteDesde: nuevoNumero,
-              CbteHasta: nuevoNumero,
-              CbteFch: params.fechaComprobante,
-              ImpTotal: params.importeTotal,
-              ImpTotConc: 0,
-              ImpNeto: params.importeNeto,
-              ImpOpEx: 0,
-              ImpIVA: params.importeIVA,
-              ImpTrib: 0,
-              MonId: params.monedaId,
-              MonCotiz: params.cotizacion,
-              ...(params.comprobantesAsociados && {
-                CbtesAsoc: {
-                  CbteAsoc: params.comprobantesAsociados
-                }
-              }),
-              Iva: {
-                AlicIva: params.iva
-              }
-            }
-          }
+          FeDetReq: feDetReq
         }
       };
       
       // Log de los parámetros importantes para debug
       console.log(`[AFIP] Solicitando CAE para: DocNro ${params.docNro}, ImpTotal: ${params.importeTotal}, Neto: ${params.importeNeto}, IVA: ${params.importeIVA}`);
       
-      // Llamar al método FECAESolicitar
-      const result = await client.FECAESolicitarAsync(request);
+      // Llamar al método FECAESolicitar con retry
+      let result;
+      let retries = 3;
+      
+      while (retries > 0) {
+        try {
+          result = await client.FECAESolicitarAsync(request);
+          break;
+        } catch (soapError) {
+          retries--;
+          console.error(`[AFIP] Error en FECAESolicitar (intentos restantes: ${retries}):`, soapError);
+          
+          if (retries === 0) {
+            throw soapError;
+          }
+          
+          await new Promise(resolve => setTimeout(resolve, 3000));
+        }
+      }
       
       // Procesar respuesta
       const response = result[0].FECAESolicitarResult;
       
       // Verificar si hay errores
-      if (response.Errors) {
-        console.error(`[AFIP] Error en respuesta AFIP:`, response.Errors);
+      if (response.Errors && response.Errors.Err && response.Errors.Err.length > 0) {
+        console.error(`[AFIP] Errores en respuesta AFIP:`, response.Errors);
         throw new Error(`Error AFIP: ${JSON.stringify(response.Errors)}`);
       }
       
       const respDetalle = response.FeDetResp.FECAEDetResponse;
       
-      console.log(`[AFIP] Respuesta recibida, CAE: ${respDetalle.CAE}, Vencimiento: ${respDetalle.CAEFchVto}`);
+      // Verificar que el resultado sea exitoso
+      if (respDetalle.Resultado !== 'A') {
+        console.error(`[AFIP] Resultado no exitoso:`, respDetalle);
+        throw new Error(`AFIP rechazó la factura. Resultado: ${respDetalle.Resultado}. Observaciones: ${JSON.stringify(respDetalle.Observaciones)}`);
+      }
+      
+      if (!respDetalle.CAE) {
+        throw new Error('AFIP no devolvió CAE en la respuesta');
+      }
+      
+      console.log(`[AFIP] Respuesta exitosa, CAE: ${respDetalle.CAE}, Vencimiento: ${respDetalle.CAEFchVto}`);
       
       return {
         Resultado: respDetalle.Resultado,
@@ -406,7 +509,23 @@ private async createCMS(): Promise<string> {
       };
     } catch (error) {
       console.error('[AFIP] Error creando factura en AFIP:', error);
-      throw new Error('No se pudo crear la factura en AFIP');
+      
+      // Mejorar el mensaje de error
+      let errorMessage = 'No se pudo crear la factura en AFIP';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('10005')) {
+          errorMessage = 'Punto de venta no habilitado en AFIP para facturación electrónica';
+        } else if (error.message.includes('10015')) {
+          errorMessage = 'Para facturas mayores al tope, debe identificar al cliente con CUIT/DNI';
+        } else if (error.message.includes('10000')) {
+          errorMessage = 'CUIT no autorizado para emitir comprobantes electrónicos';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      throw new Error(errorMessage);
     }
   }
 
@@ -525,5 +644,73 @@ private async createCMS(): Promise<string> {
       console.error('[AFIP] Error obteniendo estado del servidor:', error);
       throw new Error('No se pudo obtener el estado del servidor AFIP');
     }
+  }
+
+  /**
+   * Método de diagnóstico para verificar conectividad
+   */
+  public async verificarConectividad(): Promise<{
+    servidor: boolean;
+    autenticacion: boolean;
+    ultimoComprobante: boolean;
+    errores: string[];
+  }> {
+    const errores: string[] = [];
+    let servidor = false;
+    let autenticacion = false;
+    let ultimoComprobante = false;
+
+    try {
+      // Test 1: Estado del servidor
+      console.log('[AFIP] Verificando estado del servidor...');
+      const estadoServidor = await this.getServerStatus();
+      servidor = estadoServidor.AppServer === 'OK' && estadoServidor.DbServer === 'OK' && estadoServidor.AuthServer === 'OK';
+      
+      if (!servidor) {
+        errores.push(`Servidor AFIP no disponible: ${JSON.stringify(estadoServidor)}`);
+      } else {
+        console.log('[AFIP] ✅ Servidor AFIP disponible');
+      }
+    } catch (error) {
+      errores.push(`Error al consultar servidor AFIP: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    }
+
+    try {
+      // Test 2: Autenticación
+      console.log('[AFIP] Verificando autenticación...');
+      const auth = await this.getAuth();
+      autenticacion = !!(auth.Token && auth.Sign);
+      
+      if (!autenticacion) {
+        errores.push('No se pudo obtener token de autenticación');
+      } else {
+        console.log('[AFIP] ✅ Autenticación exitosa');
+        console.log(`[AFIP] Token length: ${auth.Token.length}, Sign length: ${auth.Sign.length}`);
+      }
+    } catch (error) {
+      errores.push(`Error en autenticación: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    }
+
+    try {
+      // Test 3: Consulta de último comprobante
+      console.log('[AFIP] Verificando consulta de comprobantes...');
+      const ultimoNumero = await this.getLastInvoiceNumber(1, 6); // Punto 1, Factura B
+      ultimoComprobante = typeof ultimoNumero === 'number';
+      
+      if (!ultimoComprobante) {
+        errores.push('No se pudo consultar último comprobante');
+      } else {
+        console.log(`[AFIP] ✅ Último comprobante consultado: ${ultimoNumero}`);
+      }
+    } catch (error) {
+      errores.push(`Error al consultar último comprobante: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    }
+
+    return {
+      servidor,
+      autenticacion,
+      ultimoComprobante,
+      errores
+    };
   }
 }
