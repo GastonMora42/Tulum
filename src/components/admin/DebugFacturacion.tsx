@@ -43,6 +43,24 @@ export function DebugFacturacion() {
     }
   };
 
+  const debugAfip = async (accion: string, params: any = {}) => {
+    setLoading(true);
+    try {
+      const response = await authenticatedFetch('/api/admin/facturas/debug-afip', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accion, ...params })
+      });
+  
+      const data = await response.json();
+      setResultado(data);
+    } catch (error) {
+      setResultado({ error: error instanceof Error ? error.message : 'Error desconocido' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="bg-white p-6 rounded-lg shadow">
       <h2 className="text-xl font-bold mb-4">🔧 Debug Facturación AFIP</h2>
@@ -93,6 +111,32 @@ export function DebugFacturacion() {
           >
             🔄 Procesar Facturas Colgadas
           </button>
+
+          <button
+  onClick={() => debugAfip('test-conectividad-completa')}
+  disabled={loading}
+  className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
+>
+  🔍 Test Completo AFIP
+</button>
+
+<button
+  onClick={() => debugAfip('verificar-configuracion')}
+  disabled={loading}
+  className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
+>
+  ⚙️ Verificar Configuración
+</button>
+
+{facturaId && (
+  <button
+    onClick={() => debugAfip('debug-factura', { facturaId })}
+    disabled={loading}
+    className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 disabled:opacity-50"
+  >
+    🐛 Debug Factura Específica
+  </button>
+)}
         </div>
       </div>
 

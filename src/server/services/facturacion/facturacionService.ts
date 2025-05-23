@@ -749,22 +749,28 @@ public async procesarFacturasColgadas(): Promise<{
         // Intentar procesar nuevamente
         const resultado = await this.generarFactura(factura.ventaId);
         
-        if (resultado.success) {
+        const facturaVerificada = await prisma.facturaElectronica.findUnique({
+          where: { id: factura.id },
+          select: { cae: true, estado: true }
+        });
+        
+        if (facturaVerificada?.cae && facturaVerificada.cae.trim() !== '') {
           exitosas++;
           resultados.push({
             facturaId: factura.id,
             estado: 'exitosa',
-            cae: resultado.cae
+            cae: facturaVerificada.cae
           });
         } else {
           errores++;
           resultados.push({
             facturaId: factura.id,
-            estado: 'error',
-            error: resultado.message
+            estado: 'falso_positivo',
+            error: 'Sistema reportó éxito pero no hay CAE'
           });
         }
-      } catch (error) {
+      }
+        catch (error) {
         errores++;
         logger.log(`Error reprocesando ${factura.id}: ${error}`, 'ERROR');
         resultados.push({
