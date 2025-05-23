@@ -254,6 +254,24 @@ export function DebugFacturacion() {
     }
   };
 
+  // Nuevo test específico para RG 5616
+const testCondicionIvaReceptor = async () => {
+    setLoading(true);
+    try {
+      const response = await authenticatedFetch('/api/admin/facturas/test-condicion-iva', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cuit: cuit || undefined })
+      });
+      
+      await handleResponse(response, 'Test Condición IVA Receptor (RG 5616)');
+    } catch (error) {
+      handleError(error, 'Test Condición IVA');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // ✅ MANEJO MEJORADO DE ERRORES
   const handleError = (error: any, operacion: string) => {
     console.error(`[DEBUG] Error en ${operacion}:`, error);

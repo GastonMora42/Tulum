@@ -243,20 +243,39 @@ export class FacturacionService {
 
       logger.log(`Factura creada en 'procesando'`, 'SUCCESS');
 
-      // 7. Calcular totales
-      let importeNeto: number;
-      let importeIVA: number;
-      const importeTotal = Number(venta.total);
+// LÍNEA ~200 - Corregir cálculo de totales
+// 7. Calcular totales SEGÚN FÓRMULA AFIP
+let importeNeto: number;
+let importeIVA: number;
+let importeTotConc: number = 0; // Conceptos no gravados
+let importeOpEx: number = 0;    // Operaciones exentas
+let importeTrib: number = 0;    // Otros tributos
 
-      if (tipoComprobanteLetra === 'A') {
-        importeNeto = Number((importeTotal / 1.21).toFixed(2));
-        importeIVA = Number((importeTotal - importeNeto).toFixed(2));
-        logger.log(`Factura A - Neto: $${importeNeto}, IVA: $${importeIVA}`, 'DEBUG');
-      } else {
-        importeNeto = importeTotal;
-        importeIVA = 0;
-        logger.log(`Factura B - Total: $${importeTotal}`, 'DEBUG');
-      }
+const importeTotal = Number(venta.total);
+
+if (tipoComprobanteLetra === 'A') {
+  // Factura A: IVA discriminado
+  importeNeto = Number((importeTotal / 1.21).toFixed(2));
+  importeIVA = Number((importeTotal - importeNeto).toFixed(2));
+  
+  // 🔧 VERIFICAR FÓRMULA AFIP
+  const calculoVerificacion = importeTotConc + importeNeto + importeOpEx + importeTrib + importeIVA;
+  if (Math.abs(calculoVerificacion - importeTotal) > 0.01) {
+    logger.log(`ADVERTENCIA: Fórmula AFIP no cuadra. Calculado: ${calculoVerificacion}, Real: ${importeTotal}`, 'WARN');
+  }
+  
+} else if (tipoComprobanteLetra === 'B') {
+  // Factura B: IVA incluido
+  importeNeto = importeTotal;
+  importeIVA = 0;
+} else {
+  // Factura C: Sin IVA
+  importeNeto = importeTotal;
+  importeIVA = 0;
+  importeTotConc = 0;
+}
+
+logger.log(`Totales - Neto: $${importeNeto}, IVA: $${importeIVA}, Total: $${importeTotal}`, 'DEBUG');
 
       // 8. Preparar alícuotas IVA
       const iva = [];
@@ -299,21 +318,27 @@ export class FacturacionService {
         // 12. Comunicación con AFIP
         logger.log(`Enviando a AFIP...`, 'INFO');
         
-        const respuestaAFIP = await this.afipClient.createInvoice({
-          puntoVenta: configAFIP.puntoVenta,
-          comprobanteTipo: comprobanteTipo,
-          concepto: AFIP_CONFIG.defaultValues.conceptos.productos,
-          docTipo: docTipo,
-          docNro: docNro,
-          fechaComprobante: fechaComprobante,
-          importeTotal: importeTotal,
-          importeNeto: importeNeto,
-          importeIVA: importeIVA,
-          monedaId: 'PES',
-          cotizacion: 1,
-          iva: iva,
-          items: itemsFactura
-        });
+const respuestaAFIP = await this.afipClient.createInvoice({
+  puntoVenta: configAFIP.puntoVenta,
+  comprobanteTipo: comprobanteTipo,
+  concepto: AFIP_CONFIG.defaultValues.conceptos.productos,
+  docTipo: docTipo,
+  docNro: docNro,
+  fechaComprobante: fechaComprobante,
+  importeTotal: importeTotal,
+  importeNeto: importeNeto,
+  importeIVA: importeIVA,
+  importeTotConc: importeTotConc, // 🔧 AÑADIR
+  importeOpEx: importeOpEx,       // 🔧 AÑADIR
+  importeTrib: importeTrib,       // 🔧 AÑADIR
+  monedaId: 'PES',
+  cotizacion: 1,
+  iva: iva,
+  items: itemsFactura,
+  // 🔧 NUEVO: Datos del cliente para determinar condición IVA
+  clienteTipoDoc: docTipo,
+  clienteEsResponsableInscripto: docTipo === 80
+});
 
         logger.log(`Respuesta AFIP recibida`, 'SUCCESS');
         logger.log(`CAE: "${respuestaAFIP.CAE}" (${typeof respuestaAFIP.CAE})`, 'INFO');

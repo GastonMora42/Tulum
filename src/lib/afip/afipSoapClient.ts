@@ -362,40 +362,58 @@ export class AfipSoapClient {
     }
   }
 
-  public async createInvoice(params: any): Promise<any> {
-    try {
-      console.log(`[AFIP] 🚀 INICIO - createInvoice`);
-      console.log(`[AFIP] 📊 Parámetros recibidos:`, JSON.stringify(params, null, 2));
+// LÍNEA ~430 - En el método createInvoice, AGREGAR:
+public async createInvoice(params: any): Promise<any> {
+  try {
+    console.log(`[AFIP] 🚀 INICIO - createInvoice`);
+    
+    const auth = await this.getAuth();
+    const ultimoNumero = await this.getLastInvoiceNumber(params.puntoVenta, params.comprobanteTipo);
+    const nuevoNumero = ultimoNumero + 1;
+    
+    console.log(`[AFIP] 🔢 NUMERACIÓN - Último: ${ultimoNumero}, Nuevo: ${nuevoNumero}, Tipo: ${params.comprobanteTipo}, PV: ${params.puntoVenta}`);
+    
+    // Verificar que la numeración sea correcta
+    if (nuevoNumero <= ultimoNumero) {
+      throw new Error(`Error numeración: nuevo ${nuevoNumero} <= último ${ultimoNumero}`);
+    }
+    // 🔧 DETERMINAR CONDICIÓN IVA RECEPTOR (NUEVO CAMPO OBLIGATORIO)
+    let condicionIvaReceptorId: number;
+    
+    if (params.comprobanteTipo === 1 || params.comprobanteTipo === 2 || params.comprobanteTipo === 3) {
+      // Facturas A, ND A, NC A - Cliente debe ser Responsable Inscripto
+      condicionIvaReceptorId = 1; // IVA Responsable Inscripto
+    } else if (params.docTipo === 99 || params.docNro === '0') {
+      // Consumidor Final
+      condicionIvaReceptorId = 5; // Consumidor Final
+    } else {
+      // Otros casos - asumir Responsable Inscripto o Monotributista
+      condicionIvaReceptorId = params.docTipo === 80 ? 1 : 6; // CUIT = Responsable, otros = Monotributo
+    }
 
-      const auth = await this.getAuth();
-      
-      // Obtener último número
-      const ultimoNumero = await this.getLastInvoiceNumber(params.puntoVenta, params.comprobanteTipo);
-      const nuevoNumero = ultimoNumero + 1;
-      
-      console.log(`[AFIP] 📊 Numeración: Último=${ultimoNumero}, Nuevo=${nuevoNumero}`);
-      
-      const client = await soap.createClientAsync(this.wsfeUrl + '?WSDL');
-      
-      // Construir request con logging detallado
-      const feDetReq: any = {
-        FECAEDetRequest: {
-          Concepto: params.concepto,
-          DocTipo: params.docTipo,
-          DocNro: params.docNro,
-          CbteDesde: nuevoNumero,
-          CbteHasta: nuevoNumero,
-          CbteFch: params.fechaComprobante,
-          ImpTotal: Number(params.importeTotal.toFixed(2)),
-          ImpTotConc: 0,
-          ImpNeto: Number(params.importeNeto.toFixed(2)),
-          ImpOpEx: 0,
-          ImpIVA: Number(params.importeIVA.toFixed(2)),
-          ImpTrib: 0,
-          MonId: params.monedaId,
-          MonCotiz: params.cotizacion
-        }
-      };
+    const client = await soap.createClientAsync(this.wsfeUrl + '?WSDL');
+    
+    // 🔧 REQUEST CORREGIDO CON CAMPO OBLIGATORIO
+    const feDetReq: any = {
+      FECAEDetRequest: {
+        Concepto: params.concepto,
+        DocTipo: params.docTipo,
+        DocNro: params.docNro,
+        CbteDesde: nuevoNumero,
+        CbteHasta: nuevoNumero,
+        CbteFch: params.fechaComprobante,
+        ImpTotal: Number(params.importeTotal.toFixed(2)),
+        ImpTotConc: 0,
+        ImpNeto: Number(params.importeNeto.toFixed(2)),
+        ImpOpEx: 0,
+        ImpIVA: Number(params.importeIVA.toFixed(2)),
+        ImpTrib: 0,
+        MonId: params.monedaId,
+        MonCotiz: params.cotizacion,
+        // 🔧 CAMPO OBLIGATORIO AÑADIDO
+        CondicionIVAReceptorId: condicionIvaReceptorId
+      }
+    };
 
       // Agregar IVA si hay alícuotas
       if (params.iva && params.iva.length > 0) {
@@ -519,6 +537,7 @@ export class AfipSoapClient {
         throw new Error('CAE inválido o vacío recibido de AFIP');
       }
 
+      
       // Verificar número de comprobante
       const nroComprobante = respDetalle.CbteDesde || respDetalle.CbteNro || respDetalle.cbteNro;
       if (!nroComprobante) {
