@@ -138,42 +138,82 @@ export function DebugFacturacion() {
   </button>
 )}
 
-<button
-  onClick={() => {
-    setLoading(true);
-    authenticatedFetch('/api/admin/facturas/debug-raw-afip', {
-      method: 'POST'
-    })
-    .then(r => r.json())
-    .then(setResultado)
-    .catch(e => setResultado({ 
-      error: e.message,
-      details: 'Error en petición al endpoint debug-raw-afip'
-    }))
-    .finally(() => setLoading(false));
-  }}
-  disabled={loading}
-  className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
->
-  🔍 Captura RAW AFIP
-</button>
+// En DebugFacturacion.tsx, reemplazar los botones problemáticos con:
 
-<button
-  onClick={() => {
-    setLoading(true);
-    authenticatedFetch('/api/admin/facturas/test-wsfe-alternatives', {
-      method: 'POST'
-    })
-    .then(r => r.json())
-    .then(setResultado)
-    .catch(e => setResultado({ error: e.message }))
-    .finally(() => setLoading(false));
-  }}
-  disabled={loading}
-  className="px-4 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700 disabled:opacity-50"
->
-  🔄 Probar URLs Alternativas WSFE
-</button>
+<div className="flex flex-wrap gap-2">
+  <button
+    onClick={() => {
+      setLoading(true);
+      authenticatedFetch('/api/admin/facturas/test-wsfe-simple', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      })
+      .then(async response => {
+        const data = await response.json();
+        setResultado(data);
+      })
+      .catch(error => {
+        console.error('Error en fetch:', error);
+        setResultado({ 
+          error: 'Error en la petición',
+          details: error.message 
+        });
+      })
+      .finally(() => setLoading(false));
+    }}
+    disabled={loading}
+    className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+  >
+    🔄 Test Simple WSFE
+  </button>
+
+  <button
+    onClick={() => {
+      setLoading(true);
+      authenticatedFetch('/api/admin/facturas/test-single-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: 'https://ws.afip.gov.ar/wsfev1/service.asmx?WSDL' })
+      })
+      .then(async response => {
+        const data = await response.json();
+        setResultado(data);
+      })
+      .catch(error => {
+        setResultado({ error: error.message });
+      })
+      .finally(() => setLoading(false));
+    }}
+    disabled={loading}
+    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+  >
+    🎯 Test URL Específica
+  </button>
+
+  <button
+    onClick={() => {
+      setLoading(true);
+      authenticatedFetch('/api/admin/facturas/test-single-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: 'https://httpbin.org/status/200' })
+      })
+      .then(async response => {
+        const data = await response.json();
+        setResultado(data);
+      })
+      .catch(error => {
+        setResultado({ error: error.message });
+      })
+      .finally(() => setLoading(false));
+    }}
+    disabled={loading}
+    className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
+  >
+    🌐 Test Conectividad
+  </button>
+</div>
         </div>
       </div>
 

@@ -1,95 +1,112 @@
-// src/app/api/admin/facturas/test-wsfe-alternatives/route.ts
+// src/app/api/admin/facturas/test-wsfe-simple/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { authMiddleware } from '@/server/api/middlewares/auth';
 import { checkPermission } from '@/server/api/middlewares/authorization';
 
 export async function POST(req: NextRequest) {
-  const authError = await authMiddleware(req);
-  if (authError) return authError;
-  
-  const permissionError = await checkPermission('admin')(req);
-  if (permissionError) return permissionError;
-
   try {
+    const authError = await authMiddleware(req);
+    if (authError) return authError;
+    
+    const permissionError = await checkPermission('admin')(req);
+    if (permissionError) return permissionError;
+
+    console.log('[TEST-SIMPLE] Iniciando test simple de WSFE');
+
     const resultado: any = {
       timestamp: new Date().toISOString(),
-      tests: {}
+      tests: {},
+      ambiente: process.env.NODE_ENV,
+      servidor: 'vercel' // o el que uses
     };
 
-    // URLs alternativas de WSFE que funcionan en producción
-    const urlsAlternativas = [
-      'https://servicios1.afip.gov.ar/wsfev1/service.asmx?WSDL',
+    // URLs de WSFE para probar una por una
+    const urls = [
       'https://ws.afip.gov.ar/wsfev1/service.asmx?WSDL',
       'https://servicios.afip.gov.ar/wsfev1/service.asmx?WSDL',
       'https://webservices.afip.gov.ar/wsfev1/service.asmx?WSDL',
-      // URLs sin WSDL
       'https://servicios1.afip.gov.ar/wsfev1/service.asmx',
-      'https://ws.afip.gov.ar/wsfev1/service.asmx',
       'https://servicios.afip.gov.ar/wsfev1/service.asmx',
-      'https://webservices.afip.gov.ar/wsfev1/service.asmx'
     ];
 
-    for (const url of urlsAlternativas) {
+    for (let i = 0; i < urls.length; i++) {
+      const url = urls[i];
+      const testName = `test_${i + 1}`;
+      
       try {
-        console.log(`[TEST-ALT] Probando: ${url}`);
+        console.log(`[TEST-SIMPLE] Probando URL ${i + 1}: ${url}`);
         
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
-        
-        const response = await fetch(url, {
-          signal: controller.signal,
+        // Crear una promesa con timeout manual
+        const fetchPromise = fetch(url, {
           method: 'GET',
           headers: {
-            'User-Agent': 'Mozilla/5.0 (compatible; TulumApp/1.0)',
-            'Accept': '*/*'
+            'User-Agent': 'TulumApp/1.0',
+            'Accept': 'text/xml, application/xml, */*'
           }
         });
+
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Timeout')), 8000)
+        );
+
+        const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
         
-        clearTimeout(timeoutId);
+        console.log(`[TEST-SIMPLE] Respuesta recibida: ${response.status}`);
         
-        const responseText = await response.text();
+        const text = await response.text();
         
-        resultado.tests[url] = {
+        resultado.tests[testName] = {
+          url,
           status: response.status,
-          statusText: response.statusText,
+          ok: response.ok,
           contentType: response.headers.get('content-type'),
-          bodyLength: responseText.length,
-          isAccessible: response.status === 200,
-          containsWSDL: responseText.includes('<wsdl:definitions') || responseText.includes('<definitions'),
-          bodyPreview: responseText.substring(0, 300)
+          textLength: text.length,
+          preview: text.substring(0, 200),
+          hasWSDL: text.includes('<wsdl:') || text.includes('<definitions'),
+          hasError: text.toLowerCase().includes('error')
         };
-        
-        console.log(`[TEST-ALT] ${url} → ${response.status}`);
+
+        console.log(`[TEST-SIMPLE] Test ${i + 1} completado: ${response.status}`);
         
       } catch (error) {
-        resultado.tests[url] = {
+        console.error(`[TEST-SIMPLE] Error en test ${i + 1}:`, error);
+        
+        resultado.tests[testName] = {
+          url,
           error: error instanceof Error ? error.message : 'Error desconocido',
-          accessible: false
+          success: false
         };
-        console.error(`[TEST-ALT] Error en ${url}:`, error);
       }
     }
 
-    // Test de conectividad de red general
+    // Test de conectividad básica
     try {
-      const testGeneral = await fetch('https://www.google.com', { 
-        signal: AbortSignal.timeout(5000) 
+      const googleTest = await fetch('https://httpbin.org/status/200', {
+        method: 'GET'
       });
-      resultado.conectividad_general = {
-        google_ok: testGeneral.status === 200,
-        user_agent: 'Test desde servidor'
+      
+      resultado.conectividad_basica = {
+        httpbin_ok: googleTest.ok,
+        status: googleTest.status
       };
     } catch (error) {
-      resultado.conectividad_general = {
-        error: 'Sin conectividad general a internet'
+      resultado.conectividad_basica = {
+        error: 'Sin conectividad externa'
       };
     }
 
+    console.log('[TEST-SIMPLE] Test completado');
     return NextResponse.json(resultado);
     
-  } catch (error) {
+  } catch (globalError) {
+    console.error('[TEST-SIMPLE] Error global:', globalError);
+    
+    // Retornar error detallado
     return NextResponse.json({
-      error: error instanceof Error ? error.message : 'Error desconocido'
+      error: 'Error en endpoint',
+      message: globalError instanceof Error ? globalError.message : 'Error desconocido',
+      stack: globalError instanceof Error ? globalError.stack : undefined,
+      timestamp: new Date().toISOString()
     }, { status: 500 });
   }
 }
