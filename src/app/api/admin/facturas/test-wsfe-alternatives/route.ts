@@ -1,4 +1,4 @@
-// src/app/api/admin/facturas/test-wsfe-simple/route.ts
+// src/app/api/admin/facturas/test-wsfe-alternatives/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { authMiddleware } from '@/server/api/middlewares/auth';
 import { checkPermission } from '@/server/api/middlewares/authorization';
@@ -11,22 +11,24 @@ export async function POST(req: NextRequest) {
     const permissionError = await checkPermission('admin')(req);
     if (permissionError) return permissionError;
 
-    console.log('[TEST-SIMPLE] Iniciando test simple de WSFE');
+    console.log('[TEST-WSFE] Iniciando test de URLs de AFIP');
 
     const resultado: any = {
       timestamp: new Date().toISOString(),
       tests: {},
-      ambiente: process.env.NODE_ENV,
-      servidor: 'vercel' // o el que uses
+      ambiente: process.env.AFIP_ENV || 'testing'
     };
 
-    // URLs de WSFE para probar una por una
+    // ✅ URLs CORREGIDAS - Usar .gob.ar
     const urls = [
-      'https://ws.afip.gov.ar/wsfev1/service.asmx?WSDL',
-      'https://servicios.afip.gov.ar/wsfev1/service.asmx?WSDL',
-      'https://webservices.afip.gov.ar/wsfev1/service.asmx?WSDL',
-      'https://servicios1.afip.gov.ar/wsfev1/service.asmx',
-      'https://servicios.afip.gov.ar/wsfev1/service.asmx',
+      // Producción
+      'https://wsaa.afip.gob.ar/ws/services/LoginCms?WSDL',
+      'https://servicios1.afip.gob.ar/wsfev1/service.asmx?WSDL',
+      // Homologación  
+      'https://wsaahomo.afip.gob.ar/ws/services/LoginCms?WSDL',
+      'https://wswhomo.afip.gob.ar/wsfev1/service.asmx?WSDL',
+      // Test de conectividad básica
+      'https://httpbin.org/status/200'
     ];
 
     for (let i = 0; i < urls.length; i++) {
@@ -34,78 +36,98 @@ export async function POST(req: NextRequest) {
       const testName = `test_${i + 1}`;
       
       try {
-        console.log(`[TEST-SIMPLE] Probando URL ${i + 1}: ${url}`);
+        console.log(`[TEST-WSFE] Probando URL ${i + 1}: ${url}`);
         
-        // Crear una promesa con timeout manual
-        const fetchPromise = fetch(url, {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        
+        const response = await fetch(url, {
           method: 'GET',
           headers: {
-            'User-Agent': 'TulumApp/1.0',
-            'Accept': 'text/xml, application/xml, */*'
-          }
+            'User-Agent': 'TulumApp/1.0 AFIP-Client',
+            'Accept': 'text/xml, application/xml, text/html, */*'
+          },
+          signal: controller.signal
         });
-
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Timeout')), 8000)
-        );
-
-        const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
         
-        console.log(`[TEST-SIMPLE] Respuesta recibida: ${response.status}`);
+        clearTimeout(timeoutId);
         
-        const text = await response.text();
+        // ✅ MANEJO MEJORADO DE RESPUESTAS
+        let responseText: string;
+        let contentType = response.headers.get('content-type') || '';
         
+        try {
+          responseText = await response.text();
+        } catch (textError) {
+          responseText = `[Error leyendo respuesta: ${textError}]`;
+        }
+        
+        // ✅ NO intentar parsear como JSON automáticamente
         resultado.tests[testName] = {
           url,
           status: response.status,
           ok: response.ok,
-          contentType: response.headers.get('content-type'),
-          textLength: text.length,
-          preview: text.substring(0, 200),
-          hasWSDL: text.includes('<wsdl:') || text.includes('<definitions'),
-          hasError: text.toLowerCase().includes('error')
+          statusText: response.statusText,
+          contentType,
+          textLength: responseText.length,
+          preview: responseText.substring(0, 300),
+          hasWSDL: responseText.includes('<wsdl:') || responseText.includes('<definitions'),
+          hasError: responseText.toLowerCase().includes('error'),
+          isXML: contentType.includes('xml') || responseText.includes('<?xml'),
+          isHTML: contentType.includes('html') || responseText.includes('<html'),
+          success: response.ok && (
+            responseText.includes('<wsdl:') || 
+            responseText.includes('<definitions') ||
+            url.includes('httpbin') // Para test de conectividad
+          )
         };
 
-        console.log(`[TEST-SIMPLE] Test ${i + 1} completado: ${response.status}`);
+        console.log(`[TEST-WSFE] Test ${i + 1} - Status: ${response.status}, Success: ${resultado.tests[testName].success}`);
         
       } catch (error) {
-        console.error(`[TEST-SIMPLE] Error en test ${i + 1}:`, error);
+        console.error(`[TEST-WSFE] Error en test ${i + 1}:`, error);
+        
+        // ✅ MANEJO MEJORADO DE ERRORES
+        let errorMessage = 'Error desconocido';
+        if (error instanceof Error) {
+          if (error.name === 'AbortError') {
+            errorMessage = 'Timeout (10 segundos)';
+          } else if (error.message.includes('fetch')) {
+            errorMessage = 'Error de conexión';
+          } else {
+            errorMessage = error.message;
+          }
+        }
         
         resultado.tests[testName] = {
           url,
-          error: error instanceof Error ? error.message : 'Error desconocido',
-          success: false
+          success: false,
+          error: errorMessage,
+          errorType: error instanceof Error ? error.name : 'Unknown'
         };
       }
     }
 
-    // Test de conectividad básica
-    try {
-      const googleTest = await fetch('https://httpbin.org/status/200', {
-        method: 'GET'
-      });
-      
-      resultado.conectividad_basica = {
-        httpbin_ok: googleTest.ok,
-        status: googleTest.status
-      };
-    } catch (error) {
-      resultado.conectividad_basica = {
-        error: 'Sin conectividad externa'
-      };
-    }
+    // ✅ RESUMEN DE RESULTADOS
+    const exitosos = Object.values(resultado.tests).filter(test => (test as any).success).length;
+    const total = Object.keys(resultado.tests).length;
+    
+    resultado.resumen = {
+      total,
+      exitosos,
+      fallidos: total - exitosos,
+      porcentajeExito: Math.round((exitosos / total) * 100)
+    };
 
-    console.log('[TEST-SIMPLE] Test completado');
+    console.log(`[TEST-WSFE] Test completado: ${exitosos}/${total} exitosos`);
     return NextResponse.json(resultado);
     
   } catch (globalError) {
-    console.error('[TEST-SIMPLE] Error global:', globalError);
+    console.error('[TEST-WSFE] Error global:', globalError);
     
-    // Retornar error detallado
     return NextResponse.json({
-      error: 'Error en endpoint',
+      error: 'Error en endpoint de test',
       message: globalError instanceof Error ? globalError.message : 'Error desconocido',
-      stack: globalError instanceof Error ? globalError.stack : undefined,
       timestamp: new Date().toISOString()
     }, { status: 500 });
   }
