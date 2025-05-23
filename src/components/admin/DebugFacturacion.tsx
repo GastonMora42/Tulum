@@ -144,7 +144,7 @@ export function DebugFacturacion() {
   <button
     onClick={() => {
       setLoading(true);
-      authenticatedFetch('/api/admin/facturas/test-wsfe-simple', {
+      authenticatedFetch('/api/admin/facturas/test-wsfe-alternatives', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({})
