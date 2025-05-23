@@ -32,15 +32,24 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
             sucursal: true,
             pagos: true
           }
+        },
+        sucursal: {
+          include: {
+            configuracionAFIP: true
+          }
         }
       }
     });
+    
     
     if (!factura) {
       return NextResponse.json({ error: 'Factura no encontrada' }, { status: 404 });
     }
     
-    return NextResponse.json(factura);
+    return NextResponse.json({
+      ...factura,
+      cuit: factura.sucursal?.configuracionAFIP?.cuit || null
+    });
   } catch (error) {
     console.error('Error al obtener factura:', error);
     return NextResponse.json(

@@ -13,6 +13,7 @@ import {
   BarChart2, PieChart, ArrowDownToLine, UploadCloud,
   CheckCircle, History, Clock, List, Grid, Menu, Info
 } from 'lucide-react';
+import { DebugFacturacion } from '@/components/admin/DebugFacturacion';
 
 export default function AdminFacturasPage() {
   const [facturas, setFacturas] = useState<any[]>([]);
@@ -454,6 +455,8 @@ export default function AdminFacturasPage() {
             <UploadCloud size={16} className="mr-1" />
             Regenerar Pendientes
           </button>
+          
+          <DebugFacturacion />
           
           <div className="flex border rounded-lg overflow-hidden">
             <button

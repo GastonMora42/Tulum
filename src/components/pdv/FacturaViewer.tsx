@@ -180,7 +180,7 @@ export function FacturaViewer({ facturaId, onClose }: FacturaViewerProps) {
           <div>
             <h3 className="text-lg font-semibold mb-2 text-[#311716]">Información del Emisor</h3>
             <p className="text-gray-700">Tulum Aromaterapia</p>
-            <p className="text-gray-700">CUIT: {factura.respuestaAFIP?.Auth?.Cuit || 'N/A'}</p>
+            <p className="text-gray-700">CUIT: {factura.cuit || 'N/A'}</p>
             <p className="text-gray-700">
               Punto de Venta: {String(factura.puntoVenta).padStart(4, '0')}
             </p>

@@ -697,4 +697,94 @@ export class FacturacionService {
       };
     }
   }
+
+/**
+ * Procesar facturas en estado procesando que están colgadas
+ */
+public async procesarFacturasColgadas(): Promise<{
+  procesadas: number;
+  exitosas: number;
+  errores: number;
+  detalles: any[];
+}> {
+  const sessionId = uuidv4().substring(0, 8);
+  const startTime = new Date();
+  const logger = this.createLogger(sessionId, startTime);
+
+  logger.log('=== PROCESANDO FACTURAS COLGADAS ===', 'INFO');
+
+  try {
+    // Buscar facturas en procesando por más de 5 minutos
+    const facturasColgadas = await prisma.facturaElectronica.findMany({
+      where: {
+        estado: 'procesando',
+        updatedAt: { lt: new Date(Date.now() - 5 * 60 * 1000) }
+      },
+      include: {
+        venta: { include: { items: true, sucursal: true } }
+      },
+      take: 10
+    });
+
+    logger.log(`Encontradas ${facturasColgadas.length} facturas colgadas`, 'INFO');
+
+    const resultados = [];
+    let exitosas = 0;
+    let errores = 0;
+
+    for (const factura of facturasColgadas) {
+      try {
+        logger.log(`Reprocesando factura ${factura.id}`, 'INFO');
+        
+        // Resetear estado a pendiente
+        await prisma.facturaElectronica.update({
+          where: { id: factura.id },
+          data: { 
+            estado: 'pendiente',
+            error: null,
+            logs: `${factura.logs || ''}\n[REINTENTO] ${new Date().toISOString()}: Reintentando factura colgada`
+          }
+        });
+
+        // Intentar procesar nuevamente
+        const resultado = await this.generarFactura(factura.ventaId);
+        
+        if (resultado.success) {
+          exitosas++;
+          resultados.push({
+            facturaId: factura.id,
+            estado: 'exitosa',
+            cae: resultado.cae
+          });
+        } else {
+          errores++;
+          resultados.push({
+            facturaId: factura.id,
+            estado: 'error',
+            error: resultado.message
+          });
+        }
+      } catch (error) {
+        errores++;
+        logger.log(`Error reprocesando ${factura.id}: ${error}`, 'ERROR');
+        resultados.push({
+          facturaId: factura.id,
+          estado: 'error',
+          error: error instanceof Error ? error.message : 'Error desconocido'
+        });
+      }
+    }
+
+    return {
+      procesadas: facturasColgadas.length,
+      exitosas,
+      errores,
+      detalles: resultados
+    };
+  } catch (error) {
+    logger.log(`Error general: ${error}`, 'ERROR');
+    throw error;
+  }
+}
+
 }
