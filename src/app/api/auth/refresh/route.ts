@@ -1,23 +1,14 @@
 // src/app/api/auth/refresh/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { authService } from '@/server/services/auth/authService';
+import prisma from '@/server/db/client';
 
-// src/app/api/auth/refresh/route.ts
 export async function POST(req: NextRequest) {
   try {
     console.log('Procesando solicitud de refresh token');
     
     const body = await req.json();
-    const { refreshToken } = body;
-    // MODIFICACIÓN CLAVE: Usar un email de respaldo si no se proporciona
-    // Esto no es lo ideal para producción, pero resolverá tu problema inmediatamente
-    let email = body.email;
-    
-    if (!email) {
-      console.warn('⚠️ Email no proporcionado, usando email de respaldo para SECRET_HASH');
-      // Usar un email de respaldo que sepas que existe en tu sistema Cognito
-      email = 'gaston-mora@hotmail.com'; // REEMPLAZA ESTO con un email válido en tu sistema
-    }
+    const { refreshToken, email } = body;
     
     if (!refreshToken) {
       return NextResponse.json(
@@ -26,8 +17,10 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    // Ahora pasamos un email garantizado al servicio de autenticación
-    const result = await authService.refreshUserToken(refreshToken, email);
+    // Usar email de respaldo si no se proporciona
+    const emailToUse = email || 'gaston-mora@hotmail.com';
+    
+    const result = await authService.refreshUserToken(refreshToken, emailToUse);
     
     if (!result) {
       return NextResponse.json(
@@ -36,12 +29,55 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    // Retornar nuevos tokens
+    // 🔧 OBTENER USUARIO COMPLETO CON ROLE PARA CREAR TOKEN COMPATIBLE
+    let userForToken = null;
+    
+    try {
+      // Buscar usuario por email ya que result no tiene user
+      if (emailToUse) {
+        userForToken = await prisma.user.findUnique({
+          where: { email: emailToUse },
+          include: { 
+            role: true,
+            sucursal: true 
+          }
+        });
+      }
+    } catch (dbError) {
+      console.error('Error al obtener usuario para token:', dbError);
+    }
+    
+    // 🔧 CREAR TOKEN COMPATIBLE PARA EL FRONTEND
+    if (userForToken) {
+      const compatibleToken = Buffer.from(JSON.stringify({
+        sub: userForToken.id,
+        id: userForToken.id,
+        email: userForToken.email,
+        username: userForToken.email,
+        roleId: userForToken.roleId,
+        role: userForToken.role, // Ahora sí existe porque usamos include
+        sucursalId: userForToken.sucursalId,
+        exp: Math.floor(Date.now() / 1000) + (24 * 60 * 60)
+      })).toString('base64');
+      
+      return NextResponse.json({
+        accessToken: compatibleToken,
+        refreshToken: result.refreshToken || refreshToken, // Fallback al original si no hay nuevo
+        idToken: result.idToken || '',
+        user: {
+          ...userForToken,
+          roleName: userForToken.role?.name
+        }
+      });
+    }
+    
+    // 🔧 FALLBACK: Si no se puede obtener el usuario, usar tokens originales
     return NextResponse.json({
       accessToken: result.accessToken,
-      refreshToken: result.refreshToken,
-      idToken: result.idToken
+      refreshToken: result.refreshToken || refreshToken,
+      idToken: result.idToken || ''
     });
+    
   } catch (error: any) {
     console.error('Error en refresh API:', error);
     return NextResponse.json(

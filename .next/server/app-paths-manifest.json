@@ -1,11 +1,12 @@
 {
-  "/api/auth/login/route": "app/api/auth/login/route.js",
-  "/api/auth/me/route": "app/api/auth/me/route.js",
-  "/_not-found/page": "app/_not-found/page.js",
-  "/api/contingencias/route": "app/api/contingencias/route.js",
-  "/api/reportes/stock/bajo/route": "app/api/reportes/stock/bajo/route.js",
-  "/api/auth/refresh/route": "app/api/auth/refresh/route.js",
-  "/(auth)/login/page": "app/(auth)/login/page.js",
-  "/page": "app/page.js",
-  "/(admin)/admin/page": "app/(admin)/admin/page.js"
+  "/api/admin/insumos/route": "app/api/admin/insumos/route.js",
+  "/api/admin/dashboard/route": "app/api/admin/dashboard/route.js",
+  "/api/admin/punto-equilibrio/route": "app/api/admin/punto-equilibrio/route.js",
+  "/(admin)/admin/page": "app/(admin)/admin/page.js",
+  "/(admin)/admin/contingencias/page": "app/(admin)/admin/contingencias/page.js",
+  "/(admin)/admin/insumos/page": "app/(admin)/admin/insumos/page.js",
+  "/(admin)/admin/contingencias/[id]/page": "app/(admin)/admin/contingencias/[id]/page.js",
+  "/(admin)/admin/punto-equilibrio/page": "app/(admin)/admin/punto-equilibrio/page.js",
+  "/(admin)/admin/conciliaciones/[id]/page": "app/(admin)/admin/conciliaciones/[id]/page.js",
+  "/(admin)/admin/reportes/page": "app/(admin)/admin/reportes/page.js"
 }

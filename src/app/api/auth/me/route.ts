@@ -1,6 +1,6 @@
 // src/app/api/auth/me/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { authService } from '@/server/services/auth/authService';
+import prisma from '@/server/db/client';
 
 export async function GET(req: NextRequest) {
   try {
@@ -15,14 +15,50 @@ export async function GET(req: NextRequest) {
     
     const token = authHeader.split(' ')[1];
     
-    // Verificar token con servicio de autenticación
     try {
-      // Obtener payload del token
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      const userId = payload.sub;
+      let userId: string;
+      let userEmail: string;
       
-      // Obtener usuario de nuestra BD
-      const user = await authService.getUserById(userId);
+      // 🔧 MANEJAR DIFERENTES TIPOS DE TOKENS (igual que el middleware)
+      if (token.includes('.') && token.split('.').length === 3) {
+        // Es un JWT
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        userId = payload.sub || payload.id || payload.username;
+        userEmail = payload.email;
+      } else {
+        // Es un token simple (Base64)
+        const payload = JSON.parse(atob(token));
+        userId = payload.sub || payload.id;
+        userEmail = payload.email;
+      }
+      
+      if (!userId) {
+        return NextResponse.json(
+          { error: 'Token inválido - sin ID de usuario' },
+          { status: 401 }
+        );
+      }
+      
+      // Buscar usuario en la base de datos
+      let user = await prisma.user.findUnique({
+        where: { id: userId },
+        include: { 
+          role: true,
+          sucursal: true 
+        }
+      });
+      
+      // Si no se encuentra por ID, buscar por email como fallback
+      if (!user && userEmail) {
+        user = await prisma.user.findUnique({
+          where: { email: userEmail },
+          include: { 
+            role: true,
+            sucursal: true 
+          }
+        });
+      }
+      
       if (!user) {
         return NextResponse.json(
           { error: 'Usuario no encontrado' },
@@ -31,10 +67,15 @@ export async function GET(req: NextRequest) {
       }
       
       // Retornar información del usuario
-      return NextResponse.json({ user });
+      return NextResponse.json({ 
+        user: {
+          ...user,
+          roleName: user.role?.name
+        }
+      });
       
-    } catch (error) {
-      console.error('Error al verificar token:', error);
+    } catch (tokenError) {
+      console.error('Error al verificar token en /api/auth/me:', tokenError);
       return NextResponse.json(
         { error: 'Token inválido' },
         { status: 401 }

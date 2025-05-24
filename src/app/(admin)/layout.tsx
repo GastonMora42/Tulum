@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores/authStore';
 import Link from 'next/link';
 import { OfflineStatus } from '@/components/ui/OfflineStatus';
+import { authenticatedFetch } from '@/hooks/useAuth';
 import {
   HomeIcon,
   Package,
@@ -23,7 +24,10 @@ import {
   Box,
   Clock,
   Tag,
-  FileText
+  FileText,
+  MapPin,
+  TrendingUp,
+  CheckSquare
 } from 'lucide-react';
 
 export default function AdminLayout({
@@ -31,65 +35,132 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { user, isAuthenticated, hasRole } = useAuthStore();
+  const { user, isAuthenticated, hasRole, setUser, clearAuth } = useAuthStore();
   const [isLoading, setIsLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const router = useRouter();
   const pathname = usePathname();
-
-  const { setUser } = useAuthStore();
 
   // Verificar autenticación
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        // Verificar si hay token
-        const token = localStorage.getItem('accessToken');
-        if (!token) {
-          console.log('No hay token, redireccionando a login');
+        setIsLoading(true);
+        setAuthError(null);
+        
+        // Verificar si hay tokens en localStorage
+        const accessToken = localStorage.getItem('accessToken');
+        const userEmail = localStorage.getItem('userEmail');
+        
+        if (!accessToken) {
+          console.log('No hay token, redirigiendo a login');
+          clearAuth();
           router.push('/login');
           return;
         }
 
-        // Si no hay usuario en el store, intentar obtenerlo
-        if (!user) {
-          try {
-            const response = await fetch('/api/auth/me', {
-              headers: {
-                'Authorization': `Bearer ${token}`,
-              },
-            });
-
-            if (!response.ok) {
-              throw new Error('Error al obtener información del usuario');
-            }
-
-            const data = await response.json();
-
-            if (data.user) {
-              // Usar el setUser del store
-              setUser(data.user);
-            }
-          } catch (error) {
-            console.error('Error al obtener usuario:', error);
-            router.push('/login');
+        // Si ya tenemos usuario en el store y parece válido, no hacer la llamada
+        if (user && user.email && user.roleId) {
+          console.log('Usuario ya cargado en store:', user.email);
+          
+          // Verificar que sea admin
+          if (user.roleId !== 'role-admin') {
+            console.log('Usuario no es admin, redirigiendo...');
+            router.push('/unauthorized');
             return;
           }
-        }
-
-        // Si el usuario no tiene rol admin, redirigir
-        if (user && user.roleId !== 'role-admin' && !hasRole('admin')) {
-          console.log('Usuario no es admin, redirigiendo...');
-          router.push('/');
+          
+          setIsLoading(false);
           return;
         }
 
-        setIsLoading(false);
+        try {
+          // Intentar obtener información del usuario del servidor
+          const response = await authenticatedFetch('/api/auth/me');
+          
+          if (!response.ok) {
+            // Si falla, intentar crear usuario desde token local
+            if (accessToken && userEmail) {
+              console.log('Creando usuario desde token local...');
+              
+              try {
+                let tokenPayload;
+                if (accessToken.includes('.') && accessToken.split('.').length === 3) {
+                  tokenPayload = JSON.parse(atob(accessToken.split('.')[1]));
+                } else {
+                  tokenPayload = JSON.parse(atob(accessToken));
+                }
+                
+                if (tokenPayload && tokenPayload.id) {
+                  const localUser = {
+                    id: tokenPayload.id,
+                    email: tokenPayload.email || userEmail,
+                    name: tokenPayload.name || 'Usuario',
+                    roleId: tokenPayload.roleId || 'role-admin',
+                    sucursalId: tokenPayload.sucursalId || null,
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                    roleName: tokenPayload.role?.name || 'admin'
+                  };
+                  
+                  setUser(localUser);
+                  
+                  // Verificar que sea admin
+                  if (localUser.roleId !== 'role-admin') {
+                    router.push('/unauthorized');
+                    return;
+                  }
+                  
+                  setIsLoading(false);
+                  return;
+                }
+              } catch (decodeError) {
+                console.error('Error al decodificar token local:', decodeError);
+              }
+            }
+            
+            throw new Error('No se pudo obtener información del usuario');
+          }
+          
+          const data = await response.json();
+          
+          if (data.user) {
+            setUser(data.user);
+            console.log('Usuario cargado desde servidor:', data.user.email);
+            
+            // Verificar que sea admin
+            if (data.user.roleId !== 'role-admin') {
+              console.log('Usuario no es admin, redirigiendo...');
+              router.push('/unauthorized');
+              return;
+            }
+          } else {
+            throw new Error('Respuesta del servidor sin usuario');
+          }
+          
+        } catch (apiError) {
+          console.error('Error en llamada a /api/auth/me:', apiError);
+          setAuthError('Error al verificar autenticación');
+          
+          setTimeout(() => {
+            clearAuth();
+            router.push('/login?error=auth_check_failed');
+          }, 2000);
+        }
+        
       } catch (error) {
-        console.error('Error en verificación de autenticación:', error);
-        router.push('/login');
+        console.error('Error general en checkAuth:', error);
+        setAuthError('Error de autenticación');
+        
+        setTimeout(() => {
+          clearAuth();
+          router.push('/login?error=general_auth_error');
+        }, 2000);
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -109,17 +180,22 @@ export default function AdminLayout({
     return () => {
       window.removeEventListener('resize', checkMobile);
     };
-  }, [router, user, hasRole, setUser]);
+  }, [router, user, setUser, clearAuth]);
 
-  const handleLogout = () => {
-    // Logout
-    fetch('/api/auth/logout', {
-      method: 'POST',
-    }).then(() => {
-      // Limpiar store
-      useAuthStore.getState().clearAuth();
-      router.push('/login');
-    });
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`,
+        },
+      });
+    } catch (error) {
+      console.error('Error en logout:', error);
+    }
+    
+    clearAuth();
+    router.push('/login');
   };
 
   const navItems = [
@@ -150,14 +226,16 @@ export default function AdminLayout({
       ]
     },
     { href: '/admin/usuarios', label: 'Usuarios', icon: <Users className="w-5 h-5" /> },
+    { href: '/admin/ubicaciones', label: 'Ubicaciones', icon: <MapPin className="w-5 h-5" /> },
     { href: '/admin/contingencias', label: 'Contingencias', icon: <AlertTriangle className="w-5 h-5" /> },
-    { href: '/admin/conciliaciones/', label: 'Conciliaciones', icon: <BarChart2 className="w-5 h-5" /> },
-    { href: '/admin/facturas', label: 'Facturas', icon: <FileText className="h-5 w-5" />, text: 'Facturas' },
+    { href: '/admin/conciliaciones', label: 'Conciliaciones', icon: <CheckSquare className="w-5 h-5" /> },
+    { href: '/admin/punto-equilibrio', label: 'Punto de Equilibrio', icon: <TrendingUp className="w-5 h-5" /> },
+    { href: '/admin/facturas', label: 'Facturas', icon: <FileText className="h-5 w-5" /> },
     { href: '/admin/descuentos', label: 'Códigos de Descuento', icon: <Tag className="w-5 h-5" /> },
     { href: '/admin/reportes', label: 'Reportes', icon: <BarChart2 className="w-5 h-5" /> },
-    { href: '/admin/configuracion/afip', label: 'ARCA', icon: <BarChart2 className="w-5 h-5" /> },
-    { href: '/fabrica', label: 'Fabrica', icon: <HomeIcon className="w-5 h-5" /> },
-    { href: '/pdv', label: 'PDV', icon: <HomeIcon className="w-5 h-5" /> }
+    { href: '/admin/configuracion/afip', label: 'ARCA', icon: <Settings className="w-5 h-5" /> },
+    { href: '/fabrica', label: 'Fábrica', icon: <Beaker className="w-5 h-5" /> },
+    { href: '/pdv', label: 'PDV', icon: <ShoppingCart className="w-5 h-5" /> }
   ];
   
   // Control de submenús
@@ -175,10 +253,33 @@ export default function AdminLayout({
   
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="flex flex-col items-center gap-2">
-          <div className="w-16 h-16 border-4 border-[#eeb077] border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-lg text-[#311716]">Cargando...</p>
+      <div className="min-h-screen flex items-center justify-center bg-[#fcf3ea]">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-[#eeb077] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-[#311716] font-medium">Verificando autenticación...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (authError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#fcf3ea]">
+        <div className="text-center">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            <p>{authError}</p>
+            <p className="text-sm mt-2">Redirigiendo al login...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#fcf3ea]">
+        <div className="text-center">
+          <p className="text-[#311716]">Redirigiendo...</p>
         </div>
       </div>
     );
@@ -288,7 +389,7 @@ export default function AdminLayout({
           </ul>
         </div>
         
-        {/* Logout Button - Ahora sticky para que siempre esté visible */}
+        {/* Logout Button */}
         <div className="sticky bottom-0 border-t border-[#4a292a] p-4 bg-[#311716]">
           <button
             onClick={handleLogout}
@@ -312,7 +413,6 @@ export default function AdminLayout({
           </button>
           
           <div className="flex-1 flex justify-end items-center space-x-4">
-            {/* User dropdown menu en header */}
             <div className="relative">
               <button 
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
@@ -327,7 +427,6 @@ export default function AdminLayout({
                 </div>
               </button>
               
-              {/* Dropdown menu */}
               {userMenuOpen && (
                 <div className="absolute right-0 mt-2 w-48 py-2 bg-white rounded-md shadow-lg ring-1 ring-black ring-opacity-5 z-10">
                   <div className="px-4 py-2 text-xs text-gray-500 border-b">
@@ -353,13 +452,13 @@ export default function AdminLayout({
         </main>
       </div>
       
-{/* Mobile Overlay - Corregido para no ser completamente negro */}
-{sidebarOpen && isMobile && (
-  <div 
-    className="fixed inset-0 bg-opacity-10 backdrop-blur-sm z-40 lg:hidden"
-    onClick={() => setSidebarOpen(false)}
-  />
-)}
+      {/* Mobile Overlay */}
+      {sidebarOpen && isMobile && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
     </div>
   );
 }
