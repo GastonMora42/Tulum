@@ -29,6 +29,7 @@ model User {
   conciliaciones   Conciliacion[]
   cajaEgresos      CajaEgreso[]
   reintentos       FacturaReintento[]
+  puntoEquilibrioConfigs PuntoEquilibrioConfig[]
 }
 
 model Role {
@@ -204,6 +205,8 @@ model Ubicacion {
   // Añadir esta nueva relación
   conciliaciones Conciliacion[]
   contingencias Contingencia[]
+
+  puntoEquilibrioConfigs PuntoEquilibrioConfig[]
 }
 
 // Distribución
@@ -445,4 +448,21 @@ model FacturaReintento {
   cae            String?
   iniciadoEn     DateTime  @default(now())
   completadoEn   DateTime?
+}
+
+model PuntoEquilibrioConfig {
+  id            String   @id @default(uuid())
+  sucursalId    String
+  sucursal      Ubicacion @relation(fields: [sucursalId], references: [id])
+  costosFijos   Float
+  costosVariables Float  // Porcentaje
+  metaMensual   Float
+  mes           Int      // 1-12
+  año           Int
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  creadoPor     String
+  usuario       User     @relation(fields: [creadoPor], references: [id])
+  
+  @@unique([sucursalId, mes, año])
 }

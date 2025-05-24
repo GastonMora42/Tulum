@@ -1,5 +1,10 @@
 {
-  "/api/admin/health/afip/route": "app/api/admin/health/afip/route.js",
+  "/api/auth/login/route": "app/api/auth/login/route.js",
+  "/api/auth/me/route": "app/api/auth/me/route.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/contingencias/route": "app/api/contingencias/route.js",
+  "/api/reportes/stock/bajo/route": "app/api/reportes/stock/bajo/route.js",
+  "/api/auth/refresh/route": "app/api/auth/refresh/route.js",
   "/(auth)/login/page": "app/(auth)/login/page.js",
   "/page": "app/page.js",
   "/(admin)/admin/page": "app/(admin)/admin/page.js"

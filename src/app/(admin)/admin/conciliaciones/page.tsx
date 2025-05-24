@@ -1,59 +1,58 @@
-// src/app/(admin)/admin/envios-insumos/page.tsx (MEJORADA)
+// src/app/(admin)/admin/conciliaciones/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { 
-  Package, 
+  FileText, 
   Plus, 
+  Search, 
   Filter, 
-  RefreshCw, 
-  TruckIcon,
+  RefreshCw,
   Clock,
   CheckCircle,
   AlertTriangle,
-  Send,
   Eye,
-  Search,
   Calendar,
   MapPin,
-  User
+  User,
+  BarChart3
 } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
 import { ContrastEnhancer } from '@/components/ui/ContrastEnhancer';
 
-interface Envio {
+interface Conciliacion {
   id: string;
-  origenId: string;
-  destinoId: string;
-  fechaCreacion: string;
-  fechaEnvio: string | null;
-  fechaRecepcion: string | null;
+  sucursalId: string;
+  fecha: string;
   estado: string;
-  origen: { nombre: string; };
-  destino: { nombre: string; };
-  usuario: { name: string; };
-  items: Array<{
-    id: string;
-    cantidad: number;
-    insumo: {
-      nombre: string;
-      unidadMedida: string;
-    };
-  }>;
+  usuarioId: string;
+  detalles: any;
+  observaciones?: string;
+  sucursal: {
+    nombre: string;
+    tipo: string;
+  };
+  usuario: {
+    name: string;
+  };
+  _count: {
+    contingencias: number;
+  };
 }
 
-export default function EnviosInsumosPage() {
-  const [envios, setEnvios] = useState<Envio[]>([]);
+export default function ConciliacionesPage() {
+  const [conciliaciones, setConciliaciones] = useState<Conciliacion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filtros, setFiltros] = useState({
     estado: '',
-    origen: '',
-    destino: '',
+    sucursal: '',
     fechaDesde: '',
-    fechaHasta: ''
+    fechaHasta: '',
+    usuario: ''
   });
   const [showFilters, setShowFilters] = useState(false);
 
@@ -62,25 +61,13 @@ export default function EnviosInsumosPage() {
       color: 'bg-yellow-100 text-yellow-800', 
       icon: Clock, 
       label: 'Pendiente',
-      description: 'Esperando procesamiento'
+      description: 'En proceso de revisión'
     },
-    enviado: { 
-      color: 'bg-blue-100 text-blue-800', 
-      icon: Send, 
-      label: 'Enviado',
-      description: 'En camino al destino'
-    },
-    en_transito: { 
-      color: 'bg-indigo-100 text-indigo-800', 
-      icon: TruckIcon, 
-      label: 'En Tránsito',
-      description: 'Transportándose'
-    },
-    recibido: { 
+    completada: { 
       color: 'bg-green-100 text-green-800', 
       icon: CheckCircle, 
-      label: 'Recibido',
-      description: 'Entregado exitosamente'
+      label: 'Completada',
+      description: 'Conciliación finalizada'
     },
     con_contingencia: { 
       color: 'bg-red-100 text-red-800', 
@@ -91,10 +78,10 @@ export default function EnviosInsumosPage() {
   };
 
   useEffect(() => {
-    fetchEnvios();
+    fetchConciliaciones();
   }, [filtros]);
 
-  const fetchEnvios = async () => {
+  const fetchConciliaciones = async () => {
     try {
       setIsLoading(true);
       
@@ -103,15 +90,15 @@ export default function EnviosInsumosPage() {
         if (value) params.append(key, value);
       });
       
-      const response = await authenticatedFetch(`/api/admin/envios-insumos?${params.toString()}`);
+      const response = await authenticatedFetch(`/api/admin/conciliaciones?${params.toString()}`);
       
-      if (!response.ok) throw new Error('Error al cargar envíos');
+      if (!response.ok) throw new Error('Error al cargar conciliaciones');
       
       const data = await response.json();
-      setEnvios(data);
+      setConciliaciones(data);
     } catch (err) {
       console.error('Error:', err);
-      setError('No se pudieron cargar los envíos');
+      setError('No se pudieron cargar las conciliaciones');
     } finally {
       setIsLoading(false);
     }
@@ -121,8 +108,7 @@ export default function EnviosInsumosPage() {
     return estadosConfig[estado as keyof typeof estadosConfig] || estadosConfig.pendiente;
   };
 
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return '-';
+  const formatDate = (dateString: string) => {
     try {
       return format(new Date(dateString), 'dd/MM/yyyy HH:mm');
     } catch (e) {
@@ -133,31 +119,31 @@ export default function EnviosInsumosPage() {
   const clearFilters = () => {
     setFiltros({
       estado: '',
-      origen: '',
-      destino: '',
+      sucursal: '',
       fechaDesde: '',
-      fechaHasta: ''
+      fechaHasta: '',
+      usuario: ''
     });
   };
 
   // Estadísticas rápidas
   const stats = {
-    total: envios.length,
-    pendientes: envios.filter(e => e.estado === 'pendiente').length,
-    enTransito: envios.filter(e => e.estado === 'en_transito' || e.estado === 'enviado').length,
-    recibidos: envios.filter(e => e.estado === 'recibido').length,
-    contingencias: envios.filter(e => e.estado === 'con_contingencia').length
+    total: conciliaciones.length,
+    pendientes: conciliaciones.filter(c => c.estado === 'pendiente').length,
+    completadas: conciliaciones.filter(c => c.estado === 'completada').length,
+    conContingencias: conciliaciones.filter(c => c.estado === 'con_contingencia').length,
+    totalContingencias: conciliaciones.reduce((sum, c) => sum + c._count.contingencias, 0)
   };
 
   return (
     <ContrastEnhancer>
       <div className="space-y-6">
-        {/* Header Mejorado */}
+        {/* Header */}
         <div className="bg-gradient-to-r from-[#311716] to-[#462625] rounded-lg p-6 text-white">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-3xl font-bold mb-2">Gestión de Envíos de Insumos</h1>
-              <p className="text-white/80">Controla y administra todos los envíos de insumos del sistema</p>
+              <h1 className="text-3xl font-bold mb-2">Gestión de Conciliaciones</h1>
+              <p className="text-white/80">Supervisa y administra las conciliaciones de inventario</p>
             </div>
             <div className="flex space-x-3">
               <button
@@ -168,22 +154,22 @@ export default function EnviosInsumosPage() {
                 {showFilters ? 'Ocultar Filtros' : 'Filtros'}
               </button>
               <Link 
-                href="/admin/envios/nuevo" 
+                href="/admin/conciliaciones/nueva" 
                 className="inline-flex items-center px-4 py-2 bg-white text-[#311716] rounded-md hover:bg-gray-100 transition-colors font-medium"
               >
                 <Plus className="h-4 w-4 mr-2" />
-                Nuevo Envío
+                Nueva Conciliación
               </Link>
             </div>
           </div>
         </div>
 
-        {/* Estadísticas Dashboard */}
+        {/* Estadísticas */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div className="bg-white rounded-lg shadow border border-gray-200 p-4">
             <div className="flex items-center">
               <div className="bg-gray-100 p-2 rounded-lg">
-                <Package className="h-6 w-6 text-gray-600" />
+                <FileText className="h-6 w-6 text-gray-600" />
               </div>
               <div className="ml-3">
                 <p className="text-sm font-medium text-gray-600">Total</p>
@@ -204,26 +190,14 @@ export default function EnviosInsumosPage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow border border-blue-200 p-4">
-            <div className="flex items-center">
-              <div className="bg-blue-100 p-2 rounded-lg">
-                <TruckIcon className="h-6 w-6 text-blue-600" />
-              </div>
-              <div className="ml-3">
-                <p className="text-sm font-medium text-blue-700">En Tránsito</p>
-                <p className="text-2xl font-bold text-blue-900">{stats.enTransito}</p>
-              </div>
-            </div>
-          </div>
-
           <div className="bg-white rounded-lg shadow border border-green-200 p-4">
             <div className="flex items-center">
               <div className="bg-green-100 p-2 rounded-lg">
                 <CheckCircle className="h-6 w-6 text-green-600" />
               </div>
               <div className="ml-3">
-                <p className="text-sm font-medium text-green-700">Recibidos</p>
-                <p className="text-2xl font-bold text-green-900">{stats.recibidos}</p>
+                <p className="text-sm font-medium text-green-700">Completadas</p>
+                <p className="text-2xl font-bold text-green-900">{stats.completadas}</p>
               </div>
             </div>
           </div>
@@ -234,14 +208,26 @@ export default function EnviosInsumosPage() {
                 <AlertTriangle className="h-6 w-6 text-red-600" />
               </div>
               <div className="ml-3">
-                <p className="text-sm font-medium text-red-700">Contingencias</p>
-                <p className="text-2xl font-bold text-red-900">{stats.contingencias}</p>
+                <p className="text-sm font-medium text-red-700">Con Contingencias</p>
+                <p className="text-2xl font-bold text-red-900">{stats.conContingencias}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow border border-orange-200 p-4">
+            <div className="flex items-center">
+              <div className="bg-orange-100 p-2 rounded-lg">
+                <BarChart3 className="h-6 w-6 text-orange-600" />
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium text-orange-700">Contingencias</p>
+                <p className="text-2xl font-bold text-orange-900">{stats.totalContingencias}</p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Panel de Filtros Expandible */}
+        {/* Panel de Filtros */}
         {showFilters && (
           <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Filtros Avanzados</h3>
@@ -255,9 +241,7 @@ export default function EnviosInsumosPage() {
                 >
                   <option value="">Todos los estados</option>
                   <option value="pendiente">Pendiente</option>
-                  <option value="enviado">Enviado</option>
-                  <option value="en_transito">En tránsito</option>
-                  <option value="recibido">Recibido</option>
+                  <option value="completada">Completada</option>
                   <option value="con_contingencia">Con contingencia</option>
                 </select>
               </div>
@@ -294,7 +278,7 @@ export default function EnviosInsumosPage() {
 
               <div className="flex items-end">
                 <button
-                  onClick={fetchEnvios}
+                  onClick={fetchConciliaciones}
                   className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-[#311716] hover:bg-[#462625]"
                 >
                   <Search className="h-4 w-4 mr-2" />
@@ -305,50 +289,39 @@ export default function EnviosInsumosPage() {
           </div>
         )}
 
-        {/* Lista Mejorada de Envíos */}
+        {/* Lista de Conciliaciones */}
         <div className="bg-white shadow overflow-hidden sm:rounded-lg">
           {isLoading ? (
             <div className="text-center py-12">
               <div className="inline-block animate-spin h-8 w-8 border-4 border-[#311716] border-t-transparent rounded-full"></div>
-              <p className="mt-2 text-sm text-gray-600">Cargando envíos...</p>
+              <p className="mt-2 text-sm text-gray-600">Cargando conciliaciones...</p>
             </div>
           ) : error ? (
             <div className="text-center py-12">
               <AlertTriangle className="h-12 w-12 text-red-400 mx-auto mb-4" />
               <p className="text-red-600">{error}</p>
             </div>
-          ) : envios.length === 0 ? (
+          ) : conciliaciones.length === 0 ? (
             <div className="text-center py-12">
-              <TruckIcon className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900">No hay envíos</h3>
+              <FileText className="mx-auto h-12 w-12 text-gray-400" />
+              <h3 className="mt-2 text-sm font-medium text-gray-900">No hay conciliaciones</h3>
               <p className="mt-1 text-sm text-gray-500">
-                Comienza creando un nuevo envío de insumos.
+                Las conciliaciones aparecerán aquí cuando se generen desde las sucursales.
               </p>
-              <div className="mt-6">
-                <Link
-                  href="/admin/envios/nuevo"
-                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-[#311716] hover:bg-[#462625]"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nuevo Envío
-                </Link>
-              </div>
             </div>
           ) : (
             <div className="divide-y divide-gray-200">
-              {envios.map((envio) => {
-                const estadoConfig = getEstadoConfig(envio.estado);
+              {conciliaciones.map((conciliacion) => {
+                const estadoConfig = getEstadoConfig(conciliacion.estado);
                 const IconoEstado = estadoConfig.icon;
                 
                 return (
-                  <div key={envio.id} className="p-6 hover:bg-gray-50 transition-colors">
+                  <div key={conciliacion.id} className="p-6 hover:bg-gray-50 transition-colors">
                     <div className="flex items-center justify-between">
                       <div className="flex items-start space-x-4">
                         <div className="flex-shrink-0">
                           <div className={`p-2 rounded-lg ${estadoConfig.color.replace('text-', 'bg-').replace('800', '100')}`}>
                             <IconoEstado className={`h-5 w-5 ${estadoConfig.color.includes('yellow') ? 'text-yellow-600' : 
-                                                                    estadoConfig.color.includes('blue') ? 'text-blue-600' :
-                                                                    estadoConfig.color.includes('indigo') ? 'text-indigo-600' :
                                                                     estadoConfig.color.includes('green') ? 'text-green-600' :
                                                                     'text-red-600'}`} />
                           </div>
@@ -357,78 +330,68 @@ export default function EnviosInsumosPage() {
                         <div className="flex-1">
                           <div className="flex items-center space-x-3 mb-2">
                             <h3 className="text-lg font-medium text-gray-900">
-                              Envío #{envio.id.substring(envio.id.length - 8)}
+                              Conciliación #{conciliacion.id.substring(conciliacion.id.length - 8)}
                             </h3>
                             <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${estadoConfig.color}`}>
                               {estadoConfig.label}
                             </span>
+                            {conciliacion._count.contingencias > 0 && (
+                              <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">
+                                {conciliacion._count.contingencias} contingencias
+                              </span>
+                            )}
                           </div>
                           
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
                             <div className="flex items-center">
-                              <MapPin className="h-4 w-4 mr-1 text-green-500" />
-                              <span className="font-medium">Origen:</span>
-                              <span className="ml-1">{envio.origen.nombre}</span>
-                            </div>
-                            <div className="flex items-center">
-                              <MapPin className="h-4 w-4 mr-1 text-red-500" />
-                              <span className="font-medium">Destino:</span>
-                              <span className="ml-1">{envio.destino.nombre}</span>
+                              <MapPin className="h-4 w-4 mr-1 text-gray-400" />
+                              <span className="font-medium">Sucursal:</span>
+                              <span className="ml-1">{conciliacion.sucursal.nombre}</span>
                             </div>
                             <div className="flex items-center">
                               <User className="h-4 w-4 mr-1 text-gray-400" />
-                              <span className="font-medium">Creado por:</span>
-                              <span className="ml-1">{envio.usuario.name}</span>
+                              <span className="font-medium">Responsable:</span>
+                              <span className="ml-1">{conciliacion.usuario.name}</span>
+                            </div>
+                            <div className="flex items-center">
+                              <Calendar className="h-4 w-4 mr-1 text-gray-400" />
+                              <span className="font-medium">Fecha:</span>
+                              <span className="ml-1">{formatDate(conciliacion.fecha)}</span>
                             </div>
                           </div>
                           
-                          <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                            <div>
-                              <span className="flex items-center text-gray-500">
-                                <Calendar className="h-4 w-4 mr-1" />
-                                Creado: {formatDate(envio.fechaCreacion)}
-                              </span>
+                          {conciliacion.observaciones && (
+                            <div className="mt-3 text-sm text-gray-600">
+                              <p className="italic">"{conciliacion.observaciones}"</p>
                             </div>
-                            {envio.fechaEnvio && (
-                              <div>
-                                <span className="flex items-center text-blue-600">
-                                  <Send className="h-4 w-4 mr-1" />
-                                  Enviado: {formatDate(envio.fechaEnvio)}
-                                </span>
-                              </div>
-                            )}
-                            {envio.fechaRecepcion && (
-                              <div>
-                                <span className="flex items-center text-green-600">
-                                  <CheckCircle className="h-4 w-4 mr-1" />
-                                  Recibido: {formatDate(envio.fechaRecepcion)}
-                                </span>
-                              </div>
-                            )}
-                          </div>
+                          )}
 
-                          {/* Resumen de items */}
-                          <div className="mt-3 flex items-center text-sm text-gray-500">
-                            <Package className="h-4 w-4 mr-1" />
-                            <span>{envio.items.length} insumos • </span>
-                            <span className="ml-1">
-                              {envio.items.reduce((sum, item) => sum + item.cantidad, 0)} unidades totales
-                            </span>
+                          <div className="mt-3 text-xs text-gray-500">
+                            {estadoConfig.description}
                           </div>
                         </div>
                       </div>
                       
                       <div className="flex flex-col items-end space-y-2">
-                        <div className="text-right text-xs text-gray-500 mb-2">
-                          {estadoConfig.description}
+                        <div className="flex space-x-2">
+                          <Link 
+                            href={`/admin/conciliaciones/${conciliacion.id}`}
+                            className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            Ver detalles
+                          </Link>
+                          
+                          {conciliacion._count.contingencias > 0 && (
+                            <Link 
+                              href={`/admin/conciliaciones/${conciliacion.id}/contingencias`}
+                              className="inline-flex items-center px-3 py-2 border border-orange-300 shadow-sm text-sm leading-4 font-medium rounded-md text-orange-700 bg-orange-50 hover:bg-orange-100"
+                            >
+                              <AlertTriangle className="h-4 w-4 mr-1" />
+                              Contingencias
+                            </Link>
+                          )}
                         </div>
-                        <Link 
-                          href={`/admin/envios/${envio.id}`}
-                          className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          Ver detalles
-                        </Link>
                       </div>
                     </div>
                   </div>
