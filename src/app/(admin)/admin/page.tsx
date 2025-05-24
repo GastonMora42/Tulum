@@ -167,7 +167,7 @@ export default function AdminDashboard() {
       <div className="bg-gradient-to-r from-[#311716] via-[#462625] to-[#9c7561] rounded-2xl p-8 text-white shadow-xl">
         <div className="flex justify-between items-start">
           <div>
-            <h1 className="text-4xl font-bold mb-3">Centro de Control Ejecutivo</h1>
+            <h1 className="text-4xl font-bold mb-3">Panel de administracion central</h1>
             <p className="text-white/90 text-lg">
               Bienvenido, <span className="font-semibold text-[#eeb077]">{user?.name}</span>
             </p>

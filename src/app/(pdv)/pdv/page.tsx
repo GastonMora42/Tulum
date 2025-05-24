@@ -1,4 +1,4 @@
-// src/app/(pdv)/pdv/page.tsx (actualización para añadir escáner)
+// src/app/(pdv)/pdv/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -11,13 +11,9 @@ import { useOffline } from '@/hooks/useOffline';
 import { SucursalSetupModal } from '@/components/pdv/SucursalSetupModal';
 import { authenticatedFetch } from '@/hooks/useAuth';
 import { 
-  AlertCircle, 
-  CheckCircle, 
-  X, 
-  QrCode,
-  Package,
-  Grid,
-  Layers
+  AlertCircle, CheckCircle, X, QrCode, Package, Grid, Layers, 
+  ShoppingCart as CartIcon, Star, TrendingUp, Clock, Zap,
+  Filter, Search, ChevronDown, ArrowRight
 } from 'lucide-react';
 import { Producto } from '@/types/models/producto';
 
@@ -32,14 +28,19 @@ export default function PDVPage() {
   const [activeCategory, setActiveCategory] = useState<string>('todos');
   const [isMobileView, setIsMobileView] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
+  const [currentView, setCurrentView] = useState<'products' | 'cart'>('products');
+  const [showFilters, setShowFilters] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   
-  const { addItem, items } = useCartStore();
+  const { addItem, items, getTotal } = useCartStore();
   const { isOnline } = useOffline();
   
   // Verificar el tamaño de pantalla
   useEffect(() => {
     const checkMobile = () => {
-      setIsMobileView(window.innerWidth < 768);
+      const isMob = window.innerWidth < 768;
+      setIsMobileView(isMob);
+      if (!isMob) setCurrentView('products');
     };
     
     checkMobile();
@@ -53,7 +54,6 @@ export default function PDVPage() {
       try {
         setIsLoading(true);
         
-        // Verificar si hay sucursal configurada
         const sucursalId = localStorage.getItem('sucursalId');
         
         if (!sucursalId) {
@@ -62,12 +62,10 @@ export default function PDVPage() {
         }
         
         if (!isOnline) {
-          // Si estamos offline, asumimos que hay caja abierta
           setHayCajaAbierta(true);
           return;
         }
         
-        // Verificar estado de la caja
         const response = await authenticatedFetch(`/api/pdv/cierre?sucursalId=${sucursalId}`);
         
         if (response.status === 404) {
@@ -90,7 +88,7 @@ export default function PDVPage() {
         const popularesResponse = await authenticatedFetch(`/api/pdv/productos-disponibles?popular=true&sucursalId=${sucursalId}`);
         if (popularesResponse.ok) {
           const popularesData = await popularesResponse.json();
-          setProductosPopulares(popularesData.slice(0, 8));
+          setProductosPopulares(popularesData.slice(0, 12));
         }
       } catch (error) {
         console.error('Error al verificar caja:', error);
@@ -117,10 +115,9 @@ export default function PDVPage() {
         throw new Error('No se ha definido una sucursal para este punto de venta');
       }
       
-      // Solicitar monto inicial
       const montoInicial = prompt('Ingrese el monto inicial de la caja:');
       
-      if (montoInicial === null) return; // Usuario canceló
+      if (montoInicial === null) return;
       
       const montoInicialNum = parseFloat(montoInicial);
       
@@ -128,7 +125,6 @@ export default function PDVPage() {
         throw new Error('El monto inicial debe ser un número válido mayor o igual a cero');
       }
       
-      // Crear caja
       const response = await authenticatedFetch('/api/pdv/cierre', {
         method: 'POST',
         headers: {
@@ -169,7 +165,6 @@ export default function PDVPage() {
         throw new Error('No se ha definido una sucursal');
       }
       
-      // Buscar producto por código de barras
       const response = await authenticatedFetch(`/api/productos/barcode?code=${encodeURIComponent(code)}&sucursalId=${sucursalId}`);
       
       if (!response.ok) {
@@ -178,7 +173,6 @@ export default function PDVPage() {
       
       const producto = await response.json();
       
-      // Verificar stock disponible
       if (producto.stock <= 0) {
         setNotification({
           type: 'error',
@@ -187,7 +181,6 @@ export default function PDVPage() {
         return;
       }
       
-      // Agregar al carrito
       addItem(producto);
       
       setNotification({
@@ -195,7 +188,6 @@ export default function PDVPage() {
         message: `"${producto.nombre}" agregado al carrito`
       });
       
-      // Auto-limpiar notificación después de 1.5 segundos
       setTimeout(() => {
         setNotification(null);
       }, 1500);
@@ -221,7 +213,6 @@ export default function PDVPage() {
       message: `"${producto.nombre}" agregado al carrito`
     });
     
-    // Auto-limpiar notificación después de 1.5 segundos
     setTimeout(() => {
       setNotification(null);
     }, 1500);
@@ -249,7 +240,6 @@ export default function PDVPage() {
       });
     }
     
-    // Auto-limpiar notificación después de 5 segundos
     if (result.message) {
       setTimeout(() => {
         setNotification(null);
@@ -271,8 +261,10 @@ export default function PDVPage() {
   if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#311716]"></div>
-        <span className="ml-3 text-lg text-gray-700">Cargando...</span>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-[#311716] border-t-transparent mx-auto"></div>
+          <span className="mt-4 text-lg text-gray-700 font-medium block">Configurando punto de venta...</span>
+        </div>
       </div>
     );
   }
@@ -280,18 +272,18 @@ export default function PDVPage() {
   // Mostrar pantalla de abrir caja si no hay caja abierta
   if (hayCajaAbierta === false) {
     return (
-      <div className="h-full flex flex-col items-center justify-center px-4">
+      <div className="h-full flex flex-col items-center justify-center p-6">
         {notification && (
-          <div className={`mb-6 w-full max-w-md p-4 rounded-lg ${
-            notification.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+          <div className={`mb-6 w-full max-w-md p-4 rounded-xl shadow-sm ${
+            notification.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'
           }`}>
             <div className="flex items-center">
               {notification.type === 'success' ? (
-                <CheckCircle className="mr-2" size={20} />
+                <CheckCircle className="mr-3" size={20} />
               ) : (
-                <AlertCircle className="mr-2" size={20} />
+                <AlertCircle className="mr-3" size={20} />
               )}
-              <p>{notification.message}</p>
+              <p className="font-medium">{notification.message}</p>
               <button 
                 onClick={handleCloseNotification}
                 className="ml-auto text-gray-500 hover:text-gray-700"
@@ -303,10 +295,15 @@ export default function PDVPage() {
           </div>
         )}
         
-        <div className="text-center bg-white p-8 rounded-xl shadow-lg max-w-md w-full">
+        <div className="text-center bg-white p-8 rounded-2xl shadow-sm border border-gray-200 max-w-md w-full">
+          <div className="w-16 h-16 bg-gradient-to-br from-[#eeb077] to-[#9c7561] rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <Clock className="w-8 h-8 text-white" />
+          </div>
+          <h2 className="text-xl font-bold text-gray-900 mb-2">Caja Cerrada</h2>
+          <p className="text-gray-600 mb-6">Para comenzar a realizar ventas, debe abrir la caja registradora.</p>
           <button
             onClick={handleAbrirCaja}
-            className="w-full py-3 px-6 bg-[#311716] text-white rounded-lg hover:bg-[#462625] transition-colors"
+            className="w-full py-3 px-6 bg-gradient-to-r from-[#311716] to-[#462625] text-white rounded-xl hover:from-[#462625] hover:to-[#311716] transition-all transform hover:scale-105 font-medium shadow-sm"
           >
             Abrir Caja
           </button>
@@ -316,22 +313,22 @@ export default function PDVPage() {
   }
   
   return (
-    <div className="h-full grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div className="h-full flex flex-col">
       {/* Notificación */}
       {notification && (
-        <div className={`fixed top-4 right-4 z-50 w-full max-w-md p-4 rounded-lg shadow-lg ${
-          notification.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+        <div className={`fixed top-4 right-4 z-50 w-full max-w-md p-4 rounded-xl shadow-lg transition-all duration-300 ${
+          notification.type === 'success' ? 'bg-green-50 text-green-800 border border-green-200' : 'bg-red-50 text-red-800 border border-red-200'
         }`}>
           <div className="flex items-center">
             {notification.type === 'success' ? (
-              <CheckCircle className="mr-2" size={20} />
+              <CheckCircle className="mr-3 flex-shrink-0" size={20} />
             ) : (
-              <AlertCircle className="mr-2" size={20} />
+              <AlertCircle className="mr-3 flex-shrink-0" size={20} />
             )}
-            <p>{notification.message}</p>
+            <p className="font-medium">{notification.message}</p>
             <button 
               onClick={handleCloseNotification}
-              className="ml-auto text-gray-500 hover:text-gray-700"
+              className="ml-auto text-gray-500 hover:text-gray-700 flex-shrink-0"
               aria-label="Cerrar notificación"
             >
               <X size={16} />
@@ -348,131 +345,194 @@ export default function PDVPage() {
           if (sucursalId) window.location.reload();
         }}
       />
-      
-      {/* Área de productos y escáner */}
-      <div className={`${isMobileView ? 'col-span-1' : 'lg:col-span-2'} ${isMobileView && items.length > 0 ? 'hidden' : 'block'} flex flex-col gap-4`}>
-        {/* Escáner en la parte superior */}
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-            <h2 className="text-lg font-bold text-[#311716]">
-              {showScanner ? 'Escáner de Productos' : 'Búsqueda de Productos'}
-            </h2>
-            <button
-              onClick={() => setShowScanner(!showScanner)}
-              className={`p-2 rounded-lg ${
-                showScanner ? 'bg-gray-100 text-gray-700' : 'bg-[#311716] text-white'
-              } transition-colors`}
-              aria-label={showScanner ? 'Mostrar buscador' : 'Mostrar escáner'}
-            >
-              {showScanner ? <Grid size={20} /> : <QrCode size={20} />}
-            </button>
-          </div>
-          
-          <div className="p-4">
-            {showScanner ? (
-              <BarcodeScanner 
-                onScan={handleBarcodeScanned}
-                onError={(error) => {
-                  setNotification({
-                    type: 'error',
-                    message: error.message || 'Error en el escáner'
-                  });
-                }}
-              />
-            ) : (
-              <ProductSearch onProductSelect={handleProductSelect} className="w-full" />
+
+      {/* Mobile Navigation Bar */}
+      {isMobileView && (
+        <div className="bg-white border-b border-gray-200 px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex space-x-1">
+              <button
+                onClick={() => setCurrentView('products')}
+                className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all ${
+                  currentView === 'products' 
+                    ? 'bg-[#311716] text-white' 
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                <Grid className="w-4 h-4" />
+                <span className="text-sm font-medium">Productos</span>
+              </button>
+              <button
+                onClick={() => setCurrentView('cart')}
+                className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all relative ${
+                  currentView === 'cart' 
+                    ? 'bg-[#311716] text-white' 
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                <CartIcon className="w-4 h-4" />
+                <span className="text-sm font-medium">Carrito</span>
+                {items.length > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+                    {items.length}
+                  </span>
+                )}
+              </button>
+            </div>
+            
+            {items.length > 0 && (
+              <div className="text-right">
+                <p className="text-sm text-gray-600">Total</p>
+                <p className="text-lg font-bold text-[#311716]">${getTotal().toFixed(2)}</p>
+              </div>
             )}
           </div>
         </div>
-        
-        {/* Lista de productos */}
-        <div className="bg-white rounded-xl shadow-sm overflow-hidden flex-1">
-          <div className="p-4 border-b border-gray-100 bg-gray-50">
-            <h2 className="text-lg font-bold text-[#311716] mb-3">Productos</h2>
-            
-            {/* Categorías */}
-            {categoriasProductos.length > 0 && (
-              <div className="flex space-x-2 overflow-x-auto pb-2">
+      )}
+      
+      <div className={`flex-1 ${isMobileView ? 'block' : 'grid grid-cols-1 lg:grid-cols-3 gap-6'} p-6`}>
+        {/* Área de productos */}
+        <div className={`${isMobileView ? (currentView === 'products' ? 'block' : 'hidden') : 'lg:col-span-2'} flex flex-col h-full`}>
+          {/* Header de productos */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6 mb-6">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-1">Productos</h2>
+                <p className="text-gray-600">Selecciona productos para agregar al carrito</p>
+              </div>
+              
+              <div className="flex items-center space-x-3">
                 <button
-                  onClick={() => setActiveCategory('todos')}
-                  className={`${
-                    activeCategory === 'todos' 
+                  onClick={() => setShowScanner(!showScanner)}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-xl transition-all ${
+                    showScanner 
                       ? 'bg-[#311716] text-white' 
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  } px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-150`}
+                  }`}
                 >
-                  Todos
+                  <QrCode className="w-4 h-4" />
+                  <span className="hidden sm:inline">Escáner</span>
                 </button>
                 
-                {categoriasProductos.map(categoria => (
+                <button
+                  onClick={() => setShowFilters(!showFilters)}
+                  className="flex items-center space-x-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all"
+                >
+                  <Filter className="w-4 h-4" />
+                  <span className="hidden sm:inline">Filtros</span>
+                  <ChevronDown className={`w-4 h-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+                </button>
+              </div>
+            </div>
+            
+            {/* Buscador y escáner */}
+            <div className="mt-4">
+              {showScanner ? (
+                <div className="p-4 bg-gray-50 rounded-xl">
+                  <BarcodeScanner 
+                    onScan={handleBarcodeScanned}
+                    onError={(error) => {
+                      setNotification({
+                        type: 'error',
+                        message: error.message || 'Error en el escáner'
+                      });
+                    }}
+                  />
+                </div>
+              ) : (
+                <ProductSearch onProductSelect={handleProductSelect} />
+              )}
+            </div>
+            
+            {/* Filtros colapsables */}
+            {showFilters && (
+              <div className="mt-4 p-4 bg-gray-50 rounded-xl">
+                <div className="flex flex-wrap gap-2">
                   <button
-                    key={categoria.id}
-                    onClick={() => setActiveCategory(categoria.id)}
-                    className={`${
-                      activeCategory === categoria.id 
-                        ? 'bg-[#311716] text-white' 
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    } px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-150 whitespace-nowrap`}
+                    onClick={() => setActiveCategory('todos')}
+                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                      activeCategory === 'todos' 
+                        ? 'bg-[#311716] text-white shadow-sm' 
+                        : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                    }`}
                   >
-                    {categoria.nombre}
+                    Todos
                   </button>
-                ))}
+                  
+                  {categoriasProductos.map(categoria => (
+                    <button
+                      key={categoria.id}
+                      onClick={() => setActiveCategory(categoria.id)}
+                      className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                        activeCategory === categoria.id 
+                          ? 'bg-[#311716] text-white shadow-sm' 
+                          : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-200'
+                      }`}
+                    >
+                      {categoria.nombre}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>
           
-          <div className="p-4 overflow-y-auto max-h-[calc(100vh-26rem)]">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+          {/* Grid de productos */}
+          <div className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-200 p-6 overflow-hidden">
+            <div className="h-full overflow-y-auto">
               {filteredProducts.length > 0 ? (
-                filteredProducts.map((producto) => (
-                  <button 
-                    key={producto.id}
-                    className="bg-white border border-gray-100 p-4 rounded-xl hover:shadow-md flex flex-col items-center text-center transition-all group"
-                    onClick={() => handleProductSelect(producto)}
-                  >
-                    <div className="h-24 w-24 bg-gray-50 rounded-xl mb-3 flex items-center justify-center overflow-hidden">
-                      {producto.imagen ? (
-                        <img src={producto.imagen} alt={producto.nombre} className="h-full w-full object-cover" />
-                      ) : (
-                        <Package className="h-12 w-12 text-gray-300 group-hover:text-[#9c7561] transition-colors" />
-                      )}
-                    </div>
-                    <span className="font-medium text-gray-800 mb-1 group-hover:text-[#311716] transition-colors line-clamp-2 h-10">{producto.nombre}</span>
-                    <span className="text-[#9c7561] font-bold group-hover:text-[#eeb077] transition-colors">${producto.precio.toFixed(2)}</span>
-                    <div className="bg-[#311716] text-white text-xs rounded-full px-3 py-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      Agregar
-                    </div>
-                  </button>
-                ))
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                  {filteredProducts.map((producto) => (
+                    <button 
+                      key={producto.id}
+                      className="group bg-white border border-gray-200 p-4 rounded-xl hover:shadow-md hover:border-[#eeb077] transition-all duration-200 flex flex-col items-center text-center"
+                      onClick={() => handleProductSelect(producto)}
+                    >
+                      <div className="h-20 w-20 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl mb-3 flex items-center justify-center overflow-hidden group-hover:from-[#eeb077]/10 group-hover:to-[#9c7561]/10 transition-all">
+                        {producto.imagen ? (
+                          <img src={producto.imagen} alt={producto.nombre} className="h-full w-full object-cover rounded-xl" />
+                        ) : (
+                          <Package className="h-10 w-10 text-gray-400 group-hover:text-[#9c7561] transition-colors" />
+                        )}
+                      </div>
+                      
+                      <h3 className="font-medium text-gray-900 mb-1 group-hover:text-[#311716] transition-colors line-clamp-2 text-sm leading-tight h-8">
+                        {producto.nombre}
+                      </h3>
+                      
+                      <div className="mt-auto">
+                        <p className="text-lg font-bold text-[#311716] group-hover:text-[#eeb077] transition-colors">
+                          ${producto.precio.toFixed(2)}
+                        </p>
+                        
+                        <div className="mt-2 opacity-0 group-hover:opacity-100 transition-all duration-200 transform translate-y-1 group-hover:translate-y-0">
+                          <div className="bg-[#311716] text-white text-xs rounded-full px-3 py-1 flex items-center space-x-1">
+                            <Zap className="w-3 h-3" />
+                            <span>Agregar</span>
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               ) : (
-                <div className="col-span-full flex flex-col items-center justify-center py-8">
-                  <Package className="h-12 w-12 text-gray-300 mb-2" />
-                  <p className="text-gray-500">No hay productos disponibles en esta categoría</p>
+                <div className="h-full flex flex-col items-center justify-center text-center">
+                  <div className="w-24 h-24 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center mb-4">
+                    <Package className="h-12 w-12 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">No hay productos disponibles</h3>
+                  <p className="text-gray-500">Intenta con otra categoría o búsqueda</p>
                 </div>
               )}
             </div>
           </div>
         </div>
+        
+        {/* Carrito */}
+        <div className={`${isMobileView ? (currentView === 'cart' ? 'block' : 'hidden') : 'block'} h-full`}>
+          <CartDisplay onCheckout={handleCheckout} className="h-full" />
+        </div>
       </div>
-      
-      {/* Carrito - Responsive */}
-      <div className={`${isMobileView && items.length === 0 ? 'hidden' : 'block'} h-full`}>
-        <CartDisplay onCheckout={handleCheckout} className="h-full bg-white rounded-xl shadow-sm" />
-      </div>
-
-      {/* Botón para intercambiar vistas en móvil */}
-      {isMobileView && (
-        <button
-          onClick={() => {}}
-          className="fixed bottom-16 right-4 z-40 bg-[#311716] text-white p-3 rounded-full shadow-lg"
-        >
-          {items.length === 0 ? (
-            <Grid size={24} />
-          ) : (
-            <Layers size={24} />
-          )}
-        </button>
-      )}
       
       {/* Modal de checkout */}
       <CheckoutModal

@@ -1,4 +1,4 @@
-// src/app/(pdv)/layout.tsx - versión mejorada
+// src/app/(pdv)/layout.tsx
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -9,11 +9,7 @@ import { useOffline } from '@/hooks/useOffline';
 import { 
   ShoppingCart, Tag, Home, Clock, Settings, LogOut, Menu, X, ChevronLeft, ChevronRight,
   Package, AlertTriangle, Archive, Truck, FileText, Database, BarChart2, User,
-  WifiOff,
-  Wifi,
-  RefreshCw,
-  ArrowDownLeft,
-  Factory
+  WifiOff, Wifi, RefreshCw, ArrowDownLeft, Factory, Bell, Search, Grid3x3
 } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
 
@@ -27,6 +23,7 @@ export default function PDVLayout({
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [notifications, setNotifications] = useState(0);
   
   const router = useRouter();
   const pathname = usePathname();
@@ -48,8 +45,9 @@ export default function PDVLayout({
   useEffect(() => {
     const handleResize = () => {
       const mobile = window.innerWidth < 768;
+      const tablet = window.innerWidth >= 768 && window.innerWidth < 1024;
       setIsMobile(mobile);
-      setSidebarCollapsed(mobile);
+      setSidebarCollapsed(mobile || tablet);
     };
     
     handleResize();
@@ -124,85 +122,177 @@ export default function PDVLayout({
   // Mostrar pantalla de carga
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#311716]"></div>
-        <p className="ml-4 text-lg text-gray-700">Cargando...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-[#311716] border-t-transparent mx-auto"></div>
+          <p className="mt-4 text-lg text-gray-700 font-medium">Cargando sistema...</p>
+        </div>
       </div>
     );
   }
 
   // Definición de los enlaces de navegación
   const navLinks = [
-    { href: '/pdv/dashboard', icon: <BarChart2 className="h-5 w-5" />, text: 'Dashboard' },
-    { href: '/pdv', icon: <ShoppingCart className="h-5 w-5" />, text: 'Venta', exact: true },
-    { href: '/pdv/recepcion', icon: <Truck className="h-5 w-5" />, text: 'Recepción' },
-    { href: '/pdv/conciliacion', icon: <Database className="h-5 w-5" />, text: 'Inventario' },
-    { href: '/pdv/cierre', icon: <Clock className="h-5 w-5" />, text: 'Cierre' },
-    { href: '/pdv/ventas', icon: <Tag className="h-5 w-5" />, text: 'Historial' },
-    { href: '/pdv/egresos', icon: <ArrowDownLeft className="h-5 w-5" />, text: 'Salidas' },
-    { href: '/pdv/facturas', icon: <FileText className="h-5 w-5" />, text: 'Facturas' },
-    { href: '/pdv/contingencias', icon: <AlertTriangle className="h-5 w-5" />, text: 'Contingencias' }
+    { 
+      href: '/pdv/dashboard', 
+      icon: <BarChart2 className="h-5 w-5" />, 
+      text: 'Dashboard',
+      description: 'Resumen general'
+    },
+    { 
+      href: '/pdv', 
+      icon: <ShoppingCart className="h-5 w-5" />, 
+      text: 'Venta', 
+      exact: true,
+      description: 'Nueva venta'
+    },
+    { 
+      href: '/pdv/recepcion', 
+      icon: <Truck className="h-5 w-5" />, 
+      text: 'Recepción',
+      description: 'Recibir envíos'
+    },
+    { 
+      href: '/pdv/conciliacion', 
+      icon: <Database className="h-5 w-5" />, 
+      text: 'Inventario',
+      description: 'Control de stock'
+    },
+    { 
+      href: '/pdv/cierre', 
+      icon: <Clock className="h-5 w-5" />, 
+      text: 'Cierre',
+      description: 'Cierre de caja'
+    },
+    { 
+      href: '/pdv/ventas', 
+      icon: <Tag className="h-5 w-5" />, 
+      text: 'Historial',
+      description: 'Ventas realizadas'
+    },
+    { 
+      href: '/pdv/egresos', 
+      icon: <ArrowDownLeft className="h-5 w-5" />, 
+      text: 'Salidas',
+      description: 'Egresos de caja'
+    },
+    { 
+      href: '/pdv/facturas', 
+      icon: <FileText className="h-5 w-5" />, 
+      text: 'Facturas',
+      description: 'Facturación electrónica'
+    },
+    { 
+      href: '/pdv/contingencias', 
+      icon: <AlertTriangle className="h-5 w-5" />, 
+      text: 'Contingencias',
+      description: 'Reportar incidencias'
+    }
   ];
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
-      {/* Header para móvil y desktop */}
-      <header className="bg-[#311716] text-white shadow-md sticky top-0 z-30">
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-50 to-gray-100">
+      {/* Header moderno */}
+      <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-30">
         <div className="mx-auto px-4">
           <div className="flex justify-between h-16 items-center">
-            {/* Logo/Título y botón de menú móvil */}
-            <div className="flex items-center">
+            {/* Logo/Título y botón de menú */}
+            <div className="flex items-center space-x-4">
               {isMobile && (
                 <button
                   onClick={() => setShowMobileMenu(!showMobileMenu)}
-                  className="p-2 rounded-md text-white hover:bg-[#462625] mr-2"
+                  className="p-2 rounded-xl text-gray-600 hover:text-[#311716] hover:bg-gray-100 transition-colors"
                   aria-label={showMobileMenu ? "Cerrar menú" : "Abrir menú"}
                 >
                   {showMobileMenu ? <X size={24} /> : <Menu size={24} />}
                 </button>
               )}
-              <div className="flex-shrink-0 flex items-center">
-                <span className="text-xl font-bold truncate max-w-[200px] md:max-w-full">
-                  {sucursalNombre ? `PDV - ${sucursalNombre}` : 'Punto de Venta'}
-                </span>
+              
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 bg-gradient-to-br from-[#311716] to-[#9c7561] rounded-xl flex items-center justify-center">
+                  <ShoppingCart className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-gray-900 truncate max-w-[200px] md:max-w-full">
+                    {sucursalNombre ? sucursalNombre : 'Punto de Venta'}
+                  </h1>
+                  <p className="text-xs text-gray-500 hidden md:block">
+                    {pathname === '/pdv' ? 'Nueva venta' : 
+                     pathname === '/pdv/dashboard' ? 'Resumen general' :
+                     navLinks.find(link => pathname.startsWith(link.href))?.description || 'Sistema PDV'}
+                  </p>
+                </div>
               </div>
             </div>
             
-            {/* Estado de conexión y usuario (visible en todos los tamaños) */}
-            <div className="flex items-center space-x-4">
-              {!isOnline ? (
-                <span className="text-yellow-300 text-sm flex items-center px-2 py-1 bg-[#462625] rounded-full">
-                  <WifiOff className="w-4 h-4 mr-1" />
-                  <span className="hidden sm:inline">Offline</span>
-                </span>
-              ) : (
-                <span className="text-green-300 text-sm flex items-center px-2 py-1 bg-[#462625] rounded-full">
-                  <Wifi className="w-4 h-4 mr-1" />
-                  <span className="hidden sm:inline">Online</span>
-                </span>
-              )}
+            {/* Centro - Búsqueda rápida (solo desktop) */}
+            <div className="hidden lg:flex flex-1 max-w-md mx-8">
+              <div className="relative w-full">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Buscar productos, ventas..."
+                  className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#eeb077] focus:border-transparent transition-all"
+                />
+              </div>
+            </div>
+            
+            {/* Estado de conexión y usuario */}
+            <div className="flex items-center space-x-3">
+              {/* Notificaciones */}
+              <button className="relative p-2 text-gray-600 hover:text-[#311716] hover:bg-gray-100 rounded-xl transition-colors">
+                <Bell className="w-5 h-5" />
+                {notifications > 0 && (
+                  <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
+                    {notifications}
+                  </span>
+                )}
+              </button>
               
-              {pendingOperations > 0 && (
-                <button 
-                  onClick={handleSyncNow}
-                  disabled={isSyncing || !isOnline}
-                  className="bg-[#eeb077] text-[#311716] text-xs px-3 py-1 rounded-full mr-2 hover:bg-[#d9a15d] disabled:opacity-50 flex items-center"
-                >
-                  <RefreshCw className={`h-3 w-3 mr-1 ${isSyncing ? 'animate-spin' : ''}`} />
-                  <span className="hidden sm:inline">{isSyncing ? 'Sincronizando...' : `Sincronizar (${pendingOperations})`}</span>
-                  <span className="sm:hidden">{pendingOperations}</span>
-                </button>
-              )}
+              {/* Estado de conexión */}
+              <div className="flex items-center space-x-2">
+                {!isOnline ? (
+                  <div className="flex items-center space-x-2 px-3 py-1.5 bg-yellow-50 text-yellow-700 rounded-xl border border-yellow-200">
+                    <WifiOff className="w-4 h-4" />
+                    <span className="text-sm font-medium hidden sm:inline">Offline</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center space-x-2 px-3 py-1.5 bg-green-50 text-green-700 rounded-xl border border-green-200">
+                    <Wifi className="w-4 h-4" />
+                    <span className="text-sm font-medium hidden sm:inline">Online</span>
+                  </div>
+                )}
+                
+                {pendingOperations > 0 && (
+                  <button 
+                    onClick={handleSyncNow}
+                    disabled={isSyncing || !isOnline}
+                    className="flex items-center space-x-2 px-3 py-1.5 bg-amber-50 text-amber-700 rounded-xl border border-amber-200 hover:bg-amber-100 disabled:opacity-50 transition-colors"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+                    <span className="text-sm font-medium hidden sm:inline">
+                      {isSyncing ? 'Sync...' : `Sync (${pendingOperations})`}
+                    </span>
+                  </button>
+                )}
+              </div>
               
+              {/* Menú de usuario */}
               <div className="relative group">
-                <button className="flex items-center space-x-1 text-white hover:bg-[#462625] rounded-full p-1">
-                  <User className="h-5 w-5" />
-                  <span className="hidden md:block font-medium truncate max-w-[100px]">{user?.name}</span>
+                <button className="flex items-center space-x-2 p-2 rounded-xl hover:bg-gray-100 transition-colors">
+                  <div className="w-8 h-8 bg-gradient-to-br from-[#9c7561] to-[#eeb077] rounded-lg flex items-center justify-center">
+                    <User className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="hidden md:block text-left">
+                    <p className="text-sm font-medium text-gray-900 truncate max-w-[100px]">{user?.name}</p>
+                    <p className="text-xs text-gray-500">Vendedor</p>
+                  </div>
                 </button>
                 
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-40 hidden group-hover:block">
-                  <div className="px-4 py-2 text-sm text-gray-700 border-b border-gray-100">
-                    {user?.name}
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-40 hidden group-hover:block">
+                  <div className="px-4 py-3 border-b border-gray-100">
+                    <p className="text-sm font-medium text-gray-900">{user?.name}</p>
+                    <p className="text-xs text-gray-500">{user?.email}</p>
                   </div>
                   <button 
                     onClick={() => {
@@ -211,12 +301,10 @@ export default function PDVLayout({
                         router.push('/login');
                       });
                     }}
-                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
                   >
-                    <span className="flex items-center">
-                      <LogOut className="mr-2 h-4 w-4" />
-                      Cerrar sesión
-                    </span>
+                    <LogOut className="w-4 h-4 text-gray-400" />
+                    <span>Cerrar sesión</span>
                   </button>
                 </div>
               </div>
@@ -226,12 +314,12 @@ export default function PDVLayout({
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar - colapsable en desktop, drawer en móvil */}
+        {/* Sidebar moderno */}
         <div 
           ref={sidebarRef}
           className={`${isMobile ? 
-            `fixed inset-y-0 left-0 z-40 w-64 transform transition-transform duration-300 ease-in-out ${showMobileMenu ? 'translate-x-0' : '-translate-x-full'}` : 
-            `relative bg-white shadow transition-all duration-300 ${sidebarCollapsed ? 'w-16' : 'w-64'}`
+            `fixed inset-y-0 left-0 z-40 w-72 transform transition-transform duration-300 ease-in-out ${showMobileMenu ? 'translate-x-0' : '-translate-x-full'}` : 
+            `relative bg-white shadow-sm border-r border-gray-200 transition-all duration-300 ${sidebarCollapsed ? 'w-16' : 'w-72'}`
           } flex flex-col h-full`}
           style={{ top: isMobile ? '64px' : '0px' }}
         >
@@ -240,20 +328,20 @@ export default function PDVLayout({
             <div className="fixed inset-0 bg-black opacity-50 z-30" onClick={() => setShowMobileMenu(false)}></div>
           )}
           
-          <div className="bg-white h-full flex flex-col z-40 shadow-md">
+          <div className="bg-white h-full flex flex-col z-40">
             {/* Botón para colapsar/expandir (solo desktop) */}
             {!isMobile && (
               <button 
                 onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                className="absolute right-0 top-4 transform translate-x-1/2 bg-white rounded-full p-1 border border-gray-200 text-gray-500 hover:text-gray-700"
+                className="absolute -right-3 top-6 transform bg-white rounded-full p-1.5 border border-gray-200 text-gray-500 hover:text-gray-700 shadow-sm hover:shadow transition-all z-10"
               >
                 {sidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
               </button>
             )}
             
             {/* Navegación */}
-            <nav className="flex-1 overflow-y-auto pt-5 pb-20">
-              <ul className="space-y-2 px-2">
+            <nav className="flex-1 overflow-y-auto pt-6 pb-20 px-3">
+              <ul className="space-y-2">
                 {navLinks.map((link) => {
                   const isActive = link.exact 
                     ? pathname === link.href 
@@ -263,17 +351,31 @@ export default function PDVLayout({
                     <li key={link.href}>
                       <Link 
                         href={link.href}
-                        className={`flex items-center px-3 py-2 rounded-lg transition-colors ${
+                        className={`group flex items-center px-3 py-3 rounded-xl transition-all duration-200 ${
                           isActive 
-                            ? 'bg-[#311716] text-white' 
-                            : 'text-gray-700 hover:bg-gray-100'
+                            ? 'bg-gradient-to-r from-[#311716] to-[#462625] text-white shadow-sm' 
+                            : 'text-gray-700 hover:bg-gray-50 hover:text-[#311716]'
                         }`}
                         onClick={() => isMobile && setShowMobileMenu(false)}
                       >
-                        <span className="flex-shrink-0">{link.icon}</span>
-                        <span className={`ml-3 ${sidebarCollapsed && !isMobile ? 'hidden' : 'block'}`}>
-                          {link.text}
-                        </span>
+                        <div className={`flex-shrink-0 p-2 rounded-lg ${
+                          isActive 
+                            ? 'bg-white/20' 
+                            : 'bg-gray-100 group-hover:bg-gray-200'
+                        }`}>
+                          {link.icon}
+                        </div>
+                        
+                        <div className={`ml-3 ${sidebarCollapsed && !isMobile ? 'hidden' : 'block'}`}>
+                          <p className="text-sm font-medium">{link.text}</p>
+                          <p className={`text-xs ${isActive ? 'text-white/70' : 'text-gray-500'}`}>
+                            {link.description}
+                          </p>
+                        </div>
+                        
+                        {isActive && (
+                          <div className="ml-auto w-2 h-2 bg-white rounded-full"></div>
+                        )}
                       </Link>
                     </li>
                   );
@@ -284,58 +386,60 @@ export default function PDVLayout({
         </div>
 
         {/* Contenido principal */}
-        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-4">
-          <div className="max-w-7xl mx-auto pb-16">
-            {children}
+        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gradient-to-br from-gray-50 to-gray-100">
+          <div className="h-full p-4 md:p-6">
+            <div className="max-w-7xl mx-auto h-full">
+              {children}
+            </div>
           </div>
         </main>
       </div>
 
-
       {/* Botones de navegación rápida para administrador */}
-{user?.roleId === 'role-admin' && (
-  <div className="fixed bottom-6 right-6 flex gap-2 z-50">
-    <Link 
-      href="/admin" 
-      className="bg-[#311716] text-white p-3 rounded-full hover:bg-[#4a292a] transition-colors shadow-lg"
-      title="Admin"
-    >
-      <Settings className="h-5 w-5" />
-    </Link>
-    <Link 
-      href="/fabrica" 
-      className="bg-[#311716] text-white p-3 rounded-full hover:bg-[#4a292a] transition-colors shadow-lg"
-      title="Fábrica"
-    >
-      <Factory className="h-5 w-5" />
-    </Link>
-    <Link 
-      href="/pdv" 
-      className="bg-[#311716] text-white p-3 rounded-full hover:bg-[#4a292a] transition-colors shadow-lg"
-      title="Punto de Venta"
-    >
-      <ShoppingCart className="h-5 w-5" />
-    </Link>
-  </div>
-)}
+      {user?.roleId === 'role-admin' && (
+        <div className="fixed bottom-6 right-6 flex gap-3 z-50">
+          <Link 
+            href="/admin" 
+            className="group bg-white text-[#311716] p-3 rounded-xl hover:bg-[#311716] hover:text-white transition-all shadow-lg border border-gray-200"
+            title="Admin"
+          >
+            <Settings className="h-5 w-5" />
+          </Link>
+          <Link 
+            href="/fabrica" 
+            className="group bg-white text-[#311716] p-3 rounded-xl hover:bg-[#311716] hover:text-white transition-all shadow-lg border border-gray-200"
+            title="Fábrica"
+          >
+            <Factory className="h-5 w-5" />
+          </Link>
+        </div>
+      )}
 
       {/* Footer con estado offline */}
-      <footer className="fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 z-20 h-10">
-        <div className="max-w-7xl mx-auto px-4 h-full flex items-center justify-between">
-          <p className="text-gray-600 text-xs">
+      <footer className="bg-white border-t border-gray-200 px-4 py-2 z-20">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <p className="text-gray-500 text-xs">
             Sistema Tulum PDV &copy; {new Date().getFullYear()}
           </p>
           
-          <div className="flex items-center space-x-2">
-            {!isOnline ? (
-              <span className="text-xs text-yellow-600 flex items-center">
-                <WifiOff className="w-3 h-3 mr-1" />
-                Modo Offline
-              </span>
-            ) : (
-              <span className="text-xs text-green-600 flex items-center">
-                <Wifi className="w-3 h-3 mr-1" />
-                Conectado
+          <div className="flex items-center space-x-4 text-xs">
+            <div className="flex items-center space-x-1">
+              {isOnline ? (
+                <>
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span className="text-green-600">Conectado</span>
+                </>
+              ) : (
+                <>
+                  <div className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"></div>
+                  <span className="text-yellow-600">Modo Offline</span>
+                </>
+              )}
+            </div>
+            
+            {pendingOperations > 0 && (
+              <span className="text-amber-600">
+                {pendingOperations} operaciones pendientes
               </span>
             )}
           </div>

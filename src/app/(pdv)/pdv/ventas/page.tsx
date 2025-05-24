@@ -7,10 +7,11 @@ import { es } from 'date-fns/locale';
 import { 
   Printer, Eye, Download, Search, Calendar, X, FileText, 
   ChevronLeft, ChevronRight, RefreshCw, Filter, CreditCard,
-  DollarSign, QrCode, Smartphone, Check, AlertTriangle
+  DollarSign, QrCode, Smartphone, Check, AlertTriangle,
+  TrendingUp, BarChart3, Clock, ArrowUpRight, Grid, List,
+  ChevronDown
 } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
-import Link from 'next/link';
 
 interface Venta {
   id: string;
@@ -46,6 +47,7 @@ export default function HistorialVentasPage() {
   const [isDetalleOpen, setIsDetalleOpen] = useState(false);
   const [totalVentas, setTotalVentas] = useState(0);
   const [totalFacturado, setTotalFacturado] = useState(0);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   
   // Filtros
   const [fechaDesde, setFechaDesde] = useState<string>('');
@@ -57,7 +59,7 @@ export default function HistorialVentasPage() {
   
   // Paginación
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [itemsPerPage, setItemsPerPage] = useState(12);
   const modalRef = useRef<HTMLDivElement>(null);
   
   const [exportingPdf, setExportingPdf] = useState(false);
@@ -121,7 +123,6 @@ export default function HistorialVentasPage() {
         setIsLoading(true);
         setError(null);
         
-        // Construir URL con filtros
         let url = '/api/pdv/ventas?';
         
         const sucursalId = localStorage.getItem('sucursalId');
@@ -138,7 +139,6 @@ export default function HistorialVentasPage() {
         const data = await response.json();
         setVentas(data);
         
-        // Calcular totales
         let total = 0;
         let totalFacturas = 0;
         data.forEach((venta: Venta) => {
@@ -167,21 +167,18 @@ export default function HistorialVentasPage() {
   const applyFilters = (data = ventas) => {
     let filtered = [...data];
     
-    // Filtrar por fecha desde
     if (fechaDesde) {
       const desde = new Date(fechaDesde);
       desde.setHours(0, 0, 0, 0);
       filtered = filtered.filter(venta => new Date(venta.fecha) >= desde);
     }
     
-    // Filtrar por fecha hasta
     if (fechaHasta) {
       const hasta = new Date(fechaHasta);
       hasta.setHours(23, 59, 59, 999);
       filtered = filtered.filter(venta => new Date(venta.fecha) <= hasta);
     }
     
-    // Filtrar por término de búsqueda
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(venta => 
@@ -192,13 +189,11 @@ export default function HistorialVentasPage() {
       );
     }
     
-    // Filtrar por estado de facturación
     if (filterFacturada !== 'todas') {
       const facturada = filterFacturada === 'si';
       filtered = filtered.filter(venta => venta.facturada === facturada);
     }
     
-    // Filtrar por medio de pago
     if (medioPagoFilter !== 'todos') {
       filtered = filtered.filter(venta => 
         venta.pagos.some(pago => pago.medioPago === medioPagoFilter)
@@ -206,10 +201,9 @@ export default function HistorialVentasPage() {
     }
     
     setFilteredVentas(filtered);
-    setCurrentPage(1); // Resetear a primera página al filtrar
+    setCurrentPage(1);
   };
   
-  // Aplicar filtros cuando cambian
   useEffect(() => {
     applyFilters();
   }, [fechaDesde, fechaHasta, searchTerm, filterFacturada, medioPagoFilter]);
@@ -225,7 +219,6 @@ export default function HistorialVentasPage() {
     setExportingPdf(true);
     
     try {
-      // Obtener factura si existe
       let facturaId = null;
       if (venta.facturada) {
         const facturaResp = await authenticatedFetch(`/api/pdv/facturas?ventaId=${venta.id}`);
@@ -237,20 +230,9 @@ export default function HistorialVentasPage() {
         }
       }
       
-      // Si hay factura, obtener PDF de factura
       if (facturaId) {
         window.open(`/api/pdv/facturas/${facturaId}/pdf`, '_blank');
       } else {
-        // Generar resumen de venta como respaldo
-        const formattedItems = venta.items.map(item => ({
-          producto: item.producto.nombre,
-          cantidad: item.cantidad,
-          precioUnitario: `$${item.precioUnitario.toFixed(2)}`,
-          subtotal: `$${(item.cantidad * item.precioUnitario * (1 - item.descuento / 100)).toFixed(2)}`
-        }));
-        
-        // Este es un placeholder que deberías completar con tu lógica de generación de PDF
-        // Puedes usar una biblioteca como jsPDF o pdfmake
         alert('Función de exportación sin factura disponible próximamente');
       }
     } catch (error) {
@@ -283,9 +265,11 @@ export default function HistorialVentasPage() {
   // Pantalla de carga
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#311716]"></div>
-        <span className="mt-4 text-gray-600">Cargando ventas...</span>
+      <div className="h-full flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-[#311716] border-t-transparent mx-auto"></div>
+          <span className="mt-4 text-lg text-gray-700 font-medium block">Cargando historial...</span>
+        </div>
       </div>
     );
   }
@@ -293,7 +277,7 @@ export default function HistorialVentasPage() {
   // Pantalla de error
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-lg my-6">
+      <div className="bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-xl">
         <div className="flex items-center">
           <AlertTriangle className="h-5 w-5 mr-2 text-red-500" />
           <p>{error}</p>
@@ -308,409 +292,336 @@ export default function HistorialVentasPage() {
       </div>
     );
   }
-  
-  const paginationControls = (
-    <div className="flex items-center justify-between border-t border-gray-200 bg-white px-4 py-3 sm:px-6 rounded-b-lg">
-      <div className="hidden sm:flex sm:flex-1 sm:items-center sm:justify-between">
-        <div>
-          <p className="text-sm text-gray-700">
-            Mostrando <span className="font-medium">{Math.min(filteredVentas.length, indexOfFirstItem + 1)}</span> a{' '}
-            <span className="font-medium">{Math.min(filteredVentas.length, indexOfLastItem)}</span> de{' '}
-            <span className="font-medium">{filteredVentas.length}</span> resultados
-          </p>
-        </div>
-        <div>
-          <nav className="isolate inline-flex -space-x-px rounded-md shadow-sm" aria-label="Pagination">
-            <button
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1}
-              className="relative inline-flex items-center rounded-l-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
-            >
-              <span className="sr-only">Anterior</span>
-              <ChevronLeft className="h-5 w-5" />
-            </button>
-            
-            {/* Mostrar páginas numeradas limitadas */}
-            {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
-              let pageNumber: number;
-              
-              if (totalPages <= 5) {
-                pageNumber = i + 1; // De 1 a 5
-              } else if (currentPage <= 3) {
-                pageNumber = i + 1; // De 1 a 5 si estamos al inicio
-              } else if (currentPage >= totalPages - 2) {
-                pageNumber = totalPages - 4 + i; // Las últimas 5 páginas
-              } else {
-                pageNumber = currentPage - 2 + i; // 2 páginas antes y 2 después de la actual
-              }
-              
-              // Asegurarse de que pageNumber esté en rango
-              if (pageNumber < 1 || pageNumber > totalPages) return null;
-              
-              return (
-                <button
-                  key={pageNumber}
-                  onClick={() => handlePageChange(pageNumber)}
-                  className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ring-1 ring-inset ring-gray-300 focus:outline-offset-0 ${
-                    currentPage === pageNumber
-                      ? 'bg-[#311716] text-white focus-visible:outline-[#311716]'
-                      : 'text-gray-900 hover:bg-gray-50'
-                  }`}
-                >
-                  {pageNumber}
-                </button>
-              );
-            })}
-            
-            <button
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages || totalPages === 0}
-              className="relative inline-flex items-center rounded-r-md px-2 py-2 text-gray-400 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0 disabled:opacity-50"
-            >
-              <span className="sr-only">Siguiente</span>
-              <ChevronRight className="h-5 w-5" />
-            </button>
-          </nav>
-        </div>
-      </div>
-      
-      {/* Paginación móvil simplificada */}
-      <div className="flex sm:hidden justify-between w-full items-center">
-        <button
-          onClick={() => handlePageChange(currentPage - 1)}
-          disabled={currentPage === 1}
-          className="relative inline-flex items-center rounded-md px-3 py-1 text-sm text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 disabled:opacity-50"
-        >
-          <ChevronLeft className="h-4 w-4 mr-1" />
-          Anterior
-        </button>
-        
-        <span className="text-sm text-gray-700">
-          {currentPage} de {totalPages || 1}
-        </span>
-        
-        <button
-          onClick={() => handlePageChange(currentPage + 1)}
-          disabled={currentPage === totalPages || totalPages === 0}
-          className="relative inline-flex items-center rounded-md px-3 py-1 text-sm text-gray-700 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 disabled:opacity-50"
-        >
-          Siguiente
-          <ChevronRight className="h-4 w-4 ml-1" />
-        </button>
-      </div>
-    </div>
-  );
-  
+
   return (
-    <div className="container mx-auto py-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4">
-        <h1 className="text-2xl font-bold text-gray-800">Historial de Ventas</h1>
-        
-        {/* Resumen de ventas */}
-        <div className="flex flex-wrap gap-3">
-          <div className="bg-white rounded-lg shadow-sm px-4 py-2 border border-gray-100">
-            <p className="text-xs text-gray-500">Total ventas</p>
-            <p className="text-lg font-bold">${totalVentas.toFixed(2)}</p>
+    <div className="h-full flex flex-col space-y-6">
+      {/* Header con estadísticas */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Historial de Ventas</h1>
+            <p className="text-gray-600">Gestiona y consulta todas las ventas realizadas</p>
           </div>
           
-          <div className="bg-white rounded-lg shadow-sm px-4 py-2 border border-gray-100">
-            <p className="text-xs text-gray-500">Facturadas</p>
-            <p className="text-lg font-bold">${totalFacturado.toFixed(2)}</p>
+          {/* Estadísticas rápidas */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl text-center">
+              <p className="text-2xl font-bold text-blue-700">{filteredVentas.length}</p>
+              <p className="text-sm text-blue-600">Ventas</p>
+            </div>
+            <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-xl text-center">
+              <p className="text-2xl font-bold text-green-700">${totalVentas.toFixed(0)}</p>
+              <p className="text-sm text-green-600">Total</p>
+            </div>
+            <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-xl text-center">
+              <p className="text-2xl font-bold text-purple-700">${totalFacturado.toFixed(0)}</p>
+              <p className="text-sm text-purple-600">Facturado</p>
+            </div>
+            <div className="bg-gradient-to-br from-amber-50 to-amber-100 p-4 rounded-xl text-center">
+              <p className="text-2xl font-bold text-amber-700">
+                {totalVentas > 0 ? ((totalFacturado / totalVentas) * 100).toFixed(0) : 0}%
+              </p>
+              <p className="text-sm text-amber-600">Facturación</p>
+            </div>
           </div>
         </div>
       </div>
-      
-      {/* Filtros colapsables */}
-      <div className="bg-white rounded-lg shadow-sm mb-6 overflow-hidden">
-        <div className="p-4 border-b border-gray-100 flex justify-between items-center">
-          <h2 className="text-lg font-medium text-gray-800 flex items-center">
-            <Filter className="h-5 w-5 text-gray-400 mr-2" />
-            Filtros
-          </h2>
-          <button 
-            onClick={() => setFiltersVisible(!filtersVisible)}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            {filtersVisible ? 'Ocultar filtros' : 'Mostrar filtros'}
-          </button>
+
+      {/* Filtros */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+        <div className="p-4 border-b border-gray-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center space-x-4">
+            <button 
+              onClick={() => setFiltersVisible(!filtersVisible)}
+              className="flex items-center space-x-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all"
+            >
+              <Filter className="h-4 w-4" />
+              <span>Filtros</span>
+              <ChevronDown className={`h-4 w-4 transition-transform ${filtersVisible ? 'rotate-180' : ''}`} />
+            </button>
+            
+            {/* Búsqueda rápida */}
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <input
+                type="text"
+                placeholder="Buscar ventas..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#eeb077] focus:border-transparent"
+              />
+            </div>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={() => setViewMode('grid')}
+              className={`p-2 rounded-lg transition-all ${
+                viewMode === 'grid' ? 'bg-[#311716] text-white' : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              <Grid className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setViewMode('list')}
+              className={`p-2 rounded-lg transition-all ${
+                viewMode === 'list' ? 'bg-[#311716] text-white' : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              <List className="w-4 h-4" />
+            </button>
+          </div>
         </div>
         
         {filtersVisible && (
-          <div className="p-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <div>
-                  <label htmlFor="fechaDesde" className="block text-sm font-medium text-gray-700 mb-1">
-                    Desde:
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="date"
-                      id="fechaDesde"
-                      value={fechaDesde}
-                      onChange={(e) => setFechaDesde(e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#9c7561] focus:border-[#9c7561] pl-9"
-                    />
-                    <Calendar className="absolute left-3 top-2.5 text-gray-400" size={16} />
-                  </div>
-                </div>
-                
-                <div>
-                  <label htmlFor="fechaHasta" className="block text-sm font-medium text-gray-700 mb-1">
-                    Hasta:
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="date"
-                      id="fechaHasta"
-                      value={fechaHasta}
-                      onChange={(e) => setFechaHasta(e.target.value)}
-                      className="w-full p-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#9c7561] focus:border-[#9c7561] pl-9"
-                    />
-                    <Calendar className="absolute left-3 top-2.5 text-gray-400" size={16} />
-                  </div>
-                </div>
+          <div className="p-6 bg-gray-50">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Desde:</label>
+                <input
+                  type="date"
+                  value={fechaDesde}
+                  onChange={(e) => setFechaDesde(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#eeb077] focus:border-transparent"
+                />
               </div>
               
-              <div className="space-y-2">
-                <div>
-                  <label htmlFor="searchTerm" className="block text-sm font-medium text-gray-700 mb-1">
-                    Buscar:
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      id="searchTerm"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      placeholder="Cliente, producto, ID..."
-                      className="w-full p-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#9c7561] focus:border-[#9c7561] pl-9"
-                    />
-                    <Search className="absolute left-3 top-2.5 text-gray-400" size={16} />
-                  </div>
-                </div>
-                
-                <div>
-                  <label htmlFor="filterFacturada" className="block text-sm font-medium text-gray-700 mb-1">
-                    Facturada:
-                  </label>
-                  <select
-                    id="filterFacturada"
-                    value={filterFacturada}
-                    onChange={(e) => setFilterFacturada(e.target.value)}
-                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#9c7561] focus:border-[#9c7561]"
-                  >
-                    <option value="todas">Todas</option>
-                    <option value="si">Sí</option>
-                    <option value="no">No</option>
-                  </select>
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Hasta:</label>
+                <input
+                  type="date"
+                  value={fechaHasta}
+                  onChange={(e) => setFechaHasta(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#eeb077] focus:border-transparent"
+                />
               </div>
               
-              <div className="space-y-2">
-                <div>
-                  <label htmlFor="medioPagoFilter" className="block text-sm font-medium text-gray-700 mb-1">
-                    Método de pago:
-                  </label>
-                  <select
-                    id="medioPagoFilter"
-                    value={medioPagoFilter}
-                    onChange={(e) => setMedioPagoFilter(e.target.value)}
-                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#9c7561] focus:border-[#9c7561]"
-                  >
-                    <option value="todos">Todos</option>
-                    {getMediosPago().map(medio => (
-                      <option key={medio} value={medio}>
-                        {formatMedioPago(medio)}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div className="pt-4 flex items-end justify-end gap-2">
-                  <button
-                    onClick={handleResetFiltros}
-                    className="px-3 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 text-sm"
-                  >
-                    Limpiar filtros
-                  </button>
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Facturada:</label>
+                <select
+                  value={filterFacturada}
+                  onChange={(e) => setFilterFacturada(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#eeb077] focus:border-transparent"
+                >
+                  <option value="todas">Todas</option>
+                  <option value="si">Sí</option>
+                  <option value="no">No</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Método de pago:</label>
+                <select
+                  value={medioPagoFilter}
+                  onChange={(e) => setMedioPagoFilter(e.target.value)}
+                  className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#eeb077] focus:border-transparent"
+                >
+                  <option value="todos">Todos</option>
+                  {getMediosPago().map(medio => (
+                    <option key={medio} value={medio}>
+                      {formatMedioPago(medio)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className="flex items-end">
+                <button
+                  onClick={handleResetFiltros}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-all"
+                >
+                  Limpiar filtros
+                </button>
               </div>
             </div>
           </div>
         )}
       </div>
-      
+
       {/* Lista de ventas */}
-      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-        {/* Vista móvil en tarjetas */}
-        <div className="block md:hidden">
-          {filteredVentas.length === 0 ? (
-            <div className="p-8 text-center">
-              <FileText className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-              <p className="text-gray-500">No se encontraron ventas</p>
-              <p className="text-gray-400 text-sm mt-1">Prueba con otros filtros</p>
+      <div className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-200 p-6 overflow-hidden">
+        {filteredVentas.length === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center text-center">
+            <div className="w-24 h-24 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center mb-4">
+              <FileText className="h-12 w-12 text-gray-400" />
             </div>
-          ) : (
-            <div className="divide-y divide-gray-100">
-              {currentItems.map(venta => (
-                <div key={venta.id} className="p-4">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <span className="inline-flex items-center text-sm text-gray-500 mb-1">
-                        <Calendar className="h-3 w-3 mr-1" />
-                        {format(new Date(venta.fecha), 'dd MMM yyyy, HH:mm', { locale: es })}
-                      </span>
-                      <p className="font-semibold">${venta.total.toFixed(2)}</p>
-                      <div className="flex items-center text-sm mt-1 space-x-2">
-                        {venta.pagos.map((pago, idx) => (
-                          <span key={idx} className="flex items-center">
-                            {getMedioPagoIcon(pago.medioPago)}
-                          </span>
-                        ))}
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No se encontraron ventas</h3>
+            <p className="text-gray-500">Prueba con otros filtros o realiza una nueva venta</p>
+          </div>
+        ) : (
+          <>
+            {viewMode === 'grid' ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 h-full overflow-y-auto">
+                {currentItems.map(venta => (
+                  <div key={venta.id} className="group bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md hover:border-[#eeb077] transition-all cursor-pointer">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <span className="inline-flex items-center text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                          <Clock className="h-3 w-3 mr-1" />
+                          {format(new Date(venta.fecha), 'dd MMM, HH:mm', { locale: es })}
+                        </span>
+                        <p className="text-xs text-gray-500 mt-1">#{venta.id.slice(-6)}</p>
                       </div>
-                    </div>
-                    
-                    <div>
-                      <span className="text-xs text-gray-500">#{venta.id.slice(-6)}</span>
+                      
                       {venta.facturada && (
-                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
                           <Check className="w-3 h-3 mr-1" />
                           Facturada
                         </span>
                       )}
                     </div>
-                  </div>
-                  
-                  <div className="flex mt-2 space-x-2">
-                    <button
-                      onClick={() => handleVerDetalle(venta)}
-                      className="flex-1 text-xs py-1 px-2 border border-gray-200 rounded bg-gray-50 text-gray-700 flex items-center justify-center"
-                    >
-                      <Eye className="w-3 h-3 mr-1" />
-                      Detalle
-                    </button>
                     
-                    <button
-                      onClick={() => handleExportPdf(venta)}
-                      className="flex-1 text-xs py-1 px-2 border border-gray-200 rounded bg-gray-50 text-gray-700 flex items-center justify-center"
-                      disabled={exportingPdf}
-                    >
-                      <Download className="w-3 h-3 mr-1" />
-                      {venta.facturada ? 'Factura' : 'Comprobante'}
-                    </button>
+                    <div className="mb-3">
+                      <p className="text-2xl font-bold text-gray-900">${venta.total.toFixed(2)}</p>
+                      <p className="text-sm text-gray-600">{venta.items.length} productos</p>
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div className="flex space-x-1">
+                        {venta.pagos.slice(0, 2).map((pago, idx) => (
+                          <div key={idx} className="flex items-center space-x-1">
+                            {getMedioPagoIcon(pago.medioPago)}
+                          </div>
+                        ))}
+                      </div>
+                      
+                      <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-all">
+                        <button
+                          onClick={() => handleVerDetalle(venta)}
+                          className="p-1 text-gray-600 hover:text-[#311716] transition-colors"
+                          title="Ver detalle"
+                        >
+                          <Eye size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleExportPdf(venta)}
+                          className="p-1 text-gray-600 hover:text-[#311716] transition-colors"
+                          title="Descargar"
+                        >
+                          <Download size={16} />
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-        
-        {/* Vista escritorio en tabla */}
-        <div className="hidden md:block">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    ID
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Fecha
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Total
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Facturada
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Cliente
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Método de Pago
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Acciones
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredVentas.length === 0 ? (
-                  <tr>
-                    <td colSpan={7} className="px-6 py-8 text-center text-sm text-gray-500">
-                      <FileText className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                      No se encontraron ventas para los filtros seleccionados
-                    </td>
-                  </tr>
-                ) : (
-                  currentItems.map((venta) => (
-                    <tr key={venta.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        #{venta.id.slice(-6)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {format(new Date(venta.fecha), 'dd MMM yyyy, HH:mm', { locale: es })}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
-                        ${venta.total.toFixed(2)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        {venta.facturada ? (
-                          <span className="px-2 inline-flex items-center text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                            <Check className="w-3 h-3 mr-1" />
-                            {venta.numeroFactura || 'Sí'}
-                          </span>
-                        ) : (
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
-                            No
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 max-w-[180px] truncate">
-                        {venta.clienteNombre || 'Consumidor Final'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <div className="flex flex-wrap gap-1">
+                ))}
+              </div>
+            ) : (
+              <div className="h-full overflow-y-auto">
+                <div className="space-y-2">
+                  {currentItems.map((venta) => (
+                    <div key={venta.id} className="group flex items-center justify-between p-4 border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-[#eeb077] transition-all">
+                      <div className="flex items-center space-x-4">
+                        <div className="text-center">
+                          <p className="text-xs text-gray-500">#{venta.id.slice(-6)}</p>
+                          <p className="text-xs text-gray-400">{format(new Date(venta.fecha), 'dd MMM', { locale: es })}</p>
+                        </div>
+                        
+                        <div>
+                          <p className="font-semibold text-gray-900">${venta.total.toFixed(2)}</p>
+                          <p className="text-sm text-gray-600">{venta.items.length} productos</p>
+                        </div>
+                        
+                        <div className="flex items-center space-x-2">
                           {venta.pagos.map((pago, idx) => (
-                            <span key={idx} className="inline-flex items-center bg-gray-50 px-2 py-0.5 rounded text-xs">
+                            <span key={idx} className="flex items-center space-x-1 text-xs bg-gray-100 px-2 py-1 rounded">
                               {getMedioPagoIcon(pago.medioPago)}
-                              <span className="ml-1">{formatMedioPago(pago.medioPago)}</span>
+                              <span>{formatMedioPago(pago.medioPago)}</span>
                             </span>
                           ))}
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        
+                        {venta.facturada && (
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            <Check className="w-3 h-3 mr-1" />
+                            Facturada
+                          </span>
+                        )}
+                      </div>
+                      
+                      <div className="flex items-center space-x-2 opacity-0 group-hover:opacity-100 transition-all">
                         <button
                           onClick={() => handleVerDetalle(venta)}
-                          className="text-[#311716] hover:text-[#462625] mr-3"
+                          className="p-2 text-gray-600 hover:text-[#311716] hover:bg-white rounded-lg transition-all"
                           title="Ver detalle"
                         >
                           <Eye size={18} />
                         </button>
                         <button
                           onClick={() => handleExportPdf(venta)}
-                          className="text-gray-600 hover:text-gray-900"
-                          title={venta.facturada ? "Descargar factura" : "Exportar comprobante"}
-                          disabled={exportingPdf}
+                          className="p-2 text-gray-600 hover:text-[#311716] hover:bg-white rounded-lg transition-all"
+                          title="Descargar"
                         >
-                          {exportingPdf ? (
-                            <RefreshCw size={18} className="animate-spin" />
-                          ) : (
-                            <Download size={18} />
-                          )}
+                          <Download size={18} />
                         </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-        
-        {/* Paginación */}
-        {filteredVentas.length > 0 && paginationControls}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Paginación */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between border-t border-gray-200 pt-4 mt-6">
+                <div className="text-sm text-gray-700">
+                  Mostrando {Math.min(filteredVentas.length, indexOfFirstItem + 1)} a{' '}
+                  {Math.min(filteredVentas.length, indexOfLastItem)} de{' '}
+                  {filteredVentas.length} resultados
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="p-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  
+                  <div className="flex space-x-1">
+                    {Array.from({ length: Math.min(5, totalPages) }).map((_, i) => {
+                      let pageNumber: number;
+                      
+                      if (totalPages <= 5) {
+                        pageNumber = i + 1;
+                      } else if (currentPage <= 3) {
+                        pageNumber = i + 1;
+                      } else if (currentPage >= totalPages - 2) {
+                        pageNumber = totalPages - 4 + i;
+                      } else {
+                        pageNumber = currentPage - 2 + i;
+                      }
+                      
+                      if (pageNumber < 1 || pageNumber > totalPages) return null;
+                      
+                      return (
+                        <button
+                          key={pageNumber}
+                          onClick={() => handlePageChange(pageNumber)}
+                          className={`px-3 py-2 text-sm rounded-lg transition-all ${
+                            currentPage === pageNumber
+                              ? 'bg-[#311716] text-white'
+                              : 'text-gray-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          {pageNumber}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  
+                  <button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="p-2 border border-gray-300 rounded-lg text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
       
       {/* Modal de detalle de venta */}
@@ -718,16 +629,22 @@ export default function HistorialVentasPage() {
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
           <div 
             ref={modalRef}
-            className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col"
+            className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col"
           >
-            <div className="p-4 border-b flex justify-between items-center sticky top-0 bg-white rounded-t-lg">
-              <h2 className="text-xl font-bold text-gray-800 flex items-center">
-                <FileText className="h-5 w-5 mr-2 text-[#9c7561]" />
-                Venta #{selectedVenta.id.slice(-6)}
-              </h2>
+            <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 flex items-center">
+                  <FileText className="h-6 w-6 mr-3 text-[#9c7561]" />
+                  Venta #{selectedVenta.id.slice(-6)}
+                </h2>
+                <p className="text-gray-600 mt-1">
+                  {format(new Date(selectedVenta.fecha), 'dd MMMM yyyy, HH:mm', { locale: es })}
+                </p>
+              </div>
+              
               <button 
                 onClick={() => setIsDetalleOpen(false)}
-                className="text-gray-500 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100"
+                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all"
                 aria-label="Cerrar"
               >
                 <X size={20} />
@@ -735,98 +652,113 @@ export default function HistorialVentasPage() {
             </div>
             
             <div className="p-6 overflow-y-auto flex-1">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h3 className="text-gray-700 font-medium mb-2">Información de la Venta</h3>
-                  <p className="flex justify-between py-1 border-b border-gray-100">
-                    <span className="text-gray-600">Fecha:</span>
-                    <span>{format(new Date(selectedVenta.fecha), 'dd MMMM yyyy, HH:mm', { locale: es })}</span>
-                  </p>
-                  <p className="flex justify-between py-1 border-b border-gray-100">
-                    <span className="text-gray-600">Total:</span>
-                    <span className="font-medium">${selectedVenta.total.toFixed(2)}</span>
-                  </p>
-                  {selectedVenta.descuento > 0 && (
-                    <p className="flex justify-between py-1 border-b border-gray-100">
-                      <span className="text-gray-600">Descuento:</span>
-                      <span className="text-green-600">${selectedVenta.descuento.toFixed(2)}</span>
-                    </p>
-                  )}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                <div className="bg-gray-50 p-6 rounded-xl">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                    <BarChart3 className="h-5 w-5 mr-2 text-[#9c7561]" />
+                    Información de la Venta
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between py-2 border-b border-gray-200">
+                      <span className="text-gray-600">Total:</span>
+                      <span className="font-semibold text-gray-900">${selectedVenta.total.toFixed(2)}</span>
+                    </div>
+                    {selectedVenta.descuento > 0 && (
+                      <div className="flex justify-between py-2 border-b border-gray-200">
+                        <span className="text-gray-600">Descuento:</span>
+                        <span className="text-green-600 font-semibold">${selectedVenta.descuento.toFixed(2)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between py-2 border-b border-gray-200">
+                      <span className="text-gray-600">Productos:</span>
+                      <span className="font-semibold">{selectedVenta.items.length}</span>
+                    </div>
+                    <div className="flex justify-between py-2">
+                      <span className="text-gray-600">Estado:</span>
+                      <span>
+                        {selectedVenta.facturada ? (
+                          <span className="inline-flex items-center text-green-600 font-semibold">
+                            <Check className="w-4 h-4 mr-1" />
+                            Facturada
+                          </span>
+                        ) : (
+                          <span className="text-gray-600">Sin facturar</span>
+                        )}
+                      </span>
+                    </div>
+                  </div>
                 </div>
                 
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <h3 className="text-gray-700 font-medium mb-2">Información del Cliente</h3>
-                  <p className="flex justify-between py-1 border-b border-gray-100">
-                    <span className="text-gray-600">Cliente:</span>
-                    <span>{selectedVenta.clienteNombre || 'Consumidor Final'}</span>
-                  </p>
-                  
-                  <p className="flex justify-between py-1 border-b border-gray-100">
-                    <span className="text-gray-600">Facturada:</span>
-                    <span>
-                      {selectedVenta.facturada ? (
-                        <span className="inline-flex items-center text-green-600">
-                          <Check className="w-4 h-4 mr-1" />
-                          Sí
-                        </span>
-                      ) : 'No'}
-                    </span>
-                  </p>
-                  
-                  {selectedVenta.facturada && selectedVenta.numeroFactura && (
-                    <p className="flex justify-between py-1 border-b border-gray-100">
-                      <span className="text-gray-600">N° Factura:</span>
-                      <span>{selectedVenta.numeroFactura}</span>
-                    </p>
-                  )}
+                <div className="bg-gray-50 p-6 rounded-xl">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Cliente y Facturación</h3>
+                  <div className="space-y-3">
+                    <div className="flex justify-between py-2 border-b border-gray-200">
+                      <span className="text-gray-600">Cliente:</span>
+                      <span className="font-semibold">{selectedVenta.clienteNombre || 'Consumidor Final'}</span>
+                    </div>
+                    
+                    {selectedVenta.facturada && selectedVenta.numeroFactura && (
+                      <div className="flex justify-between py-2 border-b border-gray-200">
+                        <span className="text-gray-600">N° Factura:</span>
+                        <span className="font-semibold">{selectedVenta.numeroFactura}</span>
+                      </div>
+                    )}
+                    
+                    <div className="pt-2">
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">Métodos de Pago:</h4>
+                      <div className="space-y-2">
+                        {selectedVenta.pagos.map((pago) => (
+                          <div key={pago.id} className="flex items-center justify-between p-2 bg-white rounded-lg">
+                            <span className="flex items-center space-x-2">
+                              {getMedioPagoIcon(pago.medioPago)}
+                              <span className="text-sm">{formatMedioPago(pago.medioPago)}</span>
+                            </span>
+                            <span className="font-semibold">${pago.monto.toFixed(2)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
               
-              <h3 className="text-gray-700 font-medium mb-2">Productos</h3>
-              <div className="bg-gray-50 rounded-lg overflow-hidden mb-4">
+              <div className="bg-gray-50 p-6 rounded-xl">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Productos</h3>
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-100">
-                      <tr>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Producto
-                        </th>
-                        <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Cantidad
-                        </th>
-                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Precio Unit.
-                        </th>
-                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Subtotal
-                        </th>
+                  <table className="min-w-full">
+                    <thead>
+                      <tr className="border-b border-gray-200">
+                        <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Producto</th>
+                        <th className="px-4 py-3 text-center text-sm font-medium text-gray-700">Cantidad</th>
+                        <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">Precio Unit.</th>
+                        <th className="px-4 py-3 text-right text-sm font-medium text-gray-700">Subtotal</th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-100">
+                    <tbody className="divide-y divide-gray-200">
                       {selectedVenta.items.map((item) => (
-                        <tr key={item.id} className="hover:bg-gray-50">
-                          <td className="px-4 py-2 text-sm text-gray-900">
+                        <tr key={item.id} className="hover:bg-white transition-colors">
+                          <td className="px-4 py-3 text-sm text-gray-900">
                             {item.producto.nombre}
                           </td>
-                          <td className="px-4 py-2 text-sm text-gray-500 text-center">
+                          <td className="px-4 py-3 text-sm text-gray-900 text-center">
                             {item.cantidad}
                           </td>
-                          <td className="px-4 py-2 text-sm text-gray-900 text-right">
+                          <td className="px-4 py-3 text-sm text-gray-900 text-right">
                             ${item.precioUnitario.toFixed(2)}
                             {item.descuento > 0 && (
                               <span className="text-xs text-green-600 ml-1">(-{item.descuento}%)</span>
                             )}
                           </td>
-                          <td className="px-4 py-2 text-sm text-gray-900 font-medium text-right">
+                          <td className="px-4 py-3 text-sm text-gray-900 font-semibold text-right">
                             ${(item.cantidad * item.precioUnitario * (1 - item.descuento / 100)).toFixed(2)}
                           </td>
                         </tr>
                       ))}
-                      <tr className="bg-gray-50">
-                        <td colSpan={3} className="px-4 py-2 text-right font-medium">
+                      <tr className="bg-white border-t-2 border-gray-300">
+                        <td colSpan={3} className="px-4 py-3 text-right font-semibold text-gray-900">
                           Total:
                         </td>
-                        <td className="px-4 py-2 text-right font-bold">
+                        <td className="px-4 py-3 text-right font-bold text-lg text-gray-900">
                           ${selectedVenta.total.toFixed(2)}
                         </td>
                       </tr>
@@ -834,63 +766,30 @@ export default function HistorialVentasPage() {
                   </table>
                 </div>
               </div>
-              
-              <h3 className="text-gray-700 font-medium mt-4 mb-2">Pagos</h3>
-              <div className="bg-gray-50 rounded-lg overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-100">
-                      <tr>
-                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Método de Pago
-                        </th>
-                        <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Monto
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-100">
-                      {selectedVenta.pagos.map((pago) => (
-                        <tr key={pago.id}>
-                          <td className="px-4 py-2 text-sm text-gray-900">
-                            <span className="flex items-center">
-                              {getMedioPagoIcon(pago.medioPago)}
-                              <span className="ml-2">{formatMedioPago(pago.medioPago)}</span>
-                            </span>
-                          </td>
-                          <td className="px-4 py-2 text-sm text-gray-900 font-medium text-right">
-                            ${pago.monto.toFixed(2)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
             </div>
             
-            <div className="p-4 border-t sticky bottom-0 bg-white rounded-b-lg flex justify-end gap-3">
+            <div className="p-6 border-t border-gray-200 bg-gray-50 rounded-b-2xl flex justify-end gap-3">
               <button
                 onClick={() => setIsDetalleOpen(false)}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                className="px-6 py-2 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-100 transition-all"
               >
                 Cerrar
               </button>
               
               <button
                 onClick={() => handleExportPdf(selectedVenta)}
-                className="px-4 py-2 bg-[#311716] text-white rounded-lg hover:bg-[#462625] flex items-center"
+                className="px-6 py-2 bg-[#311716] text-white rounded-xl hover:bg-[#462625] flex items-center space-x-2 transition-all"
                 disabled={exportingPdf}
               >
                 {exportingPdf ? (
                   <>
-                    <RefreshCw size={18} className="animate-spin mr-2" />
-                    Generando...
+                    <RefreshCw size={18} className="animate-spin" />
+                    <span>Generando...</span>
                   </>
                 ) : (
                   <>
-                    <Download size={18} className="mr-2" />
-                    {selectedVenta.facturada ? 'Descargar Factura' : 'Exportar Comprobante'}
+                    <Download size={18} />
+                    <span>{selectedVenta.facturada ? 'Descargar Factura' : 'Exportar Comprobante'}</span>
                   </>
                 )}
               </button>

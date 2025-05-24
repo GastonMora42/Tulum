@@ -1,12 +1,10 @@
 {
-  "/api/admin/insumos/route": "app/api/admin/insumos/route.js",
-  "/api/admin/dashboard/route": "app/api/admin/dashboard/route.js",
-  "/api/admin/punto-equilibrio/route": "app/api/admin/punto-equilibrio/route.js",
-  "/(admin)/admin/page": "app/(admin)/admin/page.js",
-  "/(admin)/admin/contingencias/page": "app/(admin)/admin/contingencias/page.js",
-  "/(admin)/admin/insumos/page": "app/(admin)/admin/insumos/page.js",
-  "/(admin)/admin/contingencias/[id]/page": "app/(admin)/admin/contingencias/[id]/page.js",
-  "/(admin)/admin/punto-equilibrio/page": "app/(admin)/admin/punto-equilibrio/page.js",
-  "/(admin)/admin/conciliaciones/[id]/page": "app/(admin)/admin/conciliaciones/[id]/page.js",
-  "/(admin)/admin/reportes/page": "app/(admin)/admin/reportes/page.js"
+  "/api/productos/cache/route": "app/api/productos/cache/route.js",
+  "/api/auth/refresh/route": "app/api/auth/refresh/route.js",
+  "/api/pdv/ventas/route": "app/api/pdv/ventas/route.js",
+  "/favicon.ico/route": "app/favicon.ico/route.js",
+  "/api/auth/me/route": "app/api/auth/me/route.js",
+  "/(auth)/login/page": "app/(auth)/login/page.js",
+  "/(pdv)/pdv/ventas/page": "app/(pdv)/pdv/ventas/page.js",
+  "/(pdv)/pdv/page": "app/(pdv)/pdv/page.js"
 }
