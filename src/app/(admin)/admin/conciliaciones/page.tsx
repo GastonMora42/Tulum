@@ -382,6 +382,7 @@ export default function ConciliacionesPage() {
                             Ver detalles
                           </Link>
                           
+                          
                           {conciliacion._count.contingencias > 0 && (
                             <Link 
                               href={`/admin/conciliaciones/${conciliacion.id}/contingencias`}
