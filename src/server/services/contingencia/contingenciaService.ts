@@ -1,7 +1,16 @@
-// src/server/services/contingencia/contingenciaService.ts
+// src/server/services/contingencia/contingenciaService.ts - VERSIÓN COMPLETA ACTUALIZADA
 import prisma from '@/server/db/client';
-import { Contingencia } from '@prisma/client';
+import { Contingencia, User, Ubicacion, Conciliacion, Production, Envio } from '@prisma/client';
 import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
+
+// Tipos extendidos con relaciones
+export type ContingenciaCompleta = Contingencia & {
+  usuario: User;
+  ubicacion?: Ubicacion | null;
+  conciliacion?: Conciliacion | null;
+  produccion?: Production | null;
+  envio?: Envio | null;
+};
 
 export class ContingenciaService {
   private s3Client: S3Client;
@@ -32,7 +41,7 @@ export class ContingenciaService {
     mediaType?: 'image' | 'video';
     urgente?: boolean;
     tipo?: string;
-  }): Promise<Contingencia> {
+  }): Promise<ContingenciaCompleta> {
     console.log('[ContingenciaService] Creando contingencia:', {
       ...datos,
       descripcion: datos.descripcion?.substring(0, 30) + '...'
@@ -82,68 +91,66 @@ export class ContingenciaService {
       }
     }
     
-  let mediaExpiraEn = null;
-  if (datos.imagenUrl || datos.videoUrl) {
-    const fechaExpiracion = new Date();
-    fechaExpiracion.setDate(fechaExpiracion.getDate() + 30);
-    mediaExpiraEn = fechaExpiracion;
-    console.log(`[ContingenciaService] Archivos multimedia expirarán en: ${mediaExpiraEn}`);
-  }
-  
-  // Determinar el tipo de archivo multimedia
-  let imagenUrl = null;
-  let videoUrl = null;
-  
-  if (datos.mediaType === 'image' && datos.imagenUrl) {
-    imagenUrl = datos.imagenUrl;
-    console.log(`[ContingenciaService] Guardando imagen: ${imagenUrl}`);
-  } else if (datos.mediaType === 'video' && (datos.videoUrl || datos.imagenUrl)) {
-    videoUrl = datos.videoUrl || datos.imagenUrl;
-    console.log(`[ContingenciaService] Guardando video: ${videoUrl}`);
-  }
-  
-  // Crear la contingencia con datos limpios
-  try {
-    const contingencia = await prisma.contingencia.create({
-      data: {
-        titulo: datos.titulo,
-        descripcion: datos.descripcion,
-        origen: datos.origen,
-        produccionId: datos.produccionId || null, // Convertir undefined a null para Prisma
-        envioId: datos.envioId || null, // Convertir undefined a null para Prisma
-        tipo: datos.tipo || null,
-        urgente: datos.urgente || false,
-        ubicacionId: datos.ubicacionId || null,
-        conciliacionId: datos.conciliacionId || null,
-        imagenUrl: datos.imagenUrl || null,
-        videoUrl: datos.videoUrl || null,
-        mediaType: datos.mediaType || null,
-        mediaExpiraEn: (datos.imagenUrl || datos.videoUrl) ? 
-                      new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) : null,
-        estado: 'pendiente',
-        fechaCreacion: new Date(),
-        creadoPor: datos.creadoPor,
-        ajusteRealizado: false
-      }
-    });
+    // Configurar fechas de expiración para archivos multimedia
+    let mediaExpiraEn = null;
+    if (datos.imagenUrl || datos.videoUrl) {
+      const fechaExpiracion = new Date();
+      fechaExpiracion.setDate(fechaExpiracion.getDate() + 30);
+      mediaExpiraEn = fechaExpiracion;
+      console.log(`[ContingenciaService] Archivos multimedia expirarán en: ${mediaExpiraEn}`);
+    }
     
-    console.log(`[ContingenciaService] Contingencia creada con ID: ${contingencia.id}`);
-    return contingencia;
-  } catch (error) {
-    console.error('[ContingenciaService] Error al crear contingencia:', error);
-    throw error;
+    // Crear la contingencia con datos limpios
+    try {
+      const contingencia = await prisma.contingencia.create({
+        data: {
+          titulo: datos.titulo,
+          descripcion: datos.descripcion,
+          origen: datos.origen,
+          produccionId: datos.produccionId || null,
+          envioId: datos.envioId || null,
+          tipo: datos.tipo || null,
+          urgente: datos.urgente || false,
+          ubicacionId: datos.ubicacionId || null,
+          conciliacionId: datos.conciliacionId || null,
+          imagenUrl: datos.imagenUrl || null,
+          videoUrl: datos.videoUrl || null,
+          mediaType: datos.mediaType || null,
+          mediaExpiraEn: mediaExpiraEn,
+          estado: 'pendiente',
+          fechaCreacion: new Date(),
+          creadoPor: datos.creadoPor,
+          ajusteRealizado: false
+        },
+        include: {
+          usuario: true,
+          ubicacion: true,
+          conciliacion: true,
+          produccion: true,
+          envio: true
+        }
+      });
+      
+      console.log(`[ContingenciaService] Contingencia creada con ID: ${contingencia.id}`);
+      return contingencia;
+    } catch (error) {
+      console.error('[ContingenciaService] Error al crear contingencia:', error);
+      throw error;
+    }
   }
-}
 
   async listarContingencias(filtros?: {
     estado?: string;
     origen?: string;
     creadoPor?: string;
-    ubicacionId?: string;        // Nuevo filtro
-    conciliacionId?: string;     // Nuevo filtro
+    ubicacionId?: string;
+    conciliacionId?: string;
     tipo?: string;
-    urgente?: boolean;
-  }): Promise<Contingencia[]> {
+    urgente?: string | boolean;
+    search?: string;
+    fechaDesde?: string;
+    fechaHasta?: string;
+  }): Promise<ContingenciaCompleta[]> {
     const where: any = {};
 
     if (filtros?.estado) {
@@ -154,13 +161,13 @@ export class ContingenciaService {
       where.origen = filtros.origen;
     }
 
-      if (filtros?.ubicacionId) {
-    where.ubicacionId = filtros.ubicacionId;
-  }
-  
-  if (filtros?.conciliacionId) {
-    where.conciliacionId = filtros.conciliacionId;
-  }
+    if (filtros?.ubicacionId) {
+      where.ubicacionId = filtros.ubicacionId;
+    }
+    
+    if (filtros?.conciliacionId) {
+      where.conciliacionId = filtros.conciliacionId;
+    }
 
     if (filtros?.creadoPor) {
       where.creadoPor = filtros.creadoPor;
@@ -170,8 +177,36 @@ export class ContingenciaService {
       where.tipo = filtros.tipo;
     }
     
+    // Manejar filtro de urgente (puede venir como string o boolean)
     if (filtros?.urgente !== undefined) {
-      where.urgente = filtros.urgente;
+      if (typeof filtros.urgente === 'string') {
+        where.urgente = filtros.urgente === 'true';
+      } else {
+        where.urgente = filtros.urgente;
+      }
+    }
+
+    // Filtro de búsqueda por texto
+    if (filtros?.search) {
+      where.OR = [
+        { titulo: { contains: filtros.search, mode: 'insensitive' } },
+        { descripcion: { contains: filtros.search, mode: 'insensitive' } }
+      ];
+    }
+
+    // Filtros de fecha
+    if (filtros?.fechaDesde || filtros?.fechaHasta) {
+      where.fechaCreacion = {};
+      
+      if (filtros.fechaDesde) {
+        where.fechaCreacion.gte = new Date(filtros.fechaDesde);
+      }
+      
+      if (filtros.fechaHasta) {
+        const fechaHasta = new Date(filtros.fechaHasta);
+        fechaHasta.setHours(23, 59, 59, 999); // Final del día
+        where.fechaCreacion.lte = fechaHasta;
+      }
     }
 
     return prisma.contingencia.findMany({
@@ -180,8 +215,8 @@ export class ContingenciaService {
         usuario: true,
         produccion: true,
         envio: true,
-        ubicacion: true,         // Incluir ubicación
-        conciliacion: true       // Incluir conciliación
+        ubicacion: true,
+        conciliacion: true
       },
       orderBy: [
         { urgente: 'desc' }, // Contingencias urgentes primero
@@ -190,248 +225,323 @@ export class ContingenciaService {
     });
   }
 
-  async obtenerContingencia(id: string): Promise<Contingencia | null> {
+  async obtenerContingencia(id: string): Promise<ContingenciaCompleta | null> {
     return prisma.contingencia.findUnique({
       where: { id },
       include: {
         usuario: true,
         produccion: true,
-        envio: true
+        envio: true,
+        ubicacion: true,
+        conciliacion: true
       }
     });
   }
 
-  async enRevisionContingencia(id: string, resueltoPor: string): Promise<Contingencia> {
+  async enRevisionContingencia(id: string, resueltoPor: string): Promise<ContingenciaCompleta> {
     return prisma.contingencia.update({
       where: { id },
       data: {
         estado: 'en_revision',
         resueltoPor: resueltoPor
+      },
+      include: {
+        usuario: true,
+        produccion: true,
+        envio: true,
+        ubicacion: true,
+        conciliacion: true
       }
     });
   }
-  
-  // Métodos para manejo de imágenes
-  
-  async eliminarImagenContingencia(id: string): Promise<Contingencia> {
-    // Obtener la contingencia para verificar si tiene imagen
+
+  // NUEVOS MÉTODOS PARA ACCIONES EN LOTE
+
+  async marcarUrgente(id: string, urgente: boolean): Promise<ContingenciaCompleta> {
+    return prisma.contingencia.update({
+      where: { id },
+      data: { urgente },
+      include: {
+        usuario: true,
+        produccion: true,
+        envio: true,
+        ubicacion: true,
+        conciliacion: true
+      }
+    });
+  }
+
+  async asignarResponsable(id: string, responsableId: string): Promise<ContingenciaCompleta> {
+    // Verificar que el responsable existe
+    const responsable = await prisma.user.findUnique({
+      where: { id: responsableId }
+    });
+
+    if (!responsable) {
+      throw new Error('El responsable especificado no existe');
+    }
+
+    return prisma.contingencia.update({
+      where: { id },
+      data: { 
+        resueltoPor: responsableId,
+        estado: 'en_revision' // Cambiar estado a en revisión cuando se asigna
+      },
+      include: {
+        usuario: true,
+        produccion: true,
+        envio: true,
+        ubicacion: true,
+        conciliacion: true
+      }
+    });
+  }
+
+  async archivarContingencia(id: string, usuarioId: string): Promise<ContingenciaCompleta> {
+    return prisma.contingencia.update({
+      where: { id },
+      data: { 
+        estado: 'archivado',
+        resueltoPor: usuarioId,
+        fechaRespuesta: new Date(),
+        respuesta: 'Contingencia archivada'
+      },
+      include: {
+        usuario: true,
+        produccion: true,
+        envio: true,
+        ubicacion: true,
+        conciliacion: true
+      }
+    });
+  }
+
+  // MÉTODOS PARA MANEJO DE ARCHIVOS MULTIMEDIA
+
+  async eliminarArchivoMultimedia(id: string): Promise<ContingenciaCompleta> {
+    // Obtener la contingencia para verificar qué tipo de archivo tiene
     const contingencia = await prisma.contingencia.findUnique({
       where: { id }
     });
     
-    if (!contingencia || !contingencia.imagenUrl) {
-      throw new Error('Contingencia no tiene imagen o no existe');
+    if (!contingencia) {
+      throw new Error('Contingencia no existe');
+    }
+    
+    // Determinar qué archivo eliminar
+    let key = '';
+    let url = '';
+    
+    if (contingencia.imagenUrl) {
+      url = contingencia.imagenUrl;
+    } else if (contingencia.videoUrl) {
+      url = contingencia.videoUrl;
+    } else {
+      // No hay archivo para eliminar, devolver contingencia actual
+      return this.obtenerContingencia(id) as Promise<ContingenciaCompleta>;
     }
     
     try {
-      // Extraer la clave del objeto desde la URL
-      const url = new URL(contingencia.imagenUrl);
-      const key = url.pathname.substring(1); // Eliminar la barra inicial
-      
-      // Eliminar de S3
-      const deleteParams = {
-        Bucket: this.bucketName,
-        Key: key
-      };
-      
-      await this.s3Client.send(new DeleteObjectCommand(deleteParams));
+      if (url) {
+        // Extraer la clave del objeto desde la URL
+        const urlObj = new URL(url);
+        key = urlObj.pathname.substring(1); // Eliminar la barra inicial
+        
+        // Eliminar de S3
+        const deleteParams = {
+          Bucket: this.bucketName,
+          Key: key
+        };
+        
+        await this.s3Client.send(new DeleteObjectCommand(deleteParams));
+        console.log(`Archivo ${key} eliminado de S3`);
+      }
       
       // Actualizar contingencia
       return prisma.contingencia.update({
         where: { id },
         data: {
           imagenUrl: null,
-          imagenExpiraEn: null
+          videoUrl: null,
+          mediaType: null,
+          mediaExpiraEn: null
+        },
+        include: {
+          usuario: true,
+          produccion: true,
+          envio: true,
+          ubicacion: true,
+          conciliacion: true
         }
       });
     } catch (error) {
-      console.error(`Error al eliminar imagen de contingencia ${id}:`, error);
-      throw new Error('Error al eliminar imagen de contingencia');
+      console.error(`Error al eliminar archivo multimedia de contingencia ${id}:`, error);
+      throw new Error('Error al eliminar archivo multimedia');
     }
   }
-  
-  async actualizarImagenContingencia(id: string, imagenUrl: string): Promise<Contingencia> {
+
+  async actualizarArchivoMultimedia(id: string, mediaUrl: string, mediaType: 'image' | 'video'): Promise<ContingenciaCompleta> {
     // Calcular nueva fecha de expiración
     const fechaExpiracion = new Date();
     fechaExpiracion.setDate(fechaExpiracion.getDate() + 30);
     
-    // Actualizar la contingencia con la nueva imagen
-    return prisma.contingencia.update({
-      where: { id },
-      data: {
-        imagenUrl,
-        imagenExpiraEn: fechaExpiracion
-      }
-    });
-  }
+    // Preparar datos según el tipo de archivo
+    const updateData: any = {
+      mediaType,
+      mediaExpiraEn: fechaExpiracion
+    };
 
-  // Método para eliminar archivo multimedia
-async eliminarArchivoMultimedia(id: string): Promise<Contingencia> {
-  // Obtener la contingencia para verificar qué tipo de archivo tiene
-  const contingencia = await prisma.contingencia.findUnique({
-    where: { id }
-  });
-  
-  if (!contingencia) {
-    throw new Error('Contingencia no existe');
-  }
-  
-  // Determinar qué archivo eliminar
-  let key = '';
-  let url = '';
-  
-  if (contingencia.imagenUrl) {
-    url = contingencia.imagenUrl;
-  } else if (contingencia.videoUrl) {
-    url = contingencia.videoUrl;
-  } else {
-    // No hay archivo para eliminar
-    return contingencia;
-  }
-  
-  try {
-    if (url) {
-      // Extraer la clave del objeto desde la URL
-      const urlObj = new URL(url);
-      key = urlObj.pathname.substring(1); // Eliminar la barra inicial
-      
-      // Eliminar de S3
-      const deleteParams = {
-        Bucket: this.bucketName,
-        Key: key
-      };
-      
-      await this.s3Client.send(new DeleteObjectCommand(deleteParams));
-      console.log(`Archivo ${key} eliminado de S3`);
-    }
-    
-    // Actualizar contingencia
-    return prisma.contingencia.update({
-      where: { id },
-      data: {
-        imagenUrl: null,
-        videoUrl: null,
-        mediaType: null,
-        mediaExpiraEn: null
-      }
-    });
-  } catch (error) {
-    console.error(`Error al eliminar archivo multimedia de contingencia ${id}:`, error);
-    throw new Error('Error al eliminar archivo multimedia');
-  }
-}
-
-// Método para resolver o rechazar contingencia
-async resolverContingencia(id: string, datos: {
-  respuesta: string;
-  resueltoPor: string;
-  ajusteRealizado: boolean;
-  eliminarArchivos?: boolean;
-}): Promise<Contingencia> {
-  const { eliminarArchivos = true } = datos;
-  
-  try {
-    // Si se debe eliminar los archivos
-    if (eliminarArchivos) {
-      try {
-        // Primero intentar eliminar el archivo
-        await this.eliminarArchivoMultimedia(id);
-      } catch (error) {
-        console.error(`Error al eliminar archivos de contingencia ${id}:`, error);
-        // Continuar con la resolución aunque falle la eliminación
-      }
+    if (mediaType === 'image') {
+      updateData.imagenUrl = mediaUrl;
+      updateData.videoUrl = null;
+    } else {
+      updateData.videoUrl = mediaUrl;
+      updateData.imagenUrl = null;
     }
     
     // Actualizar la contingencia
     return prisma.contingencia.update({
       where: { id },
-      data: {
-        estado: 'resuelto',
-        respuesta: datos.respuesta,
-        resueltoPor: datos.resueltoPor,
-        fechaRespuesta: new Date(),
-        ajusteRealizado: datos.ajusteRealizado,
-        // Si eliminarArchivos=true, ya se eliminaron arriba
-        // Si es false, mantenemos los archivos
-        ...(eliminarArchivos ? {
-          imagenUrl: null,
-          videoUrl: null,
-          mediaType: null,
-          mediaExpiraEn: null
-        } : {})
+      data: updateData,
+      include: {
+        usuario: true,
+        produccion: true,
+        envio: true,
+        ubicacion: true,
+        conciliacion: true
       }
     });
-  } catch (error) {
-    console.error(`Error al resolver contingencia ${id}:`, error);
-    throw error;
   }
-}
 
-async rechazarContingencia(id: string, datos: {
-  respuesta: string;
-  resueltoPor: string;
-  eliminarArchivos?: boolean;
-}): Promise<Contingencia> {
-  const { eliminarArchivos = true } = datos;
-  
-  try {
-    // Si se debe eliminar los archivos
-    if (eliminarArchivos) {
-      try {
-        await this.eliminarArchivoMultimedia(id);
-      } catch (error) {
-        console.error(`Error al eliminar archivos de contingencia ${id}:`, error);
-      }
-    }
+  // MÉTODOS PARA RESOLVER/RECHAZAR CONTINGENCIAS
+
+  async resolverContingencia(id: string, datos: {
+    respuesta: string;
+    resueltoPor: string;
+    ajusteRealizado: boolean;
+    eliminarArchivos?: boolean;
+  }): Promise<ContingenciaCompleta> {
+    const { eliminarArchivos = true } = datos;
     
-    // Actualizar la contingencia
-    return prisma.contingencia.update({
-      where: { id },
-      data: {
-        estado: 'rechazado',
-        respuesta: datos.respuesta,
-        resueltoPor: datos.resueltoPor,
-        fechaRespuesta: new Date(),
-        ...(eliminarArchivos ? {
-          imagenUrl: null,
-          videoUrl: null,
-          mediaType: null,
-          mediaExpiraEn: null
-        } : {})
+    try {
+      // Si se debe eliminar los archivos
+      if (eliminarArchivos) {
+        try {
+          await this.eliminarArchivoMultimedia(id);
+        } catch (error) {
+          console.error(`Error al eliminar archivos de contingencia ${id}:`, error);
+          // Continuar con la resolución aunque falle la eliminación
+        }
       }
-    });
-  } catch (error) {
-    console.error(`Error al rechazar contingencia ${id}:`, error);
-    throw error;
+      
+      // Actualizar la contingencia
+      return prisma.contingencia.update({
+        where: { id },
+        data: {
+          estado: 'resuelto',
+          respuesta: datos.respuesta,
+          resueltoPor: datos.resueltoPor,
+          fechaRespuesta: new Date(),
+          ajusteRealizado: datos.ajusteRealizado,
+          // Si eliminarArchivos=true, limpiar campos multimedia
+          ...(eliminarArchivos ? {
+            imagenUrl: null,
+            videoUrl: null,
+            mediaType: null,
+            mediaExpiraEn: null
+          } : {})
+        },
+        include: {
+          usuario: true,
+          produccion: true,
+          envio: true,
+          ubicacion: true,
+          conciliacion: true
+        }
+      });
+    } catch (error) {
+      console.error(`Error al resolver contingencia ${id}:`, error);
+      throw error;
+    }
   }
-}
-  
-  // Método para limpiar imágenes expiradas
-  async limpiarImagenesExpiradas(): Promise<{
+
+  async rechazarContingencia(id: string, datos: {
+    respuesta: string;
+    resueltoPor: string;
+    eliminarArchivos?: boolean;
+  }): Promise<ContingenciaCompleta> {
+    const { eliminarArchivos = true } = datos;
+    
+    try {
+      // Si se debe eliminar los archivos
+      if (eliminarArchivos) {
+        try {
+          await this.eliminarArchivoMultimedia(id);
+        } catch (error) {
+          console.error(`Error al eliminar archivos de contingencia ${id}:`, error);
+        }
+      }
+      
+      // Actualizar la contingencia
+      return prisma.contingencia.update({
+        where: { id },
+        data: {
+          estado: 'rechazado',
+          respuesta: datos.respuesta,
+          resueltoPor: datos.resueltoPor,
+          fechaRespuesta: new Date(),
+          ...(eliminarArchivos ? {
+            imagenUrl: null,
+            videoUrl: null,
+            mediaType: null,
+            mediaExpiraEn: null
+          } : {})
+        },
+        include: {
+          usuario: true,
+          produccion: true,
+          envio: true,
+          ubicacion: true,
+          conciliacion: true
+        }
+      });
+    } catch (error) {
+      console.error(`Error al rechazar contingencia ${id}:`, error);
+      throw error;
+    }
+  }
+
+  // MÉTODOS DE MANTENIMIENTO
+
+  async limpiarArchivosExpirados(): Promise<{
     eliminadas: number;
     errores: number;
   }> {
-    // Buscar contingencias con imágenes expiradas
+    // Buscar contingencias con archivos multimedia expirados
     const ahora = new Date();
     const contingenciasExpiradas = await prisma.contingencia.findMany({
       where: {
-        imagenUrl: { not: null },
-        imagenExpiraEn: { lt: ahora }
+        OR: [
+          { imagenUrl: { not: null } },
+          { videoUrl: { not: null } }
+        ],
+        mediaExpiraEn: { lt: ahora }
       }
     });
     
-    console.log(`[ContingenciaService] Encontradas ${contingenciasExpiradas.length} imágenes expiradas`);
+    console.log(`[ContingenciaService] Encontradas ${contingenciasExpiradas.length} contingencias con archivos expirados`);
     
     let eliminadas = 0;
     let errores = 0;
     
     for (const contingencia of contingenciasExpiradas) {
       try {
-        if (!contingencia.imagenUrl) continue;
+        let url = contingencia.imagenUrl || contingencia.videoUrl;
+        if (!url) continue;
         
         // Extraer la clave del objeto desde la URL
-        const url = new URL(contingencia.imagenUrl);
-        const key = url.pathname.substring(1);
+        const urlObj = new URL(url);
+        const key = urlObj.pathname.substring(1);
         
         // Eliminar de S3
         const deleteParams = {
@@ -446,18 +556,110 @@ async rechazarContingencia(id: string, datos: {
           where: { id: contingencia.id },
           data: {
             imagenUrl: null,
-            imagenExpiraEn: null
+            videoUrl: null,
+            mediaType: null,
+            mediaExpiraEn: null
           }
         });
         
         eliminadas++;
+        console.log(`[ContingenciaService] Archivo ${key} eliminado de contingencia ${contingencia.id}`);
       } catch (error) {
-        console.error(`Error al limpiar imagen de contingencia ${contingencia.id}:`, error);
+        console.error(`Error al limpiar archivo de contingencia ${contingencia.id}:`, error);
         errores++;
       }
     }
     
     return { eliminadas, errores };
+  }
+
+  // MÉTODOS DE ESTADÍSTICAS
+
+  async obtenerEstadisticas(filtros?: {
+    fechaDesde?: Date;
+    fechaHasta?: Date;
+    origen?: string;
+    ubicacionId?: string;
+  }): Promise<{
+    total: number;
+    porEstado: Record<string, number>;
+    porOrigen: Record<string, number>;
+    porTipo: Record<string, number>;
+    urgentes: number;
+    promedioResolucion: number; // en horas
+  }> {
+    const where: any = {};
+    
+    if (filtros?.origen) {
+      where.origen = filtros.origen;
+    }
+    
+    if (filtros?.ubicacionId) {
+      where.ubicacionId = filtros.ubicacionId;
+    }
+    
+    if (filtros?.fechaDesde || filtros?.fechaHasta) {
+      where.fechaCreacion = {};
+      if (filtros.fechaDesde) {
+        where.fechaCreacion.gte = filtros.fechaDesde;
+      }
+      if (filtros.fechaHasta) {
+        where.fechaCreacion.lte = filtros.fechaHasta;
+      }
+    }
+    
+    const contingencias = await prisma.contingencia.findMany({
+      where
+    });
+    
+    const stats = {
+      total: contingencias.length,
+      porEstado: {} as Record<string, number>,
+      porOrigen: {} as Record<string, number>,
+      porTipo: {} as Record<string, number>,
+      urgentes: 0,
+      promedioResolucion: 0
+    };
+    
+    let tiempoResolucionTotal = 0;
+    let resueltas = 0;
+    
+    contingencias.forEach(c => {
+      // Contar por estado
+      stats.porEstado[c.estado] = (stats.porEstado[c.estado] || 0) + 1;
+      
+      // Contar por origen
+      stats.porOrigen[c.origen] = (stats.porOrigen[c.origen] || 0) + 1;
+      
+      // Contar por tipo
+      const tipo = c.tipo || 'sin_tipo';
+      stats.porTipo[tipo] = (stats.porTipo[tipo] || 0) + 1;
+      
+      // Contar urgentes
+      if (c.urgente) {
+        stats.urgentes++;
+      }
+      
+      // Calcular tiempo de resolución
+      if (c.fechaRespuesta && (c.estado === 'resuelto' || c.estado === 'rechazado')) {
+        const tiempoResolucion = c.fechaRespuesta.getTime() - c.fechaCreacion.getTime();
+        tiempoResolucionTotal += tiempoResolucion;
+        resueltas++;
+      }
+    });
+    
+    // Calcular promedio de resolución en horas
+    if (resueltas > 0) {
+      stats.promedioResolucion = Math.round(tiempoResolucionTotal / resueltas / (1000 * 60 * 60));
+    }
+    
+    return stats;
+  }
+
+  // MÉTODOS PARA EXPORTACIÓN
+
+  async exportarContingencias(filtros?: any): Promise<ContingenciaCompleta[]> {
+    return this.listarContingencias(filtros);
   }
 }
 
