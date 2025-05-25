@@ -21,15 +21,19 @@ model User {
   updatedAt  DateTime   @updatedAt
 
   // Relaciones
-  producciones     Production[]
-  ventas           Venta[]
-  envios           Envio[]
-  contingencias    Contingencia[]
-  movimientosStock MovimientoStock[]
-  conciliaciones   Conciliacion[]
-  cajaEgresos      CajaEgreso[]
-  reintentos       FacturaReintento[]
+  producciones           Production[]
+  ventas                 Venta[]
+  envios                 Envio[]
+  contingencias          Contingencia[]
+  movimientosStock       MovimientoStock[]
+  conciliaciones         Conciliacion[]
+  cajaEgresos            CajaEgreso[]
+  reintentos             FacturaReintento[]
   puntoEquilibrioConfigs PuntoEquilibrioConfig[]
+
+  movimientosStockInsumoPdv MovimientoStockInsumoPdv[]
+  solicitudesInsumoPdv      SolicitudInsumoPdv[]
+  egresosInsumoPdv          EgresoInsumoPdv[]
 }
 
 model Role {
@@ -204,9 +208,15 @@ model Ubicacion {
 
   // Añadir esta nueva relación
   conciliaciones Conciliacion[]
-  contingencias Contingencia[]
+  contingencias  Contingencia[]
 
   puntoEquilibrioConfigs PuntoEquilibrioConfig[]
+
+  stocksInsumoPdv        StockInsumoPdv[]
+  solicitudesInsumoPdv   SolicitudInsumoPdv[]
+  enviosInsumoPdvOrigen  EnvioInsumoPdv[]     @relation("EnvioInsumoPdvOrigen")
+  enviosInsumoPdvDestino EnvioInsumoPdv[]     @relation("EnvioInsumoPdvDestino")
+  egresosInsumoPdv       EgresoInsumoPdv[]
 }
 
 // Distribución
@@ -317,13 +327,13 @@ model Contingencia {
   origen String // fabrica, sucursal, oficina
 
   // Referencias opcionales según el origen
-  produccionId String?
-  produccion   Production? @relation(fields: [produccionId], references: [id])
-  envioId      String?
-  envio        Envio?      @relation(fields: [envioId], references: [id])
-  videoUrl       String?    // Nuevo campo para videos
-  mediaType      String?    // 'image' o 'video'
-  mediaExpiraEn  DateTime?  // Fecha de expiración unificada
+  produccionId  String?
+  produccion    Production? @relation(fields: [produccionId], references: [id])
+  envioId       String?
+  envio         Envio?      @relation(fields: [envioId], references: [id])
+  videoUrl      String? // Nuevo campo para videos
+  mediaType     String? // 'image' o 'video'
+  mediaExpiraEn DateTime? // Fecha de expiración unificada
 
   // Agregar campo tipo para mejor categorización
   tipo String? // producto, stock, caja, sistema, otro
@@ -344,12 +354,12 @@ model Contingencia {
   imagenUrl      String?
   imagenExpiraEn DateTime?
 
-  ubicacionId     String?
-  ubicacion       Ubicacion?     @relation(fields: [ubicacionId], references: [id])
-  
+  ubicacionId String?
+  ubicacion   Ubicacion? @relation(fields: [ubicacionId], references: [id])
+
   // Referencia a conciliación
-  conciliacionId  String?
-  conciliacion    Conciliacion?  @relation(fields: [conciliacionId], references: [id])
+  conciliacionId String?
+  conciliacion   Conciliacion? @relation(fields: [conciliacionId], references: [id])
 }
 
 // Codigos de descuento
@@ -367,24 +377,24 @@ model CodigoDescuento {
 }
 
 model Conciliacion {
-  id            String    @id @default(uuid())
+  id            String         @id @default(uuid())
   sucursalId    String
-  sucursal      Ubicacion @relation(fields: [sucursalId], references: [id])
-  fecha         DateTime  @default(now())
+  sucursal      Ubicacion      @relation(fields: [sucursalId], references: [id])
+  fecha         DateTime       @default(now())
   estado        String // pendiente, completada, con_contingencia
   usuarioId     String
-  usuario       User      @relation(fields: [usuarioId], references: [id])
+  usuario       User           @relation(fields: [usuarioId], references: [id])
   detalles      Json? // Array de productos y cantidades
   observaciones String?
   contingencias Contingencia[]
 }
 
 model FacturaElectronica {
-  id              String    @id @default(uuid())
-  ventaId         String    @unique
-  venta           Venta     @relation(fields: [ventaId], references: [id])
+  id              String             @id @default(uuid())
+  ventaId         String             @unique
+  venta           Venta              @relation(fields: [ventaId], references: [id])
   sucursalId      String
-  sucursal        Ubicacion @relation(fields: [sucursalId], references: [id])
+  sucursal        Ubicacion          @relation(fields: [sucursalId], references: [id])
   tipoComprobante String // "A", "B", etc.
   puntoVenta      Int
   numeroFactura   Int
@@ -396,9 +406,9 @@ model FacturaElectronica {
   respuestaAFIP   Json? // Respuesta completa de AFIP
   error           String?
   qrData          String? // Datos para el código QR de AFIP
-  logs            String?   @db.Text // Añadir este campo para almacenar logs extensos
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  logs            String?            @db.Text // Añadir este campo para almacenar logs extensos
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
   reintentos      FacturaReintento[]
 }
 
@@ -426,43 +436,171 @@ model CajaEgreso {
 }
 
 model TokenAFIP {
-  id           String   @id @default(uuid())
-  cuit         String
-  token        String   @db.Text
-  sign         String   @db.Text
+  id             String   @id @default(uuid())
+  cuit           String
+  token          String   @db.Text
+  sign           String   @db.Text
   expirationTime DateTime
-  createdAt    DateTime @default(now())
+  createdAt      DateTime @default(now())
 }
 
 model FacturaReintento {
-  id             String    @id @default(uuid())
+  id             String             @id @default(uuid())
   facturaId      String
   factura        FacturaElectronica @relation(fields: [facturaId], references: [id])
   usuarioId      String
-  usuario        User      @relation(fields: [usuarioId], references: [id])
+  usuario        User               @relation(fields: [usuarioId], references: [id])
   estadoAnterior String
   motivo         String?
-  resultado      String    // 'iniciado', 'exitoso', 'fallido'
-  error          String?   @db.Text
-  logs           String?   @db.Text
+  resultado      String // 'iniciado', 'exitoso', 'fallido'
+  error          String?            @db.Text
+  logs           String?            @db.Text
   cae            String?
-  iniciadoEn     DateTime  @default(now())
+  iniciadoEn     DateTime           @default(now())
   completadoEn   DateTime?
 }
 
 model PuntoEquilibrioConfig {
-  id            String   @id @default(uuid())
+  id              String    @id @default(uuid())
+  sucursalId      String
+  sucursal        Ubicacion @relation(fields: [sucursalId], references: [id])
+  costosFijos     Float
+  costosVariables Float // Porcentaje
+  metaMensual     Float
+  mes             Int // 1-12
+  año            Int
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  creadoPor       String
+  usuario         User      @relation(fields: [creadoPor], references: [id])
+
+  @@unique([sucursalId, mes, año])
+}
+
+model InsumoPdv {
+  id           String   @id @default(uuid())
+  nombre       String
+  descripcion  String?
+  unidadMedida String // rollo, paquete, unidad, etc.
+  stockMinimo  Float    @default(0)
+  activo       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relaciones
+  stocks           StockInsumoPdv[]
+  itemsEnvio       ItemEnvioInsumoPdv[]
+  itemsSolicitudes ItemSolicitudInsumoPdv[]
+  egresos          EgresoInsumoPdv[]
+}
+
+// Stock de insumos PDV por ubicación
+model StockInsumoPdv {
+  id                  String    @id @default(uuid())
+  insumoPdvId         String
+  insumoPdv           InsumoPdv @relation(fields: [insumoPdvId], references: [id])
+  ubicacionId         String
+  ubicacion           Ubicacion @relation(fields: [ubicacionId], references: [id])
+  cantidad            Float
+  version             Int       @default(0)
+  ultimaActualizacion DateTime  @default(now())
+
+  // Relaciones
+  movimientos MovimientoStockInsumoPdv[]
+
+  @@unique([insumoPdvId, ubicacionId])
+}
+
+// Movimientos de stock de insumos PDV
+model MovimientoStockInsumoPdv {
+  id             String         @id @default(uuid())
+  stockId        String
+  stock          StockInsumoPdv @relation(fields: [stockId], references: [id])
+  tipoMovimiento String // entrada, salida, ajuste
+  cantidad       Float
+  motivo         String
+  fecha          DateTime       @default(now())
+  usuarioId      String
+  usuario        User           @relation(fields: [usuarioId], references: [id])
+
+  // Referencias opcionales
+  envioId     String?
+  solicitudId String?
+}
+
+// Solicitudes de insumos PDV desde sucursales a admin
+model SolicitudInsumoPdv {
+  id             String    @id @default(uuid())
+  sucursalId     String
+  sucursal       Ubicacion @relation(fields: [sucursalId], references: [id])
+  usuarioId      String
+  usuario        User      @relation(fields: [usuarioId], references: [id])
+  estado         String // pendiente, aprobada, rechazada, enviada, recibida
+  observaciones  String?
+  fechaCreacion  DateTime  @default(now())
+  fechaRespuesta DateTime?
+  respondioPor   String?
+
+  // Relaciones
+  items ItemSolicitudInsumoPdv[]
+  envio EnvioInsumoPdv?
+}
+
+// Items de solicitud de insumos PDV
+model ItemSolicitudInsumoPdv {
+  id                 String             @id @default(uuid())
+  solicitudId        String
+  solicitud          SolicitudInsumoPdv @relation(fields: [solicitudId], references: [id])
+  insumoPdvId        String
+  insumoPdv          InsumoPdv          @relation(fields: [insumoPdvId], references: [id])
+  cantidadSolicitada Float
+  cantidadAprobada   Float?
+  observaciones      String?
+}
+
+// Envíos de insumos PDV
+model EnvioInsumoPdv {
+  id               String             @id @default(uuid())
+  solicitudId      String             @unique
+  solicitud        SolicitudInsumoPdv @relation(fields: [solicitudId], references: [id])
+  origenId         String // Siempre será desde admin/almacén
+  origen           Ubicacion          @relation("EnvioInsumoPdvOrigen", fields: [origenId], references: [id])
+  destinoId        String
+  destino          Ubicacion          @relation("EnvioInsumoPdvDestino", fields: [destinoId], references: [id])
+  estado           String // pendiente, enviado, en_transito, recibido
+  fechaCreacion    DateTime           @default(now())
+  fechaEnvio       DateTime?
+  fechaRecepcion   DateTime?
+  usuarioEnvio     String?
+  usuarioRecepcion String?
+  observaciones    String?
+
+  // Relaciones
+  items ItemEnvioInsumoPdv[]
+}
+
+// Items de envío de insumos PDV
+model ItemEnvioInsumoPdv {
+  id               String         @id @default(uuid())
+  envioId          String
+  envio            EnvioInsumoPdv @relation(fields: [envioId], references: [id])
+  insumoPdvId      String
+  insumoPdv        InsumoPdv      @relation(fields: [insumoPdvId], references: [id])
+  cantidad         Float
+  cantidadRecibida Float?
+}
+
+// Egresos de insumos PDV desde el punto de venta
+model EgresoInsumoPdv {
+  id            String    @id @default(uuid())
   sucursalId    String
   sucursal      Ubicacion @relation(fields: [sucursalId], references: [id])
-  costosFijos   Float
-  costosVariables Float  // Porcentaje
-  metaMensual   Float
-  mes           Int      // 1-12
-  año           Int
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  creadoPor     String
-  usuario       User     @relation(fields: [creadoPor], references: [id])
-  
-  @@unique([sucursalId, mes, año])
+  insumoPdvId   String
+  insumoPdv     InsumoPdv @relation(fields: [insumoPdvId], references: [id])
+  cantidad      Float
+  motivo        String // uso_normal, perdida, daño, etc.
+  usuarioId     String
+  usuario       User      @relation(fields: [usuarioId], references: [id])
+  fecha         DateTime  @default(now())
+  observaciones String?
 }

@@ -177,6 +177,12 @@ export default function PDVLayout({
       description: 'Egresos de caja'
     },
     { 
+      href: '/pdv/insumos', 
+      icon: <Package className="h-5 w-5" />, 
+      text: 'Insumos',
+      description: 'Insumos de Punto de venta'
+    },
+    { 
       href: '/pdv/facturas', 
       icon: <FileText className="h-5 w-5" />, 
       text: 'Facturas',

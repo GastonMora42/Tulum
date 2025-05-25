@@ -1,11 +1,14 @@
 {
-  "/api/contingencias/route": "app/api/contingencias/route.js",
-  "/api/admin/ubicaciones/route": "app/api/admin/ubicaciones/route.js",
-  "/api/contingencias/[id]/route": "app/api/contingencias/[id]/route.js",
-  "/api/contingencias/batch/route": "app/api/contingencias/batch/route.js",
+  "/api/admin/insumos-pdv/route": "app/api/admin/insumos-pdv/route.js",
+  "/api/admin/solicitudes-insumos-pdv/route": "app/api/admin/solicitudes-insumos-pdv/route.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/auth/me/route": "app/api/auth/me/route.js",
+  "/api/pdv/cierre/route": "app/api/pdv/cierre/route.js",
+  "/api/productos/cache/route": "app/api/productos/cache/route.js",
   "/page": "app/page.js",
   "/(auth)/login/page": "app/(auth)/login/page.js",
-  "/(admin)/admin/contingencias/page": "app/(admin)/admin/contingencias/page.js",
-  "/(admin)/admin/contingencias/[id]/page": "app/(admin)/admin/contingencias/[id]/page.js",
-  "/(admin)/admin/page": "app/(admin)/admin/page.js"
+  "/(admin)/admin/page": "app/(admin)/admin/page.js",
+  "/(admin)/admin/insumos-pdv/page": "app/(admin)/admin/insumos-pdv/page.js",
+  "/(admin)/admin/solicitudes-insumos-pdv/page": "app/(admin)/admin/solicitudes-insumos-pdv/page.js",
+  "/(pdv)/pdv/page": "app/(pdv)/pdv/page.js"
 }

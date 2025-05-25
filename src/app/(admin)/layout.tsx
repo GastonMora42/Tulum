@@ -225,6 +225,14 @@ export default function AdminLayout({
         { href: '/admin/envios-insumos', label: 'Pedidos' }
       ]
     },
+{ 
+  label: 'Insumos PDV', 
+  icon: <Package className="w-5 h-5" />,
+  submenu: [
+    { href: '/admin/insumos-pdv', label: 'Lista de insumos' },
+    { href: '/admin/solicitudes-insumos-pdv', label: 'Solicitudes' },
+  ]
+},
     { href: '/admin/usuarios', label: 'Usuarios', icon: <Users className="w-5 h-5" /> },
     { href: '/admin/ubicaciones', label: 'Ubicaciones', icon: <MapPin className="w-5 h-5" /> },
     { href: '/admin/contingencias', label: 'Contingencias', icon: <AlertTriangle className="w-5 h-5" /> },
@@ -455,7 +463,7 @@ export default function AdminLayout({
       {/* Mobile Overlay */}
       {sidebarOpen && isMobile && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          className="fixed inset-0 bg-opacity-50 z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
