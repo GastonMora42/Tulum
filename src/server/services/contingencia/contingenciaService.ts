@@ -413,104 +413,6 @@ export class ContingenciaService {
     });
   }
 
-  // MÉTODOS PARA RESOLVER/RECHAZAR CONTINGENCIAS
-
-  async resolverContingencia(id: string, datos: {
-    respuesta: string;
-    resueltoPor: string;
-    ajusteRealizado: boolean;
-    eliminarArchivos?: boolean;
-  }): Promise<ContingenciaCompleta> {
-    const { eliminarArchivos = true } = datos;
-    
-    try {
-      // Si se debe eliminar los archivos
-      if (eliminarArchivos) {
-        try {
-          await this.eliminarArchivoMultimedia(id);
-        } catch (error) {
-          console.error(`Error al eliminar archivos de contingencia ${id}:`, error);
-          // Continuar con la resolución aunque falle la eliminación
-        }
-      }
-      
-      // Actualizar la contingencia
-      return prisma.contingencia.update({
-        where: { id },
-        data: {
-          estado: 'resuelto',
-          respuesta: datos.respuesta,
-          resueltoPor: datos.resueltoPor,
-          fechaRespuesta: new Date(),
-          ajusteRealizado: datos.ajusteRealizado,
-          // Si eliminarArchivos=true, limpiar campos multimedia
-          ...(eliminarArchivos ? {
-            imagenUrl: null,
-            videoUrl: null,
-            mediaType: null,
-            mediaExpiraEn: null
-          } : {})
-        },
-        include: {
-          usuario: true,
-          produccion: true,
-          envio: true,
-          ubicacion: true,
-          conciliacion: true
-        }
-      });
-    } catch (error) {
-      console.error(`Error al resolver contingencia ${id}:`, error);
-      throw error;
-    }
-  }
-
-  async rechazarContingencia(id: string, datos: {
-    respuesta: string;
-    resueltoPor: string;
-    eliminarArchivos?: boolean;
-  }): Promise<ContingenciaCompleta> {
-    const { eliminarArchivos = true } = datos;
-    
-    try {
-      // Si se debe eliminar los archivos
-      if (eliminarArchivos) {
-        try {
-          await this.eliminarArchivoMultimedia(id);
-        } catch (error) {
-          console.error(`Error al eliminar archivos de contingencia ${id}:`, error);
-        }
-      }
-      
-      // Actualizar la contingencia
-      return prisma.contingencia.update({
-        where: { id },
-        data: {
-          estado: 'rechazado',
-          respuesta: datos.respuesta,
-          resueltoPor: datos.resueltoPor,
-          fechaRespuesta: new Date(),
-          ...(eliminarArchivos ? {
-            imagenUrl: null,
-            videoUrl: null,
-            mediaType: null,
-            mediaExpiraEn: null
-          } : {})
-        },
-        include: {
-          usuario: true,
-          produccion: true,
-          envio: true,
-          ubicacion: true,
-          conciliacion: true
-        }
-      });
-    } catch (error) {
-      console.error(`Error al rechazar contingencia ${id}:`, error);
-      throw error;
-    }
-  }
-
   // MÉTODOS DE MANTENIMIENTO
 
   async limpiarArchivosExpirados(): Promise<{
@@ -655,6 +557,166 @@ export class ContingenciaService {
     
     return stats;
   }
+
+// NUEVO: Método para transiciones de estado más profesionales
+async validateStateTransition(contingenciaId: string, newState: string, currentUser: any): Promise<{
+  allowed: boolean;
+  reason?: string;
+}> {
+  const contingencia = await this.obtenerContingencia(contingenciaId);
+  
+  if (!contingencia) {
+    return { allowed: false, reason: 'Contingencia no encontrada' };
+  }
+
+  const currentState = contingencia.estado;
+  const userRole = currentUser.roleId;
+  const isAdmin = userRole === 'role-admin';
+  
+  // Definir transiciones permitidas
+  const allowedTransitions: Record<string, string[]> = {
+    'pendiente': ['en_revision', 'resuelto', 'rechazado'],
+    'en_revision': ['resuelto', 'rechazado', 'pendiente'], // Permitir volver a pendiente
+    'resuelto': isAdmin ? ['en_revision'] : [], // Solo admin puede reabrir
+    'rechazado': isAdmin ? ['en_revision', 'pendiente'] : [] // Solo admin puede reabrir
+  };
+
+  // Verificar si la transición está permitida
+  if (!allowedTransitions[currentState]?.includes(newState)) {
+    return {
+      allowed: false,
+      reason: `No se puede cambiar de ${currentState} a ${newState}`
+    };
+  }
+
+  // Verificar permisos específicos por origen
+  const hasPermission = isAdmin || 
+    (contingencia.origen === 'fabrica' && userRole === 'role-fabrica') ||
+    (contingencia.origen === 'sucursal' && userRole === 'role-vendedor');
+
+  if (!hasPermission) {
+    return {
+      allowed: false,
+      reason: 'No tiene permisos para esta contingencia'
+    };
+  }
+
+  return { allowed: true };
+}
+
+// MEJORADO: Actualizar método de resolución
+async resolverContingencia(id: string, datos: {
+  respuesta: string;
+  resueltoPor: string;
+  ajusteRealizado: boolean;
+  eliminarArchivos?: boolean;
+}): Promise<ContingenciaCompleta> {
+  const { eliminarArchivos = true } = datos;
+  
+  // Validar transición de estado
+  const user = await prisma.user.findUnique({ where: { id: datos.resueltoPor } });
+  const validation = await this.validateStateTransition(id, 'resuelto', user);
+  
+  if (!validation.allowed) {
+    throw new Error(validation.reason || 'No se puede resolver esta contingencia');
+  }
+  
+  try {
+    // Si se debe eliminar los archivos
+    if (eliminarArchivos) {
+      try {
+        await this.eliminarArchivoMultimedia(id);
+      } catch (error) {
+        console.error(`Error al eliminar archivos de contingencia ${id}:`, error);
+        // Continuar con la resolución aunque falle la eliminación
+      }
+    }
+    
+    // Actualizar la contingencia
+    return prisma.contingencia.update({
+      where: { id },
+      data: {
+        estado: 'resuelto',
+        respuesta: datos.respuesta,
+        resueltoPor: datos.resueltoPor,
+        fechaRespuesta: new Date(),
+        ajusteRealizado: datos.ajusteRealizado,
+        // Si eliminarArchivos=true, limpiar campos multimedia
+        ...(eliminarArchivos ? {
+          imagenUrl: null,
+          videoUrl: null,
+          mediaType: null,
+          mediaExpiraEn: null
+        } : {})
+      },
+      include: {
+        usuario: true,
+        produccion: true,
+        envio: true,
+        ubicacion: true,
+        conciliacion: true
+      }
+    });
+  } catch (error) {
+    console.error(`Error al resolver contingencia ${id}:`, error);
+    throw error;
+  }
+}
+
+// MEJORADO: Actualizar método de rechazo
+async rechazarContingencia(id: string, datos: {
+  respuesta: string;
+  resueltoPor: string;
+  eliminarArchivos?: boolean;
+}): Promise<ContingenciaCompleta> {
+  const { eliminarArchivos = true } = datos;
+  
+  // Validar transición de estado
+  const user = await prisma.user.findUnique({ where: { id: datos.resueltoPor } });
+  const validation = await this.validateStateTransition(id, 'rechazado', user);
+  
+  if (!validation.allowed) {
+    throw new Error(validation.reason || 'No se puede rechazar esta contingencia');
+  }
+  
+  try {
+    // Si se debe eliminar los archivos
+    if (eliminarArchivos) {
+      try {
+        await this.eliminarArchivoMultimedia(id);
+      } catch (error) {
+        console.error(`Error al eliminar archivos de contingencia ${id}:`, error);
+      }
+    }
+    
+    // Actualizar la contingencia
+    return prisma.contingencia.update({
+      where: { id },
+      data: {
+        estado: 'rechazado',
+        respuesta: datos.respuesta,
+        resueltoPor: datos.resueltoPor,
+        fechaRespuesta: new Date(),
+        ...(eliminarArchivos ? {
+          imagenUrl: null,
+          videoUrl: null,
+          mediaType: null,
+          mediaExpiraEn: null
+        } : {})
+      },
+      include: {
+        usuario: true,
+        produccion: true,
+        envio: true,
+        ubicacion: true,
+        conciliacion: true
+      }
+    });
+  } catch (error) {
+    console.error(`Error al rechazar contingencia ${id}:`, error);
+    throw error;
+  }
+}
 
   // MÉTODOS PARA EXPORTACIÓN
 

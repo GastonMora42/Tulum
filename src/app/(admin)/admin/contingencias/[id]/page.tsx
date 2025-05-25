@@ -1,6 +1,7 @@
+// src/app/(admin)/admin/contingencias/[id]/page.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, use } from 'react'; // Importar 'use'
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { useAuthStore } from '@/stores/authStore';
@@ -40,7 +41,15 @@ interface Contingencia {
   };
 }
 
-export default function DetalleContingenciaPage({ params }: { params: { id: string } }) {
+// Cambiar la signatura de la función para usar Promise
+export default function DetalleContingenciaPage({ 
+  params 
+}: { 
+  params: Promise<{ id: string }> 
+}) {
+  // Usar React.use() para unwrap el Promise
+  const { id } = use(params);
+  
   const [contingencia, setContingencia] = useState<Contingencia | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -54,7 +63,7 @@ export default function DetalleContingenciaPage({ params }: { params: { id: stri
     const fetchContingencia = async () => {
       try {
         setIsLoading(true);
-        const response = await authenticatedFetch(`/api/contingencias/${params.id}`);
+        const response = await authenticatedFetch(`/api/contingencias/${id}`);
         
         if (!response.ok) {
           throw new Error('Error al cargar contingencia');
@@ -72,7 +81,7 @@ export default function DetalleContingenciaPage({ params }: { params: { id: stri
     };
 
     fetchContingencia();
-  }, [params.id]);
+  }, [id]); // Ahora usamos 'id' directamente
 
   const handleAction = async (accion: string) => {
     try {
@@ -94,14 +103,14 @@ export default function DetalleContingenciaPage({ params }: { params: { id: stri
         
         if (accion === 'resolver') {
           payload.ajusteRealizado = ajusteRealizado;
-          payload.mantenerArchivos = false; // Eliminar archivos por defecto
+          payload.mantenerArchivos = false;
         }
       }
       
-      // Ejecutar la acción
-      console.log(`Ejecutando acción "${accion}" en contingencia ${params.id}`, payload);
+      // Ejecutar la acción - Usar 'id' directamente
+      console.log(`Ejecutando acción "${accion}" en contingencia ${id}`, payload);
       
-      const response = await authenticatedFetch(`/api/contingencias/${params.id}`, {
+      const response = await authenticatedFetch(`/api/contingencias/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -240,10 +249,10 @@ export default function DetalleContingenciaPage({ params }: { params: { id: stri
     }
   };
 
-  // Determinar si el usuario actual puede resolver la contingencia
-  const puedeResolver = user?.roleId === 'role-admin' || 
-                        (contingencia?.origen === 'fabrica' && user?.roleId === 'role-fabrica') ||
-                        (contingencia?.origen === 'sucursal' && user?.roleId === 'role-vendedor');
+  const puedeResolver = (user?.roleId === 'role-admin' || 
+    (contingencia?.origen === 'fabrica' && user?.roleId === 'role-fabrica') ||
+    (contingencia?.origen === 'sucursal' && user?.roleId === 'role-vendedor')) &&
+    (contingencia?.estado === 'pendiente' || contingencia?.estado === 'en_revision');
 
   if (isLoading) {
     return (
@@ -432,82 +441,91 @@ export default function DetalleContingenciaPage({ params }: { params: { id: stri
         </div>
 
         {/* Acciones permitidas según el estado */}
-        {puedeResolver && contingencia.estado === 'pendiente' && (
-          <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-            <div className="px-4 py-5 sm:px-6">
-              <h3 className="text-lg leading-6 font-medium text-black">
-                Resolver contingencia
-              </h3>
-            </div>
-            <div className="border-t border-gray-200 px-4 py-5 sm:px-6">
-              <div className="space-y-4">
-                <div>
-                  <HCLabel htmlFor="respuesta" className="block text-sm font-medium mb-1">
-                    Respuesta
-                  </HCLabel>
-                  <HCTextarea
-                    id="respuesta"
-                    name="respuesta"
-                    rows={4}
-                    className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
-                    value={respuesta}
-                    onChange={(e) => setRespuesta(e.target.value)}
-                  ></HCTextarea>
-                </div>
-                
-                <div className="flex items-center">
-                  <input
-                    id="ajusteRealizado"
-                    name="ajusteRealizado"
-                    type="checkbox"
-                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                    checked={ajusteRealizado}
-                    onChange={(e) => setAjusteRealizado(e.target.checked)}
-                  />
-                  <label htmlFor="ajusteRealizado" className="ml-2 block text-sm text-black">
-                    Se realizó un ajuste de stock
-                  </label>
-                </div>
-                
-                <div className="flex space-x-3 justify-end">
-                  <button
-                    type="button"
-                    onClick={() => handleAction('en_revision')}
-                    disabled={isSaving}
-                    className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-black bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                  >
-                    {isSaving ? 'Procesando...' : 'Marcar en revisión'}
-                  </button>
-                  
-                  <button
-                    type="button"
-                    onClick={() => handleAction('rechazar')}
-                    disabled={isSaving || !respuesta.trim()}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                  >
-                    {isSaving ? 'Procesando...' : 'Rechazar contingencia'}
-                  </button>
-                  
-                  <button
-                    type="button"
-                    onClick={() => handleAction('resolver')}
-                    disabled={isSaving || !respuesta.trim()}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                  >
-                    {isSaving ? (
-                      <>
-                        <span className="animate-spin mr-2">⟳</span>
-                        Procesando...
-                      </>
-                    ) : (
-                      <>Resolver contingencia</>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
+  {/* Acciones permitidas según el estado - MEJORADO */}
+  {puedeResolver && (contingencia.estado === 'pendiente' || contingencia.estado === 'en_revision') && (
+    <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+      <div className="px-4 py-5 sm:px-6">
+        <h3 className="text-lg leading-6 font-medium text-black">
+          {contingencia.estado === 'en_revision' ? 'Continuar con contingencia en revisión' : 'Resolver contingencia'}
+        </h3>
+        <p className="mt-1 max-w-2xl text-sm text-gray-500">
+          {contingencia.estado === 'en_revision' 
+            ? 'Esta contingencia está en revisión. Puede resolver o rechazar.' 
+            : 'Proporcione una respuesta para resolver o rechazar esta contingencia.'}
+        </p>
+      </div>
+      <div className="border-t border-gray-200 px-4 py-5 sm:px-6">
+        <div className="space-y-4">
+          <div>
+            <HCLabel htmlFor="respuesta" className="block text-sm font-medium mb-1">
+              Respuesta
+            </HCLabel>
+            <HCTextarea
+              id="respuesta"
+              name="respuesta"
+              rows={4}
+              className="shadow-sm focus:ring-indigo-500 focus:border-indigo-500 block w-full sm:text-sm border-gray-300 rounded-md"
+              value={respuesta}
+              onChange={(e) => setRespuesta(e.target.value)}
+              placeholder="Describe las acciones tomadas y la resolución..."
+            ></HCTextarea>
           </div>
-        )}
+          
+          <div className="flex items-center">
+            <input
+              id="ajusteRealizado"
+              name="ajusteRealizado"
+              type="checkbox"
+              className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+              checked={ajusteRealizado}
+              onChange={(e) => setAjusteRealizado(e.target.checked)}
+            />
+            <label htmlFor="ajusteRealizado" className="ml-2 block text-sm text-black">
+              Se realizó un ajuste de stock o corrección
+            </label>
+          </div>
+          
+          <div className="flex space-x-3 justify-end">
+            {contingencia.estado === 'pendiente' && (
+              <button
+                type="button"
+                onClick={() => handleAction('en_revision')}
+                disabled={isSaving}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-black bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                {isSaving ? 'Procesando...' : 'Marcar en revisión'}
+              </button>
+            )}
+            
+            <button
+              type="button"
+              onClick={() => handleAction('rechazar')}
+              disabled={isSaving || !respuesta.trim()}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50"
+            >
+              {isSaving ? 'Procesando...' : 'Rechazar contingencia'}
+            </button>
+            
+            <button
+              type="button"
+              onClick={() => handleAction('resolver')}
+              disabled={isSaving || !respuesta.trim()}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
+            >
+              {isSaving ? (
+                <>
+                  <span className="animate-spin mr-2">⟳</span>
+                  Procesando...
+                </>
+              ) : (
+                <>Resolver contingencia</>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )}
       </div>
     </ContrastEnhancer>
   );
