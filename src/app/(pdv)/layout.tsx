@@ -1,4 +1,4 @@
-// src/app/(pdv)/layout.tsx
+// src/app/(pdv)/layout.tsx - Con información de sucursal mejorada
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -9,7 +9,8 @@ import { useOffline } from '@/hooks/useOffline';
 import { 
   ShoppingCart, Tag, Home, Clock, Settings, LogOut, Menu, X, ChevronLeft, ChevronRight,
   Package, AlertTriangle, Archive, Truck, FileText, Database, BarChart2, User,
-  WifiOff, Wifi, RefreshCw, ArrowDownLeft, Factory, Bell, Search, Grid3x3
+  WifiOff, Wifi, RefreshCw, ArrowDownLeft, Factory, Bell, Search, Grid3x3,
+  MapPin, Building2
 } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
 
@@ -25,20 +26,68 @@ export default function PDVLayout({
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [notifications, setNotifications] = useState(0);
   
+  // Estados para información de sucursal
+  const [sucursalInfo, setSucursalInfo] = useState({
+    nombre: '',
+    direccion: '',
+    tipo: '',
+    id: ''
+  });
+  
   const router = useRouter();
   const pathname = usePathname();
   const { isOnline, pendingOperations, syncNow, isSyncing } = useOffline();
   const { setUser } = useAuthStore();
   const sidebarRef = useRef<HTMLDivElement>(null);
-  const [sucursalNombre, setSucursalNombre] = useState('');
   
+  // Cargar información de la sucursal
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const storedName = localStorage.getItem('sucursalNombre');
-      if (storedName) {
-        setSucursalNombre(storedName);
+    const loadSucursalInfo = async () => {
+      if (typeof window !== 'undefined') {
+        try {
+          // Obtener datos del localStorage
+          const sucursalId = localStorage.getItem('sucursalId');
+          const sucursalNombre = localStorage.getItem('sucursalNombre');
+          const sucursalDireccion = localStorage.getItem('sucursalDireccion');
+          const sucursalTipo = localStorage.getItem('sucursalTipo');
+          
+          if (sucursalId) {
+            setSucursalInfo({
+              id: sucursalId,
+              nombre: sucursalNombre || 'Sucursal Sin Nombre',
+              direccion: sucursalDireccion || 'Dirección no especificada',
+              tipo: sucursalTipo || 'punto_venta'
+            });
+          } else {
+            // Si no hay sucursal configurada, intentar obtener de API
+            try {
+              const response = await authenticatedFetch('/api/pdv/sucursal-actual');
+              if (response.ok) {
+                const data = await response.json();
+                setSucursalInfo({
+                  id: data.id,
+                  nombre: data.nombre || 'Sucursal Sin Nombre',
+                  direccion: data.direccion || 'Dirección no especificada',
+                  tipo: data.tipo || 'punto_venta'
+                });
+                
+                // Guardar en localStorage
+                localStorage.setItem('sucursalId', data.id);
+                localStorage.setItem('sucursalNombre', data.nombre);
+                localStorage.setItem('sucursalDireccion', data.direccion || '');
+                localStorage.setItem('sucursalTipo', data.tipo || 'punto_venta');
+              }
+            } catch (error) {
+              console.log('No se pudo cargar información de sucursal desde API');
+            }
+          }
+        } catch (error) {
+          console.error('Error al cargar información de sucursal:', error);
+        }
       }
-    }
+    };
+    
+    loadSucursalInfo();
   }, []);
   
   // Detectar tamaño de pantalla
@@ -119,6 +168,32 @@ export default function PDVLayout({
     }
   };
 
+  // Obtener el tipo de sucursal formateado
+  const getTipoSucursal = (tipo: string) => {
+    switch (tipo) {
+      case 'fabrica':
+        return 'Fábrica';
+      case 'sucursal':
+        return 'Sucursal';
+      case 'punto_venta':
+        return 'Punto de Venta';
+      default:
+        return 'Punto de Venta';
+    }
+  };
+
+  // Obtener el ícono según el tipo de sucursal
+  const getTipoIcon = (tipo: string) => {
+    switch (tipo) {
+      case 'fabrica':
+        return <Factory className="w-4 h-4" />;
+      case 'sucursal':
+        return <Building2 className="w-4 h-4" />;
+      default:
+        return <ShoppingCart className="w-4 h-4" />;
+    }
+  };
+
   // Mostrar pantalla de carga
   if (isLoading) {
     return (
@@ -177,12 +252,6 @@ export default function PDVLayout({
       description: 'Egresos de caja'
     },
     { 
-      href: '/pdv/insumos', 
-      icon: <Package className="h-5 w-5" />, 
-      text: 'Insumos',
-      description: 'Insumos de Punto de venta'
-    },
-    { 
       href: '/pdv/facturas', 
       icon: <FileText className="h-5 w-5" />, 
       text: 'Facturas',
@@ -198,7 +267,7 @@ export default function PDVLayout({
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-50 to-gray-100">
-      {/* Header moderno */}
+      {/* Header moderno con información de sucursal */}
       <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-30">
         <div className="mx-auto px-4">
           <div className="flex justify-between h-16 items-center">
@@ -215,18 +284,29 @@ export default function PDVLayout({
               )}
               
               <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-gradient-to-br from-[#311716] to-[#9c7561] rounded-xl flex items-center justify-center">
-                  <ShoppingCart className="w-5 h-5 text-white" />
+                <div className="w-10 h-10 bg-gradient-to-br from-[#311716] to-[#9c7561] rounded-xl flex items-center justify-center">
+                  {getTipoIcon(sucursalInfo.tipo)}
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold text-gray-900 truncate max-w-[200px] md:max-w-full">
-                    {sucursalNombre ? sucursalNombre : 'Punto de Venta'}
+                  <h1 className="text-lg font-bold text-gray-900 truncate max-w-[250px] md:max-w-full">
+                    {sucursalInfo.nombre || 'Punto de Venta'}
                   </h1>
-                  <p className="text-xs text-gray-500 hidden md:block">
-                    {pathname === '/pdv' ? 'Nueva venta' : 
-                     pathname === '/pdv/dashboard' ? 'Resumen general' :
-                     navLinks.find(link => pathname.startsWith(link.href))?.description || 'Sistema PDV'}
-                  </p>
+                  <div className="flex items-center space-x-2 text-xs text-gray-500">
+                    {/* Información de ubicación */}
+                    <div className="flex items-center space-x-1">
+                      <MapPin className="w-3 h-3" />
+                      <span className="truncate max-w-[200px] md:max-w-[300px]">
+                        {sucursalInfo.direccion || 'Ubicación no especificada'}
+                      </span>
+                    </div>
+                    {/* Separador */}
+                    <span className="hidden md:inline">•</span>
+                    {/* Tipo de sucursal */}
+                    <div className="hidden md:flex items-center space-x-1">
+                      {getTipoIcon(sucursalInfo.tipo)}
+                      <span>{getTipoSucursal(sucursalInfo.tipo)}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -299,6 +379,17 @@ export default function PDVLayout({
                   <div className="px-4 py-3 border-b border-gray-100">
                     <p className="text-sm font-medium text-gray-900">{user?.name}</p>
                     <p className="text-xs text-gray-500">{user?.email}</p>
+                    {/* Información de sucursal en el menú de usuario */}
+                    <div className="mt-2 pt-2 border-t border-gray-100">
+                      <div className="flex items-center space-x-2 text-xs text-gray-600">
+                        <Building2 className="w-3 h-3" />
+                        <span className="font-medium">{sucursalInfo.nombre}</span>
+                      </div>
+                      <div className="flex items-center space-x-2 text-xs text-gray-500 mt-1">
+                        <MapPin className="w-3 h-3" />
+                        <span className="truncate">{sucursalInfo.direccion}</span>
+                      </div>
+                    </div>
                   </div>
                   <button 
                     onClick={() => {
@@ -317,6 +408,22 @@ export default function PDVLayout({
             </div>
           </div>
         </div>
+
+        {/* Barra adicional con información detallada de sucursal (solo móvil) */}
+        {isMobile && (
+          <div className="bg-gray-50 border-t border-gray-200 px-4 py-2">
+            <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center space-x-2 text-gray-600">
+                <Building2 className="w-3 h-3" />
+                <span className="font-medium">{getTipoSucursal(sucursalInfo.tipo)}</span>
+              </div>
+              <div className="flex items-center space-x-1 text-gray-500">
+                <MapPin className="w-3 h-3" />
+                <span className="truncate max-w-[200px]">{sucursalInfo.direccion}</span>
+              </div>
+            </div>
+          </div>
+        )}
       </header>
 
       <div className="flex flex-1 overflow-hidden">
@@ -327,7 +434,7 @@ export default function PDVLayout({
             `fixed inset-y-0 left-0 z-40 w-72 transform transition-transform duration-300 ease-in-out ${showMobileMenu ? 'translate-x-0' : '-translate-x-full'}` : 
             `relative bg-white shadow-sm border-r border-gray-200 transition-all duration-300 ${sidebarCollapsed ? 'w-16' : 'w-72'}`
           } flex flex-col h-full`}
-          style={{ top: isMobile ? '64px' : '0px' }}
+          style={{ top: isMobile ? (sucursalInfo.direccion ? '96px' : '64px') : '0px' }}
         >
           {/* Backdrop para móvil */}
           {isMobile && showMobileMenu && (
@@ -343,6 +450,25 @@ export default function PDVLayout({
               >
                 {sidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
               </button>
+            )}
+
+            {/* Información de sucursal en sidebar (cuando está expandido) */}
+            {(!sidebarCollapsed || isMobile) && (
+              <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-[#311716] to-[#462625] text-white">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
+                    {getTipoIcon(sucursalInfo.tipo)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-sm truncate">{sucursalInfo.nombre}</h3>
+                    <p className="text-xs text-white/80 truncate">{getTipoSucursal(sucursalInfo.tipo)}</p>
+                  </div>
+                </div>
+                <div className="mt-2 flex items-center space-x-1 text-xs text-white/70">
+                  <MapPin className="w-3 h-3 flex-shrink-0" />
+                  <span className="truncate">{sucursalInfo.direccion}</span>
+                </div>
+              </div>
             )}
             
             {/* Navegación */}
@@ -424,9 +550,20 @@ export default function PDVLayout({
       {/* Footer con estado offline */}
       <footer className="bg-white border-t border-gray-200 px-4 py-2 z-20">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <p className="text-gray-500 text-xs">
-            Sistema Tulum PDV &copy; {new Date().getFullYear()}
-          </p>
+          <div className="flex items-center space-x-4">
+            <p className="text-gray-500 text-xs">
+              Sistema Tulum PDV &copy; {new Date().getFullYear()}
+            </p>
+            {/* Información de sucursal en footer */}
+            <div className="hidden lg:flex items-center space-x-2 text-xs text-gray-500">
+              <span>•</span>
+              <Building2 className="w-3 h-3" />
+              <span>{sucursalInfo.nombre}</span>
+              <span>•</span>
+              <MapPin className="w-3 h-3" />
+              <span className="truncate max-w-[200px]">{sucursalInfo.direccion}</span>
+            </div>
+          </div>
           
           <div className="flex items-center space-x-4 text-xs">
             <div className="flex items-center space-x-1">

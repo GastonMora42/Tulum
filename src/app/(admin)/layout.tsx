@@ -231,6 +231,7 @@ export default function AdminLayout({
   submenu: [
     { href: '/admin/insumos-pdv', label: 'Lista de insumos' },
     { href: '/admin/solicitudes-insumos-pdv', label: 'Solicitudes' },
+    { href: '/admin/stock-insumos-pdv', label: 'Stock por ubicacion' }
   ]
 },
     { href: '/admin/usuarios', label: 'Usuarios', icon: <Users className="w-5 h-5" /> },
