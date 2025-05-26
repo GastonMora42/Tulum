@@ -1,7 +1,6 @@
-// src/server/api/middlewares/authorization.ts
+// src/server/api/middlewares/authorization.ts - SOLO CAMBIO MÍNIMO
 import { NextRequest, NextResponse } from 'next/server';
 
-// src/server/api/middlewares/authorization.ts
 export function checkPermission(requiredPermission: string | string[]) {
   return async function(req: NextRequest) {
     const user = (req as any).user;
@@ -18,24 +17,33 @@ export function checkPermission(requiredPermission: string | string[]) {
       (requiredPermission === 'stock:ajustar' || 
        (Array.isArray(requiredPermission) && requiredPermission.includes('stock:ajustar')))) {
     
-    // Permitir ajustes en el contexto de producciones o envíos
-    const path = req.nextUrl.pathname;
-    const isProductionOrShipping = path.includes('/produccion') || 
-                                   path.includes('/envios');
-    
-    if (!isProductionOrShipping) {
-      return NextResponse.json(
-        { error: 'Como operador de fábrica, no puede ajustar el stock directamente. Debe utilizar el flujo de solicitud y recepción de insumos.' },
-        { status: 403 }
-      );
+      // Permitir ajustes en el contexto de producciones o envíos
+      const path = req.nextUrl.pathname;
+      const isProductionOrShipping = path.includes('/produccion') || 
+                                     path.includes('/envios');
+      
+      if (!isProductionOrShipping) {
+        return NextResponse.json(
+          { error: 'Como operador de fábrica, no puede ajustar el stock directamente. Debe utilizar el flujo de solicitud y recepción de insumos.' },
+          { status: 403 }
+        );
+      }
     }
-  }
     
     // Tratar admin como rol especial con todos los permisos
     if (user.roleId === 'role-admin') {
       return null; // Sin error, continuar
     }
 
+    // NUEVO: Para vendedores, permitir operaciones de caja
+    if (user.roleId === 'role-vendedor') {
+      const permsToCheck = Array.isArray(requiredPermission) ? requiredPermission : [requiredPermission];
+      const vendedorPermisos = ['caja:ver', 'caja:crear', 'venta:crear', 'venta:ver', 'venta:facturar', 'producto:ver', 'stock:ver', 'contingencia:crear'];
+      
+      if (permsToCheck.some(p => vendedorPermisos.includes(p))) {
+        return null; // Permitir estas operaciones
+      }
+    }
         
     // Para rol fábrica, permitir operaciones de producción y envíos
     if (user.roleId === 'role-fabrica') {
@@ -46,13 +54,13 @@ export function checkPermission(requiredPermission: string | string[]) {
       ];
 
       const permsToCheck = Array.isArray(requiredPermission) 
-      ? requiredPermission 
-      : [requiredPermission];
+        ? requiredPermission 
+        : [requiredPermission];
     
-    if (permsToCheck.some(p => fabricaPermisos.includes(p))) {
-      return null; // Permitir estas operaciones
+      if (permsToCheck.some(p => fabricaPermisos.includes(p))) {
+        return null; // Permitir estas operaciones
+      }
     }
-  }
     
     // Para otros roles, verificar permiso específico
     if (!user.role || !user.role.permissions) {

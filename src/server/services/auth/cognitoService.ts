@@ -376,59 +376,68 @@ async registerUser(params: RegisterUserParams): Promise<{ success: boolean; user
     }
   }
 
-  async refreshToken(refreshToken: string, email?: string): Promise<Omit<AuthResult, 'user'>> {
-    try {
-      // Si tenemos email, usarlo; de lo contrario, intentar extraerlo del token
-      let username = email || '';
-      
-      // Construir los parámetros de renovación
-      const authParams: Record<string, string> = {
-        REFRESH_TOKEN: refreshToken
-      };
-      
-      // Añadir SECRET_HASH solo si tenemos username y clientSecret
-      if (username && this.clientSecret) {
-        try {
-          authParams.SECRET_HASH = this.calculateSecretHash(username);
-        } catch (error) {
-          console.error('Error calculando SECRET_HASH:', error);
-        }
-      }
-      
-      
-// En la función refreshToken
-const command = new InitiateAuthCommand({
-  ClientId: this.clientId,
-  AuthFlow: 'REFRESH_TOKEN_AUTH',
-  AuthParameters: {
-    REFRESH_TOKEN: refreshToken,
-    SECRET_HASH: this.calculateSecretHash(username) // Asegúrate de que esta función existe
-  }
-});
-      
-      console.log("Intentando refrescar token con params:", {
-        hasUsername: !!username,
-        hasSecretHash: !!authParams.SECRET_HASH,
-        refreshTokenLength: refreshToken.length > 10 ? `${refreshToken.substring(0, 10)}...` : 'invalid'
-      });
-      
-      const response = await this.client.send(command);
-      
-      if (!response.AuthenticationResult) {
-        throw new Error('Error al refrescar token');
-      }
-      
-      return {
-        accessToken: response.AuthenticationResult.AccessToken as string,
-        idToken: response.AuthenticationResult.IdToken as string,
-        refreshToken: refreshToken, // Mantener el mismo refresh token
-        expiresIn: response.AuthenticationResult.ExpiresIn || 3600
-      };
-    } catch (error) {
-      console.error('Error al refrescar token:', error);
-      throw error;
+// src/server/services/auth/cognitoService.ts - CORREGIR REFRESH TOKEN
+async refreshToken(refreshToken: string, email?: string): Promise<Omit<AuthResult, 'user'>> {
+  try {
+    console.log('[COGNITO] Iniciando refresh token...');
+    
+    // Si tenemos email, usarlo; de lo contrario, intentar extraerlo del localStorage
+    let username = email || '';
+    
+    // NUEVO: Si no tenemos email, intentar obtenerlo del localStorage del cliente
+    if (!username && typeof window !== 'undefined') {
+      username = localStorage.getItem('userEmail') || '';
     }
+    
+    console.log('[COGNITO] Username para refresh:', username ? 'presente' : 'ausente');
+    
+    if (!username) {
+      console.error('[COGNITO] No se puede hacer refresh sin username');
+      throw new Error('Username requerido para refresh token');
+    }
+    
+    // Construir los parámetros de renovación
+    const authParams: Record<string, string> = {
+      REFRESH_TOKEN: refreshToken
+    };
+    
+    // Añadir SECRET_HASH solo si tenemos username y clientSecret
+    if (this.clientSecret) {
+      try {
+        authParams.SECRET_HASH = this.calculateSecretHash(username);
+        console.log('[COGNITO] SECRET_HASH calculado correctamente');
+      } catch (error) {
+        console.error('[COGNITO] Error calculando SECRET_HASH:', error);
+        throw error;
+      }
+    }
+    
+    const command = new InitiateAuthCommand({
+      ClientId: this.clientId,
+      AuthFlow: 'REFRESH_TOKEN_AUTH',
+      AuthParameters: authParams
+    });
+    
+    console.log('[COGNITO] Enviando comando refresh...');
+    const response = await this.client.send(command);
+    
+    if (!response.AuthenticationResult) {
+      throw new Error('Error al refrescar token - no se recibieron tokens');
+    }
+    
+    console.log('[COGNITO] Refresh exitoso');
+    
+    return {
+      accessToken: response.AuthenticationResult.AccessToken as string,
+      idToken: response.AuthenticationResult.IdToken as string,
+      refreshToken: refreshToken, // Mantener el mismo refresh token
+      expiresIn: response.AuthenticationResult.ExpiresIn || 3600
+    };
+  } catch (error) {
+    console.error('[COGNITO] Error al refrescar token:', error);
+    throw error;
   }
+}
 
   async getUserByUsername(username: string): Promise<any> {
     try {
