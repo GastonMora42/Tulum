@@ -1,10 +1,10 @@
-// src/components/pdv/CierreCaja.tsx - Parte relevante
-
+// src/components/pdv/CierreCaja.tsx - MEJORAS EN EL FETCH
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
-import { AlertCircle, CheckCircle, X, Printer } from 'lucide-react';
+import { AlertCircle, CheckCircle, X, Printer, DollarSign } from 'lucide-react';
 import { exportToPdf } from '@/lib/utils/pdfExport';
+import { authenticatedFetch } from '@/hooks/useAuth';
 
 interface CierreCajaProps {
   id: string;
@@ -29,52 +29,46 @@ export function CierreCaja({ id, onSuccess }: CierreCajaProps) {
         setIsLoading(true);
         
         const sucursalId = localStorage.getItem('sucursalId');
-        
         if (!sucursalId) {
           throw new Error('No se ha definido una sucursal para este punto de venta');
         }
         
-        const response = await fetch(`/api/pdv/cierre?sucursalId=${sucursalId}`);
+        // Usar authenticatedFetch en lugar de fetch directo
+        const response = await authenticatedFetch(
+          `/api/pdv/cierre?sucursalId=${encodeURIComponent(sucursalId)}`
+        );
         
         if (!response.ok) {
-          if (response.status === 404) {
-            throw new Error('No hay una caja abierta actualmente');
-          }
-          const data = await response.json();
-          throw new Error(data.error || 'Error al obtener datos del cierre de caja');
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.error || 'Error al obtener datos del cierre de caja');
         }
         
         const data = await response.json();
         
-        // Verificar que la respuesta contiene los datos esperados
         if (!data.cierreCaja) {
           throw new Error('Datos de cierre de caja incompletos o inválidos');
         }
         
         setCierreCaja(data.cierreCaja);
         
+        // Procesar resumen de ventas
         if (data.ventasResumen) {
           setVentasResumen(data.ventasResumen);
           
-          // Buscar el monto en efectivo para pre-llenarlo
-          const efectivo = data.ventasResumen.detallesPorMedioPago.find(
-            (item: any) => item.medioPago === 'efectivo'
-          );
+          // Calcular efectivo esperado
+          const efectivoEsperado = data.ventasResumen.efectivoEsperado || 
+            (data.cierreCaja.montoInicial + data.ventasResumen.ventasEfectivo);
           
-          if (efectivo) {
-            // Sumar monto inicial + ventas en efectivo
-            const montoEfectivoEsperado = data.cierreCaja.montoInicial + efectivo.monto;
-            setMontoFinal(montoEfectivoEsperado.toFixed(2));
-          } else {
-            setMontoFinal(data.cierreCaja.montoInicial.toFixed(2));
-          }
+          setMontoFinal(efectivoEsperado.toFixed(2));
         } else {
+          // Si no hay ventas, el monto final es igual al inicial
           setVentasResumen({
             detallesPorMedioPago: [],
             total: 0,
             cantidadVentas: 0,
             ventasEfectivo: 0,
-            ventasDigital: 0
+            ventasDigital: 0,
+            efectivoEsperado: data.cierreCaja.montoInicial
           });
           setMontoFinal(data.cierreCaja.montoInicial.toFixed(2));
         }
@@ -89,7 +83,9 @@ export function CierreCaja({ id, onSuccess }: CierreCajaProps) {
       }
     };
     
-    loadCierreCaja();
+    if (id) {
+      loadCierreCaja();
+    }
   }, [id]);
   
   // Cerrar la caja
@@ -107,7 +103,7 @@ export function CierreCaja({ id, onSuccess }: CierreCajaProps) {
         throw new Error('El monto final debe ser un número válido mayor o igual a cero');
       }
       
-      const response = await fetch('/api/pdv/cierre', {
+      const response = await authenticatedFetch('/api/pdv/cierre', {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
@@ -135,8 +131,10 @@ export function CierreCaja({ id, onSuccess }: CierreCajaProps) {
       if (data.diferencia !== 0) {
         setTimeout(() => {
           setNotification({
-            type: 'error',
-            message: `Se detectó una diferencia de ${Math.abs(data.diferencia).toFixed(2)} ${data.diferencia > 0 ? 'sobrante' : 'faltante'} en la caja.`
+            type: data.diferencia > 0 ? 'success' : 'error',
+            message: `Se detectó una diferencia de $${Math.abs(data.diferencia).toFixed(2)} ${
+              data.diferencia > 0 ? '(sobrante)' : '(faltante)'
+            } en la caja.`
           });
         }, 3000);
       }
@@ -155,32 +153,6 @@ export function CierreCaja({ id, onSuccess }: CierreCajaProps) {
     } finally {
       setIsSaving(false);
     }
-  };
-  
-  // Imprimir reporte
-  const handlePrintReport = () => {
-    if (!cierreCaja || !ventasResumen) return;
-    
-    const fechaApertura = new Date(cierreCaja.fechaApertura);
-    
-    // Preparar datos para el reporte
-    const ventasDetalles = ventasResumen.detallesPorMedioPago.map((item: any) => ({
-      medioPago: formatMedioPago(item.medioPago),
-      cantidad: item.cantidad,
-      monto: `$${item.monto.toFixed(2)}`
-    }));
-    
-    exportToPdf({
-      title: 'Reporte de Cierre de Caja',
-      subtitle: `Caja #${cierreCaja.id} - ${format(fechaApertura, 'dd/MM/yyyy HH:mm')}`,
-      fileName: `cierre-caja-${cierreCaja.id}`,
-      columns: [
-        { header: 'Medio de Pago', dataKey: 'medioPago' },
-        { header: 'Cantidad', dataKey: 'cantidad' },
-        { header: 'Monto', dataKey: 'monto' }
-      ],
-      data: ventasDetalles
-    });
   };
   
   // Formatear nombre de medio de pago
@@ -213,24 +185,24 @@ export function CierreCaja({ id, onSuccess }: CierreCajaProps) {
     const montoEsperado = cierreCaja.montoInicial + (efectivo ? efectivo.monto : 0);
     return parseFloat(montoFinal) - montoEsperado;
   };
-  
-  // Mostrar pantalla de carga
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-8">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-        <span className="ml-3 text-lg">Cargando...</span>
+        <span className="ml-3 text-lg">Cargando datos de cierre...</span>
       </div>
     );
   }
   
-  // Si no hay caja abierta
   if (!cierreCaja) {
     return (
-      <div className="text-center p-8">
-        <h2 className="text-2xl font-bold text-gray-800 mb-4">No hay una caja abierta</h2>
-        <p className="text-gray-600 mb-6">Debe abrir una caja antes de realizar un cierre</p>
-        
+      <div className="text-center p-8 bg-yellow-50 rounded-lg">
+        <AlertCircle className="h-12 w-12 text-yellow-600 mx-auto mb-4" />
+        <h2 className="text-2xl font-bold text-gray-800 mb-4">No se encontró la caja</h2>
+        <p className="text-gray-600 mb-6">
+          No se pudo cargar la información de la caja. Por favor, intenta nuevamente.
+        </p>
         <button
           onClick={() => router.push('/pdv')}
           className="py-2 px-4 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
@@ -269,14 +241,6 @@ export function CierreCaja({ id, onSuccess }: CierreCajaProps) {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800">Cierre de Caja</h2>
         
-        <button
-          onClick={handlePrintReport}
-          className="flex items-center py-2 px-4 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
-        >
-          <Printer size={18} className="mr-2" />
-          Imprimir Reporte
-        </button>
-      </div>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Información de apertura */}
@@ -399,6 +363,7 @@ export function CierreCaja({ id, onSuccess }: CierreCajaProps) {
           </button>
         </div>
       </div>
+    </div>
     </div>
   );
 }
