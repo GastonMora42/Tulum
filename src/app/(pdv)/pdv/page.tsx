@@ -1,4 +1,4 @@
-// src/app/(pdv)/pdv/page.tsx - Versión Simplificada
+// src/app/(pdv)/pdv/page.tsx - CORREGIDO
 'use client';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
@@ -117,7 +117,7 @@ export default function PDVPage() {
     loadFavorites();
   }, []);
 
-  // Verificar caja abierta
+  // Verificar caja abierta al cargar y cuando cambia el estado online
   useEffect(() => {
     checkCajaAbierta();
   }, [isOnline]);
@@ -162,6 +162,7 @@ export default function PDVPage() {
     }
   };
 
+  // CORREGIDO: Función mejorada para verificar caja abierta
   const checkCajaAbierta = async () => {
     try {
       setIsLoading(true);
@@ -169,27 +170,66 @@ export default function PDVPage() {
       const sucursalId = localStorage.getItem('sucursalId');
       
       if (!sucursalId) {
+        console.log('No hay sucursalId, mostrando modal de configuración');
         setShowSucursalModal(true);
+        setIsLoading(false);
         return;
       }
       
+      // Si estamos offline, asumir que la caja está abierta
       if (!isOnline) {
+        console.log('Modo offline, asumiendo caja abierta');
         setHayCajaAbierta(true);
+        setIsLoading(false);
         return;
       }
       
-      const response = await authenticatedFetch(`/api/pdv/cierre?sucursalId=${sucursalId}`);
+      console.log('Verificando estado de caja para sucursal:', sucursalId);
+      
+      const response = await authenticatedFetch(`/api/pdv/cierre?sucursalId=${encodeURIComponent(sucursalId)}`);
+      
+      console.log('Respuesta de verificación de caja:', {
+        status: response.status,
+        ok: response.ok
+      });
       
       if (response.status === 404) {
+        console.log('Caja cerrada (404)');
         setHayCajaAbierta(false);
       } else if (response.ok) {
-        setHayCajaAbierta(true);
+        try {
+          const data = await response.json();
+          console.log('Datos de caja:', data);
+          
+          // Verificar que efectivamente hay una caja abierta
+          if (data.cierreCaja && data.cierreCaja.estado === 'abierto') {
+            console.log('Caja abierta confirmada');
+            setHayCajaAbierta(true);
+          } else {
+            console.log('Caja no está abierta según datos:', data);
+            setHayCajaAbierta(false);
+          }
+        } catch (jsonError) {
+          console.error('Error al parsear respuesta:', jsonError);
+          setHayCajaAbierta(false);
+        }
       } else {
-        const data = await response.json();
-        throw new Error(data.error || 'Error al verificar el estado de la caja');
+        // Error en la verificación
+        console.error('Error en verificación de caja:', response.status);
+        
+        try {
+          const errorData = await response.json();
+          console.error('Detalles del error:', errorData);
+          throw new Error(errorData.error || 'Error al verificar el estado de la caja');
+        } catch (parseError) {
+          throw new Error(`Error del servidor: ${response.status}`);
+        }
       }
     } catch (error) {
       console.error('Error al verificar caja:', error);
+      
+      // En caso de error, no asumir nada - mostrar el error
+      setHayCajaAbierta(null);
       showNotification('error', error instanceof Error ? error.message : 'Error al verificar el estado de la caja');
     } finally {
       setIsLoading(false);
@@ -205,6 +245,7 @@ export default function PDVPage() {
     }
   };
 
+  // CORREGIDO: Función mejorada para abrir caja con re-verificación
   const handleAbrirCaja = async () => {
     try {
       setIsLoading(true);
@@ -225,19 +266,51 @@ export default function PDVPage() {
         throw new Error('El monto inicial debe ser un número válido mayor o igual a cero');
       }
       
+      console.log('Abriendo caja con datos:', { sucursalId, montoInicial: montoInicialNum });
+      
       const response = await authenticatedFetch('/api/pdv/cierre', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sucursalId, montoInicial: montoInicialNum })
+        headers: { 
+          'Content-Type': 'application/json' 
+        },
+        body: JSON.stringify({ 
+          sucursalId, 
+          montoInicial: montoInicialNum 
+        })
       });
       
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Error al abrir la caja');
+        let errorMessage = 'Error al abrir la caja';
+        
+        try {
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const data = await response.json();
+            errorMessage = data.error || errorMessage;
+          } else {
+            errorMessage = `Error del servidor: ${response.status}`;
+          }
+        } catch (parseError) {
+          console.error('Error al parsear respuesta de error:', parseError);
+          errorMessage = `Error del servidor (${response.status})`;
+        }
+        
+        throw new Error(errorMessage);
       }
       
+      const responseData = await response.json();
+      console.log('Caja abierta exitosamente:', responseData);
+      
+      // IMPORTANTE: Actualizar el estado inmediatamente y re-verificar
       setHayCajaAbierta(true);
       showNotification('success', '¡Caja abierta correctamente!');
+      
+      // Re-verificar el estado después de un breve delay para asegurar consistencia
+      setTimeout(() => {
+        console.log('Re-verificando estado de caja después de apertura...');
+        checkCajaAbierta();
+      }, 1000);
+      
     } catch (error) {
       console.error('Error al abrir caja:', error);
       showNotification('error', error instanceof Error ? error.message : 'Error al abrir la caja');
@@ -295,8 +368,17 @@ export default function PDVPage() {
     localStorage.setItem('favoriteProducts', JSON.stringify(Array.from(newFavorites)));
   };
 
+  // CORREGIDO: Verificación mejorada antes del checkout
   const handleCheckout = () => {
-    if (!hayCajaAbierta) {
+    console.log('Iniciando checkout, estado de caja:', hayCajaAbierta);
+    
+    if (hayCajaAbierta === null) {
+      showNotification('warning', 'Verificando estado de la caja...');
+      checkCajaAbierta();
+      return;
+    }
+    
+    if (hayCajaAbierta === false) {
       showNotification('error', 'No hay una caja abierta. Debe abrir la caja antes de realizar ventas.');
       return;
     }
@@ -312,6 +394,13 @@ export default function PDVPage() {
   const handleCheckoutComplete = (result: { success: boolean; message?: string }) => {
     if (result.message) {
       showNotification(result.success ? 'success' : 'error', result.message);
+    }
+    
+    // Si el checkout fue exitoso, re-verificar el estado de la caja por si acaso
+    if (result.success) {
+      setTimeout(() => {
+        checkCajaAbierta();
+      }, 500);
     }
   };
 
@@ -372,7 +461,7 @@ export default function PDVPage() {
     );
   }
 
-  // Pantalla de abrir caja
+  // Pantalla de abrir caja - SOLO cuando definitivamente está cerrada
   if (hayCajaAbierta === false) {
     return (
       <div className="h-full flex items-center justify-center p-6">
@@ -386,13 +475,59 @@ export default function PDVPage() {
             Para comenzar a realizar ventas, necesitas abrir la caja registradora.
           </p>
           
-          <button
-            onClick={handleAbrirCaja}
-            className="w-full py-3 px-6 bg-gradient-to-r from-[#311716] to-[#462625] text-white rounded-xl hover:from-[#462625] hover:to-[#311716] transition-all font-semibold flex items-center justify-center space-x-2"
-          >
-            <Zap className="w-5 h-5" />
-            <span>Abrir Caja</span>
-          </button>
+          <div className="space-y-3">
+            <button
+              onClick={handleAbrirCaja}
+              disabled={isLoading}
+              className="w-full py-3 px-6 bg-gradient-to-r from-[#311716] to-[#462625] text-white rounded-xl hover:from-[#462625] hover:to-[#311716] transition-all font-semibold flex items-center justify-center space-x-2 disabled:opacity-50"
+            >
+              <Zap className="w-5 h-5" />
+              <span>{isLoading ? 'Abriendo...' : 'Abrir Caja'}</span>
+            </button>
+            
+            <button
+              onClick={checkCajaAbierta}
+              className="w-full py-2 px-4 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-all text-sm"
+            >
+              Verificar Estado de Caja
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // AÑADIR: Pantalla de error/verificación cuando el estado es null
+  if (hayCajaAbierta === null) {
+    return (
+      <div className="h-full flex items-center justify-center p-6">
+        <div className="text-center bg-white p-8 rounded-2xl shadow-lg border border-gray-200 max-w-md w-full">
+          <div className="w-16 h-16 bg-gradient-to-br from-amber-500 to-orange-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
+            <AlertTriangle className="w-8 h-8 text-white" />
+          </div>
+          
+          <h2 className="text-2xl font-bold text-gray-900 mb-3">Verificando Estado</h2>
+          <p className="text-gray-600 mb-6">
+            No se pudo verificar el estado de la caja. Esto puede deberse a problemas de conectividad.
+          </p>
+          
+          <div className="space-y-3">
+            <button
+              onClick={checkCajaAbierta}
+              disabled={isLoading}
+              className="w-full py-3 px-6 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all font-semibold flex items-center justify-center space-x-2 disabled:opacity-50"
+            >
+              <AlertTriangle className="w-5 h-5" />
+              <span>{isLoading ? 'Verificando...' : 'Reintentar Verificación'}</span>
+            </button>
+            
+            <button
+              onClick={handleAbrirCaja}
+              className="w-full py-2 px-4 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-all text-sm"
+            >
+              Abrir Nueva Caja
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -496,8 +631,6 @@ export default function PDVPage() {
     </div>
   );
 }
-
-// Componentes simplificados
 
 interface MobileNavigationPillsProps {
   currentView: ViewType;

@@ -105,7 +105,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST - Crear nueva apertura de caja
+// POST - Crear nueva apertura de caja (VERSIÓN CORREGIDA)
 export async function POST(req: NextRequest) {
   // Autenticación
   const authError = await authMiddleware(req);
@@ -116,7 +116,35 @@ export async function POST(req: NextRequest) {
   if (permError) return permError;
   
   try {
-    const body = await req.json();
+    // CORREGIDO: Verificar que hay contenido antes de parsear JSON
+    const contentType = req.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      return NextResponse.json(
+        { error: 'Content-Type debe ser application/json' },
+        { status: 400 }
+      );
+    }
+    
+    // Verificar que hay un body
+    const contentLength = req.headers.get('content-length');
+    if (!contentLength || parseInt(contentLength) === 0) {
+      return NextResponse.json(
+        { error: 'Se requiere enviar datos en el cuerpo de la petición' },
+        { status: 400 }
+      );
+    }
+    
+    let body;
+    try {
+      body = await req.json();
+    } catch (jsonError) {
+      console.error('Error al parsear JSON:', jsonError);
+      return NextResponse.json(
+        { error: 'Formato JSON inválido en el cuerpo de la petición' },
+        { status: 400 }
+      );
+    }
+    
     const { sucursalId, montoInicial } = body;
     
     if (!sucursalId) {
@@ -126,7 +154,7 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    if (montoInicial === undefined) {
+    if (montoInicial === undefined || montoInicial === null) {
       return NextResponse.json(
         { error: 'Se requiere el monto inicial' },
         { status: 400 }
@@ -155,7 +183,7 @@ export async function POST(req: NextRequest) {
     const cierreCaja = await prisma.cierreCaja.create({
       data: {
         sucursalId,
-        montoInicial,
+        montoInicial: parseFloat(montoInicial),
         usuarioApertura: user.id,
         estado: 'abierto'
       }

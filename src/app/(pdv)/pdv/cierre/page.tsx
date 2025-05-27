@@ -14,7 +14,7 @@ export default function CierreCajaPage() {
   
   const router = useRouter();
   
-  // Primero obtener sucursalId del localStorage
+  // Obtener sucursalId del localStorage
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const storedSucursalId = localStorage.getItem('sucursalId');
@@ -23,11 +23,11 @@ export default function CierreCajaPage() {
     }
   }, []);
   
-  // Luego verificar la caja cuando tenemos sucursalId
+  // Verificar la caja cuando tenemos sucursalId
   useEffect(() => {
     if (!sucursalId) {
       console.log("Esperando sucursalId...");
-      return; // Esperar a que se cargue sucursalId
+      return;
     }
     
     const checkCajaAbierta = async () => {
@@ -37,35 +37,67 @@ export default function CierreCajaPage() {
         
         console.log("Verificando caja para sucursal:", sucursalId);
         
-        const response2 = await authenticatedFetch(`/api/pdv/cierre`, { method: 'POST' });
-        console.log('Response 2 (POST):', response2.status);
-
-        if (response2.ok) {
-          const data = await response2.json();
-          console.log("Datos recibidos:", data);
-          
-          if (data.cierreCaja && data.cierreCaja.id) {
-            setCierreCajaId(data.cierreCaja.id);
-            console.log("Caja encontrada con ID:", data.cierreCaja.id);
-          } else {
-            setErrorMessage('No se encontró información válida de la caja abierta');
+        // CORREGIDO: Usar GET en lugar de POST para verificar estado
+        const response = await authenticatedFetch(`/api/pdv/cierre?sucursalId=${encodeURIComponent(sucursalId)}`);
+        console.log('Response status:', response.status);
+        
+        // CORREGIDO: Manejar respuestas de error de manera segura
+        if (response.ok) {
+          // Solo intentar parsear JSON si la respuesta es exitosa
+          try {
+            const data = await response.json();
+            console.log("Datos recibidos:", data);
+            
+            if (data.cierreCaja && data.cierreCaja.id) {
+              setCierreCajaId(data.cierreCaja.id);
+              console.log("Caja encontrada con ID:", data.cierreCaja.id);
+            } else {
+              setErrorMessage('No se encontró información válida de la caja abierta');
+            }
+          } catch (jsonError) {
+            console.error('Error al parsear JSON de respuesta exitosa:', jsonError);
+            setErrorMessage('Error al procesar la respuesta del servidor');
           }
-        } else if (response2.status === 404) {
+        } else if (response.status === 404) {
           setErrorMessage('No hay una caja abierta actualmente. Debes abrir una caja antes de poder cerrarla.');
         } else {
-          const errorData = await response2.json();
-          throw new Error(errorData.error || 'Error al verificar el estado de la caja');
+          // CORREGIDO: Manejar errores sin asumir que hay JSON válido
+          let errorMessage = 'Error al verificar el estado de la caja';
+          
+          try {
+            // Verificar si la respuesta contiene JSON
+            const contentType = response.headers.get('content-type');
+            if (contentType && contentType.includes('application/json')) {
+              const errorData = await response.json();
+              errorMessage = errorData.error || errorMessage;
+            } else {
+              // Si no es JSON, intentar obtener texto
+              const errorText = await response.text();
+              if (errorText) {
+                errorMessage = `Error del servidor: ${response.status}`;
+              }
+            }
+          } catch (parseError) {
+            console.error('Error al parsear respuesta de error:', parseError);
+            errorMessage = `Error del servidor (${response.status}): No se pudo obtener detalles del error`;
+          }
+          
+          setErrorMessage(errorMessage);
         }
       } catch (error) {
         console.error('Error al verificar caja:', error);
-        setErrorMessage(error instanceof Error ? error.message : 'Error desconocido');
+        if (error instanceof TypeError && error.message.includes('fetch')) {
+          setErrorMessage('Error de conexión. Verifique su conexión a internet.');
+        } else {
+          setErrorMessage(error instanceof Error ? error.message : 'Error desconocido al verificar la caja');
+        }
       } finally {
         setIsLoading(false);
       }
     };
     
     checkCajaAbierta();
-  }, [sucursalId]); // Ejecutar cuando sucursalId esté disponible
+  }, [sucursalId]);
   
   // Manejar cierre exitoso
   const handleCierreSuccess = () => {
