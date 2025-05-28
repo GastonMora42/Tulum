@@ -14,7 +14,8 @@ import {
   Zap,
   Database,
   Clock,
-  Wifi
+  Wifi,
+  Key
 } from 'lucide-react';
 
 interface TestResult {
@@ -272,6 +273,40 @@ const testCondicionIvaReceptor = async () => {
     }
   };
 
+  // Agregar después de las otras funciones de test
+const testTokenManual = async () => {
+  // Obtener token y sign del textarea o inputs
+  const tokenInput = prompt('Pega el token completo (el contenido entre <token> y </token>):');
+  const signInput = prompt('Pega el sign completo (el contenido entre <sign> y </sign>):');
+  
+  if (!tokenInput || !signInput) {
+    setResultado({
+      error: 'Debes proporcionar tanto el token como el sign',
+      timestamp: new Date().toISOString()
+    });
+    return;
+  }
+
+  setLoading(true);
+  try {
+    const response = await authenticatedFetch('/api/admin/facturas/test-manual-token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token: tokenInput.trim(),
+        sign: signInput.trim(),
+        cuit: '27285773658' // CUIT correcto del certificado
+      })
+    });
+
+    await handleResponse(response, 'Test con Token Manual');
+  } catch (error) {
+    handleError(error, 'Test token manual');
+  } finally {
+    setLoading(false);
+  }
+};
+
   // ✅ MANEJO MEJORADO DE ERRORES
   const handleError = (error: any, operacion: string) => {
     console.error(`[DEBUG] Error en ${operacion}:`, error);
@@ -483,7 +518,15 @@ const testCondicionIvaReceptor = async () => {
                 {loading ? <RefreshCw className="animate-spin mr-2" /> : <Shield className="mr-2" />}
                 Test Autenticación Manual
               </button>
-              
+              <button
+        onClick={testTokenManual}
+        disabled={loading}
+        className="p-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center justify-center"
+      >
+        {loading ? <RefreshCw className="animate-spin mr-2" /> : <Key className="mr-2" />}
+        Test con Token Manual (PowerShell)
+      </button>
+      
               <button
                 onClick={() => {
                   // Test último comprobante

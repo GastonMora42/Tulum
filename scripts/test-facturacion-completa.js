@@ -1,115 +1,106 @@
-// scripts/test-afip-simple.js
-require('dotenv').config();
+// src/scripts/test-facturacion-completa.js
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
 
-// Test básico de configuración AFIP
-async function testAfipBasico() {
+async function testFacturacionCompleta() {
   try {
-    console.log('🔍 Verificando configuración AFIP...');
+    console.log('=== TEST DE FACTURACIÓN COMPLETA ===\n');
     
-    // 1. Verificar variables de ambiente
-    console.log('\n📋 Verificando variables de ambiente:');
-    const requiredVars = ['AFIP_CERT', 'AFIP_KEY', 'AFIP_CUIT', 'AFIP_ENV'];
+    // 1. Verificar configuración AFIP
+    console.log('1. Verificando configuración AFIP...');
+    const configs = await prisma.configuracionAFIP.findMany();
     
-    for (const varName of requiredVars) {
-      const value = process.env[varName];
-      if (value) {
-        if (varName === 'AFIP_CERT' || varName === 'AFIP_KEY') {
-          console.log(`   ✅ ${varName}: Configurado (${value.length} caracteres)`);
-        } else {
-          console.log(`   ✅ ${varName}: ${value}`);
+    console.log(`Configuraciones encontradas: ${configs.length}`);
+    configs.forEach(config => {
+      console.log(`- Sucursal: ${config.sucursalId}, CUIT: ${config.cuit}, PV: ${config.puntoVenta}`);
+    });
+    
+    // 2. Actualizar CUIT si es necesario
+    const configConCuitIncorrecto = configs.find(c => c.cuit === '30718236564');
+    if (configConCuitIncorrecto) {
+      console.log('\n⚠️  Encontrada configuración con CUIT incorrecto, actualizando...');
+      await prisma.configuracionAFIP.update({
+        where: { id: configConCuitIncorrecto.id },
+        data: { cuit: '27285773658' }
+      });
+      console.log('✅ CUIT actualizado a 27285773658');
+    }
+    
+    // 3. Verificar tokens existentes
+    console.log('\n2. Verificando tokens AFIP...');
+    const tokens = await prisma.tokenAFIP.findMany();
+    
+    tokens.forEach(token => {
+      const ahora = new Date();
+      const valido = token.expirationTime > ahora;
+      console.log(`- CUIT: ${token.cuit}, Válido: ${valido ? 'Sí' : 'No'}, Expira: ${token.expirationTime}`);
+    });
+    
+    // 4. Crear datos de prueba si no existen
+    console.log('\n3. Verificando datos de prueba...');
+    
+    // Verificar sucursal
+    let sucursal = await prisma.ubicacion.findFirst({
+      where: { tipo: 'sucursal' }
+    });
+    
+    if (!sucursal) {
+      console.log('Creando sucursal de prueba...');
+      sucursal = await prisma.ubicacion.create({
+        data: {
+          id: 'sucursal-test',
+          nombre: 'Sucursal Test',
+          tipo: 'sucursal',
+          direccion: 'Test 123',
+          activo: true
         }
-      } else {
-        console.log(`   ❌ ${varName}: NO CONFIGURADO`);
-        return;
-      }
+      });
     }
     
-    // 2. Verificar URLs según ambiente
-    const isProduction = process.env.AFIP_ENV === 'production';
-    console.log(`\n🌐 Ambiente: ${isProduction ? 'PRODUCCIÓN' : 'HOMOLOGACIÓN'}`);
+    // Verificar producto
+    let producto = await prisma.producto.findFirst();
     
-    const wsaaUrl = isProduction 
-      ? 'https://wsaa.afip.gov.ar/ws/services/LoginCms'
-      : 'https://wsaahomo.afip.gov.ar/ws/services/LoginCms';
+    if (!producto) {
+      console.log('Creando categoría y producto de prueba...');
       
-    const wsfeUrl = isProduction
-      ? 'https://servicios1.afip.gov.ar/wsfev1/service.asmx'
-      : 'https://wswhomo.afip.gov.ar/wsfev1/service.asmx';
-    
-    console.log(`   📡 WSAA URL: ${wsaaUrl}`);
-    console.log(`   📄 WSFE URL: ${wsfeUrl}`);
-    
-    // 3. Verificar certificado
-    console.log('\n🔐 Verificando certificado...');
-    try {
-      const cert = Buffer.from(process.env.AFIP_CERT, 'base64').toString('utf8');
-      const key = Buffer.from(process.env.AFIP_KEY, 'base64').toString('utf8');
-      
-      if (cert.includes('BEGIN CERTIFICATE') && cert.includes('END CERTIFICATE')) {
-        console.log('   ✅ Certificado tiene formato válido');
-      } else {
-        console.log('   ❌ Certificado no tiene formato PEM válido');
-        return;
-      }
-      
-      if (key.includes('BEGIN PRIVATE KEY') && key.includes('END PRIVATE KEY')) {
-        console.log('   ✅ Clave privada tiene formato válido');
-      } else {
-        console.log('   ❌ Clave privada no tiene formato PEM válido');
-        return;
-      }
-    } catch (error) {
-      console.log(`   ❌ Error al decodificar certificado: ${error.message}`);
-      return;
-    }
-    
-    // 4. Test de conectividad básica
-    console.log('\n🌐 Probando conectividad con AFIP...');
-    
-    try {
-      const https = require('https');
-      const { URL } = require('url');
-      
-      const testUrl = new URL(wsfeUrl + '?WSDL');
-      
-      await new Promise((resolve, reject) => {
-        const req = https.get({
-          hostname: testUrl.hostname,
-          path: testUrl.pathname + testUrl.search,
-          timeout: 10000
-        }, (res) => {
-          if (res.statusCode === 200) {
-            console.log('   ✅ Conectividad con AFIP OK');
-            resolve(true);
-          } else {
-            console.log(`   ⚠️ AFIP responde pero con status ${res.statusCode}`);
-            resolve(true);
-          }
-        });
-        
-        req.on('timeout', () => {
-          console.log('   ❌ Timeout al conectar con AFIP');
-          reject(new Error('Timeout'));
-        });
-        
-        req.on('error', (error) => {
-          console.log(`   ❌ Error de conectividad: ${error.message}`);
-          reject(error);
-        });
+      const categoria = await prisma.categoria.create({
+        data: {
+          nombre: 'General'
+        }
       });
       
-    } catch (error) {
-      console.log(`   ❌ No se puede conectar con AFIP: ${error.message}`);
+      producto = await prisma.producto.create({
+        data: {
+          nombre: 'Producto Test',
+          precio: 100,
+          categoriaId: categoria.id,
+          activo: true
+        }
+      });
+    }
+    
+    // Verificar usuario
+    let usuario = await prisma.user.findFirst({
+      where: { roleId: 'role-admin' }
+    });
+    
+    if (!usuario) {
+      console.log('Error: No hay usuario admin');
       return;
     }
     
-    console.log('\n🎉 ¡CONFIGURACIÓN BÁSICA CORRECTA!');
-    console.log('✅ Todas las verificaciones básicas pasaron');
-    console.log('🚀 Ahora puedes probar la facturación completa');
+    console.log('\n✅ Configuración lista para pruebas');
+    console.log('\nPróximos pasos:');
+    console.log('1. Ejecuta el script PowerShell para obtener token y sign');
+    console.log('2. Usa el componente de Debug con "Test con Token Manual"');
+    console.log('3. Pega el token y sign cuando te lo solicite');
+    console.log('\nRecuerda usar CUIT: 27285773658');
     
   } catch (error) {
-    console.error('💥 Error en test básico:', error);
+    console.error('Error:', error);
+  } finally {
+    await prisma.$disconnect();
   }
 }
 
-testAfipBasico();
+testFacturacionCompleta();

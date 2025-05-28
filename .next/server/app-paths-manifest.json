@@ -1,9 +1,7 @@
 {
-  "/api/auth/me/route": "app/api/auth/me/route.js",
-  "/favicon.ico/route": "app/favicon.ico/route.js",
-  "/api/admin/facturas/route": "app/api/admin/facturas/route.js",
-  "/api/admin/ubicaciones/route": "app/api/admin/ubicaciones/route.js",
-  "/api/admin/facturas/stats/route": "app/api/admin/facturas/stats/route.js",
-  "/api/admin/facturas/test-factura/route": "app/api/admin/facturas/test-factura/route.js",
-  "/(admin)/admin/facturas/page": "app/(admin)/admin/facturas/page.js"
+  "/api/auth/refresh/route": "app/api/auth/refresh/route.js",
+  "/api/productos/cache/route": "app/api/productos/cache/route.js",
+  "/api/pdv/ventas/route": "app/api/pdv/ventas/route.js",
+  "/(admin)/admin/page": "app/(admin)/admin/page.js",
+  "/(pdv)/pdv/page": "app/(pdv)/pdv/page.js"
 }

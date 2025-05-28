@@ -1,17 +1,16 @@
-// src/config/afip.ts - CONFIGURACIÓN CORREGIDA
 // src/config/afip.ts - VERSIÓN CORREGIDA
 export const AFIP_CONFIG = {
   production: process.env.AFIP_ENV === 'production',
   
-  // ✅ URLs OFICIALES CORREGIDAS - Usar .gov.ar (no .gob.ar)
+  // ✅ URLs OFICIALES CORREGIDAS
   wsaa_url: process.env.AFIP_ENV === 'production' 
-    ? process.env.AFIP_WSAA_URL_PROD || 'https://wsaa.afip.gov.ar/ws/services/LoginCms'
-    : process.env.AFIP_WSAA_URL_DEV || 'https://wsaahomo.afip.gov.ar/ws/services/LoginCms',
+    ? 'https://wsaa.afip.gov.ar/ws/services/LoginCms'
+    : 'https://wsaahomo.afip.gov.ar/ws/services/LoginCms',
     
   wsfe_url: process.env.AFIP_ENV === 'production'
-    ? process.env.AFIP_WSFE_URL_PROD || 'https://servicios1.afip.gov.ar/wsfev1/service.asmx'
-    : process.env.AFIP_WSFE_URL_DEV || 'https://wswhomo.afip.gov.ar/wsfev1/service.asmx',
-  // ... resto de la configuración igual
+    ? 'https://servicios1.afip.gov.ar/wsfev1/service.asmx'
+    : 'https://wswhomo.afip.gov.ar/wsfev1/service.asmx',
+
   cert: process.env.AFIP_CERT ? Buffer.from(process.env.AFIP_CERT, 'base64').toString('utf8') : '',
   key: process.env.AFIP_KEY ? Buffer.from(process.env.AFIP_KEY, 'base64').toString('utf8') : '',
   cuit: process.env.AFIP_CUIT || '',
@@ -32,19 +31,26 @@ export const AFIP_CONFIG = {
       consumidorFinal: 99
     },
     cbteTipos: {
-      A: {
-        factura: 1,
-        notaDebito: 2,
-        notaCredito: 3
-      },
-      B: {
-        factura: 6,
-        notaDebito: 7,
-        notaCredito: 8
-      },
-      C: {
-        factura: 11
-      }
+      A: { factura: 1, notaDebito: 2, notaCredito: 3 },
+      B: { factura: 6, notaDebito: 7, notaCredito: 8 },
+      C: { factura: 11 }
+    },
+    // ✅ NUEVO: Condiciones IVA Receptor según RG 5616
+    condicionesIVAReceptor: {
+      responsableInscripto: 1,
+      responsableNoInscripto: 2,
+      exento: 3,
+      noResponsable: 4,
+      consumidorFinal: 5,
+      responsableMonotributo: 6,
+      sujetoNoCategorizado: 7,
+      proveedorDelExterior: 8,
+      clienteDelExterior: 9,
+      iva_liberado_ley19640: 10,
+      agenteDePerpepcion: 11,
+      pequenoContribuyenteEventual: 12,
+      monotributista_social: 13,
+      pequenoContribuyente_eventual_social: 14
     },
     iva: {
       exento: 3,
