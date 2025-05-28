@@ -576,6 +576,28 @@ const testCondicionIvaReceptor = async () => {
             </div>
           </>
         )}
+
+<button
+  onClick={async () => {
+    setLoading(true);
+    try {
+      const response = await authenticatedFetch('/api/admin/facturas/test-factura', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      await handleResponse(response, 'Test Factura Completo');
+    } catch (error) {
+      handleError(error, 'Test factura');
+    } finally {
+      setLoading(false);
+    }
+  }}
+  disabled={loading}
+  className="p-4 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center justify-center"
+>
+  {loading ? <RefreshCw className="animate-spin mr-2" /> : <Zap className="mr-2" />}
+  Test Factura Completo (Crear y Facturar)
+</button>
       </div>
 
       {/* Indicador de carga */}

@@ -11,7 +11,6 @@ export const AFIP_CONFIG = {
   wsfe_url: process.env.AFIP_ENV === 'production'
     ? process.env.AFIP_WSFE_URL_PROD || 'https://servicios1.afip.gov.ar/wsfev1/service.asmx'
     : process.env.AFIP_WSFE_URL_DEV || 'https://wswhomo.afip.gov.ar/wsfev1/service.asmx',
-    
   // ... resto de la configuración igual
   cert: process.env.AFIP_CERT ? Buffer.from(process.env.AFIP_CERT, 'base64').toString('utf8') : '',
   key: process.env.AFIP_KEY ? Buffer.from(process.env.AFIP_KEY, 'base64').toString('utf8') : '',
