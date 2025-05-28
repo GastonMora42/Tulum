@@ -1,14 +1,17 @@
 # .github/workflows/renew-afip-tokens.yml - VERSIÓN MEJORADA
-name: Renovar Tokens AFIP
+name: Renovar Tokens AFIP Producción
 
 on:
   schedule:
-    - cron: '0 */6 * * *'  # Cada 5 horas (correcto para tokens de 24h)
-  workflow_dispatch:        # Permite ejecución manual desde GitHub
+    # Cada 6 horas para asegurar renovación antes de vencimiento
+    - cron: '0 */6 * * *'
+  workflow_dispatch: # Permite ejecución manual
 
 jobs:
-  renew:
+  renew-tokens:
     runs-on: ubuntu-latest
+    environment: production # Usar entorno de producción
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -16,29 +19,40 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Verificar estado actual de tokens
+      - name: 📊 Verificar estado actual de tokens
         run: |
+          echo "🔍 Verificando estado actual..."
           curl -X GET ${{ secrets.API_URL }}/api/admin/jobs/afip-status \
             -H "Authorization: Bearer ${{ secrets.ADMIN_TOKEN }}" \
-            -H "Content-Type: application/json"
+            -H "Content-Type: application/json" \
+            --max-time 30 \
+            --retry 2
 
-      - name: Renovar tokens AFIP
+      - name: 🔄 Renovar tokens AFIP
+        id: renew
         run: |
+          echo "🚀 Iniciando renovación..."
           curl -X POST ${{ secrets.API_URL }}/api/admin/jobs/renew-afip-tokens \
             -H "Authorization: Bearer ${{ secrets.ADMIN_TOKEN }}" \
             -H "Content-Type: application/json" \
             --max-time 300 \
             --retry 3 \
-            --retry-delay 30
+            --retry-delay 30 \
+            --fail-with-body
 
-      - name: Verificar resultado
+      - name: ✅ Verificar resultado final
         if: always()
         run: |
+          echo "📋 Verificando resultado..."
           curl -X GET ${{ secrets.API_URL }}/api/admin/jobs/afip-status \
             -H "Authorization: Bearer ${{ secrets.ADMIN_TOKEN }}" \
-            -H "Content-Type: application/json"
+            -H "Content-Type: application/json" \
+            --max-time 30
+
+      - name: 🚨 Notificación en caso de fallo
+        if: failure()
+        run: |
+          echo "❌ Falló la renovación de tokens AFIP"
+          # Aquí puedes agregar notificación por email, Slack, etc.

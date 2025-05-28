@@ -2,7 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authMiddleware } from '@/server/api/middlewares/auth';
 import { checkPermission } from '@/server/api/middlewares/authorization';
-import { checkAfipTokensStatus } from '@/server/jobs/renewAfipTokenJob';
+import { checkAllTokensStatus } from '@/server/jobs/renewAfipTokenJob';
 
 export async function GET(req: NextRequest) {
   // Verificar autenticación
@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   if (permissionError) return permissionError;
   
   try {
-    const status = await checkAfipTokensStatus();
+    const status = await checkAllTokensStatus();
     return NextResponse.json({
       success: true,
       timestamp: new Date().toISOString(),
