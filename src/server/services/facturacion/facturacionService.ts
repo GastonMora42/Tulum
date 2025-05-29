@@ -243,39 +243,35 @@ export class FacturacionService {
 
       logger.log(`Factura creada en 'procesando'`, 'SUCCESS');
 
-// LÍNEA ~200 - Corregir cálculo de totales
-// 7. Calcular totales SEGÚN FÓRMULA AFIP
+// CORRECCIÓN en líneas ~250-280:
 let importeNeto: number;
 let importeIVA: number;
-let importeTotConc: number = 0; // Conceptos no gravados
-let importeOpEx: number = 0;    // Operaciones exentas
-let importeTrib: number = 0;    // Otros tributos
+let importeTotConc: number = 0;
+let importeOpEx: number = 0;
+let importeTrib: number = 0;
 
 const importeTotal = Number(venta.total);
 
 if (tipoComprobanteLetra === 'A') {
-  // Factura A: IVA discriminado
-  importeNeto = Number((importeTotal / 1.21).toFixed(2));
-  importeIVA = Number((importeTotal - importeNeto).toFixed(2));
+  // Factura A: IVA discriminado - CÁLCULO CORREGIDO
+  importeNeto = Math.round((importeTotal / 1.21) * 100) / 100; // Redondear a centavos
+  importeIVA = Math.round((importeTotal - importeNeto) * 100) / 100;
   
-  // 🔧 VERIFICAR FÓRMULA AFIP
-  const calculoVerificacion = importeTotConc + importeNeto + importeOpEx + importeTrib + importeIVA;
-  if (Math.abs(calculoVerificacion - importeTotal) > 0.01) {
-    logger.log(`ADVERTENCIA: Fórmula AFIP no cuadra. Calculado: ${calculoVerificacion}, Real: ${importeTotal}`, 'WARN');
+  // Verificar que los totales cuadren
+  const verificacion = importeTotConc + importeNeto + importeOpEx + importeTrib + importeIVA;
+  if (Math.abs(verificacion - importeTotal) > 0.02) {
+    // Ajustar IVA para que cuadre exactamente
+    importeIVA = Math.round((importeTotal - importeNeto) * 100) / 100;
+    logger.log(`Ajuste IVA: Neto=${importeNeto}, IVA=${importeIVA}, Total=${importeTotal}`, 'WARN');
   }
   
-} else if (tipoComprobanteLetra === 'B') {
-  // Factura B: IVA incluido
-  importeNeto = importeTotal;
-  importeIVA = 0;
 } else {
-  // Factura C: Sin IVA
+  // Factura B/C: Sin IVA discriminado
   importeNeto = importeTotal;
   importeIVA = 0;
-  importeTotConc = 0;
 }
 
-logger.log(`Totales - Neto: $${importeNeto}, IVA: $${importeIVA}, Total: $${importeTotal}`, 'DEBUG');
+logger.log(`Cálculo final - Neto: $${importeNeto}, IVA: $${importeIVA}, Total: $${importeTotal}`, 'INFO');
 
       // 8. Preparar alícuotas IVA
       const iva = [];
@@ -343,24 +339,35 @@ const respuestaAFIP = await this.afipClient.createInvoice({
         logger.log(`Respuesta AFIP recibida`, 'SUCCESS');
         logger.log(`CAE: "${respuestaAFIP.CAE}" (${typeof respuestaAFIP.CAE})`, 'INFO');
 
-        // 13. Verificaciones AFIP
-        if (!respuestaAFIP || respuestaAFIP.Resultado !== 'A') {
-          throw new Error(`AFIP rechazó: ${JSON.stringify(respuestaAFIP)}`);
-        }
 
-        // 🔧 CORRECCIÓN: Manejo robusto del CAE
-        let caeValidado: string;
-        
-        if (!respuestaAFIP.CAE) {
-          throw new Error('AFIP no devolvió CAE');
-        }
+if (!respuestaAFIP || respuestaAFIP.Resultado !== 'A') {
+  const errorInfo = {
+    resultado: respuestaAFIP?.Resultado,
+    observaciones: respuestaAFIP?.Observaciones,
+    errores: respuestaAFIP?.Errores || respuestaAFIP?.Errors
+  };
+  logger.log(`AFIP rechazó: ${JSON.stringify(errorInfo)}`, 'ERROR');
+  throw new Error(`AFIP rechazó la factura: ${JSON.stringify(errorInfo)}`);
+}
 
-        caeValidado = String(respuestaAFIP.CAE).trim();
-        
-        if (!caeValidado || caeValidado === 'undefined' || caeValidado === 'null') {
-          throw new Error('CAE vacío recibido de AFIP');
-        }
+// 🔧 VERIFICACIÓN ROBUSTA DE CAE
+let caeValidado: string | undefined;
 
+// Intentar diferentes formatos de CAE que AFIP puede devolver
+caeValidado = respuestaAFIP.CAE || respuestaAFIP.Cae || respuestaAFIP.cae;
+
+if (caeValidado) {
+  caeValidado = String(caeValidado).trim();
+}
+
+logger.log(`CAE extraído: "${caeValidado}" (tipo: ${typeof caeValidado})`, 'DEBUG');
+
+// Solo fallar si definitivamente no hay CAE
+if (!caeValidado || caeValidado === '' || caeValidado === 'undefined' || caeValidado === 'null' || caeValidado.length < 10) {
+  logger.log(`CAE inválido: "${caeValidado}"`, 'ERROR');
+  logger.log(`Respuesta completa AFIP: ${JSON.stringify(respuestaAFIP, null, 2)}`, 'ERROR');
+  throw new Error(`CAE inválido recibido de AFIP: "${caeValidado}"`);
+}
         const numeroFactura = Number(respuestaAFIP.CbteNro);
         if (!numeroFactura || numeroFactura <= 0) {
           throw new Error(`Número inválido: ${respuestaAFIP.CbteNro}`);
@@ -464,9 +471,7 @@ const respuestaAFIP = await this.afipClient.createInvoice({
           logger.log(`Error QR (no crítico): ${qrError}`, 'WARN');
         }
 
-        // 18. Resultado final
-        const numeroCompleto = `${configAFIP.puntoVenta.toString().padStart(5, '0')}-${numeroFactura.toString().padStart(8, '0')}`;
-        
+
         logger.log(`COMPLETADO - CAE: "${verificacion.cae}"`, 'SUCCESS');
 
         // Guardar logs finales
