@@ -7,6 +7,7 @@ import * as forge from 'node-forge';
 import { v4 as uuidv4 } from 'uuid';
 import { AFIP_CONFIG } from '@/config/afip';
 import prisma from '@/server/db/client';
+import * as https from 'https';
 
 export class AfipSoapClient {
   private wsaaUrl: string;
@@ -18,6 +19,7 @@ export class AfipSoapClient {
   private token: string = '';
   private sign: string = '';
   private tokenExpiration: Date = new Date();
+  private httpsAgent: https.Agent;
 
   constructor(cuit: string) {
     this.wsaaUrl = AFIP_CONFIG.wsaa_url;
@@ -26,6 +28,18 @@ export class AfipSoapClient {
     this.key = AFIP_CONFIG.key;
     this.production = AFIP_CONFIG.production;
     this.cuit = cuit;
+    
+    // 🔧 CONFIGURACIÓN SSL PARA AFIP
+    this.httpsAgent = new https.Agent({
+      secureProtocol: 'TLSv1_2_method',
+      ciphers: 'DEFAULT@SECLEVEL=1',
+      minVersion: 'TLSv1',
+      maxVersion: 'TLSv1.3',
+      // Permitir claves DH pequeñas para AFIP
+      secureOptions: require('constants').SSL_OP_LEGACY_SERVER_CONNECT,
+      // Deshabilitar verificación estricta solo para AFIP
+      rejectUnauthorized: false
+    });
     
     // Validar configuración
     if (!this.cert || !this.key) {
