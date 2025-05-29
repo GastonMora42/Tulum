@@ -494,62 +494,65 @@ public async createInvoice(params: any): Promise<any> {
         throw new Error(`Error AFIP Global: ${JSON.stringify(response.Errors)}`);
       }
 
-      // Extraer detalle de respuesta con verificaciones robustas
-      let respDetalle;
-      
-      // Intentar diferentes estructuras de respuesta que AFIP puede devolver
-      if (response.FeDetResp && response.FeDetResp.FECAEDetResponse) {
-        respDetalle = response.FeDetResp.FECAEDetResponse;
-        console.log(`[AFIP] 📥 Detalle encontrado en FeDetResp.FECAEDetResponse`);
-      } else if (response.FeDetResp && Array.isArray(response.FeDetResp) && response.FeDetResp[0]) {
-        respDetalle = response.FeDetResp[0];
-        console.log(`[AFIP] 📥 Detalle encontrado en FeDetResp[0]`);
-      } else if (response.FECAEDetResponse) {
-        respDetalle = response.FECAEDetResponse;
-        console.log(`[AFIP] 📥 Detalle encontrado en FECAEDetResponse directamente`);
-      } else {
-        console.error(`[AFIP] ❌ No se pudo encontrar detalle en respuesta:`, Object.keys(response));
-        throw new Error('No se pudo extraer detalle de respuesta AFIP');
-      }
+// Extraer detalle de respuesta con verificaciones robustas
+let respDetalle;
 
-      console.log(`[AFIP] 📄 DETALLE EXTRAÍDO:`, JSON.stringify(respDetalle, null, 2));
+// Intentar diferentes estructuras de respuesta que AFIP puede devolver
+if (response.FeDetResp && response.FeDetResp.FECAEDetResponse) {
+  respDetalle = response.FeDetResp.FECAEDetResponse;
+  console.log(`[AFIP] 📥 Detalle encontrado en FeDetResp.FECAEDetResponse`);
+  
+  // 🔧 CORRECCIÓN: Verificar si es un array
+  if (Array.isArray(respDetalle) && respDetalle.length > 0) {
+    respDetalle = respDetalle[0]; // Tomar el primer elemento
+    console.log(`[AFIP] 📥 Detalle es array, tomando primer elemento`);
+  }
+  
+} else if (response.FeDetResp && Array.isArray(response.FeDetResp) && response.FeDetResp[0]) {
+  respDetalle = response.FeDetResp[0];
+  console.log(`[AFIP] 📥 Detalle encontrado en FeDetResp[0]`);
+} else if (response.FECAEDetResponse) {
+  respDetalle = response.FECAEDetResponse;
+  console.log(`[AFIP] 📥 Detalle encontrado en FECAEDetResponse directamente`);
+  
+  // 🔧 CORRECCIÓN: Verificar si es un array también aquí
+  if (Array.isArray(respDetalle) && respDetalle.length > 0) {
+    respDetalle = respDetalle[0];
+    console.log(`[AFIP] 📥 FECAEDetResponse es array, tomando primer elemento`);
+  }
+}
 
-      // 🔍 VERIFICACIONES ROBUSTAS
-      console.log(`[AFIP] 🔍 Verificando Resultado: "${respDetalle.Resultado}"`);
-      if (respDetalle.Resultado !== 'A') {
-        const errorInfo = {
-          resultado: respDetalle.Resultado,
-          observaciones: respDetalle.Observaciones,
-          errores: respDetalle.Errors
-        };
-        console.error(`[AFIP] ❌ RECHAZO:`, JSON.stringify(errorInfo, null, 2));
-        throw new Error(`AFIP rechazó: ${JSON.stringify(errorInfo)}`);
-      }
+console.log(`[AFIP] 📄 DETALLE FINAL EXTRAÍDO:`, JSON.stringify(respDetalle, null, 2));
 
-      // 🔍 VERIFICACIÓN ROBUSTA DE CAE
-      let cae = respDetalle.CAE;
-      console.log(`[AFIP] 🔍 CAE crudo:`, cae, `(tipo: ${typeof cae})`);
-      
-      // Intentar diferentes formatos de CAE
-      if (!cae) {
-        console.log(`[AFIP] 🔍 CAE vacío, buscando alternativas...`);
-        cae = respDetalle.Cae || respDetalle.cae || respDetalle.CAE;
-      }
-      
-      // Convertir a string y limpiar
-      if (cae) {
-        cae = String(cae).trim();
-        console.log(`[AFIP] 🔍 CAE procesado: "${cae}" (longitud: ${cae.length})`);
-      }
-      
-      if (!cae || cae === '' || cae === 'undefined' || cae === 'null') {
-        console.error(`[AFIP] ❌ CAE inválido después de procesamiento:`, {
-          original: respDetalle.CAE,
-          procesado: cae,
-          campos_disponibles: Object.keys(respDetalle)
-        });
-        throw new Error('CAE inválido o vacío recibido de AFIP');
-      }
+// Ahora la verificación debería funcionar correctamente
+console.log(`[AFIP] 🔍 Verificando Resultado: "${respDetalle?.Resultado}"`);
+if (respDetalle?.Resultado !== 'A') {
+  const errorInfo = {
+    resultado: respDetalle?.Resultado,
+    observaciones: respDetalle?.Observaciones,
+    errores: respDetalle?.Errors
+  };
+  console.error(`[AFIP] ❌ RECHAZO:`, JSON.stringify(errorInfo, null, 2));
+  throw new Error(`AFIP rechazó: ${JSON.stringify(errorInfo)}`);
+}
+
+
+// 🔍 VERIFICACIÓN ROBUSTA DE CAE
+let cae = respDetalle?.CAE || respDetalle?.Cae || respDetalle?.cae;
+
+if (cae) {
+  cae = String(cae).trim();
+  console.log(`[AFIP] 🔍 CAE procesado: "${cae}" (longitud: ${cae.length})`);
+}
+
+if (!cae || cae === '' || cae === 'undefined' || cae === 'null' || cae.length < 10) {
+  console.error(`[AFIP] ❌ CAE inválido después de procesamiento:`, {
+    original: respDetalle?.CAE,
+    procesado: cae,
+    campos_disponibles: Object.keys(respDetalle || {})
+  });
+  throw new Error('CAE inválido o vacío recibido de AFIP');
+}
 
       
       // Verificar número de comprobante
