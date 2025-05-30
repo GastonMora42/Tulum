@@ -1,9 +1,8 @@
-// src/components/pdv/BarcodeScanner.tsx - VERSIÓN CORREGIDA CON SONIDOS
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
 import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from '@zxing/library';
-import { Camera, QrCode, Box, Slash, RefreshCw, Zap, ShieldAlert, Volume2, VolumeX, Loader } from 'lucide-react';
+import { Camera, QrCode, Box, Slash, RefreshCw, Zap, ShieldAlert } from 'lucide-react';
 
 interface BarcodeScannerProps {
   onScan: (code: string) => void;
@@ -18,7 +17,7 @@ export function BarcodeScanner({
   autoStart = false,
   className = ''
 }: BarcodeScannerProps) {
-  // Estados existentes
+  // Estados
   const [isScanning, setIsScanning] = useState(autoStart);
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
@@ -29,107 +28,12 @@ export function BarcodeScanner({
   const [isLoading, setIsLoading] = useState(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
   
-  // NUEVOS: Estados para sonido y pistola scanner
-  const [soundEnabled, setSoundEnabled] = useState(true);
-  const [isProcessing, setIsProcessing] = useState(false);
-  
   // Referencias
   const videoRef = useRef<HTMLVideoElement>(null);
   const scannerRef = useRef<BrowserMultiFormatReader | null>(null);
   const manualInputRef = useRef<HTMLInputElement>(null);
   
-  // NUEVOS: Referencias para audio y pistola scanner
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const scanBufferRef = useRef<string>('');
-  const lastScanTimeRef = useRef<number>(0);
-  const keySequenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // NUEVO: Inicializar audio al montar componente
-  useEffect(() => {
-    // Crear elemento de audio para el sonido de beep
-    audioRef.current = new Audio();
-    // Usar un sonido beep simple generado por código
-    audioRef.current.src = createBeepSound();
-    audioRef.current.volume = 0.3;
-    
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-    };
-  }, []);
-
-  // NUEVA: Función para crear sonido beep
-  const createBeepSound = (): string => {
-    try {
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
-      
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-      
-      oscillator.frequency.value = 800; // Frecuencia del beep
-      oscillator.type = 'square';
-      
-      gainNode.gain.setValueAtTime(0, audioContext.currentTime);
-      gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.01);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
-      
-      oscillator.start(audioContext.currentTime);
-      oscillator.stop(audioContext.currentTime + 0.1);
-      
-      // Crear un blob de audio y retornar URL
-      const mediaRecorder = new MediaRecorder(audioContext.createMediaStreamDestination().stream);
-      return 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+bzu2EbBzaG0O/XeSsFJHC98NyKOAgSaLvt559NEAxQp+PwtmMcBjiR1/LMeSsFJHfH8N2QQAoUXrTp66hVFApGn+bzu2EbBzaG0O/XeSsFJHC98NyKOAgSaLvt559NEAxQp+PwtmMcBjiR1/LMeSsFJHfH8N2QQAoUXrTp66hVFApGn+bzu2EbBzaG0O/XeSsFJHC98NyKOAgSaLvt559NEAxQp+PwtmMcBjiR1/LMeSsFJHfH8N2QQAoUXrTp66hVFApGn+bzu2EbBzaG0O/XeSsFJHC98NyKOAgSaLvt559NEAxQp+PwtmMcBjiR1/LMeSsFJHfH8N2QQAoUXrTp66hVFApGn+bzu2EbBzaG0O/XeSsFJHC98NyKOAgSaLvt559NEAxQp+PwtmMcBjiR1/LMeSsFJHfH8N2QQAoUXrTp66hVFApGn+bzu2EbBzaG0O/XeSsFJHC98NyKOAgSaLvt559NEAxQp+PwtmMcBjiR1/LMeSsFJHfH8N2QQAoUXrTp66hVFApGn+bzu2EbBzaG0O/XeSsFJHC98NyKOA==';
-    } catch (error) {
-      console.warn('No se pudo crear sonido beep:', error);
-      return '';
-    }
-  };
-
-  // NUEVA: Función para reproducir sonido
-  const playBeepSound = () => {
-    if (soundEnabled && audioRef.current) {
-      try {
-        audioRef.current.currentTime = 0;
-        audioRef.current.play().catch(e => console.warn('No se pudo reproducir sonido:', e));
-      } catch (error) {
-        console.warn('Error reproduciendo sonido:', error);
-      }
-    }
-  };
-
-  // CORREGIDA: Función para manejar escaneo exitoso
-  const handleSuccessfulScan = async (code: string) => {
-    if (isProcessing) return; // Evitar doble procesamiento
-    
-    setIsProcessing(true);
-    setLastScanned(code);
-    
-    try {
-      // Reproducir sonido de éxito
-      playBeepSound();
-      
-      // Llamar callback
-      await onScan(code);
-      
-      console.log(`[SCANNER] Código escaneado exitosamente: ${code}`);
-    } catch (error) {
-      console.error(`[SCANNER] Error procesando código ${code}:`, error);
-      if (onError) {
-        onError(error instanceof Error ? error : new Error('Error procesando código'));
-      }
-    } finally {
-      // Pequeña pausa antes de permitir próximo escaneo
-      setTimeout(() => {
-        setIsProcessing(false);
-      }, 1000);
-    }
-  };
-
-  // Inicializar escáner (sin cambios)
+  // Inicializar escáner
   useEffect(() => {
     const hints = new Map();
     hints.set(DecodeHintType.POSSIBLE_FORMATS, [
@@ -151,89 +55,29 @@ export function BarcodeScanner({
     };
   }, []);
 
-  // CORREGIDA: Escuchar entrada de pistola scanner con mejor detección
-  useEffect(() => {
-    const handleKeyPress = (e: KeyboardEvent) => {
-      // Solo procesar si no estamos en un input de texto
-      if (document.activeElement instanceof HTMLInputElement || 
-          document.activeElement instanceof HTMLTextAreaElement) {
-        return;
-      }
-      
-      // Solo si el scanner está activo pero no la cámara (para pistola)
-      if (!isScanning || isCameraOn) {
-        return;
-      }
-      
-      const currentTime = Date.now();
-      const timeSinceLastKey = currentTime - lastScanTimeRef.current;
-      
-      // Si es Enter y tenemos un buffer válido
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        
-        if (scanBufferRef.current.length >= 3) { // Mínimo 3 caracteres para ser válido
-          console.log(`[PISTOLA-SCANNER] Código detectado: ${scanBufferRef.current}`);
-          handleSuccessfulScan(scanBufferRef.current);
-        }
-        
-        // Limpiar buffer
-        scanBufferRef.current = '';
-        return;
-      }
-      
-      // Si ha pasado mucho tiempo desde la última tecla, reiniciar buffer
-      if (timeSinceLastKey > 100) { // 100ms timeout entre teclas
-        scanBufferRef.current = '';
-      }
-      
-      // Solo agregar caracteres válidos para códigos
-      if (e.key.length === 1 || e.key === '-') {
-        scanBufferRef.current += e.key;
-        lastScanTimeRef.current = currentTime;
-        
-        // Limpiar buffer automáticamente después de cierto tiempo
-        if (keySequenceTimeoutRef.current) {
-          clearTimeout(keySequenceTimeoutRef.current);
-        }
-        
-        keySequenceTimeoutRef.current = setTimeout(() => {
-          if (scanBufferRef.current.length > 0) {
-            console.log(`[PISTOLA-SCANNER] Buffer timeout, descartando: ${scanBufferRef.current}`);
-            scanBufferRef.current = '';
-          }
-        }, 500); // 500ms timeout para secuencia completa
-      }
-    };
-    
-    if (isScanning && !isCameraOn) {
-      document.addEventListener('keydown', handleKeyPress);
-      console.log('[PISTOLA-SCANNER] Listener activado para pistola scanner');
-    }
-    
-    return () => {
-      document.removeEventListener('keydown', handleKeyPress);
-      if (keySequenceTimeoutRef.current) {
-        clearTimeout(keySequenceTimeoutRef.current);
-      }
-    };
-  }, [isScanning, isCameraOn]);
-
-  // CORREGIDA: Función para solicitar permisos de cámara
+  // Función para verificar si estamos en Chrome
+  const isChrome = () => {
+    return navigator.userAgent.indexOf("Chrome") !== -1;
+  };
+  
+  // Función específica para solicitar permisos en Chrome
   const requestCameraPermission = async () => {
     try {
       setIsLoading(true);
       setPermissionDenied(false);
       setCameraError(null);
       
-      console.log("[CAMARA-SCANNER] Solicitando permisos de cámara...");
+      console.log("Solicitando permisos de cámara...");
       
+      // Solicitud de permisos que funciona mejor en Chrome
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { facingMode: "environment" } 
       });
       
+      // Si llegamos aquí, tenemos permiso
       setHasPermission(true);
       
+      // Enumerar dispositivos después de obtener permisos
       const devices = await navigator.mediaDevices.enumerateDevices();
       const videoDevices = devices.filter(device => device.kind === 'videoinput');
       
@@ -241,6 +85,7 @@ export function BarcodeScanner({
         throw new Error('No se detectaron cámaras');
       }
       
+      // Preferir cámara trasera
       const backCamera = videoDevices.find(device => 
         device.label.toLowerCase().includes('back') || 
         device.label.toLowerCase().includes('trasera') ||
@@ -250,27 +95,31 @@ export function BarcodeScanner({
       setCameraDevices(videoDevices);
       setSelectedDeviceId(backCamera?.deviceId || videoDevices[0].deviceId);
       
+      // Detener el stream inicial
       stream.getTracks().forEach(track => track.stop());
       
+      // Activar la cámara
       if (videoRef.current && scannerRef.current) {
         const deviceId = backCamera?.deviceId || videoDevices[0].deviceId;
         
+        // Iniciar escaner con la cámara seleccionada
         await scannerRef.current.decodeFromVideoDevice(
           deviceId,
           videoRef.current,
           (result) => {
-            if (result && !isProcessing) {
+            if (result) {
               const code = result.getText();
-              console.log(`[CAMARA-SCANNER] Código detectado: ${code}`);
-              handleSuccessfulScan(code);
+              setLastScanned(code);
+              onScan(code);
             }
           }
         );
       }
       
     } catch (error) {
-      console.error('[CAMARA-SCANNER] Error:', error);
+      console.error('Error al solicitar permisos:', error);
       
+      // Identificar tipo de error para mostrar mensaje adecuado
       if (error instanceof DOMException) {
         if (error.name === 'NotAllowedError') {
           setPermissionDenied(true);
@@ -293,20 +142,23 @@ export function BarcodeScanner({
       setIsLoading(false);
     }
   };
-
-  // Resto de las funciones sin cambios
+  
+  // Toggle para la cámara (iniciar/detener)
   const toggleCamera = () => {
     if (isCameraOn) {
+      // Si la cámara está activa, detenerla
       setIsCameraOn(false);
       if (scannerRef.current) {
         scannerRef.current.reset();
       }
     } else {
+      // Si la cámara está inactiva, activarla y solicitar permisos
       setIsCameraOn(true);
       requestCameraPermission();
     }
   };
   
+  // Toggle para el escáner principal
   const toggleScanner = () => {
     if (isScanning) {
       setIsScanning(false);
@@ -314,25 +166,65 @@ export function BarcodeScanner({
       if (scannerRef.current) {
         scannerRef.current.reset();
       }
-      // Limpiar buffer de pistola
-      scanBufferRef.current = '';
     } else {
       setIsScanning(true);
     }
   };
   
-  const handleManualInput = async () => {
+  // Escuchar entrada de escáner físico
+  useEffect(() => {
+    let buffer = '';
+    let lastKeyTime = 0;
+    const TIMEOUT = 50; // Tiempo entre teclas en ms
+    
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Solo procesar si no estamos en un input de texto
+      if (document.activeElement instanceof HTMLInputElement || 
+          document.activeElement instanceof HTMLTextAreaElement) {
+        return;
+      }
+      
+      const currentTime = new Date().getTime();
+      
+      if (currentTime - lastKeyTime > TIMEOUT && buffer.length > 0) {
+        // Si ha pasado mucho tiempo, reiniciar buffer
+        buffer = '';
+      }
+      
+      // Actualizar tiempo de última tecla
+      lastKeyTime = currentTime;
+      
+      // Enter normalmente marca el final de un escaneo
+      if (e.key === 'Enter' && buffer.length > 3) {
+        setLastScanned(buffer);
+        onScan(buffer);
+        buffer = '';
+        e.preventDefault();
+      } else if (e.key.length === 1 || e.key === '-') {
+        // Agregar al buffer si es un carácter o guión
+        buffer += e.key;
+      }
+    };
+    
+    if (isScanning && !isCameraOn) {
+      document.addEventListener('keydown', handleKeyPress);
+    }
+    
+    return () => {
+      document.removeEventListener('keydown', handleKeyPress);
+    };
+  }, [isScanning, isCameraOn, onScan]);
+  
+  // Escaneo manual
+  const handleManualInput = () => {
     if (manualInputRef.current?.value) {
       const code = manualInputRef.current.value.trim();
       if (code) {
-        await handleSuccessfulScan(code);
+        setLastScanned(code);
+        onScan(code);
         manualInputRef.current.value = '';
       }
     }
-  };
-
-  const isChrome = () => {
-    return navigator.userAgent.indexOf("Chrome") !== -1;
   };
 
   return (
@@ -344,19 +236,6 @@ export function BarcodeScanner({
         </h3>
         
         <div className="flex items-center gap-2">
-          {/* NUEVO: Control de sonido */}
-          <button
-            onClick={() => setSoundEnabled(!soundEnabled)}
-            className={`p-2 rounded-lg ${
-              soundEnabled 
-                ? 'bg-green-100 text-green-600 hover:bg-green-200' 
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-            }`}
-            title={soundEnabled ? 'Desactivar sonido' : 'Activar sonido'}
-          >
-            {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
-          </button>
-          
           <button
             onClick={toggleScanner}
             className={`p-2 rounded-lg ${
@@ -381,23 +260,13 @@ export function BarcodeScanner({
                   ? 'bg-yellow-100 text-yellow-600 hover:bg-yellow-200' 
                   : 'bg-blue-100 text-blue-600 hover:bg-blue-200'
               }`}
-              aria-label={isCameraOn ? 'Usar pistola scanner' : 'Usar cámara'}
+              aria-label={isCameraOn ? 'Usar escáner físico' : 'Usar cámara'}
             >
               <Camera className="h-5 w-5" />
             </button>
           )}
         </div>
       </div>
-      
-      {/* Indicator de procesamiento */}
-      {isProcessing && (
-        <div className="mb-4 bg-blue-50 border border-blue-200 p-3 rounded-lg">
-          <div className="flex items-center text-blue-800">
-            <Loader className="animate-spin h-4 w-4 mr-2" />
-            <span className="text-sm">Procesando código...</span>
-          </div>
-        </div>
-      )}
       
       {isLoading ? (
         <div className="bg-gray-50 p-6 rounded-lg text-center">
@@ -408,7 +277,7 @@ export function BarcodeScanner({
         <>
           {isCameraOn ? (
             <div className="space-y-3">
-              {/* Selección de cámara */}
+              {/* Selección de cámara (cuando hay múltiples) */}
               {cameraDevices.length > 1 && hasPermission && (
                 <div className="flex gap-2 mb-2">
                   <select
@@ -421,9 +290,10 @@ export function BarcodeScanner({
                           e.target.value,
                           videoRef.current,
                           (result) => {
-                            if (result && !isProcessing) {
+                            if (result) {
                               const code = result.getText();
-                              handleSuccessfulScan(code);
+                              setLastScanned(code);
+                              onScan(code);
                             }
                           }
                         );
@@ -445,9 +315,10 @@ export function BarcodeScanner({
                           selectedDeviceId,
                           videoRef.current,
                           (result) => {
-                            if (result && !isProcessing) {
+                            if (result) {
                               const code = result.getText();
-                              handleSuccessfulScan(code);
+                              setLastScanned(code);
+                              onScan(code);
                             }
                           }
                         );
@@ -528,12 +399,7 @@ export function BarcodeScanner({
             <div className="bg-gray-50 p-4 rounded-lg text-center">
               <div className="flex flex-col items-center justify-center p-4">
                 <Box className="h-12 w-12 text-gray-400 mb-2" />
-                <p className="text-gray-600">
-                  {scanBufferRef.current.length > 0 
-                    ? `Leyendo código... (${scanBufferRef.current.length} caracteres)`
-                    : 'Esperando pistola scanner...'
-                  }
-                </p>
+                <p className="text-gray-600">Esperando escáner de código de barras físico...</p>
                 <p className="text-sm text-gray-500 mt-1">
                   O usa la cámara de tu dispositivo para escanear
                 </p>
@@ -593,15 +459,16 @@ export function BarcodeScanner({
       )}
       
       {/* Información de ayuda */}
-      <div className="mt-4 bg-blue-50 p-3 rounded-lg text-xs text-blue-700">
-        <p className="font-semibold mb-1">💡 Consejos de uso:</p>
-        <div className="ml-2 space-y-1">
-          <p>• <strong>Pistola scanner:</strong> Conecte por USB y escanee directamente</p>
-          <p>• <strong>Cámara:</strong> Apunte hacia el código de barras</p>
-          <p>• <strong>Sonido:</strong> Un beep confirma que se agregó al carrito</p>
-          <p>• Si hay problemas, use la entrada manual</p>
+      {isChrome() && (
+        <div className="mt-4 bg-blue-50 p-3 rounded-lg text-xs text-blue-700">
+          <p className="font-semibold mb-1">¿Problemas con la cámara en Chrome?</p>
+          <div className="ml-2">
+            <p>• Asegúrate de dar permisos cuando Chrome lo solicite</p>
+            <p>• Si bloqueaste la cámara anteriormente: haz clic en el icono 🔒 en la barra de direcciones, luego en "Permisos del sitio" y cambia la configuración de la cámara a "Permitir"</p>
+            <p>• Después de cambiar los permisos, recarga la página</p>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
