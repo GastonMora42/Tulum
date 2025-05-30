@@ -969,6 +969,7 @@ function ProductCardCompact({ producto, onSelect, onToggleFavorite, isFavorite }
             className="w-full h-full object-cover"
             onError={() => setImageError(true)}
           />
+          
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <Package className="w-8 h-8 text-gray-400" />
