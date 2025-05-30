@@ -21,7 +21,6 @@ export async function POST(req: NextRequest) {
     
     const user = (req as any).user;
     
-    // Verificar permisos de sucursal
     if (user.sucursalId && user.sucursalId !== sucursalId && user.roleId !== 'role-admin') {
       return NextResponse.json(
         { error: 'No tiene permisos para esta sucursal' },
@@ -29,7 +28,6 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    // Verificar que la conciliación existe
     const conciliacion = await prisma.conciliacion.findFirst({
       where: { id, sucursalId }
     });
@@ -41,23 +39,23 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    // NUEVA LÓGICA: Verificar si existe contingencia pendiente antes de proceder
-    const contingenciasPendientes = await prisma.contingencia.findMany({
+    // 🆕 VERIFICAR SOLO CONTINGENCIAS DE CONCILIACIÓN
+    const contingenciasConciliacion = await prisma.contingencia.findMany({
       where: {
         ubicacionId: sucursalId,
-        tipo: 'stock',
+        tipo: 'conciliacion', // 🔥 Solo este tipo bloquea nuevas conciliaciones
         estado: { in: ['pendiente', 'en_revision'] }
       }
     });
     
-    if (contingenciasPendientes.length > 0 && !forzarContingencia) {
+    if (contingenciasConciliacion.length > 0 && !forzarContingencia) {
       return NextResponse.json(
-        { error: 'Existe una contingencia de stock pendiente. Debe ser resuelta antes de realizar nueva conciliación.' },
+        { error: 'Existe una contingencia de conciliación pendiente. Debe ser resuelta antes de realizar nueva conciliación.' },
         { status: 409 }
       );
     }
     
-    // Analizar diferencias
+    // Resto de la lógica...
     let hayDiferencias = false;
     const diferenciasPorProducto: Array<{
       productoId: string;
@@ -67,7 +65,6 @@ export async function POST(req: NextRequest) {
       nombre?: string;
     }> = [];
     
-    // Obtener información de productos
     const productosInfo = await prisma.producto.findMany({
       where: { id: { in: productos.map(p => p.productoId) } }
     });
@@ -75,7 +72,6 @@ export async function POST(req: NextRequest) {
     const productosPorId = new Map();
     productosInfo.forEach(p => productosPorId.set(p.id, p));
     
-    // Verificar diferencias
     for (const produto of productos) {
       const { productoId, stockTeorico, stockFisico } = produto;
       if (stockFisico === null || stockFisico === undefined) continue;
@@ -95,19 +91,15 @@ export async function POST(req: NextRequest) {
     }
     
     const resultado = await prisma.$transaction(async (tx) => {
-      // 1. Actualizar conciliación
-      const estadoFinal = (hayDiferencias || forzarContingencia) ? 'con_contingencia' : 'completada';
-      
       await tx.conciliacion.update({
         where: { id },
         data: {
-          estado: estadoFinal,
+          estado: (hayDiferencias || forzarContingencia) ? 'con_contingencia' : 'completada',
           detalles: productos,
           observaciones: observaciones || ''
         }
       });
       
-      // 2. Si hay diferencias o se fuerza, crear contingencia MEJORADA
       if (hayDiferencias || forzarContingencia) {
         const detallesTexto = diferenciasPorProducto.map(diff => 
           `- ${diff.nombre || diff.productoId}: Sistema=${diff.stockTeorico}, Contado=${diff.stockFisico}, Diferencia=${diff.diferencia > 0 ? '+' : ''}${diff.diferencia}`
@@ -139,17 +131,14 @@ ACCIONES REQUERIDAS:
             origen: 'sucursal',
             creadoPor: user.id,
             estado: 'pendiente',
-            tipo: 'stock',
+            tipo: 'conciliacion', // 🔥 ESPECÍFICO para conciliaciones
             ubicacionId: sucursalId,
             urgente: diferenciasPorProducto.length > 5 || diferenciasPorProducto.some(d => Math.abs(d.diferencia) > 10)
           }
         });
         
-        console.log(`[CONCILIACIÓN] Contingencia generada: ${contingencia.id} con ${diferenciasPorProducto.length} diferencias`);
+        console.log(`[CONCILIACIÓN] Contingencia de conciliación generada: ${contingencia.id}`);
       }
-      
-      // 3. NUEVO: Actualizar stock SOLO si no hay diferencias significativas (opcional)
-      // Por ahora, NO actualizamos automáticamente el stock hasta que admin resuelva
       
       return { 
         success: true,

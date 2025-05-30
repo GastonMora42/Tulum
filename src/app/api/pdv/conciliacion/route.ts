@@ -1,11 +1,10 @@
-// src/app/api/pdv/conciliacion/route.ts
+// src/app/api/pdv/conciliacion/route.ts - VERSIÓN MEJORADA
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/server/db/client';
 import { authMiddleware } from '@/server/api/middlewares/auth';
 import { format } from 'date-fns';
 
 export async function GET(req: NextRequest) {
-  // Aplicar middleware de autenticación
   const authError = await authMiddleware(req);
   if (authError) return authError;
   
@@ -20,12 +19,34 @@ export async function GET(req: NextRequest) {
       );
     }
     
-    // Verificar que el usuario tenga acceso a la sucursal
     const user = (req as any).user;
     if (user.sucursalId && user.sucursalId !== sucursalId && user.roleId !== 'role-admin') {
       return NextResponse.json(
         { error: 'No tiene permisos para acceder a esta sucursal' },
         { status: 403 }
+      );
+    }
+    
+    // 🆕 VERIFICAR SOLO CONTINGENCIAS DE CONCILIACIÓN
+    const contingenciasBloqueo = await prisma.contingencia.findMany({
+      where: {
+        ubicacionId: sucursalId,
+        tipo: 'conciliacion', // 🔥 SOLO contingencias de conciliación bloquean
+        estado: { in: ['pendiente', 'en_revision'] }
+      }
+    });
+    
+    if (contingenciasBloqueo.length > 0) {
+      return NextResponse.json(
+        { 
+          error: 'Existe una contingencia de conciliación pendiente que debe ser resuelta antes de realizar nueva conciliación.',
+          contingencias: contingenciasBloqueo.map(c => ({
+            id: c.id,
+            titulo: c.titulo,
+            fechaCreacion: c.fechaCreacion
+          }))
+        },
+        { status: 409 }
       );
     }
     
@@ -45,7 +66,7 @@ export async function GET(req: NextRequest) {
       );
     }
     
-    // Obtener productos con stock en esta sucursal
+    // Resto del código igual...
     const productos = await prisma.stock.findMany({
       where: {
         ubicacionId: sucursalId,
@@ -56,14 +77,12 @@ export async function GET(req: NextRequest) {
       }
     });
     
-    // Preparar la respuesta con formato correcto
     const formattedData = {
       id: conciliacionActiva.id,
       fecha: conciliacionActiva.fecha,
       estado: conciliacionActiva.estado,
       usuario: conciliacionActiva.usuarioId,
       productos: productos.map(stock => {
-        // Verificar si hay datos previos en detalles
         let stockFisico = null;
         if (conciliacionActiva.detalles) {
           const detalles = typeof conciliacionActiva.detalles === 'string' 

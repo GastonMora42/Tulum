@@ -1,4 +1,4 @@
-// src/app/(pdv)/pdv/page.tsx - CORREGIDO
+// src/app/(pdv)/pdv/page.tsx - EXPERIENCIA MEJORADA
 'use client';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
@@ -13,11 +13,11 @@ import { authenticatedFetch } from '@/hooks/useAuth';
 import { 
   AlertCircle, CheckCircle, X, QrCode, Package, Grid, 
   ShoppingCart as CartIcon, Search, ChevronDown, ArrowRight, 
-  Plus, Heart, Clock, Zap, Target, Home, Scan, AlertTriangle
+  Plus, Heart, Clock, Zap, Target, Home, Scan, AlertTriangle,
+  ArrowLeft, Sparkles
 } from 'lucide-react';
 import { Producto } from '@/types/models/producto';
 
-// Tipo específico para las vistas
 type ViewType = 'dashboard' | 'products' | 'cart' | 'scanner';
 
 interface QuickAction {
@@ -47,11 +47,12 @@ export default function PDVPage() {
   const [productosFavoritos, setProductosFavoritos] = useState<Set<string>>(new Set());
   const [activeCategory, setActiveCategory] = useState<string>('todos');
   
-  // Estados de UI
+  // 🆕 ESTADOS MEJORADOS PARA UX
   const [isMobileView, setIsMobileView] = useState(false);
   const [currentView, setCurrentView] = useState<ViewType>('dashboard');
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [showProductosRecientes, setShowProductosRecientes] = useState(true); // 🔥 NUEVO ESTADO
   
   // Referencias
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -60,14 +61,24 @@ export default function PDVPage() {
   const { addItem, items, getTotal } = useCartStore();
   const { isOnline } = useOffline();
 
-  // Función helper para verificar stock
-  const hasStock = useCallback((producto: Producto): boolean => {
-    return (producto.stock ?? 0) > 0;
-  }, []);
-
-  // Función para cambiar vistas
+  // 🆕 FUNCIÓN MEJORADA PARA CAMBIO DE VISTAS
   const handleViewChange = useCallback((view: ViewType) => {
     setCurrentView(view);
+    
+    // 🔥 OCULTAR PRODUCTOS RECIENTES cuando se selecciona una acción específica
+    if (view === 'products' || view === 'scanner') {
+      setShowProductosRecientes(false);
+      
+      // Si es búsqueda de productos, hacer foco en el input
+      if (view === 'products') {
+        setTimeout(() => {
+          searchInputRef.current?.focus();
+        }, 100);
+      }
+    } else if (view === 'dashboard') {
+      // Mostrar productos recientes solo en dashboard
+      setShowProductosRecientes(true);
+    }
   }, []);
 
   // Verificar tamaño de pantalla
@@ -85,12 +96,12 @@ export default function PDVPage() {
     return () => window.removeEventListener('resize', checkMobile);
   }, [currentView]);
 
-  // Atajos de teclado básicos
+  // Resto de efectos y funciones existentes...
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
-        searchInputRef.current?.focus();
+        handleViewChange('products');
       }
       
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && items.length > 0) {
@@ -99,17 +110,15 @@ export default function PDVPage() {
       }
       
       if (e.key === 'Escape') {
-        if (searchTerm) {
-          setSearchTerm('');
-        } else if (currentView !== 'dashboard') {
-          setCurrentView('dashboard');
+        if (currentView !== 'dashboard') {
+          handleViewChange('dashboard');
         }
       }
     };
     
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [items.length, searchTerm, currentView]);
+  }, [items.length, currentView, handleViewChange]);
   
   // Cargar datos iniciales
   useEffect(() => {
@@ -117,7 +126,6 @@ export default function PDVPage() {
     loadFavorites();
   }, []);
 
-  // Verificar caja abierta al cargar y cuando cambia el estado online
   useEffect(() => {
     checkCajaAbierta();
   }, [isOnline]);
@@ -162,7 +170,6 @@ export default function PDVPage() {
     }
   };
 
-  // CORREGIDO: Función mejorada para verificar caja abierta
   const checkCajaAbierta = async () => {
     try {
       setIsLoading(true);
@@ -170,43 +177,28 @@ export default function PDVPage() {
       const sucursalId = localStorage.getItem('sucursalId');
       
       if (!sucursalId) {
-        console.log('No hay sucursalId, mostrando modal de configuración');
         setShowSucursalModal(true);
         setIsLoading(false);
         return;
       }
       
-      // Si estamos offline, asumir que la caja está abierta
       if (!isOnline) {
-        console.log('Modo offline, asumiendo caja abierta');
         setHayCajaAbierta(true);
         setIsLoading(false);
         return;
       }
       
-      console.log('Verificando estado de caja para sucursal:', sucursalId);
-      
       const response = await authenticatedFetch(`/api/pdv/cierre?sucursalId=${encodeURIComponent(sucursalId)}`);
       
-      console.log('Respuesta de verificación de caja:', {
-        status: response.status,
-        ok: response.ok
-      });
-      
       if (response.status === 404) {
-        console.log('Caja cerrada (404)');
         setHayCajaAbierta(false);
       } else if (response.ok) {
         try {
           const data = await response.json();
-          console.log('Datos de caja:', data);
           
-          // Verificar que efectivamente hay una caja abierta
           if (data.cierreCaja && data.cierreCaja.estado === 'abierto') {
-            console.log('Caja abierta confirmada');
             setHayCajaAbierta(true);
           } else {
-            console.log('Caja no está abierta según datos:', data);
             setHayCajaAbierta(false);
           }
         } catch (jsonError) {
@@ -214,12 +206,10 @@ export default function PDVPage() {
           setHayCajaAbierta(false);
         }
       } else {
-        // Error en la verificación
-        console.error('Error en verificación de caja:', response.status);
+        setHayCajaAbierta(null);
         
         try {
           const errorData = await response.json();
-          console.error('Detalles del error:', errorData);
           throw new Error(errorData.error || 'Error al verificar el estado de la caja');
         } catch (parseError) {
           throw new Error(`Error del servidor: ${response.status}`);
@@ -227,8 +217,6 @@ export default function PDVPage() {
       }
     } catch (error) {
       console.error('Error al verificar caja:', error);
-      
-      // En caso de error, no asumir nada - mostrar el error
       setHayCajaAbierta(null);
       showNotification('error', error instanceof Error ? error.message : 'Error al verificar el estado de la caja');
     } finally {
@@ -236,16 +224,6 @@ export default function PDVPage() {
     }
   };
 
-  const showNotification = (type: 'success' | 'error' | 'info' | 'warning', message: string) => {
-    const id = Date.now().toString();
-    setNotification({ type, message, id });
-    
-    if (type !== 'error') {
-      setTimeout(() => setNotification(null), 3000);
-    }
-  };
-
-  // CORREGIDO: Función mejorada para abrir caja con re-verificación
   const handleAbrirCaja = async () => {
     try {
       setIsLoading(true);
@@ -265,8 +243,6 @@ export default function PDVPage() {
       if (isNaN(montoInicialNum) || montoInicialNum < 0) {
         throw new Error('El monto inicial debe ser un número válido mayor o igual a cero');
       }
-      
-      console.log('Abriendo caja con datos:', { sucursalId, montoInicial: montoInicialNum });
       
       const response = await authenticatedFetch('/api/pdv/cierre', {
         method: 'POST',
@@ -298,16 +274,10 @@ export default function PDVPage() {
         throw new Error(errorMessage);
       }
       
-      const responseData = await response.json();
-      console.log('Caja abierta exitosamente:', responseData);
-      
-      // IMPORTANTE: Actualizar el estado inmediatamente y re-verificar
       setHayCajaAbierta(true);
       showNotification('success', '¡Caja abierta correctamente!');
       
-      // Re-verificar el estado después de un breve delay para asegurar consistencia
       setTimeout(() => {
-        console.log('Re-verificando estado de caja después de apertura...');
         checkCajaAbierta();
       }, 1000);
       
@@ -316,6 +286,15 @@ export default function PDVPage() {
       showNotification('error', error instanceof Error ? error.message : 'Error al abrir la caja');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const showNotification = (type: 'success' | 'error' | 'info' | 'warning', message: string) => {
+    const id = Date.now().toString();
+    setNotification({ type, message, id });
+    
+    if (type !== 'error') {
+      setTimeout(() => setNotification(null), 3000);
     }
   };
 
@@ -328,6 +307,10 @@ export default function PDVPage() {
     addItem(producto);
     showNotification('success', `"${producto.nombre}" agregado al carrito`);
   };
+
+  const hasStock = useCallback((producto: Producto): boolean => {
+    return (producto.stock ?? 0) > 0;
+  }, []);
 
   const handleBarcodeScanned = async (code: string) => {
     try {
@@ -368,10 +351,7 @@ export default function PDVPage() {
     localStorage.setItem('favoriteProducts', JSON.stringify(Array.from(newFavorites)));
   };
 
-  // CORREGIDO: Verificación mejorada antes del checkout
   const handleCheckout = () => {
-    console.log('Iniciando checkout, estado de caja:', hayCajaAbierta);
-    
     if (hayCajaAbierta === null) {
       showNotification('warning', 'Verificando estado de la caja...');
       checkCajaAbierta();
@@ -396,7 +376,6 @@ export default function PDVPage() {
       showNotification(result.success ? 'success' : 'error', result.message);
     }
     
-    // Si el checkout fue exitoso, re-verificar el estado de la caja por si acaso
     if (result.success) {
       setTimeout(() => {
         checkCajaAbierta();
@@ -404,30 +383,27 @@ export default function PDVPage() {
     }
   };
 
-  // Quick Actions simplificadas
+  // 🆕 QUICK ACTIONS MEJORADAS CON MEJOR UX
   const quickActions: QuickAction[] = [
     {
       id: 'products',
-      label: 'Productos',
+      label: 'Buscar Productos',
       icon: <Package className="w-6 h-6" />,
-      action: () => setCurrentView('products'),
+      action: () => handleViewChange('products'),
       color: 'from-[#311716] to-[#462625]'
     },
     {
       id: 'scanner',
-      label: 'Escáner',
+      label: 'Escanear Código',
       icon: <QrCode className="w-6 h-6" />,
-      action: () => setCurrentView('scanner'),
+      action: () => handleViewChange('scanner'),
       color: 'from-[#9c7561] to-[#eeb077]'
     },
     {
       id: 'search',
-      label: 'Buscar',
+      label: 'Búsqueda Rápida',
       icon: <Search className="w-6 h-6" />,
-      action: () => {
-        setCurrentView('products');
-        setTimeout(() => searchInputRef.current?.focus(), 100);
-      },
+      action: () => handleViewChange('products'),
       color: 'from-[#462625] to-[#9c7561]'
     }
   ];
@@ -461,7 +437,7 @@ export default function PDVPage() {
     );
   }
 
-  // Pantalla de abrir caja - SOLO cuando definitivamente está cerrada
+  // Pantalla de abrir caja
   if (hayCajaAbierta === false) {
     return (
       <div className="h-full flex items-center justify-center p-6">
@@ -497,7 +473,6 @@ export default function PDVPage() {
     );
   }
 
-  // AÑADIR: Pantalla de error/verificación cuando el estado es null
   if (hayCajaAbierta === null) {
     return (
       <div className="h-full flex items-center justify-center p-6">
@@ -517,7 +492,7 @@ export default function PDVPage() {
               disabled={isLoading}
               className="w-full py-3 px-6 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all font-semibold flex items-center justify-center space-x-2 disabled:opacity-50"
             >
-              <AlertTriangle className="w-5 h-5" />
+              <AlertTriangle className="w-5" />
               <span>{isLoading ? 'Verificando...' : 'Reintentar Verificación'}</span>
             </button>
             
@@ -565,7 +540,7 @@ export default function PDVPage() {
       <div className="flex-1 flex overflow-hidden">
         {/* Panel principal */}
         <div className={`flex-1 flex flex-col ${isMobileView ? 'block' : ''}`}>
-          {/* Dashboard View */}
+          {/* 🆕 DASHBOARD MEJORADO CON CONDITIONAL RENDERING */}
           {(!isMobileView || currentView === 'dashboard') && (
             <DashboardView
               productosRecientes={productosRecientes}
@@ -575,6 +550,8 @@ export default function PDVPage() {
               onToggleFavorite={toggleFavorite}
               onViewChange={handleViewChange}
               isVisible={currentView === 'dashboard' || !isMobileView}
+              showProductosRecientes={showProductosRecientes} // 🔥 NUEVO PROP
+              currentView={currentView} // 🔥 NUEVO PROP
             />
           )}
 
@@ -594,6 +571,7 @@ export default function PDVPage() {
               onToggleFavorite={toggleFavorite}
               productosFavoritos={productosFavoritos}
               isVisible={currentView === 'products'}
+              onBack={() => handleViewChange('dashboard')} // 🔥 NUEVO PROP
             />
           )}
 
@@ -604,6 +582,7 @@ export default function PDVPage() {
               onProductSelect={handleProductSelect}
               productosRecientes={productosRecientes}
               isVisible={currentView === 'scanner'}
+              onBack={() => handleViewChange('dashboard')} // 🔥 NUEVO PROP
             />
           )}
         </div>
@@ -631,6 +610,8 @@ export default function PDVPage() {
     </div>
   );
 }
+
+// 🆕 COMPONENTES ACTUALIZADOS CON MEJORAS UX
 
 interface MobileNavigationPillsProps {
   currentView: ViewType;
@@ -688,6 +669,7 @@ function MobileNavigationPills({ currentView, onViewChange, cartItemCount, cartT
   );
 }
 
+// 🆕 DASHBOARD VIEW MEJORADO
 interface DashboardViewProps {
   productosRecientes: Producto[];
   productosFavoritos: Set<string>;
@@ -696,6 +678,8 @@ interface DashboardViewProps {
   onToggleFavorite: (productId: string) => void;
   onViewChange: (view: ViewType) => void;
   isVisible: boolean;
+  showProductosRecientes: boolean; // 🔥 NUEVO
+  currentView: ViewType; // 🔥 NUEVO
 }
 
 function DashboardView({
@@ -705,41 +689,53 @@ function DashboardView({
   onProductSelect,
   onToggleFavorite,
   onViewChange,
-  isVisible
+  isVisible,
+  showProductosRecientes, // 🔥 NUEVO
+  currentView // 🔥 NUEVO
 }: DashboardViewProps) {
   if (!isVisible) return null;
 
   return (
     <div className="flex-1 p-6 overflow-y-auto">
       <div className="max-w-6xl mx-auto space-y-8">
-        {/* Bienvenida */}
-
-        {/* Quick Actions */}
+        {/* Quick Actions - SIEMPRE VISIBLES */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {quickActions.map(action => (
             <button
               key={action.id}
               onClick={action.action}
-              className={`p-8 bg-gradient-to-br ${action.color} rounded-2xl text-white hover:scale-105 transition-all shadow-lg`}
+              className={`group p-8 bg-gradient-to-br ${action.color} rounded-2xl text-white hover:scale-105 transition-all shadow-lg hover:shadow-xl`}
             >
               <div className="flex flex-col items-center text-center">
-                <div className="p-4 bg-white/20 rounded-2xl mb-4">
+                <div className="p-4 bg-white/20 rounded-2xl mb-4 group-hover:scale-110 transition-transform">
                   {action.icon}
                 </div>
                 <span className="text-xl font-bold">{action.label}</span>
+                <div className="mt-2 opacity-75 group-hover:opacity-100 transition-opacity">
+                  <ArrowRight className="w-5 h-5" />
+                </div>
               </div>
             </button>
           ))}
         </div>
 
-        {/* Productos Recientes */}
-        {productosRecientes.length > 0 && (
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
+        {/* 🔥 PRODUCTOS RECIENTES - CONDITIONAL RENDERING */}
+        {showProductosRecientes && productosRecientes.length > 0 && (
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200 animate-in slide-in-from-bottom duration-300">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-gray-900">Productos Recientes</h2>
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-[#eeb077]/10 rounded-lg">
+                  <Sparkles className="w-6 h-6 text-[#9c7561]" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Productos Recientes</h2>
+                  <p className="text-gray-500 text-sm">Agregados recientemente al catálogo</p>
+                </div>
+              </div>
+              
               <button
                 onClick={() => onViewChange('products')}
-                className="flex items-center space-x-2 text-[#311716] hover:text-[#9c7561] font-medium"
+                className="flex items-center space-x-2 text-[#311716] hover:text-[#9c7561] font-medium bg-gray-50 hover:bg-gray-100 px-4 py-2 rounded-lg transition-colors"
               >
                 <span>Ver todos</span>
                 <ArrowRight className="w-4 h-4" />
@@ -764,6 +760,7 @@ function DashboardView({
   );
 }
 
+// 🆕 PRODUCTS VIEW CON BOTÓN DE REGRESO
 interface ProductsViewProps {
   categoriasProductos: any[];
   filteredProducts: Producto[];
@@ -778,7 +775,10 @@ interface ProductsViewProps {
   onToggleFavorite: (productId: string) => void;
   productosFavoritos: Set<string>;
   isVisible: boolean;
+  onBack: () => void; // 🔥 NUEVO
 }
+
+// Continuando desde ProductsView...
 
 function ProductsView({
   categoriasProductos,
@@ -793,17 +793,25 @@ function ProductsView({
   onProductSelect,
   onToggleFavorite,
   productosFavoritos,
-  isVisible
+  isVisible,
+  onBack // 🔥 NUEVO
 }: ProductsViewProps) {
   if (!isVisible) return null;
 
   return (
     <div className="flex-1 flex flex-col p-6 overflow-hidden">
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 flex-1 flex flex-col">
-        {/* Header */}
+        {/* 🆕 HEADER MEJORADO CON NAVEGACIÓN */}
         <div className="p-6 border-b border-gray-200">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-900">Productos</h2>
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center space-x-4">
+
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Catálogo de Productos</h2>
+                <p className="text-gray-600">Busca y agrega productos al carrito</p>
+              </div>
+            </div>
+            
             <div className="flex items-center space-x-2">
               <button
                 onClick={() => setViewMode('grid')}
@@ -820,24 +828,33 @@ function ProductsView({
             </div>
           </div>
           
-          {/* Búsqueda */}
+          {/* 🆕 BÚSQUEDA MÁS PROMINENTE */}
           <div className="relative mb-4">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
               ref={searchInputRef}
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Buscar productos..."
-              className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#eeb077] focus:border-[#eeb077]"
+              placeholder="Buscar productos por nombre, descripción o código..."
+              className="w-full pl-12 pr-4 py-4 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-[#eeb077] focus:border-[#eeb077] text-lg"
+              autoFocus
             />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            )}
           </div>
           
           {/* Categorías */}
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setActiveCategory('todos')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium ${
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 activeCategory === 'todos' 
                   ? 'bg-[#311716] text-white' 
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -850,7 +867,7 @@ function ProductsView({
               <button
                 key={categoria.id}
                 onClick={() => setActiveCategory(categoria.id)}
-                className={`px-4 py-2 rounded-lg text-sm font-medium ${
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   activeCategory === categoria.id 
                     ? 'bg-[#311716] text-white' 
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -892,6 +909,14 @@ function ProductsView({
                   : 'Los productos aparecerán aquí cuando estén disponibles'
                 }
               </p>
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="mt-4 px-4 py-2 bg-[#311716] text-white rounded-lg hover:bg-[#462625] transition-colors"
+                >
+                  Limpiar búsqueda
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -900,23 +925,44 @@ function ProductsView({
   );
 }
 
-function ScannerView({ onBarcodeScanned, onProductSelect, productosRecientes, isVisible }: {
+// 🆕 SCANNER VIEW CON BOTÓN DE REGRESO
+interface ScannerViewProps {
   onBarcodeScanned: (code: string) => void;
   onProductSelect: (producto: Producto) => void;
   productosRecientes: Producto[];
   isVisible: boolean;
-}) {
+  onBack: () => void; // 🔥 NUEVO
+}
+
+function ScannerView({ 
+  onBarcodeScanned, 
+  onProductSelect, 
+  productosRecientes, 
+  isVisible,
+  onBack // 🔥 NUEVO
+}: ScannerViewProps) {
   if (!isVisible) return null;
 
   return (
     <div className="flex-1 p-6">
       <div className="max-w-4xl mx-auto">
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-gradient-to-br from-[#311716] to-[#9c7561] rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <QrCode className="w-8 h-8 text-white" />
+        {/* 🆕 HEADER CON NAVEGACIÓN */}
+        <div className="flex items-center space-x-4 mb-8">
+          <button
+            onClick={onBack}
+            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
+            title="Volver al inicio"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          
+          <div className="text-center flex-1">
+            <div className="w-16 h-16 bg-gradient-to-br from-[#311716] to-[#9c7561] rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <QrCode className="w-8 h-8 text-white" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Escáner de Códigos</h2>
+            <p className="text-gray-600">Apunta la cámara hacia el código de barras del producto</p>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Escáner de Códigos</h2>
-          <p className="text-gray-600">Apunta la cámara hacia el código de barras</p>
         </div>
         
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 mb-8">
@@ -926,9 +972,13 @@ function ScannerView({ onBarcodeScanned, onProductSelect, productosRecientes, is
           />
         </div>
         
+        {/* Productos recientes con acceso rápido */}
         {productosRecientes.length > 0 && (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-4">Productos Recientes</h3>
+            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
+              <Clock className="w-5 h-5 mr-2 text-[#9c7561]" />
+              Acceso Rápido - Productos Recientes
+            </h3>
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
               {productosRecientes.map(producto => (
                 <ProductCardCompact
@@ -947,6 +997,7 @@ function ScannerView({ onBarcodeScanned, onProductSelect, productosRecientes, is
   );
 }
 
+// 🆕 COMPONENTE DE TARJETA DE PRODUCTO COMPACTA MEJORADA
 function ProductCardCompact({ producto, onSelect, onToggleFavorite, isFavorite }: {
   producto: Producto;
   onSelect: (producto: Producto) => void;
@@ -959,7 +1010,8 @@ function ProductCardCompact({ producto, onSelect, onToggleFavorite, isFavorite }
   return (
     <button
       onClick={() => onSelect(producto)}
-      className="group bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-all hover:scale-105"
+      disabled={stockValue === 0}
+      className="group bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
     >
       <div className="aspect-square bg-gray-50 rounded-lg mb-3 overflow-hidden relative">
         {producto.imagen && !imageError ? (
@@ -969,46 +1021,42 @@ function ProductCardCompact({ producto, onSelect, onToggleFavorite, isFavorite }
             className="w-full h-full object-cover"
             onError={() => setImageError(true)}
           />
-          
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <Package className="w-8 h-8 text-gray-400" />
           </div>
         )}
         
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onToggleFavorite(producto.id);
-          }}
-          className={`absolute top-2 right-2 p-1.5 rounded-full ${
-            isFavorite ? 'bg-red-500 text-white' : 'bg-white/80 text-gray-600'
-          }`}
-        >
-          <Heart className={`w-3 h-3 ${isFavorite ? 'fill-current' : ''}`} />
-        </button>
+        {/* Stock indicator */}
+        <div className={`absolute top-2 right-2 px-2 py-1 rounded-full text-xs font-medium ${
+          stockValue > 5 
+            ? 'bg-green-500 text-white' 
+            : stockValue > 0 
+            ? 'bg-amber-500 text-white' 
+            : 'bg-red-500 text-white'
+        }`}>
+          {stockValue > 0 ? stockValue : '0'}
+        </div>
         
-        {stockValue <= 5 && stockValue > 0 && (
-          <div className="absolute bottom-2 left-2 bg-amber-500 text-white text-xs px-2 py-1 rounded-full">
-            Stock: {stockValue}
+        {/* Quick add overlay */}
+        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+          <div className="bg-white text-[#311716] px-3 py-1 rounded-full text-sm font-semibold">
+            {stockValue === 0 ? 'Sin stock' : 'Agregar'}
           </div>
-        )}
-        
-        {stockValue === 0 && (
-          <div className="absolute bottom-2 left-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full">
-            Sin stock
-          </div>
-        )}
+        </div>
       </div>
       
       <div className="text-left">
-        <h3 className="font-medium text-gray-900 text-sm truncate mb-1">{producto.nombre}</h3>
+        <h3 className="font-medium text-gray-900 text-sm truncate mb-1 group-hover:text-[#311716]">
+          {producto.nombre}
+        </h3>
         <div className="text-lg font-bold text-[#311716]">${producto.precio.toFixed(2)}</div>
       </div>
     </button>
   );
 }
 
+// 🆕 COMPONENTE DE TARJETA DE PRODUCTO MEJORADA
 function ProductCard({ producto, viewMode, onSelect, onToggleFavorite, isFavorite }: {
   producto: Producto;
   viewMode: 'grid' | 'list';
@@ -1021,7 +1069,7 @@ function ProductCard({ producto, viewMode, onSelect, onToggleFavorite, isFavorit
   
   if (viewMode === 'list') {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition-all">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 hover:shadow-md transition-all duration-200 group">
         <div className="flex items-center space-x-4">
           <div className="w-16 h-16 bg-gray-50 rounded-lg overflow-hidden flex-shrink-0">
             {producto.imagen && !imageError ? (
@@ -1033,47 +1081,56 @@ function ProductCard({ producto, viewMode, onSelect, onToggleFavorite, isFavorit
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">
-                <Package className="w-5 h-5 text-gray-400" />
+                <Package className="w-6 text-gray-400" />
               </div>
             )}
           </div>
           
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-gray-900 truncate">{producto.nombre}</h3>
-            <p className="text-sm text-gray-500 truncate">{producto.descripcion}</p>
-            <div className="flex items-center space-x-2 mt-1">
-              <div className="text-lg font-bold text-[#311716]">${producto.precio.toFixed(2)}</div>
-              {stockValue <= 5 && (
-                <span className={`text-xs px-2 py-1 rounded-full ${
-                  stockValue === 0 ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'
-                }`}>
-                  {stockValue === 0 ? 'Sin stock' : `Stock: ${stockValue}`}
-                </span>
-              )}
+            <div className="flex items-start justify-between">
+              <div className="flex-1 min-w-0">
+                <h3 className="font-semibold text-gray-900 truncate">{producto.nombre}</h3>
+                {producto.descripcion && (
+                  <p className="text-sm text-gray-500 truncate mt-1">{producto.descripcion}</p>
+                )}
+                <div className="flex items-center space-x-2 mt-2">
+                  <span className="text-lg font-bold text-[#311716]">
+                    ${producto.precio.toFixed(2)}
+                  </span>
+                  <span className={`text-xs px-2 py-1 rounded-full ${
+                    stockValue > 5 
+                      ? 'bg-green-100 text-green-700' 
+                      : stockValue > 0 
+                      ? 'bg-amber-100 text-amber-700' 
+                      : 'bg-red-100 text-red-700'
+                  }`}>
+                    Stock: {stockValue}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2 ml-4">
+                <button
+                  onClick={() => onToggleFavorite(producto.id)}
+                  className={`p-2 rounded-lg transition-colors ${
+                    isFavorite 
+                      ? 'text-red-500 bg-red-50' 
+                      : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
+                  }`}
+                >
+                  <Heart className={`h-4 w-4 ${isFavorite ? 'fill-current' : ''}`} />
+                </button>
+                
+                <button
+                  onClick={() => onSelect(producto)}
+                  disabled={stockValue === 0}
+                  className="px-4 py-2 bg-[#311716] text-white rounded-lg hover:bg-[#462625] disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Agregar</span>
+                </button>
+              </div>
             </div>
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <button
-              onClick={() => onToggleFavorite(producto.id)}
-              className={`p-2 rounded-lg ${
-                isFavorite ? 'text-red-500 bg-red-50' : 'text-gray-400 hover:text-red-500 hover:bg-red-50'
-              }`}
-            >
-              <Heart className={`w-4 h-4 ${isFavorite ? 'fill-current' : ''}`} />
-            </button>
-            
-            <button
-              onClick={() => onSelect(producto)}
-              disabled={stockValue === 0}
-              className={`px-4 py-2 rounded-lg font-medium ${
-                stockValue === 0
-                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                  : 'bg-[#311716] text-white hover:bg-[#462625]'
-              }`}
-            >
-              {stockValue === 0 ? 'Sin stock' : 'Agregar'}
-            </button>
           </div>
         </div>
       </div>
@@ -1081,18 +1138,18 @@ function ProductCard({ producto, viewMode, onSelect, onToggleFavorite, isFavorit
   }
 
   return (
-    <div className="group bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-lg transition-all hover:scale-105">
+    <div className="group bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-lg transition-all duration-300">
       <div className="aspect-square bg-gray-50 overflow-hidden relative">
         {producto.imagen && !imageError ? (
           <img 
             src={producto.imagen} 
             alt={producto.nombre}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             onError={() => setImageError(true)}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <Package className="w-12 h-12 text-gray-400" />
+            <Package className="h-12 w-12 text-gray-400" />
           </div>
         )}
         
@@ -1101,50 +1158,60 @@ function ProductCard({ producto, viewMode, onSelect, onToggleFavorite, isFavorit
             e.stopPropagation();
             onToggleFavorite(producto.id);
           }}
-          className={`absolute top-3 right-3 p-2 rounded-full ${
+          className={`absolute top-3 right-3 p-2 rounded-full transition-all ${
             isFavorite ? 'bg-red-500 text-white' : 'bg-white/80 text-gray-600'
           }`}
         >
           <Heart className={`w-4 h-4 ${isFavorite ? 'fill-current' : ''}`} />
         </button>
         
-        {stockValue <= 5 && (
-          <div className={`absolute top-3 left-3 text-white text-xs px-2 py-1 rounded-full ${
-            stockValue === 0 ? 'bg-red-500' : 'bg-amber-500'
-          }`}>
-            {stockValue === 0 ? 'Sin stock' : `Stock: ${stockValue}`}
-          </div>
-        )}
+        <div className={`absolute top-3 left-3 text-white text-xs px-2 py-1 rounded-full ${
+          stockValue > 5 
+            ? 'bg-green-500' 
+            : stockValue > 0 
+            ? 'bg-amber-500' 
+            : 'bg-red-500'
+        }`}>
+          {stockValue > 0 ? `${stockValue} disp.` : 'Agotado'}
+        </div>
         
         <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
           <button
             onClick={() => onSelect(producto)}
             disabled={stockValue === 0}
-            className={`px-6 py-3 rounded-xl font-semibold ${
-              stockValue === 0
-                ? 'bg-gray-400 text-white cursor-not-allowed'
-                : 'bg-white text-[#311716] hover:bg-gray-100'
-            }`}
+            className="bg-white text-[#311716] px-6 py-3 rounded-xl font-semibold hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center space-x-2 shadow-lg"
           >
-            {stockValue === 0 ? 'Sin stock' : 'Agregar'}
+            <Zap className="h-4 w-4" />
+            <span>{stockValue === 0 ? 'Sin stock' : 'Agregar'}</span>
           </button>
         </div>
       </div>
       
       <div className="p-4">
-        <h3 className="font-semibold text-gray-900 mb-1 truncate">{producto.nombre}</h3>
+        <div className="mb-3">
+          <h3 className="font-semibold text-gray-900 line-clamp-2 mb-1">
+            {producto.nombre}
+          </h3>
+          {producto.descripcion && (
+            <p className="text-sm text-gray-500 line-clamp-2">
+              {producto.descripcion}
+            </p>
+          )}
+        </div>
+
         <div className="flex items-center justify-between">
-          <div className="text-xl font-bold text-[#311716]">${producto.precio.toFixed(2)}</div>
+          <div>
+            <span className="text-xl font-bold text-[#311716]">
+              ${producto.precio.toFixed(2)}
+            </span>
+          </div>
+
           <button
             onClick={() => onSelect(producto)}
             disabled={stockValue === 0}
-            className={`p-2 rounded-lg ${
-              stockValue === 0
-                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                : 'bg-[#311716] text-white hover:bg-[#462625]'
-            }`}
+            className="p-3 bg-[#311716] text-white rounded-xl hover:bg-[#462625] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            <Plus className="w-4 h-4" />
+            <Plus className="h-4 w-4" />
           </button>
         </div>
       </div>
@@ -1152,6 +1219,7 @@ function ProductCard({ producto, viewMode, onSelect, onToggleFavorite, isFavorit
   );
 }
 
+// Componente de notificación existente
 function NotificationToast({ notification, onClose }: {
   notification: {
     type: 'success' | 'error' | 'info' | 'warning';
@@ -1176,7 +1244,7 @@ function NotificationToast({ notification, onClose }: {
 
   return (
     <div className="fixed top-4 right-4 z-50 max-w-md">
-      <div className={`p-4 rounded-xl border shadow-lg ${colors[notification.type]}`}>
+      <div className={`p-4 rounded-xl border shadow-lg ${colors[notification.type]} animate-in slide-in-from-right duration-300`}>
         <div className="flex items-start">
           <div className="flex-shrink-0 mr-3">
             {icons[notification.type]}
@@ -1186,7 +1254,7 @@ function NotificationToast({ notification, onClose }: {
           </div>
           <button
             onClick={onClose}
-            className="ml-3 flex-shrink-0 p-1 rounded-full hover:bg-black/10"
+            className="ml-3 flex-shrink-0 p-1 rounded-full hover:bg-black/10 transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
