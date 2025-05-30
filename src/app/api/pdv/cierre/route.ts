@@ -203,20 +203,19 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// PATCH - Cerrar caja
+// src/app/api/pdv/cierre/route.ts - MÉTODO PATCH MEJORADO
 export async function PATCH(req: NextRequest) {
-  // Autenticación
   const authError = await authMiddleware(req);
   if (authError) return authError;
   
-  // Verificar permiso
   const permError = await checkPermission(['caja:crear', 'admin'])(req);
   if (permError) return permError;
   
   try {
     const body = await req.json();
-    const { id, montoFinal, observaciones } = body;
+    const { id, montoFinal, observaciones, generateContingency } = body;
     
+    // Validaciones mejoradas
     if (!id) {
       return NextResponse.json(
         { error: 'Se requiere el ID de la caja a cerrar' },
@@ -224,16 +223,27 @@ export async function PATCH(req: NextRequest) {
       );
     }
     
-    if (montoFinal === undefined) {
+    if (montoFinal === undefined || montoFinal === null) {
       return NextResponse.json(
         { error: 'Se requiere el monto final' },
         { status: 400 }
       );
     }
     
-    // Verificar que la caja existe y está abierta
+    const montoFinalNum = parseFloat(montoFinal);
+    if (isNaN(montoFinalNum) || montoFinalNum < 0) {
+      return NextResponse.json(
+        { error: 'El monto final debe ser un número válido mayor o igual a cero' },
+        { status: 400 }
+      );
+    }
+    
+    // 🔍 OBTENER Y VALIDAR CAJA
     const cierreCaja = await prisma.cierreCaja.findUnique({
-      where: { id }
+      where: { id },
+      include: {
+        egresos: true // Incluir egresos para cálculos precisos
+      }
     });
     
     if (!cierreCaja) {
@@ -250,7 +260,7 @@ export async function PATCH(req: NextRequest) {
       );
     }
     
-    // Obtener ventas para calcular la diferencia
+    // 💰 CÁLCULOS PRECISOS MEJORADOS
     const ventas = await prisma.venta.findMany({
       where: {
         sucursalId: cierreCaja.sucursalId,
@@ -263,40 +273,127 @@ export async function PATCH(req: NextRequest) {
       }
     });
     
-    // Calcular efectivo esperado
+    // Calcular ventas por método de pago
     let ventasEfectivo = 0;
+    let ventasDigital = 0;
+    const detallesPorMedioPago: Record<string, { monto: number; cantidad: number }> = {};
+    
     for (const venta of ventas) {
       for (const pago of venta.pagos) {
+        if (!detallesPorMedioPago[pago.medioPago]) {
+          detallesPorMedioPago[pago.medioPago] = { monto: 0, cantidad: 0 };
+        }
+        
+        detallesPorMedioPago[pago.medioPago].monto += pago.monto;
+        detallesPorMedioPago[pago.medioPago].cantidad += 1;
+        
         if (pago.medioPago === 'efectivo') {
           ventasEfectivo += pago.monto;
+        } else {
+          ventasDigital += pago.monto;
         }
       }
     }
     
-    const efectivoEsperado = cierreCaja.montoInicial + ventasEfectivo;
-    const diferencia = montoFinal - efectivoEsperado;
+    // Calcular egresos de efectivo
+    const totalEgresos = cierreCaja.egresos.reduce((sum, egreso) => sum + egreso.monto, 0);
     
-    // Obtener usuario
+    // 🎯 CÁLCULO PRECISO DEL EFECTIVO ESPERADO
+    const efectivoEsperado = cierreCaja.montoInicial + ventasEfectivo - totalEgresos;
+    const diferencia = montoFinalNum - efectivoEsperado;
+    const diferenciaAbs = Math.abs(diferencia);
+    
     const user = (req as any).user;
     
-    // Cerrar caja
+    // 🚨 GENERAR CONTINGENCIA AUTOMÁTICA SI ES NECESARIO
+    let contingenciaGenerada = false;
+    
+    if (generateContingency || diferenciaAbs > 5) { // Umbral de $5
+      try {
+        const tipoContingencia = diferenciaAbs > 20 ? 'urgente' : 'normal';
+        
+        await prisma.contingencia.create({
+          data: {
+            titulo: `Diferencia en Cierre de Caja - ${new Date().toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`,
+            descripcion: `
+DIFERENCIA EN CIERRE DE CAJA
+
+📅 Fecha: ${new Date().toLocaleString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+🏪 Sucursal: ${cierreCaja.sucursalId}
+👤 Cerrado por: ${user.name} (${user.email})
+
+💰 RESUMEN FINANCIERO:
+- Monto inicial: $${cierreCaja.montoInicial.toFixed(2)}
+- Ventas en efectivo: $${ventasEfectivo.toFixed(2)}
+- Egresos registrados: $${totalEgresos.toFixed(2)}
+- Efectivo esperado: $${efectivoEsperado.toFixed(2)}
+- Efectivo contado: $${montoFinalNum.toFixed(2)}
+- Diferencia: ${diferencia > 0 ? '+' : ''}$${diferencia.toFixed(2)}
+
+📊 DETALLES DE VENTAS:
+${Object.entries(detallesPorMedioPago).map(([medio, datos]) => 
+  `• ${medio}: $${datos.monto.toFixed(2)} (${datos.cantidad} transacciones)`
+).join('\n')}
+
+${observaciones ? `\n📝 OBSERVACIONES DEL VENDEDOR:\n${observaciones}` : ''}
+
+🔍 ACCIONES REQUERIDAS:
+- Verificar el conteo de efectivo
+- Revisar si hay egresos no registrados
+- Investigar posibles errores en el registro de ventas
+- Ajustar el sistema si corresponde
+- Documentar las correcciones realizadas
+            `.trim(),
+            origen: 'sucursal',
+            creadoPor: user.id,
+            estado: 'pendiente',
+            tipo: 'caja',
+            ubicacionId: cierreCaja.sucursalId,
+            urgente: diferenciaAbs > 20 // Marcar como urgente si la diferencia es > $20
+          }
+        });
+        
+        contingenciaGenerada = true;
+        console.log(`[CIERRE-CAJA] Contingencia generada por diferencia de $${diferencia.toFixed(2)}`);
+      } catch (contingenciaError) {
+        console.error('Error al generar contingencia:', contingenciaError);
+        // No fallar el cierre por error en contingencia
+      }
+    }
+    
+    // 🔒 CERRAR CAJA
     const cierreCajaUpdate = await prisma.cierreCaja.update({
       where: { id },
       data: {
-        montoFinal,
+        montoFinal: montoFinalNum,
         diferencia,
         fechaCierre: new Date(),
         usuarioCierre: user.id,
-        estado: 'cerrado',
-        observaciones
+        estado: contingenciaGenerada ? 'con_contingencia' : 'cerrado',
+        observaciones: observaciones || null
       }
     });
     
     return NextResponse.json({
       success: true,
-      message: 'Caja cerrada correctamente',
+      message: contingenciaGenerada 
+        ? 'Caja cerrada con diferencias. Se ha generado una contingencia para revisión.'
+        : 'Caja cerrada correctamente sin diferencias.',
       cierreCaja: cierreCajaUpdate,
-      diferencia
+      diferencia,
+      efectivoEsperado,
+      contingenciaGenerada,
+      resumen: {
+        ventasEfectivo,
+        ventasDigital,
+        totalEgresos,
+        cantidadVentas: ventas.length,
+        detallesPorMedioPago: Object.entries(detallesPorMedioPago).map(([medio, datos]) => ({
+          medioPago: medio,
+          monto: datos.monto,
+          cantidad: datos.cantidad
+        }))
+      }
     });
   } catch (error: any) {
     console.error('Error al cerrar caja:', error);

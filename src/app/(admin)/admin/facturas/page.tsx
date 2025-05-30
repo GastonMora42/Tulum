@@ -273,6 +273,7 @@ export default function AdminFacturasPage() {
     }
   };
   
+
   // Regenerar todas las facturas pendientes
   const handleRegenerarPendientes = async () => {
     if (!confirm('¿Está seguro de regenerar todas las facturas pendientes? Este proceso puede tardar varios minutos.')) {
@@ -455,8 +456,6 @@ export default function AdminFacturasPage() {
             <UploadCloud size={16} className="mr-1" />
             Regenerar Pendientes
           </button>
-          
-          <DebugFacturacion />
           
           <div className="flex border rounded-lg overflow-hidden">
             <button
