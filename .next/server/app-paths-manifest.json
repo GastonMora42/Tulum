@@ -1,8 +1,14 @@
 {
-  "/api/auth/login/route": "app/api/auth/login/route.js",
-  "/api/auth/me/route": "app/api/auth/me/route.js",
-  "/api/admin/dashboard/route": "app/api/admin/dashboard/route.js",
-  "/page": "app/page.js",
-  "/(auth)/login/page": "app/(auth)/login/page.js",
-  "/(admin)/admin/page": "app/(admin)/admin/page.js"
+  "/api/productos/cache/route": "app/api/productos/cache/route.js",
+  "/api/auth/refresh/route": "app/api/auth/refresh/route.js",
+  "/api/contingencias/route": "app/api/contingencias/route.js",
+  "/api/admin/ubicaciones/route": "app/api/admin/ubicaciones/route.js",
+  "/api/contingencias/[id]/route": "app/api/contingencias/[id]/route.js",
+  "/api/pdv/conciliacion/route": "app/api/pdv/conciliacion/route.js",
+  "/(admin)/admin/conciliaciones/page": "app/(admin)/admin/conciliaciones/page.js",
+  "/(admin)/admin/conciliaciones/[id]/page": "app/(admin)/admin/conciliaciones/[id]/page.js",
+  "/(pdv)/pdv/contingencias/page": "app/(pdv)/pdv/contingencias/page.js",
+  "/(admin)/admin/contingencias/page": "app/(admin)/admin/contingencias/page.js",
+  "/(admin)/admin/contingencias/[id]/page": "app/(admin)/admin/contingencias/[id]/page.js",
+  "/(pdv)/pdv/conciliacion/page": "app/(pdv)/pdv/conciliacion/page.js"
 }

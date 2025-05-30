@@ -1,4 +1,4 @@
-// src/components/pdv/ProductSearch.tsx - Con integración de escáner
+// src/components/pdv/ProductSearch.tsx - VERSIÓN ACTUALIZADA
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -19,6 +19,7 @@ export function ProductSearch({ onProductSelect, className = '' }: ProductSearch
   const [results, setResults] = useState<Producto[]>([]);
   const [showResults, setShowResults] = useState(false);
   const [recentlyAdded, setRecentlyAdded] = useState<Set<string>>(new Set());
+  const [showScanner, setShowScanner] = useState(false);
   const { isOnline, searchProductosCache } = useOffline();
   const searchRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -49,13 +50,18 @@ export function ProductSearch({ onProductSelect, className = '' }: ProductSearch
       setShowResults(true);
 
       try {
-        // Si estamos offline, buscar en caché
+        const sucursalId = localStorage.getItem('sucursalId');
+        if (!sucursalId) {
+          throw new Error('No se ha definido una sucursal');
+        }
+
         if (!isOnline) {
           const cachedResults = await searchProductosCache(searchTerm);
           setResults(cachedResults);
         } else {
-          // Si estamos online, hacer petición al API usando authenticatedFetch
-          const response = await authenticatedFetch(`/api/pdv/productos-disponibles?search=${encodeURIComponent(searchTerm)}&sucursalId=${localStorage.getItem('sucursalId') || ''}`);
+          const response = await authenticatedFetch(
+            `/api/pdv/productos-disponibles?search=${encodeURIComponent(searchTerm)}&sucursalId=${sucursalId}`
+          );
           
           if (!response.ok) throw new Error('Error al buscar productos');
           const data = await response.json();
@@ -68,12 +74,11 @@ export function ProductSearch({ onProductSelect, className = '' }: ProductSearch
       }
     };
 
-    // Debounce para evitar muchas peticiones
     const handler = setTimeout(searchProducts, 300);
     return () => clearTimeout(handler);
   }, [searchTerm, isOnline, searchProductosCache]);
 
-  // Manejar selección de producto
+  // CORREGIDA: Función para manejar selección de producto
   const handleSelect = (product: Producto) => {
     onProductSelect(product);
     setSearchTerm('');
@@ -93,30 +98,52 @@ export function ProductSearch({ onProductSelect, className = '' }: ProductSearch
     }, 2000);
   };
 
-  // Manejar escaneo de código de barras
+  // CORREGIDA: Función para manejar escaneo de código de barras
   const handleBarcodeScan = async (barcode: string) => {
     try {
-      setIsLoading(true);
+      console.log(`[PRODUCT-SEARCH] Procesando código escaneado: ${barcode}`);
       
-      // Buscar producto por código de barras
-      const response = await authenticatedFetch(`/api/pdv/productos-disponibles?codigoBarras=${encodeURIComponent(barcode)}&sucursalId=${localStorage.getItem('sucursalId') || ''}`);
-      
-      if (!response.ok) throw new Error('Error al buscar producto por código de barras');
-      const data = await response.json();
-      
-      if (Array.isArray(data) && data.length > 0) {
-        handleSelect(data[0]);
-      } else if (data.data && data.data.length > 0) {
-        handleSelect(data.data[0]);
-      } else {
-        // No se encontró producto
-        alert(`No se encontró producto con código: ${barcode}`);
+      const sucursalId = localStorage.getItem('sucursalId');
+      if (!sucursalId) {
+        throw new Error('No se ha definido una sucursal');
       }
+      
+      // CORREGIDO: Usar endpoint específico para búsqueda por código de barras
+      const response = await authenticatedFetch(
+        `/api/productos/barcode?code=${encodeURIComponent(barcode)}&sucursalId=${sucursalId}`
+      );
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          // Producto no encontrado
+          throw new Error(`No se encontró producto con código: ${barcode}`);
+        }
+        throw new Error('Error al buscar producto por código de barras');
+      }
+      
+      const producto = await response.json();
+      
+      // Verificar que el producto tiene stock disponible
+      if (!producto.stock || producto.stock <= 0) {
+        throw new Error(`El producto "${producto.nombre}" no tiene stock disponible`);
+      }
+      
+      console.log(`[PRODUCT-SEARCH] Producto encontrado: ${producto.nombre} (Stock: ${producto.stock})`);
+      
+      // Seleccionar el producto encontrado
+      handleSelect(producto);
+      
     } catch (error) {
-      console.error('Error al escanear código de barras:', error);
-      alert('Error al procesar el código de barras');
-    } finally {
-      setIsLoading(false);
+      console.error('[PRODUCT-SEARCH] Error al procesar código:', error);
+      
+      // Mostrar error al usuario
+      const errorMessage = error instanceof Error ? error.message : 'Error al procesar código de barras';
+      
+      // Aquí podrías mostrar una notificación toast en lugar de alert
+      // Por ahora uso alert para simplicidad
+      setTimeout(() => {
+        alert(errorMessage);
+      }, 100);
     }
   };
 
@@ -132,7 +159,7 @@ export function ProductSearch({ onProductSelect, className = '' }: ProductSearch
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Buscar productos..."
+            placeholder="Buscar productos por nombre, descripción o código..."
             className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#eeb077] focus:border-[#eeb077] text-gray-900 text-base"
             aria-label="Buscar productos"
           />
@@ -143,9 +170,35 @@ export function ProductSearch({ onProductSelect, className = '' }: ProductSearch
           )}
         </div>
         
-        <BarcodeScanner onScan={handleBarcodeScan} />
+        {/* Botón para mostrar/ocultar scanner */}
+        <button
+          onClick={() => setShowScanner(!showScanner)}
+          className={`px-4 py-3 rounded-xl border transition-colors ${
+            showScanner
+              ? 'bg-[#311716] text-white border-[#311716]'
+              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+          }`}
+          title="Activar escáner de código de barras"
+        >
+          <Camera className="h-5 w-5" />
+        </button>
       </div>
 
+      {/* Scanner expandible */}
+      {showScanner && (
+        <div className="mt-4 border border-gray-200 rounded-xl overflow-hidden">
+          <BarcodeScanner 
+            onScan={handleBarcodeScan}
+            onError={(error) => {
+              console.error('Scanner error:', error);
+              alert(`Error del scanner: ${error.message}`);
+            }}
+            autoStart={true}
+          />
+        </div>
+      )}
+
+      {/* Resultados de búsqueda */}
       {showResults && results.length > 0 && (
         <div className="absolute mt-2 bg-white border border-gray-200 rounded-xl shadow-lg max-h-96 overflow-y-auto w-full z-10">
           {results.map((product) => (
@@ -186,8 +239,14 @@ export function ProductSearch({ onProductSelect, className = '' }: ProductSearch
               </div>
               <div className="ml-4 flex flex-col items-end">
                 <span className="text-lg font-bold text-[#311716]">${product.precio.toFixed(2)}</span>
-                <span className="text-xs text-gray-500">
-                  Stock: {product.stock || 0} unid.
+                <span className={`text-xs px-2 py-1 rounded-full ${
+                  (product.stock || 0) > 5 
+                    ? 'bg-green-100 text-green-700'
+                    : (product.stock || 0) > 0
+                    ? 'bg-yellow-100 text-yellow-700' 
+                    : 'bg-red-100 text-red-700'
+                }`}>
+                  Stock: {product.stock || 0}
                 </span>
               </div>
             </button>

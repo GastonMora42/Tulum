@@ -1,4 +1,4 @@
-// src/app/api/admin/productos/route.ts
+// src/app/api/admin/productos/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/server/db/client';
 import { authMiddleware } from '@/server/api/middlewares/auth';

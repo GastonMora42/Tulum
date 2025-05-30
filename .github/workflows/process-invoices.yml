@@ -3,7 +3,7 @@ name: Procesar Facturas Pendientes
 
 on:
   schedule:
-    - cron: '*/15 * * * *'  # Cada 15 minutos
+    - cron: '0 */6 * * *'
 
 jobs:
   process:

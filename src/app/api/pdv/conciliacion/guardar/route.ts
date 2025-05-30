@@ -1,17 +1,16 @@
-// src/app/api/pdv/conciliacion/guardar/route.ts
+// src/app/api/pdv/conciliacion/guardar/route.ts - VERSIÓN MEJORADA
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/server/db/client';
 import { authMiddleware } from '@/server/api/middlewares/auth';
 import { format } from 'date-fns';
 
 export async function POST(req: NextRequest) {
-  // Aplicar middleware de autenticación
   const authError = await authMiddleware(req);
   if (authError) return authError;
   
   try {
     const body = await req.json();
-    const { id, productos, observaciones, sucursalId } = body;
+    const { id, productos, observaciones, sucursalId, forzarContingencia } = body;
     
     if (!id || !productos || !Array.isArray(productos) || !sucursalId) {
       return NextResponse.json(
@@ -20,10 +19,9 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    // Obtener usuario actual
     const user = (req as any).user;
     
-    // Verificar que el usuario tenga acceso a esta sucursal
+    // Verificar permisos de sucursal
     if (user.sucursalId && user.sucursalId !== sucursalId && user.roleId !== 'role-admin') {
       return NextResponse.json(
         { error: 'No tiene permisos para esta sucursal' },
@@ -31,19 +29,35 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    // Verificar que la conciliación existe y pertenece a la sucursal
+    // Verificar que la conciliación existe
     const conciliacion = await prisma.conciliacion.findFirst({
       where: { id, sucursalId }
     });
     
     if (!conciliacion) {
       return NextResponse.json(
-        { error: 'Conciliación no encontrada o no pertenece a esta sucursal' },
+        { error: 'Conciliación no encontrada' },
         { status: 404 }
       );
     }
     
-    // Verificar si hay diferencias
+    // NUEVA LÓGICA: Verificar si existe contingencia pendiente antes de proceder
+    const contingenciasPendientes = await prisma.contingencia.findMany({
+      where: {
+        ubicacionId: sucursalId,
+        tipo: 'stock',
+        estado: { in: ['pendiente', 'en_revision'] }
+      }
+    });
+    
+    if (contingenciasPendientes.length > 0 && !forzarContingencia) {
+      return NextResponse.json(
+        { error: 'Existe una contingencia de stock pendiente. Debe ser resuelta antes de realizar nueva conciliación.' },
+        { status: 409 }
+      );
+    }
+    
+    // Analizar diferencias
     let hayDiferencias = false;
     const diferenciasPorProducto: Array<{
       productoId: string;
@@ -53,7 +67,7 @@ export async function POST(req: NextRequest) {
       nombre?: string;
     }> = [];
     
-    // Obtener info adicional de productos para el reporte
+    // Obtener información de productos
     const productosInfo = await prisma.producto.findMany({
       where: { id: { in: productos.map(p => p.productoId) } }
     });
@@ -61,13 +75,14 @@ export async function POST(req: NextRequest) {
     const productosPorId = new Map();
     productosInfo.forEach(p => productosPorId.set(p.id, p));
     
-    for (const producto of productos) {
-      const { productoId, stockTeorico, stockFisico } = producto;
-      if (stockFisico === null) continue; // Ignorar productos no contados
+    // Verificar diferencias
+    for (const produto of productos) {
+      const { productoId, stockTeorico, stockFisico } = produto;
+      if (stockFisico === null || stockFisico === undefined) continue;
       
       const diferencia = stockFisico - stockTeorico;
       
-      if (diferencia !== 0) {
+      if (diferencia !== 0 || forzarContingencia) {
         hayDiferencias = true;
         diferenciasPorProducto.push({
           productoId,
@@ -81,123 +96,69 @@ export async function POST(req: NextRequest) {
     
     const resultado = await prisma.$transaction(async (tx) => {
       // 1. Actualizar conciliación
+      const estadoFinal = (hayDiferencias || forzarContingencia) ? 'con_contingencia' : 'completada';
+      
       await tx.conciliacion.update({
         where: { id },
         data: {
-          estado: hayDiferencias ? 'con_contingencia' : 'completada',
-          detalles: productos, // Prisma manejará la conversión a JSONB automáticamente
+          estado: estadoFinal,
+          detalles: productos,
           observaciones: observaciones || ''
         }
       });
       
-      // 2. Si hay diferencias, crear contingencia
-      if (hayDiferencias) {
-        // Formatear detalles para descripción
+      // 2. Si hay diferencias o se fuerza, crear contingencia MEJORADA
+      if (hayDiferencias || forzarContingencia) {
         const detallesTexto = diferenciasPorProducto.map(diff => 
-          `- ${diff.nombre || diff.productoId}: Teórico=${diff.stockTeorico}, Físico=${diff.stockFisico}, Diferencia=${diff.diferencia}`
+          `- ${diff.nombre || diff.productoId}: Sistema=${diff.stockTeorico}, Contado=${diff.stockFisico}, Diferencia=${diff.diferencia > 0 ? '+' : ''}${diff.diferencia}`
         ).join('\n');
         
-        const fechaFormateada = format(new Date(), 'dd/MM/yyyy');
+        const fechaFormateada = format(new Date(), 'dd/MM/yyyy HH:mm');
         
-        await tx.contingencia.create({
+        const contingencia = await tx.contingencia.create({
           data: {
-            titulo: `Diferencias en conciliación de inventario ${fechaFormateada}`,
-            descripcion: `Se encontraron diferencias en la conciliación de inventario:\n\n${detallesTexto}\n\nObservaciones: ${observaciones || 'Ninguna'}`,
+            titulo: `Diferencias en Conciliación de Inventario - ${fechaFormateada}`,
+            descripcion: `
+CONCILIACIÓN DE INVENTARIO CON DIFERENCIAS
+
+Fecha: ${fechaFormateada}
+Sucursal: ${sucursalId}
+Realizada por: ${user.name}
+
+PRODUCTOS CON DIFERENCIAS:
+${detallesTexto}
+
+${observaciones ? `\nObservaciones del vendedor:\n${observaciones}` : ''}
+
+ACCIONES REQUERIDAS:
+- Verificar las diferencias encontradas
+- Investigar posibles causas (movimientos no registrados, mermas, etc.)
+- Ajustar el stock del sistema si corresponde
+- Documentar las correcciones realizadas
+            `.trim(),
             origen: 'sucursal',
             creadoPor: user.id,
             estado: 'pendiente',
-            tipo: 'stock'
-          }
-        });
-      }
-      
-      // 3. Actualizar stock si es necesario
-      const registrosMovimiento = [];
-      
-      for (const producto of productos) {
-        const { productoId, stockFisico } = producto;
-        if (stockFisico === null) continue; // Ignorar productos no contados
-        
-        // Buscar stock actual
-        const stock = await tx.stock.findFirst({
-          where: {
-            productoId,
-            ubicacionId: sucursalId
+            tipo: 'stock',
+            ubicacionId: sucursalId,
+            urgente: diferenciasPorProducto.length > 5 || diferenciasPorProducto.some(d => Math.abs(d.diferencia) > 10)
           }
         });
         
-        if (stock) {
-          const valorAnterior = stock.cantidad;
-          const diferencia = stockFisico - valorAnterior;
-          
-          // Solo actualizar si hay diferencia
-          if (diferencia !== 0) {
-            // Actualizar stock
-            await tx.stock.update({
-              where: { id: stock.id },
-              data: {
-                cantidad: stockFisico,
-                ultimaActualizacion: new Date(),
-                version: { increment: 1 }
-              }
-            });
-            
-            // Registrar movimiento de stock
-            const movimiento = await tx.movimientoStock.create({
-              data: {
-                stockId: stock.id,
-                tipoMovimiento: 'ajuste',
-                cantidad: Math.abs(diferencia),
-                motivo: `Ajuste por conciliación de inventario ${format(new Date(), 'dd/MM/yyyy')}`,
-                usuarioId: user.id,
-                fecha: new Date()
-              }
-            });
-            
-            registrosMovimiento.push({
-              id: movimiento.id,
-              productoId,
-              diferencia
-            });
-          }
-        } else if (stockFisico > 0) {
-          // Crear nuevo stock si no existe pero hay stock físico
-          const nuevoStock = await tx.stock.create({
-            data: {
-              productoId,
-              ubicacionId: sucursalId,
-              cantidad: stockFisico,
-              ultimaActualizacion: new Date()
-            }
-          });
-          
-          // Registrar movimiento inicial
-          const movimiento = await tx.movimientoStock.create({
-            data: {
-              stockId: nuevoStock.id,
-              tipoMovimiento: 'entrada',
-              cantidad: stockFisico,
-              motivo: `Creación inicial por conciliación de inventario ${format(new Date(), 'dd/MM/yyyy')}`,
-              usuarioId: user.id,
-              fecha: new Date()
-            }
-          });
-          
-          registrosMovimiento.push({
-            id: movimiento.id,
-            productoId,
-            diferencia: stockFisico
-          });
-        }
+        console.log(`[CONCILIACIÓN] Contingencia generada: ${contingencia.id} con ${diferenciasPorProducto.length} diferencias`);
       }
+      
+      // 3. NUEVO: Actualizar stock SOLO si no hay diferencias significativas (opcional)
+      // Por ahora, NO actualizamos automáticamente el stock hasta que admin resuelva
       
       return { 
         success: true,
-        hayDiferencias,
-        mensaje: hayDiferencias 
-          ? 'Conciliación guardada con diferencias detectadas' 
-          : 'Conciliación completada sin diferencias',
-        movimientos: registrosMovimiento
+        hayDiferencias: hayDiferencias || forzarContingencia,
+        mensaje: hayDiferencias || forzarContingencia
+          ? 'Conciliación finalizada con diferencias. Se ha generado una contingencia para revisión administrativa.' 
+          : 'Conciliación completada exitosamente. Los números coinciden perfectamente.',
+        diferencias: diferenciasPorProducto.length,
+        contingenciaGenerada: hayDiferencias || forzarContingencia
       };
     });
     
