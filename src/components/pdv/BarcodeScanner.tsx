@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from '@zxing/library';
-import { Camera, QrCode, Box, Slash, RefreshCw, Zap, ShieldAlert } from 'lucide-react';
+import { Camera, QrCode, Box, Slash, RefreshCw, Zap, ShieldAlert, Scan, AlertTriangle } from 'lucide-react';
 
 interface BarcodeScannerProps {
   onScan: (code: string) => void;
@@ -28,11 +28,38 @@ export function BarcodeScanner({
   const [isLoading, setIsLoading] = useState(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
   
+  // 🆕 Estados específicos para escáner físico
+  const [scannerMode, setScannerMode] = useState<'camera' | 'physical' | 'manual'>('physical');
+  const [physicalScannerStatus, setPhysicalScannerStatus] = useState<'waiting' | 'active' | 'error'>('waiting');
+  const [debugInfo, setDebugInfo] = useState<string[]>([]);
+  const [scannerBuffer, setScannerBuffer] = useState<string>('');
+  
   // Referencias
   const videoRef = useRef<HTMLVideoElement>(null);
   const scannerRef = useRef<BrowserMultiFormatReader | null>(null);
   const manualInputRef = useRef<HTMLInputElement>(null);
   
+  // 🆕 Referencias para escáner físico mejoradas
+  const bufferRef = useRef<string>('');
+  const lastKeypressTimeRef = useRef<number>(0);
+  const scannerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isPhysicalScannerActiveRef = useRef<boolean>(false);
+
+  // 🆕 Configuración mejorada para escáner físico
+  const SCANNER_CONFIG = {
+    TIMEOUT: 100, // Tiempo entre teclas en ms (aumentado para 3nstar)
+    MIN_LENGTH: 3, // Longitud mínima del código
+    MAX_LENGTH: 50, // Longitud máxima del código
+    SCANNER_SPEED_THRESHOLD: 30, // Velocidad máxima entre teclas para considerar escáner
+    VALID_CHARS: /^[a-zA-Z0-9\-_./\\+*#@$%&()[\]{}|;:,<>?=!~`'"^\s]+$/ // Caracteres válidos
+  };
+
+  // Función para agregar información de debug
+  const addDebugInfo = (message: string) => {
+    const timestamp = new Date().toLocaleTimeString();
+    setDebugInfo(prev => [`${timestamp}: ${message}`, ...prev.slice(0, 9)]);
+  };
+
   // Inicializar escáner
   useEffect(() => {
     const hints = new Map();
@@ -43,7 +70,9 @@ export function BarcodeScanner({
       BarcodeFormat.EAN_8,
       BarcodeFormat.UPC_A,
       BarcodeFormat.UPC_E,
-      BarcodeFormat.QR_CODE
+      BarcodeFormat.QR_CODE,
+      BarcodeFormat.CODABAR,
+      BarcodeFormat.ITF
     ]);
     
     scannerRef.current = new BrowserMultiFormatReader(hints);
@@ -54,6 +83,161 @@ export function BarcodeScanner({
       }
     };
   }, []);
+
+  // 🆕 Función mejorada para validar código de barras
+  const isValidBarcode = (code: string): boolean => {
+    // Verificar longitud
+    if (code.length < SCANNER_CONFIG.MIN_LENGTH || code.length > SCANNER_CONFIG.MAX_LENGTH) {
+      return false;
+    }
+    
+    // Verificar caracteres válidos
+    if (!SCANNER_CONFIG.VALID_CHARS.test(code)) {
+      return false;
+    }
+    
+    // Verificar que no sea solo espacios o caracteres especiales
+    if (code.trim().length === 0) {
+      return false;
+    }
+    
+    // Verificar patrones comunes de códigos de barras
+    const commonPatterns = [
+      /^TULUM-/, // Códigos propios
+      /^\d{12,13}$/, // EAN-13, UPC
+      /^\d{8}$/, // EAN-8
+      /^[A-Z0-9\-]+$/, // Códigos alfanuméricos
+    ];
+    
+    return commonPatterns.some(pattern => pattern.test(code));
+  };
+
+  // 🆕 Función mejorada para procesar entrada de escáner físico
+  const processPhysicalScannerInput = (code: string) => {
+    addDebugInfo(`Procesando código físico: "${code}" (${code.length} chars)`);
+    
+    if (isValidBarcode(code)) {
+      setLastScanned(code);
+      setPhysicalScannerStatus('active');
+      onScan(code);
+      addDebugInfo(`✅ Código válido enviado: ${code}`);
+      
+      // Reset después de envío exitoso
+      setTimeout(() => {
+        setPhysicalScannerStatus('waiting');
+      }, 1000);
+    } else {
+      addDebugInfo(`❌ Código inválido rechazado: "${code}"`);
+      setPhysicalScannerStatus('error');
+      
+      setTimeout(() => {
+        setPhysicalScannerStatus('waiting');
+      }, 2000);
+    }
+  };
+
+  // 🆕 Manejo mejorado de eventos de teclado para escáner físico
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const currentTime = Date.now();
+      const timeDiff = currentTime - lastKeypressTimeRef.current;
+      
+      // Solo procesar si estamos en modo escáner físico y escaneando
+      if (!isScanning || scannerMode !== 'physical') return;
+      
+      // No procesar si estamos en un input (excepto nuestro input manual)
+      const activeElement = document.activeElement;
+      if (activeElement instanceof HTMLInputElement || activeElement instanceof HTMLTextAreaElement) {
+        if (activeElement !== manualInputRef.current) {
+          return;
+        }
+      }
+
+      // Limpiar timeout anterior
+      if (scannerTimeoutRef.current) {
+        clearTimeout(scannerTimeoutRef.current);
+      }
+
+      addDebugInfo(`Tecla: "${e.key}" | Tiempo: ${timeDiff}ms | Buffer: "${bufferRef.current}"`);
+
+      // Detectar si es entrada de escáner (teclas rápidas)
+      if (bufferRef.current.length === 0 || timeDiff < SCANNER_CONFIG.SCANNER_SPEED_THRESHOLD) {
+        isPhysicalScannerActiveRef.current = true;
+        setPhysicalScannerStatus('active');
+      }
+
+      // Reset del buffer si ha pasado mucho tiempo
+      if (timeDiff > SCANNER_CONFIG.TIMEOUT) {
+        bufferRef.current = '';
+        setScannerBuffer('');
+        addDebugInfo('Buffer reseteado por timeout');
+      }
+
+      lastKeypressTimeRef.current = currentTime;
+
+      // Manejar tecla Enter (fin de escaneo)
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        
+        if (bufferRef.current.length >= SCANNER_CONFIG.MIN_LENGTH && isPhysicalScannerActiveRef.current) {
+          addDebugInfo(`Enter detectado con buffer: "${bufferRef.current}"`);
+          processPhysicalScannerInput(bufferRef.current.trim());
+        } else {
+          addDebugInfo(`Enter ignorado - Buffer muy corto o no es escáner: "${bufferRef.current}"`);
+        }
+        
+        // Reset
+        bufferRef.current = '';
+        setScannerBuffer('');
+        isPhysicalScannerActiveRef.current = false;
+        return;
+      }
+
+      // Manejar tecla Tab (algunos escáneres usan Tab)
+      if (e.key === 'Tab' && bufferRef.current.length > 0) {
+        e.preventDefault();
+        if (isPhysicalScannerActiveRef.current) {
+          processPhysicalScannerInput(bufferRef.current.trim());
+        }
+        bufferRef.current = '';
+        setScannerBuffer('');
+        isPhysicalScannerActiveRef.current = false;
+        return;
+      }
+
+      // Agregar caracteres al buffer (solo caracteres imprimibles y algunos especiales)
+      if (e.key.length === 1 || ['-', '_', '.', '/'].includes(e.key)) {
+        bufferRef.current += e.key;
+        setScannerBuffer(bufferRef.current);
+        
+        // Timeout para auto-procesar si no llega Enter
+        scannerTimeoutRef.current = setTimeout(() => {
+          if (bufferRef.current.length >= SCANNER_CONFIG.MIN_LENGTH && isPhysicalScannerActiveRef.current) {
+            addDebugInfo(`Timeout - procesando: "${bufferRef.current}"`);
+            processPhysicalScannerInput(bufferRef.current.trim());
+          }
+          
+          bufferRef.current = '';
+          setScannerBuffer('');
+          isPhysicalScannerActiveRef.current = false;
+          setPhysicalScannerStatus('waiting');
+        }, SCANNER_CONFIG.TIMEOUT * 2);
+      }
+    };
+
+    // Solo agregar listener si estamos escaneando
+    if (isScanning && scannerMode === 'physical') {
+      document.addEventListener('keydown', handleKeyDown);
+      addDebugInfo('🎯 Listener de escáner físico activado');
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      if (scannerTimeoutRef.current) {
+        clearTimeout(scannerTimeoutRef.current);
+      }
+    };
+  }, [isScanning, scannerMode, onScan]);
 
   // Función para verificar si estamos en Chrome
   const isChrome = () => {
@@ -69,15 +253,12 @@ export function BarcodeScanner({
       
       console.log("Solicitando permisos de cámara...");
       
-      // Solicitud de permisos que funciona mejor en Chrome
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { facingMode: "environment" } 
       });
       
-      // Si llegamos aquí, tenemos permiso
       setHasPermission(true);
       
-      // Enumerar dispositivos después de obtener permisos
       const devices = await navigator.mediaDevices.enumerateDevices();
       const videoDevices = devices.filter(device => device.kind === 'videoinput');
       
@@ -85,7 +266,6 @@ export function BarcodeScanner({
         throw new Error('No se detectaron cámaras');
       }
       
-      // Preferir cámara trasera
       const backCamera = videoDevices.find(device => 
         device.label.toLowerCase().includes('back') || 
         device.label.toLowerCase().includes('trasera') ||
@@ -95,14 +275,11 @@ export function BarcodeScanner({
       setCameraDevices(videoDevices);
       setSelectedDeviceId(backCamera?.deviceId || videoDevices[0].deviceId);
       
-      // Detener el stream inicial
       stream.getTracks().forEach(track => track.stop());
       
-      // Activar la cámara
       if (videoRef.current && scannerRef.current) {
         const deviceId = backCamera?.deviceId || videoDevices[0].deviceId;
         
-        // Iniciar escaner con la cámara seleccionada
         await scannerRef.current.decodeFromVideoDevice(
           deviceId,
           videoRef.current,
@@ -119,7 +296,6 @@ export function BarcodeScanner({
     } catch (error) {
       console.error('Error al solicitar permisos:', error);
       
-      // Identificar tipo de error para mostrar mensaje adecuado
       if (error instanceof DOMException) {
         if (error.name === 'NotAllowedError') {
           setPermissionDenied(true);
@@ -143,17 +319,17 @@ export function BarcodeScanner({
     }
   };
   
-  // Toggle para la cámara (iniciar/detener)
+  // Toggle para la cámara
   const toggleCamera = () => {
     if (isCameraOn) {
-      // Si la cámara está activa, detenerla
       setIsCameraOn(false);
+      setScannerMode('physical');
       if (scannerRef.current) {
         scannerRef.current.reset();
       }
     } else {
-      // Si la cámara está inactiva, activarla y solicitar permisos
       setIsCameraOn(true);
+      setScannerMode('camera');
       requestCameraPermission();
     }
   };
@@ -163,68 +339,41 @@ export function BarcodeScanner({
     if (isScanning) {
       setIsScanning(false);
       setIsCameraOn(false);
+      setScannerMode('physical');
       if (scannerRef.current) {
         scannerRef.current.reset();
       }
+      // Reset estados del escáner físico
+      bufferRef.current = '';
+      setScannerBuffer('');
+      setPhysicalScannerStatus('waiting');
+      addDebugInfo('🛑 Escáner detenido');
     } else {
       setIsScanning(true);
+      setScannerMode('physical'); // Iniciar en modo físico por defecto
+      setPhysicalScannerStatus('waiting');
+      addDebugInfo('🚀 Escáner iniciado en modo físico');
     }
   };
-  
-  // Escuchar entrada de escáner físico
-  useEffect(() => {
-    let buffer = '';
-    let lastKeyTime = 0;
-    const TIMEOUT = 50; // Tiempo entre teclas en ms
-    
-    const handleKeyPress = (e: KeyboardEvent) => {
-      // Solo procesar si no estamos en un input de texto
-      if (document.activeElement instanceof HTMLInputElement || 
-          document.activeElement instanceof HTMLTextAreaElement) {
-        return;
-      }
-      
-      const currentTime = new Date().getTime();
-      
-      if (currentTime - lastKeyTime > TIMEOUT && buffer.length > 0) {
-        // Si ha pasado mucho tiempo, reiniciar buffer
-        buffer = '';
-      }
-      
-      // Actualizar tiempo de última tecla
-      lastKeyTime = currentTime;
-      
-      // Enter normalmente marca el final de un escaneo
-      if (e.key === 'Enter' && buffer.length > 3) {
-        setLastScanned(buffer);
-        onScan(buffer);
-        buffer = '';
-        e.preventDefault();
-      } else if (e.key.length === 1 || e.key === '-') {
-        // Agregar al buffer si es un carácter o guión
-        buffer += e.key;
-      }
-    };
-    
-    if (isScanning && !isCameraOn) {
-      document.addEventListener('keydown', handleKeyPress);
-    }
-    
-    return () => {
-      document.removeEventListener('keydown', handleKeyPress);
-    };
-  }, [isScanning, isCameraOn, onScan]);
   
   // Escaneo manual
   const handleManualInput = () => {
     if (manualInputRef.current?.value) {
       const code = manualInputRef.current.value.trim();
       if (code) {
+        addDebugInfo(`Entrada manual: "${code}"`);
         setLastScanned(code);
         onScan(code);
         manualInputRef.current.value = '';
       }
     }
+  };
+
+  // 🆕 Función para testear el escáner físico
+  const testPhysicalScanner = () => {
+    addDebugInfo('🧪 Iniciando test del escáner físico...');
+    addDebugInfo('Por favor, escanee un código de barras ahora');
+    setPhysicalScannerStatus('waiting');
   };
 
   return (
@@ -251,22 +400,71 @@ export function BarcodeScanner({
               <Zap className="h-5 w-5" />
             )}
           </button>
-          
-          {isScanning && (
-            <button
-              onClick={toggleCamera}
-              className={`p-2 rounded-lg ${
-                isCameraOn 
-                  ? 'bg-yellow-100 text-yellow-600 hover:bg-yellow-200' 
-                  : 'bg-blue-100 text-blue-600 hover:bg-blue-200'
-              }`}
-              aria-label={isCameraOn ? 'Usar escáner físico' : 'Usar cámara'}
-            >
-              <Camera className="h-5 w-5" />
-            </button>
-          )}
         </div>
       </div>
+
+      {/* 🆕 Selector de modo de escáner */}
+      {isScanning && (
+        <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-gray-700">Modo de escáner:</span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  setScannerMode('physical');
+                  setIsCameraOn(false);
+                  if (scannerRef.current) scannerRef.current.reset();
+                  addDebugInfo('🔄 Cambiado a modo físico');
+                }}
+                className={`px-3 py-1 text-xs rounded ${
+                  scannerMode === 'physical' 
+                    ? 'bg-[#311716] text-white' 
+                    : 'bg-white text-gray-600'
+                }`}
+              >
+                <Scan className="h-3 w-3 inline mr-1" />
+                Pistola USB
+              </button>
+              <button
+                onClick={toggleCamera}
+                className={`px-3 py-1 text-xs rounded ${
+                  scannerMode === 'camera' 
+                    ? 'bg-[#311716] text-white' 
+                    : 'bg-white text-gray-600'
+                }`}
+              >
+                <Camera className="h-3 w-3 inline mr-1" />
+                Cámara
+              </button>
+            </div>
+          </div>
+
+          {/* 🆕 Estado del escáner físico */}
+          {scannerMode === 'physical' && (
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-gray-600">Estado:</span>
+              <div className="flex items-center gap-2">
+                <div className={`w-2 h-2 rounded-full ${
+                  physicalScannerStatus === 'waiting' ? 'bg-yellow-400' :
+                  physicalScannerStatus === 'active' ? 'bg-green-400' : 'bg-red-400'
+                }`}></div>
+                <span className={`${
+                  physicalScannerStatus === 'waiting' ? 'text-yellow-700' :
+                  physicalScannerStatus === 'active' ? 'text-green-700' : 'text-red-700'
+                }`}>
+                  {physicalScannerStatus === 'waiting' ? 'Esperando escáner...' :
+                   physicalScannerStatus === 'active' ? 'Escáner activo' : 'Error en lectura'}
+                </span>
+                {scannerBuffer && (
+                  <span className="ml-2 text-gray-500 font-mono">
+                    Buffer: "{scannerBuffer}"
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
       
       {isLoading ? (
         <div className="bg-gray-50 p-6 rounded-lg text-center">
@@ -275,9 +473,9 @@ export function BarcodeScanner({
         </div>
       ) : isScanning ? (
         <>
-          {isCameraOn ? (
+          {scannerMode === 'camera' && isCameraOn ? (
             <div className="space-y-3">
-              {/* Selección de cámara (cuando hay múltiples) */}
+              {/* Selección de cámara */}
               {cameraDevices.length > 1 && hasPermission && (
                 <div className="flex gap-2 mb-2">
                   <select
@@ -396,19 +594,57 @@ export function BarcodeScanner({
               </div>
             </div>
           ) : (
-            <div className="bg-gray-50 p-4 rounded-lg text-center">
+            // 🆕 Vista mejorada para escáner físico
+            <div className="bg-gray-50 p-4 rounded-lg">
               <div className="flex flex-col items-center justify-center p-4">
-                <Box className="h-12 w-12 text-gray-400 mb-2" />
-                <p className="text-gray-600">Esperando escáner de código de barras físico...</p>
-                <p className="text-sm text-gray-500 mt-1">
-                  O usa la cámara de tu dispositivo para escanear
-                </p>
-                <button
-                  onClick={toggleCamera}
-                  className="mt-3 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                >
-                  <Camera className="inline h-4 w-4 mr-1"/> Activar cámara
-                </button>
+                <div className="flex items-center mb-4">
+                  <Scan className={`h-12 w-12 mr-3 ${
+                    physicalScannerStatus === 'waiting' ? 'text-blue-500' :
+                    physicalScannerStatus === 'active' ? 'text-green-500 animate-pulse' : 'text-red-500'
+                  }`} />
+                  <div>
+                    <p className="text-gray-700 font-medium">Escáner físico USB activo</p>
+                    <p className="text-sm text-gray-500">
+                      {physicalScannerStatus === 'waiting' ? 'Esperando código de barras...' :
+                       physicalScannerStatus === 'active' ? 'Procesando código...' : 'Error en la lectura'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="w-full max-w-md space-y-3">
+                  {/* Indicador visual del buffer */}
+                  {scannerBuffer && (
+                    <div className="bg-blue-50 border border-blue-200 rounded p-2">
+                      <p className="text-xs text-blue-700 mb-1">Código detectado:</p>
+                      <p className="font-mono text-sm text-blue-900 break-all">{scannerBuffer}</p>
+                    </div>
+                  )}
+
+                  {/* Botones de control */}
+                  <div className="flex gap-2 justify-center">
+                    <button
+                      onClick={testPhysicalScanner}
+                      className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
+                    >
+                      <AlertTriangle className="inline h-4 w-4 mr-1"/>
+                      Test Escáner
+                    </button>
+                    <button
+                      onClick={toggleCamera}
+                      className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
+                    >
+                      <Camera className="inline h-4 w-4 mr-1"/>
+                      Usar Cámara
+                    </button>
+                  </div>
+
+                  {/* Instrucciones */}
+                  <div className="text-xs text-gray-600 text-center space-y-1">
+                    <p>• Apunte el escáner al código de barras</p>
+                    <p>• Presione el gatillo para escanear</p>
+                    <p>• El código aparecerá automáticamente</p>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -457,18 +693,40 @@ export function BarcodeScanner({
           </div>
         </div>
       )}
-      
-      {/* Información de ayuda */}
-      {isChrome() && (
-        <div className="mt-4 bg-blue-50 p-3 rounded-lg text-xs text-blue-700">
-          <p className="font-semibold mb-1">¿Problemas con la cámara en Chrome?</p>
-          <div className="ml-2">
-            <p>• Asegúrate de dar permisos cuando Chrome lo solicite</p>
-            <p>• Si bloqueaste la cámara anteriormente: haz clic en el icono 🔒 en la barra de direcciones, luego en "Permisos del sitio" y cambia la configuración de la cámara a "Permitir"</p>
-            <p>• Después de cambiar los permisos, recarga la página</p>
+
+      {/* 🆕 Panel de debug para troubleshooting */}
+      {process.env.NODE_ENV === 'development' && debugInfo.length > 0 && (
+        <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+          <div className="flex justify-between items-center mb-2">
+            <span className="text-yellow-700 font-medium text-sm">Debug Info:</span>
+            <button
+              onClick={() => setDebugInfo([])}
+              className="text-yellow-600 hover:text-yellow-800 text-xs"
+            >
+              Limpiar
+            </button>
+          </div>
+          <div className="max-h-32 overflow-y-auto">
+            {debugInfo.map((info, index) => (
+              <div key={index} className="text-xs text-yellow-800 font-mono mb-1">
+                {info}
+              </div>
+            ))}
           </div>
         </div>
       )}
+      
+      {/* Información de ayuda específica para 3nstar */}
+      <div className="mt-4 bg-blue-50 p-3 rounded-lg text-xs text-blue-700">
+        <p className="font-semibold mb-1">💡 Tips para escáner 3nstar USB:</p>
+        <div className="ml-2 space-y-1">
+          <p>• Asegúrate de que el escáner está conectado por USB</p>
+          <p>• El escáner debe estar configurado para enviar Enter después del código</p>
+          <p>• Si no funciona, prueba presionar el botón "Test Escáner" y escanea</p>
+          <p>• Verifica que no estés escribiendo en ningún campo de texto</p>
+          <p>• El modo físico debe estar seleccionado (pistola USB)</p>
+        </div>
+      </div>
     </div>
   );
 }
