@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { BrowserMultiFormatReader, BarcodeFormat, DecodeHintType } from '@zxing/library';
-import { Camera, QrCode, Box, Slash, RefreshCw, Zap, ShieldAlert, Scan, AlertTriangle } from 'lucide-react';
+import { Camera, QrCode, Box, Slash, RefreshCw, Zap, ShieldAlert, Scan, AlertTriangle, Volume2 } from 'lucide-react';
 
 interface BarcodeScannerProps {
   onScan: (code: string) => void;
@@ -28,37 +28,97 @@ export function BarcodeScanner({
   const [isLoading, setIsLoading] = useState(false);
   const [permissionDenied, setPermissionDenied] = useState(false);
   
-  // 🆕 Estados específicos para escáner físico
+  // Estados específicos para escáner físico
   const [scannerMode, setScannerMode] = useState<'camera' | 'physical' | 'manual'>('physical');
-  const [physicalScannerStatus, setPhysicalScannerStatus] = useState<'waiting' | 'active' | 'error'>('waiting');
+  const [physicalScannerStatus, setPhysicalScannerStatus] = useState<'waiting' | 'active' | 'testing' | 'error'>('waiting');
   const [debugInfo, setDebugInfo] = useState<string[]>([]);
   const [scannerBuffer, setScannerBuffer] = useState<string>('');
+  const [isTestMode, setIsTestMode] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
   
   // Referencias
   const videoRef = useRef<HTMLVideoElement>(null);
   const scannerRef = useRef<BrowserMultiFormatReader | null>(null);
   const manualInputRef = useRef<HTMLInputElement>(null);
   
-  // 🆕 Referencias para escáner físico mejoradas
+  // Referencias para escáner físico
   const bufferRef = useRef<string>('');
   const lastKeypressTimeRef = useRef<number>(0);
   const scannerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isPhysicalScannerActiveRef = useRef<boolean>(false);
+  const testTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 🆕 Configuración mejorada para escáner físico
+  // 🆕 Configuración mejorada para escáner 3nstar
   const SCANNER_CONFIG = {
-    TIMEOUT: 100, // Tiempo entre teclas en ms (aumentado para 3nstar)
+    TIMEOUT: 150, // Tiempo entre teclas en ms (aumentado para 3nstar)
     MIN_LENGTH: 3, // Longitud mínima del código
     MAX_LENGTH: 50, // Longitud máxima del código
-    SCANNER_SPEED_THRESHOLD: 30, // Velocidad máxima entre teclas para considerar escáner
-    VALID_CHARS: /^[a-zA-Z0-9\-_./\\+*#@$%&()[\]{}|;:,<>?=!~`'"^\s]+$/ // Caracteres válidos
+    SCANNER_SPEED_THRESHOLD: 50, // Velocidad máxima entre teclas para considerar escáner
+    VALID_CHARS: /^[a-zA-Z0-9\-_./\\+*#@$%&()[\]{}|;:,<>?=!~`'"^\s]+$/, // Caracteres válidos
+    TEST_DURATION: 10000 // 10 segundos para el modo test
   };
 
+  // 🆕 Sistema de sonido mejorado
+  const playSuccessSound = useCallback(() => {
+    if (!soundEnabled) return;
+    
+    try {
+      // Crear contexto de audio
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      
+      // Crear oscilador para el beep
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      // Conectar nodos
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      // Configurar el sonido (beep agradable)
+      oscillator.frequency.setValueAtTime(800, audioContext.currentTime); // Frecuencia del beep
+      oscillator.type = 'sine';
+      
+      // Configurar volumen con fade
+      gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+      gainNode.gain.linearRampToValueAtTime(0.3, audioContext.currentTime + 0.01);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+      
+      // Reproducir
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.3);
+      
+      // Limpiar después de reproducir
+      setTimeout(() => {
+        try {
+          audioContext.close();
+        } catch (e) {
+          console.log('Audio context already closed');
+        }
+      }, 500);
+      
+    } catch (error) {
+      console.warn('No se pudo reproducir el sonido:', error);
+      
+      // Fallback: usar HTMLAudioElement con data URL
+      try {
+        const audio = new Audio();
+        // Beep corto en base64
+        audio.src = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmQdBDWByfDBeyYFI3nN7+OTSA0PVqzn77BdGAg+ltryxnkpBSl+zPLaizsIGGS57OihUgwLUKXh8bllHgg2jdz0unQpBSl/y/LEl0ALDk2o5O68XBoGPJPY88p9KwUme8rx3I4+CRZiturqpVQMCU+l4PK8aB4GM4nU8cBXOBJAogAAoAAOAAgAAADAAAAAwAAAAMAAAAAA';
+        audio.volume = 0.3;
+        audio.play().catch(() => {
+          console.log('Fallback audio también falló');
+        });
+      } catch (fallbackError) {
+        console.warn('Fallback de audio también falló:', fallbackError);
+      }
+    }
+  }, [soundEnabled]);
+
   // Función para agregar información de debug
-  const addDebugInfo = (message: string) => {
+  const addDebugInfo = useCallback((message: string) => {
     const timestamp = new Date().toLocaleTimeString();
-    setDebugInfo(prev => [`${timestamp}: ${message}`, ...prev.slice(0, 9)]);
-  };
+    setDebugInfo(prev => [`${timestamp}: ${message}`, ...prev.slice(0, 14)]);
+  }, []);
 
   // Inicializar escáner
   useEffect(() => {
@@ -84,8 +144,8 @@ export function BarcodeScanner({
     };
   }, []);
 
-  // 🆕 Función mejorada para validar código de barras
-  const isValidBarcode = (code: string): boolean => {
+  // Función mejorada para validar código de barras
+  const isValidBarcode = useCallback((code: string): boolean => {
     // Verificar longitud
     if (code.length < SCANNER_CONFIG.MIN_LENGTH || code.length > SCANNER_CONFIG.MAX_LENGTH) {
       return false;
@@ -107,36 +167,77 @@ export function BarcodeScanner({
       /^\d{12,13}$/, // EAN-13, UPC
       /^\d{8}$/, // EAN-8
       /^[A-Z0-9\-]+$/, // Códigos alfanuméricos
+      /^\d+$/, // Solo números
     ];
     
     return commonPatterns.some(pattern => pattern.test(code));
-  };
+  }, []);
 
-  // 🆕 Función mejorada para procesar entrada de escáner físico
-  const processPhysicalScannerInput = (code: string) => {
-    addDebugInfo(`Procesando código físico: "${code}" (${code.length} chars)`);
+  // Función mejorada para procesar entrada de escáner físico
+  const processPhysicalScannerInput = useCallback((code: string) => {
+    addDebugInfo(`📦 Procesando código: "${code}" (${code.length} chars)`);
     
     if (isValidBarcode(code)) {
       setLastScanned(code);
       setPhysicalScannerStatus('active');
+      
+      // 🔊 Reproducir sonido de éxito
+      playSuccessSound();
+      
+      // Ejecutar callback
       onScan(code);
       addDebugInfo(`✅ Código válido enviado: ${code}`);
       
       // Reset después de envío exitoso
       setTimeout(() => {
-        setPhysicalScannerStatus('waiting');
-      }, 1000);
+        if (!isTestMode) {
+          setPhysicalScannerStatus('waiting');
+        }
+      }, 1500);
     } else {
       addDebugInfo(`❌ Código inválido rechazado: "${code}"`);
       setPhysicalScannerStatus('error');
       
       setTimeout(() => {
-        setPhysicalScannerStatus('waiting');
+        setPhysicalScannerStatus(isTestMode ? 'testing' : 'waiting');
       }, 2000);
     }
-  };
+  }, [isValidBarcode, addDebugInfo, playSuccessSound, onScan, isTestMode]);
 
-  // 🆕 Manejo mejorado de eventos de teclado para escáner físico
+  // 🆕 Función mejorada para testear el escáner físico
+  const testPhysicalScanner = useCallback(() => {
+    addDebugInfo('🧪 Iniciando test del escáner físico...');
+    setIsTestMode(true);
+    setPhysicalScannerStatus('testing');
+    bufferRef.current = '';
+    setScannerBuffer('');
+    
+    addDebugInfo('👀 Modo test activado - Escanee cualquier código ahora');
+    addDebugInfo('⏰ El test durará 10 segundos');
+    
+    // Test automático que termina después de 10 segundos
+    if (testTimeoutRef.current) {
+      clearTimeout(testTimeoutRef.current);
+    }
+    
+    testTimeoutRef.current = setTimeout(() => {
+      setIsTestMode(false);
+      setPhysicalScannerStatus('waiting');
+      addDebugInfo('⏰ Test terminado por timeout');
+    }, SCANNER_CONFIG.TEST_DURATION);
+  }, [addDebugInfo]);
+
+  // Función para finalizar el test
+  const finishTest = useCallback(() => {
+    if (testTimeoutRef.current) {
+      clearTimeout(testTimeoutRef.current);
+    }
+    setIsTestMode(false);
+    setPhysicalScannerStatus('waiting');
+    addDebugInfo('✅ Test finalizado manualmente');
+  }, [addDebugInfo]);
+
+  // Manejo mejorado de eventos de teclado para escáner físico
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const currentTime = Date.now();
@@ -145,10 +246,10 @@ export function BarcodeScanner({
       // Solo procesar si estamos en modo escáner físico y escaneando
       if (!isScanning || scannerMode !== 'physical') return;
       
-      // No procesar si estamos en un input (excepto nuestro input manual)
+      // No procesar si estamos en un input (excepto nuestro input manual cuando no está enfocado)
       const activeElement = document.activeElement;
       if (activeElement instanceof HTMLInputElement || activeElement instanceof HTMLTextAreaElement) {
-        if (activeElement !== manualInputRef.current) {
+        if (activeElement !== manualInputRef.current || activeElement === document.activeElement) {
           return;
         }
       }
@@ -158,19 +259,20 @@ export function BarcodeScanner({
         clearTimeout(scannerTimeoutRef.current);
       }
 
-      addDebugInfo(`Tecla: "${e.key}" | Tiempo: ${timeDiff}ms | Buffer: "${bufferRef.current}"`);
+      addDebugInfo(`⌨️ Tecla: "${e.key}" | ⏱️ Tiempo: ${timeDiff}ms | 📄 Buffer: "${bufferRef.current}"`);
 
       // Detectar si es entrada de escáner (teclas rápidas)
       if (bufferRef.current.length === 0 || timeDiff < SCANNER_CONFIG.SCANNER_SPEED_THRESHOLD) {
         isPhysicalScannerActiveRef.current = true;
-        setPhysicalScannerStatus('active');
+        setPhysicalScannerStatus(isTestMode ? 'testing' : 'active');
+        addDebugInfo(`🎯 Escáner físico detectado (velocidad: ${timeDiff}ms)`);
       }
 
       // Reset del buffer si ha pasado mucho tiempo
-      if (timeDiff > SCANNER_CONFIG.TIMEOUT) {
+      if (timeDiff > SCANNER_CONFIG.TIMEOUT && bufferRef.current.length > 0) {
+        addDebugInfo(`🔄 Buffer reseteado por timeout (${timeDiff}ms > ${SCANNER_CONFIG.TIMEOUT}ms)`);
         bufferRef.current = '';
         setScannerBuffer('');
-        addDebugInfo('Buffer reseteado por timeout');
       }
 
       lastKeypressTimeRef.current = currentTime;
@@ -179,11 +281,13 @@ export function BarcodeScanner({
       if (e.key === 'Enter') {
         e.preventDefault();
         
-        if (bufferRef.current.length >= SCANNER_CONFIG.MIN_LENGTH && isPhysicalScannerActiveRef.current) {
-          addDebugInfo(`Enter detectado con buffer: "${bufferRef.current}"`);
-          processPhysicalScannerInput(bufferRef.current.trim());
+        const currentBuffer = bufferRef.current.trim();
+        addDebugInfo(`🔚 Enter detectado con buffer: "${currentBuffer}" (${currentBuffer.length} chars)`);
+        
+        if (currentBuffer.length >= SCANNER_CONFIG.MIN_LENGTH && isPhysicalScannerActiveRef.current) {
+          processPhysicalScannerInput(currentBuffer);
         } else {
-          addDebugInfo(`Enter ignorado - Buffer muy corto o no es escáner: "${bufferRef.current}"`);
+          addDebugInfo(`❌ Enter ignorado - Buffer muy corto o entrada manual`);
         }
         
         // Reset
@@ -196,9 +300,13 @@ export function BarcodeScanner({
       // Manejar tecla Tab (algunos escáneres usan Tab)
       if (e.key === 'Tab' && bufferRef.current.length > 0) {
         e.preventDefault();
-        if (isPhysicalScannerActiveRef.current) {
-          processPhysicalScannerInput(bufferRef.current.trim());
+        const currentBuffer = bufferRef.current.trim();
+        addDebugInfo(`📑 Tab detectado con buffer: "${currentBuffer}"`);
+        
+        if (isPhysicalScannerActiveRef.current && currentBuffer.length >= SCANNER_CONFIG.MIN_LENGTH) {
+          processPhysicalScannerInput(currentBuffer);
         }
+        
         bufferRef.current = '';
         setScannerBuffer('');
         isPhysicalScannerActiveRef.current = false;
@@ -206,29 +314,31 @@ export function BarcodeScanner({
       }
 
       // Agregar caracteres al buffer (solo caracteres imprimibles y algunos especiales)
-      if (e.key.length === 1 || ['-', '_', '.', '/'].includes(e.key)) {
+      if (e.key.length === 1 || ['-', '_', '.', '/', '\\', '+', '*', '#', '@', '$', '%', '&'].includes(e.key)) {
         bufferRef.current += e.key;
         setScannerBuffer(bufferRef.current);
+        addDebugInfo(`➕ Carácter agregado: "${e.key}" | Buffer actual: "${bufferRef.current}"`);
         
-        // Timeout para auto-procesar si no llega Enter
+        // Timeout para auto-procesar si no llega Enter (para escáneres que no envían Enter)
         scannerTimeoutRef.current = setTimeout(() => {
-          if (bufferRef.current.length >= SCANNER_CONFIG.MIN_LENGTH && isPhysicalScannerActiveRef.current) {
-            addDebugInfo(`Timeout - procesando: "${bufferRef.current}"`);
-            processPhysicalScannerInput(bufferRef.current.trim());
+          const finalBuffer = bufferRef.current.trim();
+          if (finalBuffer.length >= SCANNER_CONFIG.MIN_LENGTH && isPhysicalScannerActiveRef.current) {
+            addDebugInfo(`⏰ Auto-procesando por timeout: "${finalBuffer}"`);
+            processPhysicalScannerInput(finalBuffer);
           }
           
           bufferRef.current = '';
           setScannerBuffer('');
           isPhysicalScannerActiveRef.current = false;
-          setPhysicalScannerStatus('waiting');
+          setPhysicalScannerStatus(isTestMode ? 'testing' : 'waiting');
         }, SCANNER_CONFIG.TIMEOUT * 2);
       }
     };
 
-    // Solo agregar listener si estamos escaneando
+    // Solo agregar listener si estamos escaneando en modo físico
     if (isScanning && scannerMode === 'physical') {
       document.addEventListener('keydown', handleKeyDown);
-      addDebugInfo('🎯 Listener de escáner físico activado');
+      addDebugInfo('🎯 Listener de escáner físico ACTIVADO');
     }
 
     return () => {
@@ -237,7 +347,19 @@ export function BarcodeScanner({
         clearTimeout(scannerTimeoutRef.current);
       }
     };
-  }, [isScanning, scannerMode, onScan]);
+  }, [isScanning, scannerMode, addDebugInfo, processPhysicalScannerInput, isTestMode]);
+
+  // Limpiar timeouts al desmontar
+  useEffect(() => {
+    return () => {
+      if (testTimeoutRef.current) {
+        clearTimeout(testTimeoutRef.current);
+      }
+      if (scannerTimeoutRef.current) {
+        clearTimeout(scannerTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Función para verificar si estamos en Chrome
   const isChrome = () => {
@@ -287,6 +409,7 @@ export function BarcodeScanner({
             if (result) {
               const code = result.getText();
               setLastScanned(code);
+              playSuccessSound(); // 🔊 Sonido también para cámara
               onScan(code);
             }
           }
@@ -340,6 +463,7 @@ export function BarcodeScanner({
       setIsScanning(false);
       setIsCameraOn(false);
       setScannerMode('physical');
+      setIsTestMode(false);
       if (scannerRef.current) {
         scannerRef.current.reset();
       }
@@ -347,12 +471,15 @@ export function BarcodeScanner({
       bufferRef.current = '';
       setScannerBuffer('');
       setPhysicalScannerStatus('waiting');
-      addDebugInfo('🛑 Escáner detenido');
+      if (testTimeoutRef.current) {
+        clearTimeout(testTimeoutRef.current);
+      }
+      addDebugInfo('🛑 Escáner DETENIDO');
     } else {
       setIsScanning(true);
       setScannerMode('physical'); // Iniciar en modo físico por defecto
       setPhysicalScannerStatus('waiting');
-      addDebugInfo('🚀 Escáner iniciado en modo físico');
+      addDebugInfo('🚀 Escáner INICIADO en modo físico');
     }
   };
   
@@ -361,19 +488,13 @@ export function BarcodeScanner({
     if (manualInputRef.current?.value) {
       const code = manualInputRef.current.value.trim();
       if (code) {
-        addDebugInfo(`Entrada manual: "${code}"`);
+        addDebugInfo(`✍️ Entrada manual: "${code}"`);
         setLastScanned(code);
+        playSuccessSound(); // 🔊 Sonido también para entrada manual
         onScan(code);
         manualInputRef.current.value = '';
       }
     }
-  };
-
-  // 🆕 Función para testear el escáner físico
-  const testPhysicalScanner = () => {
-    addDebugInfo('🧪 Iniciando test del escáner físico...');
-    addDebugInfo('Por favor, escanee un código de barras ahora');
-    setPhysicalScannerStatus('waiting');
   };
 
   return (
@@ -382,9 +503,23 @@ export function BarcodeScanner({
         <h3 className="text-lg font-medium text-gray-800 flex items-center">
           <Box className="mr-2 h-5 w-5 text-[#9c7561]" />
           Escáner de productos
+          {soundEnabled && <Volume2 className="ml-2 h-4 w-4 text-green-600" />}
         </h3>
         
         <div className="flex items-center gap-2">
+          {/* 🆕 Toggle de sonido */}
+          <button
+            onClick={() => setSoundEnabled(!soundEnabled)}
+            className={`p-2 rounded-lg ${
+              soundEnabled 
+                ? 'bg-green-100 text-green-600 hover:bg-green-200' 
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+            title={soundEnabled ? 'Sonido activado' : 'Sonido desactivado'}
+          >
+            <Volume2 className="h-4 w-4" />
+          </button>
+          
           <button
             onClick={toggleScanner}
             className={`p-2 rounded-lg ${
@@ -403,7 +538,7 @@ export function BarcodeScanner({
         </div>
       </div>
 
-      {/* 🆕 Selector de modo de escáner */}
+      {/* Selector de modo de escáner */}
       {isScanning && (
         <div className="mb-4 p-3 bg-gray-50 rounded-lg">
           <div className="flex items-center justify-between mb-2">
@@ -413,8 +548,9 @@ export function BarcodeScanner({
                 onClick={() => {
                   setScannerMode('physical');
                   setIsCameraOn(false);
+                  setIsTestMode(false);
                   if (scannerRef.current) scannerRef.current.reset();
-                  addDebugInfo('🔄 Cambiado a modo físico');
+                  addDebugInfo('🔄 Cambiado a modo FÍSICO');
                 }}
                 className={`px-3 py-1 text-xs rounded ${
                   scannerMode === 'physical' 
@@ -439,25 +575,28 @@ export function BarcodeScanner({
             </div>
           </div>
 
-          {/* 🆕 Estado del escáner físico */}
+          {/* Estado del escáner físico */}
           {scannerMode === 'physical' && (
             <div className="flex items-center justify-between text-xs">
               <span className="text-gray-600">Estado:</span>
               <div className="flex items-center gap-2">
                 <div className={`w-2 h-2 rounded-full ${
-                  physicalScannerStatus === 'waiting' ? 'bg-yellow-400' :
+                  physicalScannerStatus === 'waiting' ? 'bg-blue-400' :
+                  physicalScannerStatus === 'testing' ? 'bg-yellow-400 animate-pulse' :
                   physicalScannerStatus === 'active' ? 'bg-green-400' : 'bg-red-400'
                 }`}></div>
                 <span className={`${
-                  physicalScannerStatus === 'waiting' ? 'text-yellow-700' :
+                  physicalScannerStatus === 'waiting' ? 'text-blue-700' :
+                  physicalScannerStatus === 'testing' ? 'text-yellow-700' :
                   physicalScannerStatus === 'active' ? 'text-green-700' : 'text-red-700'
                 }`}>
                   {physicalScannerStatus === 'waiting' ? 'Esperando escáner...' :
+                   physicalScannerStatus === 'testing' ? 'MODO TEST ACTIVO' :
                    physicalScannerStatus === 'active' ? 'Escáner activo' : 'Error en lectura'}
                 </span>
                 {scannerBuffer && (
-                  <span className="ml-2 text-gray-500 font-mono">
-                    Buffer: "{scannerBuffer}"
+                  <span className="ml-2 text-gray-500 font-mono text-xs bg-white px-1 rounded">
+                    "{scannerBuffer}"
                   </span>
                 )}
               </div>
@@ -491,6 +630,7 @@ export function BarcodeScanner({
                             if (result) {
                               const code = result.getText();
                               setLastScanned(code);
+                              playSuccessSound();
                               onScan(code);
                             }
                           }
@@ -516,6 +656,7 @@ export function BarcodeScanner({
                             if (result) {
                               const code = result.getText();
                               setLastScanned(code);
+                              playSuccessSound();
                               onScan(code);
                             }
                           }
@@ -594,18 +735,22 @@ export function BarcodeScanner({
               </div>
             </div>
           ) : (
-            // 🆕 Vista mejorada para escáner físico
+            // Vista mejorada para escáner físico
             <div className="bg-gray-50 p-4 rounded-lg">
               <div className="flex flex-col items-center justify-center p-4">
                 <div className="flex items-center mb-4">
                   <Scan className={`h-12 w-12 mr-3 ${
                     physicalScannerStatus === 'waiting' ? 'text-blue-500' :
-                    physicalScannerStatus === 'active' ? 'text-green-500 animate-pulse' : 'text-red-500'
+                    physicalScannerStatus === 'testing' ? 'text-yellow-500 animate-pulse' :
+                    physicalScannerStatus === 'active' ? 'text-green-500' : 'text-red-500'
                   }`} />
                   <div>
-                    <p className="text-gray-700 font-medium">Escáner físico USB activo</p>
+                    <p className="text-gray-700 font-medium">
+                      {isTestMode ? 'MODO TEST ACTIVO' : 'Escáner físico USB'}
+                    </p>
                     <p className="text-sm text-gray-500">
-                      {physicalScannerStatus === 'waiting' ? 'Esperando código de barras...' :
+                      {physicalScannerStatus === 'waiting' ? 'Listo para escanear...' :
+                       physicalScannerStatus === 'testing' ? 'Esperando código de prueba...' :
                        physicalScannerStatus === 'active' ? 'Procesando código...' : 'Error en la lectura'}
                     </p>
                   </div>
@@ -620,29 +765,64 @@ export function BarcodeScanner({
                     </div>
                   )}
 
+                  {/* 🆕 Contador para modo test */}
+                  {isTestMode && (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded p-2 text-center">
+                      <p className="text-sm text-yellow-700 font-medium">
+                        🧪 MODO TEST ACTIVO
+                      </p>
+                      <p className="text-xs text-yellow-600">
+                        Escanee cualquier código para probar la conexión
+                      </p>
+                    </div>
+                  )}
+
                   {/* Botones de control */}
                   <div className="flex gap-2 justify-center">
-                    <button
-                      onClick={testPhysicalScanner}
-                      className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
-                    >
-                      <AlertTriangle className="inline h-4 w-4 mr-1"/>
-                      Test Escáner
-                    </button>
-                    <button
-                      onClick={toggleCamera}
-                      className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
-                    >
-                      <Camera className="inline h-4 w-4 mr-1"/>
-                      Usar Cámara
-                    </button>
+                    {!isTestMode ? (
+                      <>
+                        <button
+                          onClick={testPhysicalScanner}
+                          className="px-3 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 text-sm flex items-center"
+                        >
+                          <AlertTriangle className="h-4 w-4 mr-1"/>
+                          Test Escáner
+                        </button>
+                        <button
+                          onClick={toggleCamera}
+                          className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm flex items-center"
+                        >
+                          <Camera className="h-4 w-4 mr-1"/>
+                          Usar Cámara
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={finishTest}
+                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm flex items-center"
+                      >
+                        <Slash className="h-4 w-4 mr-1"/>
+                        Finalizar Test
+                      </button>
+                    )}
                   </div>
 
                   {/* Instrucciones */}
                   <div className="text-xs text-gray-600 text-center space-y-1">
-                    <p>• Apunte el escáner al código de barras</p>
-                    <p>• Presione el gatillo para escanear</p>
-                    <p>• El código aparecerá automáticamente</p>
+                    {!isTestMode ? (
+                      <>
+                        <p>• Apunte el escáner al código de barras</p>
+                        <p>• Presione el gatillo para escanear</p>
+                        <p>• El código aparecerá automáticamente</p>
+                        <p>• Use "Test Escáner" si no funciona</p>
+                      </>
+                    ) : (
+                      <>
+                        <p>• El test está ACTIVO por 10 segundos</p>
+                        <p>• Escanee cualquier código ahora</p>
+                        <p>• Verá el resultado en el panel de debug</p>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -694,21 +874,21 @@ export function BarcodeScanner({
         </div>
       )}
 
-      {/* 🆕 Panel de debug para troubleshooting */}
-      {process.env.NODE_ENV === 'development' && debugInfo.length > 0 && (
-        <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+      {/* Panel de debug mejorado */}
+      {debugInfo.length > 0 && (
+        <div className="mt-4 bg-gray-800 text-green-400 rounded-lg p-3 font-mono text-xs">
           <div className="flex justify-between items-center mb-2">
-            <span className="text-yellow-700 font-medium text-sm">Debug Info:</span>
+            <span className="text-green-300 font-bold">🔍 DEBUG CONSOLE</span>
             <button
               onClick={() => setDebugInfo([])}
-              className="text-yellow-600 hover:text-yellow-800 text-xs"
+              className="text-green-400 hover:text-green-200 text-xs bg-gray-700 px-2 py-1 rounded"
             >
               Limpiar
             </button>
           </div>
-          <div className="max-h-32 overflow-y-auto">
+          <div className="max-h-48 overflow-y-auto space-y-1">
             {debugInfo.map((info, index) => (
-              <div key={index} className="text-xs text-yellow-800 font-mono mb-1">
+              <div key={index} className="text-green-400">
                 {info}
               </div>
             ))}
@@ -718,13 +898,15 @@ export function BarcodeScanner({
       
       {/* Información de ayuda específica para 3nstar */}
       <div className="mt-4 bg-blue-50 p-3 rounded-lg text-xs text-blue-700">
-        <p className="font-semibold mb-1">💡 Tips para escáner 3nstar USB:</p>
+        <p className="font-semibold mb-2">💡 Guía de solución de problemas 3nstar USB:</p>
         <div className="ml-2 space-y-1">
-          <p>• Asegúrate de que el escáner está conectado por USB</p>
-          <p>• El escáner debe estar configurado para enviar Enter después del código</p>
-          <p>• Si no funciona, prueba presionar el botón "Test Escáner" y escanea</p>
-          <p>• Verifica que no estés escribiendo en ningún campo de texto</p>
-          <p>• El modo físico debe estar seleccionado (pistola USB)</p>
+          <p><strong>1.</strong> Verifique que el escáner está conectado por USB y encendido</p>
+          <p><strong>2.</strong> Asegúrese de que el escáner está configurado para enviar Enter después del código</p>
+          <p><strong>3.</strong> Presione "Test Escáner" para verificar la comunicación</p>
+          <p><strong>4.</strong> Durante el test, escanee cualquier código y vea el debug console</p>
+          <p><strong>5.</strong> Si ve actividad en el debug pero no funciona, el escáner necesita configuración</p>
+          <p><strong>6.</strong> No debe estar escribiendo en ningún campo de texto al escanear</p>
+          <p><strong>7.</strong> El sonido {soundEnabled ? '🔊 está activado' : '🔇 está desactivado'}</p>
         </div>
       </div>
     </div>
