@@ -243,7 +243,6 @@ export class FacturacionService {
 
       logger.log(`Factura creada en 'procesando'`, 'SUCCESS');
 
-// CORRECCIÓN en líneas ~250-280:
 let importeNeto: number;
 let importeIVA: number;
 let importeTotConc: number = 0;
@@ -253,35 +252,39 @@ let importeTrib: number = 0;
 const importeTotal = Number(venta.total);
 
 if (tipoComprobanteLetra === 'A') {
-  // Factura A: IVA discriminado - CÁLCULO CORREGIDO
-  importeNeto = Math.round((importeTotal / 1.21) * 100) / 100; // Redondear a centavos
+  // Factura A: IVA discriminado
+  importeNeto = Math.round((importeTotal / 1.21) * 100) / 100;
   importeIVA = Math.round((importeTotal - importeNeto) * 100) / 100;
+  importeTotConc = 0;
   
   // Verificar que los totales cuadren
   const verificacion = importeTotConc + importeNeto + importeOpEx + importeTrib + importeIVA;
   if (Math.abs(verificacion - importeTotal) > 0.02) {
-    // Ajustar IVA para que cuadre exactamente
     importeIVA = Math.round((importeTotal - importeNeto) * 100) / 100;
-    logger.log(`Ajuste IVA: Neto=${importeNeto}, IVA=${importeIVA}, Total=${importeTotal}`, 'WARN');
+    logger.log(`Ajuste IVA Factura A: Neto=${importeNeto}, IVA=${importeIVA}, Total=${importeTotal}`, 'WARN');
   }
   
 } else {
-  // Factura B/C: Sin IVA discriminado
-  importeNeto = importeTotal;
-  importeIVA = 0;
+  importeNeto = 0;                    // ✅ No hay neto discriminado
+  importeIVA = 0;                     // ✅ No hay IVA discriminado  
+  importeTotConc = importeTotal;      // ✅ Todo como concepto no gravado
 }
 
-logger.log(`Cálculo final - Neto: $${importeNeto}, IVA: $${importeIVA}, Total: $${importeTotal}`, 'INFO');
+logger.log(`Cálculo ${tipoComprobanteLetra} - Neto: $${importeNeto}, IVA: $${importeIVA}, TotConc: $${importeTotConc}, Total: $${importeTotal}`, 'INFO');
 
-      // 8. Preparar alícuotas IVA
-      const iva = [];
-      if (tipoComprobanteLetra === 'A' && importeIVA > 0) {
-        iva.push({
-          Id: AFIP_CONFIG.defaultValues.iva['21'],
-          BaseImp: importeNeto,
-          Importe: importeIVA
-        });
-      }
+// También actualiza la sección de alícuotas IVA:
+const iva = [];
+if (tipoComprobanteLetra === 'A' && importeIVA > 0) {
+  // Solo para facturas A se discrimina el IVA
+  iva.push({
+    Id: AFIP_CONFIG.defaultValues.iva['21'], // ID 5 para 21%
+    BaseImp: importeNeto,
+    Importe: importeIVA
+  });
+}
+// ✅ Para facturas B no se envían alícuotas IVA
+
+logger.log(`Alícuotas IVA (${tipoComprobanteLetra}): ${iva.length > 0 ? JSON.stringify(iva) : 'Ninguna'}`, 'INFO');
 
       // 9. Documento del cliente
       const docTipo = venta.clienteCuit && venta.clienteCuit.trim() !== ''
@@ -294,9 +297,10 @@ logger.log(`Cálculo final - Neto: $${importeNeto}, IVA: $${importeIVA}, Total: 
 
       // 10. Preparar items
       const itemsFactura = venta.items.map((item: any) => {
+        // Para facturas B, el precio ya incluye IVA
         const precioUnitario = tipoComprobanteLetra === 'A' 
-          ? Number((item.precioUnitario / 1.21).toFixed(2))
-          : Number(item.precioUnitario.toFixed(2));
+          ? Number((item.precioUnitario / 1.21).toFixed(2))  // Sin IVA para factura A
+          : Number(item.precioUnitario.toFixed(2));          // Con IVA para factura B
           
         return {
           descripcion: item.producto.nombre.substring(0, 40),
@@ -314,6 +318,8 @@ logger.log(`Cálculo final - Neto: $${importeNeto}, IVA: $${importeIVA}, Total: 
         // 12. Comunicación con AFIP
         logger.log(`Enviando a AFIP...`, 'INFO');
         
+// En la llamada a AFIP, asegúrate de enviar los valores correctos:
+
 const respuestaAFIP = await this.afipClient.createInvoice({
   puntoVenta: configAFIP.puntoVenta,
   comprobanteTipo: comprobanteTipo,
@@ -322,16 +328,15 @@ const respuestaAFIP = await this.afipClient.createInvoice({
   docNro: docNro,
   fechaComprobante: fechaComprobante,
   importeTotal: importeTotal,
-  importeNeto: importeNeto,
-  importeIVA: importeIVA,
-  importeTotConc: importeTotConc, // 🔧 AÑADIR
-  importeOpEx: importeOpEx,       // 🔧 AÑADIR
-  importeTrib: importeTrib,       // 🔧 AÑADIR
+  importeNeto: importeNeto,           // ✅ 0 para facturas B
+  importeIVA: importeIVA,             // ✅ 0 para facturas B
+  importeTotConc: importeTotConc,     // ✅ importeTotal para facturas B
+  importeOpEx: importeOpEx,           // ✅ 0
+  importeTrib: importeTrib,           // ✅ 0
   monedaId: 'PES',
   cotizacion: 1,
-  iva: iva,
+  iva: iva, // ✅ Array vacío para facturas B
   items: itemsFactura,
-  // 🔧 NUEVO: Datos del cliente para determinar condición IVA
   clienteTipoDoc: docTipo,
   clienteEsResponsableInscripto: docTipo === 80
 });
