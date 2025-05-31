@@ -376,8 +376,28 @@ export class AfipSoapClient {
     }
   }
 
-// LÍNEA ~430 - En el método createInvoice, AGREGAR:
-public async createInvoice(params: any): Promise<any> {
+// src/lib/afip/afipSoapClient.ts - MÉTODO createInvoice CORREGIDO
+
+public async createInvoice(params: {
+  puntoVenta: number;
+  comprobanteTipo: number;
+  concepto: number;
+  docTipo: number;
+  docNro: string;
+  fechaComprobante: string;
+  importeTotal: number;
+  importeNeto: number;
+  importeIVA: number;
+  importeTotConc: number;     // 🆕 PARÁMETRO AÑADIDO
+  importeOpEx: number;        // 🆕 PARÁMETRO AÑADIDO
+  importeTrib: number;        // 🆕 PARÁMETRO AÑADIDO
+  monedaId: string;
+  cotizacion: number;
+  iva: any[];
+  items?: any[];
+  clienteTipoDoc: number;
+  clienteEsResponsableInscripto: boolean;
+}): Promise<any> {
   try {
     console.log(`[AFIP] 🚀 INICIO - createInvoice`);
     
@@ -391,7 +411,8 @@ public async createInvoice(params: any): Promise<any> {
     if (nuevoNumero <= ultimoNumero) {
       throw new Error(`Error numeración: nuevo ${nuevoNumero} <= último ${ultimoNumero}`);
     }
-    // 🔧 DETERMINAR CONDICIÓN IVA RECEPTOR (NUEVO CAMPO OBLIGATORIO)
+
+    // 🔧 DETERMINAR CONDICIÓN IVA RECEPTOR
     let condicionIvaReceptorId: number;
     
     if (params.comprobanteTipo === 1 || params.comprobanteTipo === 2 || params.comprobanteTipo === 3) {
@@ -405,9 +426,27 @@ public async createInvoice(params: any): Promise<any> {
       condicionIvaReceptorId = params.docTipo === 80 ? 1 : 6; // CUIT = Responsable, otros = Monotributo
     }
 
+    // 🔍 VERIFICACIÓN MATEMÁTICA PREVIA
+    console.log(`[AFIP] 🧮 VERIFICACIÓN MATEMÁTICA PREVIA:`);
+    console.log(`[AFIP] 🧮 ImpTotal: ${params.importeTotal}`);
+    console.log(`[AFIP] 🧮 ImpTotConc: ${params.importeTotConc}`);
+    console.log(`[AFIP] 🧮 ImpNeto: ${params.importeNeto}`);
+    console.log(`[AFIP] 🧮 ImpOpEx: ${params.importeOpEx}`);
+    console.log(`[AFIP] 🧮 ImpIVA: ${params.importeIVA}`);
+    console.log(`[AFIP] 🧮 ImpTrib: ${params.importeTrib}`);
+
+    const suma = params.importeTotConc + params.importeNeto + params.importeOpEx + params.importeIVA + params.importeTrib;
+    console.log(`[AFIP] 🧮 SUMA CALCULADA: ${suma.toFixed(2)}`);
+    console.log(`[AFIP] 🧮 TOTAL ESPERADO: ${params.importeTotal.toFixed(2)}`);
+    console.log(`[AFIP] 🧮 DIFERENCIA: ${Math.abs(suma - params.importeTotal).toFixed(4)}`);
+
+    if (Math.abs(suma - params.importeTotal) > 0.01) {
+      throw new Error(`Error matemático antes de enviar a AFIP: Suma=${suma.toFixed(2)} ≠ Total=${params.importeTotal.toFixed(2)}`);
+    }
+
     const client = await soap.createClientAsync(this.wsfeUrl + '?WSDL');
     
-    // 🔧 REQUEST CORREGIDO CON CAMPO OBLIGATORIO
+    // 🔧 REQUEST CORREGIDO CON TODOS LOS PARÁMETROS
     const feDetReq: any = {
       FECAEDetRequest: {
         Concepto: params.concepto,
@@ -417,59 +456,65 @@ public async createInvoice(params: any): Promise<any> {
         CbteHasta: nuevoNumero,
         CbteFch: params.fechaComprobante,
         ImpTotal: Number(params.importeTotal.toFixed(2)),
-        ImpTotConc: 0,
+        ImpTotConc: Number(params.importeTotConc.toFixed(2)),  // ✅ USAR PARÁMETRO
         ImpNeto: Number(params.importeNeto.toFixed(2)),
-        ImpOpEx: 0,
+        ImpOpEx: Number(params.importeOpEx.toFixed(2)),        // ✅ USAR PARÁMETRO
         ImpIVA: Number(params.importeIVA.toFixed(2)),
-        ImpTrib: 0,
+        ImpTrib: Number(params.importeTrib.toFixed(2)),        // ✅ USAR PARÁMETRO
         MonId: params.monedaId,
         MonCotiz: params.cotizacion,
-        // 🔧 CAMPO OBLIGATORIO AÑADIDO
         CondicionIVAReceptorId: condicionIvaReceptorId
       }
     };
 
-      // Agregar IVA si hay alícuotas
-      if (params.iva && params.iva.length > 0) {
-        feDetReq.FECAEDetRequest.Iva = {
-          AlicIva: params.iva
-        };
-      }
-
-      const request = {
-        Auth: auth,
-        FeCAEReq: {
-          FeCabReq: {
-            CantReg: 1,
-            PtoVta: params.puntoVenta,
-            CbteTipo: params.comprobanteTipo
-          },
-          FeDetReq: feDetReq
-        }
+    // Agregar IVA si hay alícuotas
+    if (params.iva && params.iva.length > 0) {
+      feDetReq.FECAEDetRequest.Iva = {
+        AlicIva: params.iva
       };
-      
-      console.log(`[AFIP] 📤 REQUEST COMPLETO:`, JSON.stringify(request, null, 2));
-      
-      // Llamar a AFIP con retry
-      let result;
-      let attempts = 0;
-      const maxAttempts = 3;
-      
-      while (attempts < maxAttempts) {
-        try {
-          attempts++;
-          console.log(`[AFIP] 🔄 Intento ${attempts}/${maxAttempts} llamando a FECAESolicitar...`);
-          
-          result = await client.FECAESolicitarAsync(request);
-          console.log(`[AFIP] ✅ Respuesta obtenida en intento ${attempts}`);
-          break;
-        } catch (soapError) {
-          console.error(`[AFIP] ❌ Error en intento ${attempts}:`, soapError);
-          if (attempts === maxAttempts) throw soapError;
-          await new Promise(resolve => setTimeout(resolve, 2000 * attempts));
-        }
+      console.log(`[AFIP] 📊 IVA incluido: ${params.iva.length} alícuota(s)`);
+    } else {
+      console.log(`[AFIP] 📊 Sin alícuotas IVA`);
+    }
+
+    const request = {
+      Auth: auth,
+      FeCAEReq: {
+        FeCabReq: {
+          CantReg: 1,
+          PtoVta: params.puntoVenta,
+          CbteTipo: params.comprobanteTipo
+        },
+        FeDetReq: feDetReq
       }
-      
+    };
+    
+    console.log(`[AFIP] 📤 REQUEST DETALLE:`, JSON.stringify(feDetReq, null, 2));
+    
+    // 🔍 VERIFICACIÓN FINAL EN EL REQUEST
+    const requestDetail = feDetReq.FECAEDetRequest;
+    const sumaFinal = requestDetail.ImpTotConc + requestDetail.ImpNeto + requestDetail.ImpOpEx + requestDetail.ImpIVA + requestDetail.ImpTrib;
+    console.log(`[AFIP] 🔎 VERIFICACIÓN FINAL: ${sumaFinal} = ${requestDetail.ImpTotal} ✓`);
+    
+    // Llamar a AFIP con retry
+    let result;
+    let attempts = 0;
+    const maxAttempts = 3;
+    
+    while (attempts < maxAttempts) {
+      try {
+        attempts++;
+        console.log(`[AFIP] 🔄 Intento ${attempts}/${maxAttempts} llamando a FECAESolicitar...`);
+        
+        result = await client.FECAESolicitarAsync(request);
+        console.log(`[AFIP] ✅ Respuesta obtenida en intento ${attempts}`);
+        break;
+      } catch (soapError) {
+        console.error(`[AFIP] ❌ Error en intento ${attempts}:`, soapError);
+        if (attempts === maxAttempts) throw soapError;
+        await new Promise(resolve => setTimeout(resolve, 2000 * attempts));
+      }
+    }
       // 🔍 DEBUGGING DETALLADO DE RESPUESTA
       console.log(`[AFIP] 📥 === ANÁLISIS COMPLETO DE RESPUESTA ===`);
       console.log(`[AFIP] 📥 Tipo de result:`, typeof result);
