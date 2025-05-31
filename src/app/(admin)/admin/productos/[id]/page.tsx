@@ -1,6 +1,7 @@
+// src/app/(admin)/admin/productos/[id]/page.tsx - CORREGIDO
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import { ChevronLeft, Package, Save, Loader2, Upload, Trash, AlertCircle } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
@@ -43,12 +44,15 @@ const productoSchema = z.object({
     categoriaId: z.string().min(1, { message: 'Debe seleccionar una categoría' }),
     stockMinimo: z.number().int().nonnegative({ message: 'El stock mínimo debe ser un número positivo o cero' }),
     activo: z.boolean()
-  });  
+});
 
-  
-  type ProductoFormData = z.infer<typeof productoSchema>;
+type ProductoFormData = z.infer<typeof productoSchema>;
 
-export default function EditarProductoPage({ params }: { params: { id: string } }) {
+export default function EditarProductoPage({ params }: { params: Promise<{ id: string }> }) {
+  // 🔧 CORRECCIÓN: Unwrap params usando React.use()
+  const resolvedParams = use(params);
+  const productId = resolvedParams.id;
+
   const [producto, setProducto] = useState<Producto | null>(null);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -58,109 +62,84 @@ export default function EditarProductoPage({ params }: { params: { id: string } 
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageFile, setImageFile] = useState<File | null>(null);
   const router = useRouter();
-  const [previewUrl, setPreviewUrl] = useState<string | null>(producto?.imagen || null);
-  const [imageUrl, setImageUrl] = useState<string | null>(producto?.imagen || null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
 
-const { 
-  register, 
-  handleSubmit, 
-  formState: { errors },
-  reset
-} = useForm<ProductoFormData>({
-  resolver: zodResolver(productoSchema),
-  defaultValues: {
-    nombre: '',
-    descripcion: '',
-    precio: 0,
-    codigoBarras: '',
-    categoriaId: '',
-    stockMinimo: 0,
-    activo: true
-  }
-});
-
-
-// Reemplazar el código del useEffect
-useEffect(() => {
-  const fetchData = async () => {
-    try {
-      setIsLoading(true);
-      console.log("Cargando producto con ID:", params.id);
-      
-      // Cargar producto
-      const productoResponse = await authenticatedFetch(`/api/admin/productos/${params.id}`);
-      if (!productoResponse.ok) {
-        console.error("Error en respuesta:", await productoResponse.text());
-        throw new Error('Error al cargar producto');
-      }
-      const productoData = await productoResponse.json();
-      console.log("Datos del producto recibidos:", productoData);
-      setProducto(productoData);
-      
-      // Establecer previsualización de imagen
-      if (productoData.imagen) {
-        console.log("Estableciendo imagen previa:", productoData.imagen);
-        setPreviewUrl(productoData.imagen);
-        setImageUrl(productoData.imagen);
-      }
-      
-      // Cargar categorías
-      const categoriasResponse = await authenticatedFetch('/api/admin/categorias');
-      if (!categoriasResponse.ok) {
-        throw new Error('Error al cargar categorías');
-      }
-      const categoriasData = await categoriasResponse.json();
-      setCategorias(categoriasData);
-      
-      // Establecer valores del formulario con datos explícitos
-      reset({
-        nombre: productoData.nombre || '',
-        descripcion: productoData.descripcion || '',
-        precio: typeof productoData.precio === 'number' ? productoData.precio : 0,
-        codigoBarras: productoData.codigoBarras || '',
-        categoriaId: productoData.categoriaId || '',
-        stockMinimo: typeof productoData.stockMinimo === 'number' ? productoData.stockMinimo : 0,
-        activo: productoData.activo === false ? false : true
-      });
-      
-      console.log("Formulario resetado con datos:", productoData);
-    } catch (err) {
-      console.error('Error detallado:', err);
-      setError('Error al cargar datos del producto');
-    } finally {
-      setIsLoading(false);
+  const { 
+    register, 
+    handleSubmit, 
+    formState: { errors },
+    reset
+  } = useForm<ProductoFormData>({
+    resolver: zodResolver(productoSchema),
+    defaultValues: {
+      nombre: '',
+      descripcion: '',
+      precio: 0,
+      codigoBarras: '',
+      categoriaId: '',
+      stockMinimo: 0,
+      activo: true
     }
-  };
+  });
 
-  if (params.id) {
-    fetchData();
-  }
-}, [params.id]); // Eliminar reset de las dependencias
+  // 🔧 CORRECCIÓN: Usar productId en lugar de params.id
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        console.log("Cargando producto con ID:", productId);
+        
+        // Cargar producto
+        const productoResponse = await authenticatedFetch(`/api/admin/productos/${productId}`);
+        if (!productoResponse.ok) {
+          console.error("Error en respuesta:", await productoResponse.text());
+          throw new Error('Error al cargar producto');
+        }
+        const productoData = await productoResponse.json();
+        console.log("Datos del producto recibidos:", productoData);
+        setProducto(productoData);
+        
+        // Establecer previsualización de imagen
+        if (productoData.imagen) {
+          console.log("Estableciendo imagen previa:", productoData.imagen);
+          setPreviewUrl(productoData.imagen);
+          setImageUrl(productoData.imagen);
+        }
+        
+        // Cargar categorías
+        const categoriasResponse = await authenticatedFetch('/api/admin/categorias');
+        if (!categoriasResponse.ok) {
+          throw new Error('Error al cargar categorías');
+        }
+        const categoriasData = await categoriasResponse.json();
+        setCategorias(categoriasData);
+        
+        // Establecer valores del formulario con datos explícitos
+        reset({
+          nombre: productoData.nombre || '',
+          descripcion: productoData.descripcion || '',
+          precio: typeof productoData.precio === 'number' ? productoData.precio : 0,
+          codigoBarras: productoData.codigoBarras || '',
+          categoriaId: productoData.categoriaId || '',
+          stockMinimo: typeof productoData.stockMinimo === 'number' ? productoData.stockMinimo : 0,
+          activo: productoData.activo === false ? false : true
+        });
+        
+        console.log("Formulario resetado con datos:", productoData);
+      } catch (err) {
+        console.error('Error detallado:', err);
+        setError('Error al cargar datos del producto');
+      } finally {
+        setIsLoading(false);
+        setIsFetching(false);
+      }
+    };
 
-  // Manejar carga de imagen
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setImageFile(file);
-      
-      // Crear URL para vista previa
-      const previewURL = URL.createObjectURL(file);
-      setImagePreview(previewURL);
+    if (productId) {
+      fetchData();
     }
-  };
-
-  // Subir imagen a servidor (simulado)
-  const uploadImage = async (file: File): Promise<string> => {
-    // En un entorno real, aquí subiríamos la imagen a un servidor o S3
-    // Para este ejemplo, simularemos que la imagen se subió correctamente
-    
-    // Simulamos un retraso de red
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // En un caso real, el servidor devolvería la URL de la imagen
-    // Aquí simplemente usamos la URL de vista previa como simulación
-    return imagePreview || '';
-  };
+  }, [productId, reset]); // 🔧 CORRECCIÓN: Usar productId
 
   const onSubmit = async (data: ProductoFormData) => {
     try {
@@ -170,10 +149,10 @@ useEffect(() => {
       // Usar la URL ya procesada por ImageUploader
       const productoData = {
         ...data,
-        imagen: imageUrl || undefined  // Usa la URL establecida por onImageUpload
+        imagen: imageUrl || undefined
       };
       
-      const response = await authenticatedFetch(`/api/admin/productos/${params.id}`, {
+      const response = await authenticatedFetch(`/api/admin/productos/${productId}`, {
         method: 'PATCH',
         body: JSON.stringify(productoData)
       });
@@ -206,7 +185,7 @@ useEffect(() => {
       setIsDeleting(true);
       setError(null);
       
-      const response = await authenticatedFetch(`/api/admin/productos/${params.id}`, {
+      const response = await authenticatedFetch(`/api/admin/productos/${productId}`, {
         method: 'PATCH',
         body: JSON.stringify({ activo: !producto?.activo })
       });
@@ -364,28 +343,18 @@ useEffect(() => {
               </div>
 
               <div>
-  <HCLabel className="block text-sm font-medium mb-1">
-    Imagen del Producto
-  </HCLabel>
-  <ImageUploader
-  type="product"
-  initialImage={producto?.imagen || null}
-  onImageUpload={(newImageUrl) => {
-    setImageUrl(newImageUrl);
-    console.log('Nueva URL de imagen recibida:', newImageUrl);
-  }}
-/>
-</div>
-
-{producto?.codigoBarras && (
-  <div className="mt-4 pt-4 border-t">
-    <h3 className="text-lg font-medium">Código de Barras</h3>
-    <BarcodeGenerator 
-      value={producto.codigoBarras} 
-      productName={producto.nombre} 
-    />
-  </div>
-)}
+                <HCLabel className="block text-sm font-medium mb-1">
+                  Imagen del Producto
+                </HCLabel>
+                <ImageUploader
+                  type="product"
+                  initialImage={producto?.imagen || null}
+                  onImageUpload={(newImageUrl) => {
+                    setImageUrl(newImageUrl);
+                    console.log('Nueva URL de imagen recibida:', newImageUrl);
+                  }}
+                />
+              </div>
 
               <div>
                 <HCLabel htmlFor="stockMinimo" className="block text-sm font-medium mb-1">
@@ -404,6 +373,16 @@ useEffect(() => {
                 )}
               </div>
             </div>
+
+            {producto?.codigoBarras && (
+              <div className="mt-4 pt-4 border-t">
+                <h3 className="text-lg font-medium">Código de Barras</h3>
+                <BarcodeGenerator 
+                  value={producto.codigoBarras} 
+                  productName={producto.nombre} 
+                />
+              </div>
+            )}
 
             <div className="flex items-center">
               <input

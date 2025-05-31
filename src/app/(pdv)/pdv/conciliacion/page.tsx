@@ -1,4 +1,4 @@
-// src/app/(pdv)/pdv/conciliacion/page.tsx
+// src/app/(pdv)/pdv/conciliacion/page.tsx - VISTA MEJORADA POR CATEGORÍAS
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -6,18 +6,32 @@ import { format } from 'date-fns';
 import { 
   BarChart, CheckCircle, AlertTriangle, Save, Loader, Search, 
   Package, Check, X, RotateCcw, AlertCircle, 
-  Clock, Target, TrendingUp, Eye, EyeOff, Hash, ScanLine
+  Clock, Target, TrendingUp, ChevronLeft, ChevronRight,
+  Hash, ScanLine, Grid, List, Filter, Tags
 } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
 
 interface ProductoConciliacion {
   id: string;
   nombre: string;
-  stockTeorico: number; // Solo para cálculos internos, NO se muestra
+  stockTeorico: number;
   stockFisico: number | null;
-  diferencia: number; // Solo para cálculos internos
+  diferencia: number;
   conteoIntentos: number;
   completado: boolean;
+  categoriaId: string;
+  categoria: {
+    id: string;
+    nombre: string;
+  };
+}
+
+interface Categoria {
+  id: string;
+  nombre: string;
+  productCount: number;
+  completedCount: number;
+  hasErrors: boolean;
 }
 
 interface Conciliacion {
@@ -33,13 +47,21 @@ const MAX_INTENTOS_GLOBAL = 3;
 export default function ConciliacionPage() {
   const [conciliacion, setConciliacion] = useState<Conciliacion | null>(null);
   const [stockCounts, setStockCounts] = useState<Record<string, number>>({});
-  const [conteoIntentos, setConteoIntentos] = useState<Record<string, number>>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [observaciones, setObservaciones] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  
+  // 🆕 NUEVOS ESTADOS PARA CATEGORÍAS
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [activeCategoryId, setActiveCategoryId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'category' | 'all'>('category');
+  const [completedProducts, setCompletedProducts] = useState<Set<string>>(new Set());
+  const [hasContingenciasPendientes, setHasContingenciasPendientes] = useState(false);
+  const [contingenciasPendientes, setContingenciasPendientes] = useState<any[]>([]);
+  
   const [showAlert, setShowAlert] = useState<{
     show: boolean;
     tipo: 'warning' | 'error';
@@ -48,16 +70,6 @@ export default function ConciliacionPage() {
     productosConError: string[];
     intentosRestantes: number;
   } | null>(null);
-  
-  // 🆕 Estados para la nueva UI
-  const [currentProductIndex, setCurrentProductIndex] = useState(0);
-  const [viewMode, setViewMode] = useState<'list' | 'focus'>('list');
-  const [completedProducts, setCompletedProducts] = useState<Set<string>>(new Set());
-  const [hasContingenciasPendientes, setHasContingenciasPendientes] = useState(false);
-  const [contingenciasPendientes, setContingenciasPendientes] = useState<any[]>([]);
-  
-  const productRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   // Verificar contingencias pendientes
   useEffect(() => {
@@ -132,18 +144,55 @@ export default function ConciliacionPage() {
         productos: data.productos.map((p: any) => ({
           id: p.id,
           nombre: p.nombre,
-          stockTeorico: p.stockTeorico, // Solo para cálculos internos
+          stockTeorico: p.stockTeorico,
           stockFisico: p.stockFisico,
           diferencia: p.diferencia || 0,
           conteoIntentos: 0,
-          completado: p.stockFisico !== null && p.stockFisico !== undefined
+          completado: p.stockFisico !== null && p.stockFisico !== undefined,
+          categoriaId: p.categoriaId || 'sin-categoria',
+          categoria: p.categoria || { id: 'sin-categoria', nombre: 'Sin categoría' }
         }))
       };
       
       setConciliacion(conciliacionFormateada);
       
+      // 🆕 PROCESAR CATEGORÍAS
+      const categoriasMap = new Map<string, Categoria>();
+      
+      conciliacionFormateada.productos.forEach(producto => {
+        const catId = producto.categoria.id;
+        const catNombre = producto.categoria.nombre;
+        
+        if (!categoriasMap.has(catId)) {
+          categoriasMap.set(catId, {
+            id: catId,
+            nombre: catNombre,
+            productCount: 0,
+            completedCount: 0,
+            hasErrors: false
+          });
+        }
+        
+        const categoria = categoriasMap.get(catId)!;
+        categoria.productCount++;
+        
+        if (producto.completado) {
+          categoria.completedCount++;
+        }
+      });
+      
+      const categoriasArray = Array.from(categoriasMap.values()).sort((a, b) => 
+        a.nombre.localeCompare(b.nombre)
+      );
+      
+      setCategorias(categoriasArray);
+      
+      // Seleccionar primera categoría por defecto
+      if (categoriasArray.length > 0 && !activeCategoryId) {
+        setActiveCategoryId(categoriasArray[0].id);
+      }
+      
       const initialCounts: Record<string, number> = {};
-      const initialIntentos: Record<string, number> = {};
       const completed = new Set<string>();
       
       conciliacionFormateada.productos.forEach(producto => {
@@ -151,11 +200,9 @@ export default function ConciliacionPage() {
           initialCounts[producto.id] = producto.stockFisico;
           completed.add(producto.id);
         }
-        initialIntentos[producto.id] = 0;
       });
       
       setStockCounts(initialCounts);
-      setConteoIntentos(initialIntentos);
       setCompletedProducts(completed);
       
     } catch (err) {
@@ -166,11 +213,10 @@ export default function ConciliacionPage() {
     }
   };
 
-  // 🆕 NUEVA LÓGICA: No mostrar diferencias, solo validar si está correcto
   const isProductCorrect = useCallback((productoId: string, stockFisico: number): boolean => {
     const producto = conciliacion?.productos.find(p => p.id === productoId);
     if (!producto) return false;
-    return stockFisico === producto.stockTeorico; // Comparación interna
+    return stockFisico === producto.stockTeorico;
   }, [conciliacion]);
 
   const handleStockChange = (productoId: string, value: string) => {
@@ -184,11 +230,6 @@ export default function ConciliacionPage() {
     
     if (value !== '') {
       setCompletedProducts(prev => new Set([...prev, productoId]));
-      
-      // Auto-focus siguiente producto
-      setTimeout(() => {
-        focusNextIncompleteProduct(productoId);
-      }, 500);
     } else {
       setCompletedProducts(prev => {
         const newSet = new Set(prev);
@@ -196,23 +237,30 @@ export default function ConciliacionPage() {
         return newSet;
       });
     }
+    
+    // 🆕 ACTUALIZAR ESTADÍSTICAS DE CATEGORÍA
+    actualizarEstadisticasCategorias();
   };
 
-  const focusNextIncompleteProduct = (currentProductId: string) => {
+  const actualizarEstadisticasCategorias = () => {
     if (!conciliacion) return;
     
-    const currentIndex = conciliacion.productos.findIndex(p => p.id === currentProductId);
-    const nextIncomplete = conciliacion.productos
-      .slice(currentIndex + 1)
-      .find(p => !completedProducts.has(p.id));
+    const categoriasActualizadas = categorias.map(categoria => {
+      const productosCategoria = conciliacion.productos.filter(p => p.categoriaId === categoria.id);
+      const completados = productosCategoria.filter(p => completedProducts.has(p.id));
+      const conErrores = productosCategoria.some(p => {
+        const stockFisico = stockCounts[p.id];
+        return stockFisico !== undefined && !isProductCorrect(p.id, stockFisico);
+      });
+      
+      return {
+        ...categoria,
+        completedCount: completados.length,
+        hasErrors: conErrores
+      };
+    });
     
-    if (nextIncomplete) {
-      const input = inputRefs.current[nextIncomplete.id];
-      if (input) {
-        input.focus();
-        input.select();
-      }
-    }
+    setCategorias(categoriasActualizadas);
   };
 
   const handleValidateAndSave = async () => {
@@ -234,7 +282,6 @@ export default function ConciliacionPage() {
       return;
     }
     
-    // Verificar si hay diferencias (sin mostrarlas al usuario)
     const hayDiferencias = conciliacion.productos.some(p => {
       const stockFisico = stockCounts[p.id];
       return stockFisico !== p.stockTeorico;
@@ -334,24 +381,22 @@ export default function ConciliacionPage() {
       return newSet;
     });
     
-    setTimeout(() => {
-      const input = inputRefs.current[productoId];
-      if (input) {
-        input.focus();
-      }
-    }, 100);
+    actualizarEstadisticasCategorias();
   };
 
-  // Progreso de la conciliación
+  // Filtrar productos por categoría activa
+  const productosFiltrados = conciliacion?.productos.filter(producto => {
+    const matchesCategory = activeCategoryId ? producto.categoriaId === activeCategoryId : true;
+    const matchesSearch = searchTerm ? 
+      producto.nombre.toLowerCase().includes(searchTerm.toLowerCase()) : true;
+    return matchesCategory && matchesSearch;
+  }) || [];
+
+  // Progreso general
   const progreso = {
     completados: completedProducts.size,
     total: conciliacion?.productos.length || 0
   };
-
-  // Filtros de productos
-  const filteredProductos = conciliacion?.productos.filter(producto =>
-    producto.nombre.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
 
   // Estados de carga
   if (isLoading) {
@@ -384,9 +429,6 @@ export default function ConciliacionPage() {
             <p className="text-sm text-orange-800">
               <strong>Contingencias de conciliación pendientes:</strong> {contingenciasPendientes.length}
             </p>
-            <p className="text-xs text-orange-600 mt-1">
-              Las demás contingencias no afectan las conciliaciones.
-            </p>
           </div>
           
           <button
@@ -402,21 +444,21 @@ export default function ConciliacionPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header mejorado con progreso prominente */}
+      {/* Header mejorado */}
       <div className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-10">
         <div className="p-4">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h1 className="text-2xl font-bold text-[#311716] flex items-center">
                 <BarChart className="mr-3 h-7 w-7 text-[#9c7561]" />
-                Conteo de Inventario
+                Conteo de Inventario por Categorías
               </h1>
               <p className="text-gray-600 mt-1">
-                Registra la cantidad exacta que encuentras físicamente
+                Navega por categorías y registra la cantidad exacta que encuentras físicamente
               </p>
             </div>
             
-            {/* 🆕 PROGRESO MÁS PROMINENTE */}
+            {/* Progreso prominente */}
             <div className="text-center">
               <div className="flex items-center justify-center space-x-3 mb-2">
                 <div className="text-3xl font-bold text-[#311716]">
@@ -441,41 +483,36 @@ export default function ConciliacionPage() {
             </div>
           </div>
 
-          {/* 🆕 CONTROLES DE VISTA */}
+          {/* Controles de vista */}
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <div className="flex bg-gray-100 rounded-lg p-1">
                 <button
-                  onClick={() => setViewMode('list')}
+                  onClick={() => setViewMode('category')}
                   className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                    viewMode === 'list' 
+                    viewMode === 'category' 
                       ? 'bg-white text-[#311716] shadow-sm' 
                       : 'text-gray-500 hover:text-gray-700'
                   }`}
                 >
-                  Lista Completa
+                  <Tags className="w-4 h-4 mr-1 inline" />
+                  Por Categoría
                 </button>
                 <button
-                  onClick={() => setViewMode('focus')}
+                  onClick={() => setViewMode('all')}
                   className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                    viewMode === 'focus' 
+                    viewMode === 'all' 
                       ? 'bg-white text-[#311716] shadow-sm' 
                       : 'text-gray-500 hover:text-gray-700'
                   }`}
                 >
-                  Modo Enfoque
+                  <List className="w-4 h-4 mr-1 inline" />
+                  Vista Completa
                 </button>
               </div>
-              
-              {conciliacion && conciliacion.intentosGlobales > 0 && (
-                <div className="flex items-center text-amber-600 text-sm bg-amber-50 px-3 py-1 rounded-full">
-                  <Clock className="h-4 w-4 mr-1" />
-                  <span>Intento {conciliacion.intentosGlobales + 1} de {MAX_INTENTOS_GLOBAL}</span>
-                </div>
-              )}
             </div>
             
-            {/* Buscador compacto */}
+            {/* Buscador */}
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
@@ -490,7 +527,7 @@ export default function ConciliacionPage() {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto p-6">
+      <div className="max-w-7xl mx-auto p-6">
         {/* Mensajes */}
         {error && (
           <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg mb-6">
@@ -510,49 +547,178 @@ export default function ConciliacionPage() {
           </div>
         )}
 
-        {/* 🆕 INSTRUCCIONES SIMPLIFICADAS */}
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-6 mb-6">
-          <div className="flex items-start space-x-4">
-            <div className="bg-blue-100 p-2 rounded-lg">
-              <Hash className="h-6 w-6 text-blue-600" />
-            </div>
-            <div className="flex-1">
-              <h3 className="text-lg font-semibold text-blue-900 mb-2">Instrucciones Simples</h3>
-              <div className="text-blue-800 space-y-1 text-sm">
-                <p>• Cuenta físicamente cada producto y registra la cantidad exacta</p>
-                <p>• El sistema te dirá si está ✅ correcto o ❌ incorrecto</p>
-                <p>• Tienes hasta 3 oportunidades para revisar si hay diferencias</p>
+        <div className="flex gap-6">
+          {/* 🆕 PANEL DE CATEGORÍAS */}
+          {viewMode === 'category' && (
+            <div className="w-80 bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
+                <Tags className="w-5 h-5 mr-2 text-[#9c7561]" />
+                Categorías
+              </h3>
+              
+              <div className="space-y-2">
+                {categorias.map(categoria => (
+                  <button
+                    key={categoria.id}
+                    onClick={() => setActiveCategoryId(categoria.id)}
+                    className={`w-full text-left p-4 rounded-lg border-2 transition-all ${
+                      activeCategoryId === categoria.id
+                        ? 'border-[#311716] bg-[#311716]/5'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="font-medium text-gray-900">{categoria.nombre}</span>
+                      {categoria.hasErrors && (
+                        <AlertTriangle className="w-4 h-4 text-amber-500" />
+                      )}
+                    </div>
+                    
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600">
+                        {categoria.completedCount}/{categoria.productCount} productos
+                      </span>
+                      
+                      <div className="flex items-center space-x-2">
+                        <div className="w-16 bg-gray-200 rounded-full h-2">
+                          <div 
+                            className={`h-2 rounded-full transition-all ${
+                              categoria.completedCount === categoria.productCount
+                                ? 'bg-green-500'
+                                : categoria.hasErrors
+                                ? 'bg-amber-500'
+                                : 'bg-blue-500'
+                            }`}
+                            style={{ 
+                              width: `${(categoria.completedCount / categoria.productCount) * 100}%` 
+                            }}
+                          />
+                        </div>
+                        
+                        {categoria.completedCount === categoria.productCount && !categoria.hasErrors && (
+                          <CheckCircle className="w-4 h-4 text-green-500" />
+                        )}
+                      </div>
+                    </div>
+                  </button>
+                ))}
               </div>
+            </div>
+          )}
+
+          {/* PANEL PRINCIPAL DE PRODUCTOS */}
+          <div className="flex-1">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-gray-900">
+                  {viewMode === 'category' && activeCategoryId
+                    ? categorias.find(c => c.id === activeCategoryId)?.nombre || 'Productos'
+                    : 'Todos los Productos'
+                  }
+                </h3>
+                
+                <div className="text-sm text-gray-600">
+                  {productosFiltrados.length} productos
+                </div>
+              </div>
+              
+              {productosFiltrados.length > 0 ? (
+                <div className="space-y-3">
+                  {productosFiltrados.map(producto => {
+                    const stockFisico = stockCounts[producto.id];
+                    const estaCompleto = completedProducts.has(producto.id);
+                    const esCorrectoCalculo = estaCompleto && isProductCorrect(producto.id, stockFisico);
+
+                    return (
+                      <div
+                        key={producto.id}
+                        className={`flex items-center justify-between p-4 rounded-lg border-2 transition-all ${
+                          estaCompleto
+                            ? esCorrectoCalculo
+                              ? 'border-green-500 bg-green-50'
+                              : 'border-red-500 bg-red-50'
+                            : 'border-gray-200 hover:border-[#9c7561]'
+                        }`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-semibold text-gray-900 mb-1">
+                            {producto.nombre}
+                          </h4>
+                          <div className="flex items-center space-x-4 text-sm text-gray-600">
+                            <span>Stock teórico: {producto.stockTeorico}</span>
+                            {viewMode === 'all' && (
+                              <span className="px-2 py-1 bg-gray-100 rounded-full text-xs">
+                                {producto.categoria.nombre}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center space-x-4">
+                          {/* Input de cantidad */}
+                          <div className="flex items-center space-x-2">
+                            <label className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                              Stock físico:
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={stockFisico !== undefined ? stockFisico : ''}
+                              onChange={(e) => handleStockChange(producto.id, e.target.value)}
+                              placeholder="0"
+                              className={`w-24 p-2 text-center font-semibold border-2 rounded-lg ${
+                                estaCompleto
+                                  ? esCorrectoCalculo
+                                    ? 'border-green-500 bg-green-50 text-green-900'
+                                    : 'border-red-500 bg-red-50 text-red-900'
+                                  : 'border-gray-300 focus:border-[#9c7561] focus:ring-2 focus:ring-[#9c7561] focus:ring-opacity-50'
+                              }`}
+                            />
+                          </div>
+                          
+                          {/* Estado visual */}
+                          <div className="flex items-center space-x-2">
+                            {estaCompleto ? (
+                              esCorrectoCalculo ? (
+                                <div className="flex items-center text-green-700">
+                                  <CheckCircle className="w-5 h-5 mr-1" />
+                                  <span className="text-sm font-medium">Correcto</span>
+                                </div>
+                              ) : (
+                                <div className="flex items-center text-red-700">
+                                  <AlertCircle className="w-5 h-5 mr-1" />
+                                  <span className="text-sm font-medium">Revisar</span>
+                                </div>
+                              )
+                            ) : (
+                              <div className="flex items-center text-gray-500">
+                                <Clock className="w-5 h-5 mr-1" />
+                                <span className="text-sm">Pendiente</span>
+                              </div>
+                            )}
+                            
+                            <button
+                              onClick={() => reiniciarConteoProducto(producto.id)}
+                              className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded"
+                              title="Limpiar"
+                            >
+                              <RotateCcw className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <Package className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                  <p>No hay productos en esta categoría</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
-
-        {/* 🆕 CONTENIDO PRINCIPAL CON VISTAS ALTERNATIVAS */}
-        {viewMode === 'focus' ? (
-          <FocusMode
-            productos={filteredProductos}
-            stockCounts={stockCounts}
-            completedProducts={completedProducts}
-            currentIndex={currentProductIndex}
-            onStockChange={handleStockChange}
-            onNext={() => setCurrentProductIndex(prev => Math.min(prev + 1, filteredProductos.length - 1))}
-            onPrev={() => setCurrentProductIndex(prev => Math.max(prev - 1, 0))}
-            onReset={reiniciarConteoProducto}
-            isProductCorrect={isProductCorrect}
-            inputRefs={inputRefs}
-          />
-        ) : (
-          <ListView
-            productos={filteredProductos}
-            stockCounts={stockCounts}
-            completedProducts={completedProducts}
-            onStockChange={handleStockChange}
-            onReset={reiniciarConteoProducto}
-            isProductCorrect={isProductCorrect}
-            inputRefs={inputRefs}
-            productRefs={productRefs}
-          />
-        )}
 
         {/* Footer con observaciones y finalizar */}
         {conciliacion?.estado !== 'completada' && (
@@ -607,287 +773,7 @@ export default function ConciliacionPage() {
   );
 }
 
-// 🆕 COMPONENTE MODO ENFOQUE (para concentrarse en un producto a la vez)
-interface FocusModeProps {
-  productos: ProductoConciliacion[];
-  stockCounts: Record<string, number>;
-  completedProducts: Set<string>;
-  currentIndex: number;
-  onStockChange: (id: string, value: string) => void;
-  onNext: () => void;
-  onPrev: () => void;
-  onReset: (id: string) => void;
-  isProductCorrect: (id: string, stock: number) => boolean;
-  inputRefs: React.MutableRefObject<Record<string, HTMLInputElement | null>>;
-}
-
-function FocusMode({ 
-  productos, 
-  stockCounts, 
-  completedProducts,
-  currentIndex, 
-  onStockChange, 
-  onNext, 
-  onPrev, 
-  onReset,
-  isProductCorrect,
-  inputRefs
-}: FocusModeProps) {
-  const producto = productos[currentIndex];
-  
-  if (!producto) return <div>No hay productos para mostrar</div>;
-  
-  const stockFisico = stockCounts[producto.id];
-  const estaCompleto = completedProducts.has(producto.id);
-  const esCorrectoCalculo = estaCompleto && isProductCorrect(producto.id, stockFisico);
-
-  return (
-    <div className="max-w-2xl mx-auto">
-      <div className="bg-white rounded-2xl shadow-lg p-8">
-        {/* Header del producto */}
-        <div className="text-center mb-8">
-          <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 ${
-            estaCompleto
-              ? esCorrectoCalculo
-                ? 'bg-green-100 border-4 border-green-500'
-                : 'bg-red-100 border-4 border-red-500'
-              : 'bg-gray-100 border-4 border-gray-300'
-          }`}>
-            {estaCompleto ? (
-              esCorrectoCalculo ? (
-                <Check className="w-10 h-10 text-green-600" />
-              ) : (
-                <X className="w-10 h-10 text-red-600" />
-              )
-            ) : (
-              <Hash className="w-10 h-10 text-gray-400" />
-            )}
-          </div>
-          
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">{producto.nombre}</h2>
-          <p className="text-gray-600">Producto {currentIndex + 1} de {productos.length}</p>
-        </div>
-
-        {/* Input principal */}
-        <div className="mb-8">
-          <label className="block text-lg font-medium text-gray-700 mb-4 text-center">
-            ¿Cuántas unidades contaste?
-          </label>
-          <div className="relative">
-            <input
-              ref={(el) => { inputRefs.current[producto.id] = el; }}
-              type="number"
-              min="0"
-              value={stockFisico !== undefined ? stockFisico : ''}
-              onChange={(e) => onStockChange(producto.id, e.target.value)}
-              placeholder="Cantidad contada"
-              className={`w-full p-6 text-center text-3xl font-bold border-2 rounded-2xl focus:ring-4 focus:ring-opacity-50 ${
-                estaCompleto
-                  ? esCorrectoCalculo
-                    ? 'border-green-500 bg-green-50 text-green-900 focus:ring-green-200'
-                    : 'border-red-500 bg-red-50 text-red-900 focus:ring-red-200'
-                  : 'border-gray-300 focus:border-[#9c7561] focus:ring-[#9c7561]'
-              }`}
-              autoFocus
-            />
-          </div>
-        </div>
-
-        {/* Estado visual */}
-        {estaCompleto && (
-          <div className={`text-center mb-6 p-4 rounded-xl ${
-            esCorrectoCalculo
-              ? 'bg-green-50 text-green-800'
-              : 'bg-red-50 text-red-800'
-          }`}>
-            <div className="flex items-center justify-center space-x-2">
-              {esCorrectoCalculo ? (
-                <>
-                  <CheckCircle className="w-6 h-6 text-green-600" />
-                  <span className="text-lg font-semibold">¡Correcto!</span>
-                </>
-              ) : (
-                <>
-                  <AlertCircle className="w-6 h-6 text-red-600" />
-                  <span className="text-lg font-semibold">Revisar cantidad</span>
-                </>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Controles */}
-        <div className="flex items-center justify-between">
-          <button
-            onClick={onPrev}
-            disabled={currentIndex === 0}
-            className="px-6 py-3 border border-gray-300 rounded-xl text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Anterior
-          </button>
-          
-          <div className="flex space-x-2">
-            <button
-              onClick={() => onReset(producto.id)}
-              className="px-4 py-3 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl"
-              title="Limpiar"
-            >
-              <RotateCcw className="w-5 h-5" />
-            </button>
-          </div>
-          
-          <button
-            onClick={onNext}
-            disabled={currentIndex === productos.length - 1}
-            className="px-6 py-3 bg-[#311716] text-white rounded-xl hover:bg-[#462625] disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            Siguiente
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// 🆕 COMPONENTE VISTA LISTA COMPACTA
-interface ListViewProps {
-  productos: ProductoConciliacion[];
-  stockCounts: Record<string, number>;
-  completedProducts: Set<string>;
-  onStockChange: (id: string, value: string) => void;
-  onReset: (id: string) => void;
-  isProductCorrect: (id: string, stock: number) => boolean;
-  inputRefs: React.MutableRefObject<Record<string, HTMLInputElement | null>>;
-  productRefs: React.MutableRefObject<Record<string, HTMLDivElement | null>>;
-}
-
-function ListView({ 
-  productos, 
-  stockCounts, 
-  completedProducts,
-  onStockChange, 
-  onReset,
-  isProductCorrect,
-  inputRefs,
-  productRefs
-}: ListViewProps) {
-  if (productos.length === 0) {
-    return (
-      <div className="bg-white p-8 text-center rounded-xl shadow-sm">
-        <Package className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-        <p className="text-gray-600">No se encontraron productos</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {productos.map((producto) => {
-        const stockFisico = stockCounts[producto.id];
-        const estaCompleto = completedProducts.has(producto.id);
-        const esCorrectoCalculo = estaCompleto && isProductCorrect(producto.id, stockFisico);
-
-        return (
-          <div
-            key={producto.id}
-            ref={(el) => { productRefs.current[producto.id] = el; }}
-            className={`bg-white rounded-xl shadow-sm border-2 transition-all duration-200 p-6 ${
-              estaCompleto
-                ? esCorrectoCalculo
-                  ? 'border-green-500 bg-green-50'
-                  : 'border-red-500 bg-red-50'
-                : 'border-gray-200 hover:border-[#9c7561] hover:shadow-md'
-            }`}
-          >
-            {/* Header del producto */}
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex-1">
-                <h3 className="font-semibold text-gray-900 text-lg mb-2 leading-tight">
-                  {producto.nombre}
-                </h3>
-              </div>
-              
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
-                estaCompleto
-                  ? esCorrectoCalculo
-                    ? 'bg-green-500 text-white'
-                    : 'bg-red-500 text-white'
-                  : 'bg-gray-200 text-gray-500'
-              }`}>
-                {estaCompleto ? (
-                  esCorrectoCalculo ? (
-                    <Check className="w-6 h-6" />
-                  ) : (
-                    <X className="w-6 h-6" />
-                  )
-                ) : (
-                  <Hash className="w-6 h-6" />
-                )}
-              </div>
-            </div>
-
-            {/* Input de cantidad */}
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Cantidad contada:
-              </label>
-              <div className="flex items-center space-x-2">
-                <input
-                  ref={(el) => { inputRefs.current[producto.id] = el; }}
-                  type="number"
-                  min="0"
-                  value={stockFisico !== undefined ? stockFisico : ''}
-                  onChange={(e) => onStockChange(producto.id, e.target.value)}
-                  placeholder="0"
-                  className={`flex-1 p-3 text-center text-xl font-semibold border-2 rounded-lg ${
-                    estaCompleto
-                      ? esCorrectoCalculo
-                        ? 'border-green-500 bg-green-50 text-green-900'
-                        : 'border-red-500 bg-red-50 text-red-900'
-                      : 'border-gray-300 focus:border-[#9c7561] focus:ring-2 focus:ring-[#9c7561] focus:ring-opacity-50'
-                  }`}
-                />
-                
-                <button
-                  onClick={() => onReset(producto.id)}
-                  className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                  title="Limpiar"
-                >
-                  <RotateCcw className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            {/* Estado visual */}
-            {estaCompleto && (
-              <div className={`text-center py-2 px-4 rounded-lg ${
-                esCorrectoCalculo
-                  ? 'bg-green-100 text-green-800'
-                  : 'bg-red-100 text-red-800'
-              }`}>
-                <div className="flex items-center justify-center space-x-2">
-                  {esCorrectoCalculo ? (
-                    <>
-                      <CheckCircle className="w-4 h-4" />
-                      <span className="text-sm font-medium">Correcto</span>
-                    </>
-                  ) : (
-                    <>
-                      <AlertCircle className="w-4 h-4" />
-                      <span className="text-sm font-medium">Revisar</span>
-                    </>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// 🆕 COMPONENTE MODAL DE ALERTA MEJORADO
+// Componente de modal de alerta (mantener igual)
 interface AlertModalProps {
   alert: {
     tipo: 'warning' | 'error';

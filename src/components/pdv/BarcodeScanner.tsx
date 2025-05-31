@@ -499,12 +499,12 @@ export function BarcodeScanner({
 
   return (
     <div className={`border border-gray-200 rounded-lg bg-white shadow-sm p-4 ${className}`}>
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-medium text-gray-800 flex items-center">
-          <Box className="mr-2 h-5 w-5 text-[#9c7561]" />
-          Escáner de productos
-          {soundEnabled && <Volume2 className="ml-2 h-4 w-4 text-green-600" />}
-        </h3>
+<div className="flex justify-between items-center mb-2"> {/* Cambiar de mb-4 a mb-2 */}
+  <h3 className="text-lg font-medium text-gray-800 flex items-center">
+    <Box className="mr-2 h-5 w-5 text-[#9c7561]" />
+    Escáner de productos
+    {soundEnabled && <Volume2 className="ml-2 h-4 w-4 text-green-600" />}
+  </h3>
         
         <div className="flex items-center gap-2">
           {/* 🆕 Toggle de sonido */}
