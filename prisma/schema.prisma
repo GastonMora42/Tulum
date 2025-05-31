@@ -271,6 +271,7 @@ model Venta {
 
   // Facturación
   facturada     Boolean @default(false)
+  tipoFactura   String? 
   numeroFactura String?
   clienteNombre String?
   clienteCuit   String?

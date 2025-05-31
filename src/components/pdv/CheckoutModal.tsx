@@ -1,11 +1,11 @@
-// src/components/pdv/CheckoutModal.tsx
+// src/components/pdv/CheckoutModal.tsx - VERSIÓN MEJORADA CON SELECCIÓN A/B
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
 import { useCartStore } from '@/stores/cartStore';
 import { 
   CreditCard, DollarSign, QrCode, Smartphone, X, Check, Loader, 
-  Plus, Trash, ArrowLeft, Receipt, AlertCircle, Percent, User
+  Plus, Trash, ArrowLeft, Receipt, AlertCircle, Percent, User, FileText
 } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
 
@@ -33,9 +33,13 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
   const [amountTendered, setAmountTendered] = useState<string>('');
   const [change, setChange] = useState<number>(0);
   const [isProcessing, setIsProcessing] = useState(false);
+  
+  // 🆕 ESTADOS PARA FACTURACIÓN MEJORADA
   const [facturar, setFacturar] = useState(false);
+  const [tipoFactura, setTipoFactura] = useState<'A' | 'B'>('B'); // Por defecto factura B
   const [clienteNombre, setClienteNombre] = useState('');
   const [clienteCuit, setClienteCuit] = useState('');
+  
   const [currentStep, setCurrentStep] = useState(1);
   const [facturacionObligatoria, setFacturacionObligatoria] = useState(false);
   const [remainingAmount, setRemainingAmount] = useState<number>(0);
@@ -73,6 +77,7 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
       setDiscountCode('');
       setValidationErrors({});
       setFacturar(false);
+      setTipoFactura('B'); // 🆕 Resetear a factura B por defecto
       setClienteNombre('');
       setClienteCuit('');
       
@@ -82,7 +87,6 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
       setAmountTendered(total.toFixed(2));
       setRemainingAmount(0);
       
-      // Auto focus en el botón principal cuando se abre
       setTimeout(() => {
         initialFocusRef.current?.focus();
       }, 100);
@@ -95,46 +99,75 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
     };
   }, [isOpen, getTotal]);
   
-  // Manejar clicks fuera del modal para cerrar
-  useEffect(() => {
-    function handleOutsideClick(event: MouseEvent) {
-      if (modalRef.current && !modalRef.current.contains(event.target as Node) && !isProcessing) {
-        onClose();
+  // 🆕 FUNCIÓN PARA VALIDAR LÍMITES DE FACTURAS B
+  const validarLimiteFacturaB = () => {
+    const total = getTotalWithDiscount();
+    // Las facturas B tienen un límite para consumidores finales 
+    const LIMITE_FACTURA_B = 15380; // Según el código de facturación
+    
+    if (tipoFactura === 'B' && total >= LIMITE_FACTURA_B && (!clienteCuit || clienteCuit.trim() === '')) {
+      return `Para montos ≥ $${LIMITE_FACTURA_B.toLocaleString()} se requiere CUIT del cliente`;
+    }
+    return null;
+  };
+
+  // 🆕 FUNCIÓN PARA VALIDAR CUIT
+  const validarCuit = (cuit: string): boolean => {
+    // Eliminar guiones y espacios
+    const cuitLimpio = cuit.replace(/[-\s]/g, '');
+    
+    // Verificar que tenga 11 dígitos
+    if (cuitLimpio.length !== 11 || !/^\d{11}$/.test(cuitLimpio)) {
+      return false;
+    }
+    
+    // Algoritmo de validación de CUIT
+    const multiplicadores = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
+    let suma = 0;
+    
+    for (let i = 0; i < 10; i++) {
+      suma += parseInt(cuitLimpio[i]) * multiplicadores[i];
+    }
+    
+    const resto = suma % 11;
+    const digitoVerificador = resto < 2 ? resto : 11 - resto;
+    
+    return parseInt(cuitLimpio[10]) === digitoVerificador;
+  };
+
+  // Manejar cambio de método de pago
+  const handlePaymentMethodChange = (index: number, methodId: string) => {
+    if (payments.some(p => p.method === methodId) && methodId !== payments[index].method) {
+      setValidationErrors({
+        ...validationErrors,
+        payment: `El método de pago ${paymentMethods.find(m => m.id === methodId)?.name} ya está en uso`
+      });
+      return;
+    }
+    
+    setValidationErrors({ ...validationErrors, payment: '' });
+    
+    const newPayments = [...payments];
+    newPayments[index] = { ...newPayments[index], method: methodId, reference: '' };
+    setPayments(newPayments);
+    
+    // 🆕 VERIFICAR FACTURACIÓN OBLIGATORIA SEGÚN MEDIO DE PAGO
+    const requiresInvoice = ['tarjeta_credito', 'tarjeta_debito', 'qr', 'transferencia'].includes(methodId);
+    setFacturacionObligatoria(requiresInvoice);
+    if (requiresInvoice) {
+      setFacturar(true);
+      // Para pagos electrónicos, sugerir factura A si el monto lo justifica
+      if (getTotalWithDiscount() > 50000) {
+        setTipoFactura('A');
       }
     }
-    
-    if (isOpen) {
-      document.addEventListener('mousedown', handleOutsideClick);
-    }
-    
-    return () => {
-      document.removeEventListener('mousedown', handleOutsideClick);
-    };
-  }, [isOpen, onClose, isProcessing]);
-  
-  // Manejar tecla Escape
-  useEffect(() => {
-    function handleEscapeKey(event: KeyboardEvent) {
-      if (event.key === 'Escape' && !isProcessing) {
-        onClose();
-      }
-    }
-    
-    if (isOpen) {
-      document.addEventListener('keydown', handleEscapeKey);
-    }
-    
-    return () => {
-      document.removeEventListener('keydown', handleEscapeKey);
-    };
-  }, [isOpen, onClose, isProcessing]);
-  
+  };
+
   // Calcular total final con descuento
   const getTotalWithDiscount = () => {
     const subtotal = getTotal();
     
     let discount = 0;
-    // Aplicar descuento de código si existe
     if (appliedDiscount) {
       if (appliedDiscount.type === 'porcentaje') {
         discount += subtotal * (appliedDiscount.value / 100);
@@ -143,14 +176,11 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
       }
     }
     
-    // Aplicar descuento general manual
     if (generalDiscount > 0) {
       discount += subtotal * (generalDiscount / 100);
     }
     
-    // Asegurar que el descuento no supere el total
     discount = Math.min(discount, subtotal);
-    
     return subtotal - discount;
   };
   
@@ -161,7 +191,6 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
     const remaining = Math.max(0, total - paidAmount);
     setRemainingAmount(remaining);
 
-    // Si solo hay un método de pago, actualizar automáticamente su cantidad al total
     if (payments.length === 1) {
       setPayments([{ ...payments[0], amount: total }]);
       if (payments[0].method === 'efectivo') {
@@ -187,29 +216,6 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
     }
   }, [amountTendered, payments]);
 
-// Manejar cambio en método de pago
-const handlePaymentMethodChange = (index: number, methodId: string) => {
-  // Validar límite de métodos de pago
-  if (payments.some(p => p.method === methodId) && methodId !== payments[index].method) {
-    setValidationErrors({
-      ...validationErrors,
-      payment: `El método de pago ${paymentMethods.find(m => m.id === methodId)?.name} ya está en uso`
-    });
-    return;
-  }
-  
-  setValidationErrors({ ...validationErrors, payment: '' });
-  
-  const newPayments = [...payments];
-  newPayments[index] = { ...newPayments[index], method: methodId, reference: '' };
-  setPayments(newPayments);
-  
-  // Verificar si hay facturación obligatoria
-  const requiresInvoice = ['tarjeta_credito', 'tarjeta_debito', 'qr', 'transferencia'].includes(methodId);
-  setFacturacionObligatoria(requiresInvoice);
-  if (requiresInvoice) setFacturar(true);
-};
-
   // Manejar cambio en monto de pago
   const handlePaymentAmountChange = (index: number, value: string) => {
     const amount = parseFloat(value);
@@ -219,22 +225,19 @@ const handlePaymentMethodChange = (index: number, methodId: string) => {
     const newPayments = [...payments];
     newPayments[index] = { ...newPayments[index], amount };
     
-    // Calcular restante
     const paidAmount = newPayments.reduce((sum, payment, i) => i !== index ? sum + payment.amount : sum + amount, 0);
     const remaining = Math.max(0, total - paidAmount);
     
     setRemainingAmount(remaining);
     setPayments(newPayments);
     
-    // Si es efectivo, actualizar también el monto entregado
     if (newPayments[index].method === 'efectivo') {
       setAmountTendered(amount.toFixed(2));
     }
   };
 
-  // Agregar método de pago adicional (máximo 2)
+  // Agregar método de pago adicional
   const addPaymentMethod = () => {
-    // Ya tenemos el máximo de métodos permitidos
     if (payments.length >= 2) {
       setValidationErrors({
         ...validationErrors,
@@ -246,7 +249,6 @@ const handlePaymentMethodChange = (index: number, methodId: string) => {
     setValidationErrors({ ...validationErrors, payment: '' });
     
     if (remainingAmount > 0) {
-      // Evitar duplicar el mismo método
       const availableMethods = paymentMethods.filter(method => 
         !payments.some(p => p.method === method.id)
       );
@@ -270,13 +272,11 @@ const handlePaymentMethodChange = (index: number, methodId: string) => {
       const removedPayment = payments[index];
       const newPayments = payments.filter((_, i) => i !== index);
       
-      // Recalcular restante
       const newRemainingAmount = remainingAmount + removedPayment.amount;
       
       setPayments(newPayments);
       setRemainingAmount(newRemainingAmount);
       
-      // Si el único pago restante es efectivo, actualizar su monto
       if (newPayments.length === 1 && newPayments[0].method === 'efectivo') {
         const totalAmount = getTotalWithDiscount();
         newPayments[0].amount = totalAmount;
@@ -292,7 +292,6 @@ const handlePaymentMethodChange = (index: number, methodId: string) => {
     newPayments[index] = { ...newPayments[index], reference: value };
     setPayments(newPayments);
     
-    // Limpiar error de validación si se completa la referencia
     if (value && validationErrors.reference) {
       setValidationErrors({ ...validationErrors, reference: '' });
     }
@@ -325,7 +324,6 @@ const handlePaymentMethodChange = (index: number, methodId: string) => {
         type: data.tipoDescuento
       });
       
-      // Recalcular total y actualizar pagos
       const newTotal = getTotalWithDiscount();
       if (payments.length === 1) {
         setPayments([{ ...payments[0], amount: newTotal }]);
@@ -376,7 +374,14 @@ const handlePaymentMethodChange = (index: number, methodId: string) => {
         newErrors.reference = 'Debe ingresar un número de referencia para los pagos con tarjeta';
       }
       
-      // Si hay errores, no avanzar
+      // 🆕 VALIDAR LÍMITES DE FACTURA B
+      if (facturar && tipoFactura === 'B') {
+        const errorLimite = validarLimiteFacturaB();
+        if (errorLimite) {
+          newErrors.facturaLimite = errorLimite;
+        }
+      }
+      
       if (Object.keys(newErrors).length > 0) {
         setValidationErrors(newErrors);
         return;
@@ -384,23 +389,40 @@ const handlePaymentMethodChange = (index: number, methodId: string) => {
     }
     
     if (currentStep === 2 && facturar) {
-      // Validar datos de facturación
-      if (!clienteNombre) {
-        newErrors.clienteNombre = 'Debe ingresar el nombre del cliente para facturar';
+      // 🆕 VALIDACIONES MEJORADAS SEGÚN TIPO DE FACTURA
+      if (tipoFactura === 'A') {
+        // Factura A: CUIT y Razón Social obligatorios
+        if (!clienteNombre || clienteNombre.trim() === '') {
+          newErrors.clienteNombre = 'La razón social es obligatoria para facturas A';
+        }
+        
+        if (!clienteCuit || clienteCuit.trim() === '') {
+          newErrors.clienteCuit = 'El CUIT es obligatorio para facturas A';
+        } else if (!validarCuit(clienteCuit)) {
+          newErrors.clienteCuit = 'El CUIT ingresado no es válido';
+        }
+      } else if (tipoFactura === 'B') {
+        // Factura B: Validar límites y CUIT si es necesario
+        const errorLimite = validarLimiteFacturaB();
+        if (errorLimite) {
+          newErrors.facturaLimite = errorLimite;
+        }
+        
+        // Si se proporciona CUIT, validarlo
+        if (clienteCuit && clienteCuit.trim() !== '' && !validarCuit(clienteCuit)) {
+          newErrors.clienteCuit = 'El CUIT ingresado no es válido';
+        }
+        
+        // Si no hay CUIT pero sí hay nombre, está bien (consumidor final con nombre)
+        // Si no hay ninguno, será consumidor final genérico
       }
       
-      if (!clienteCuit) {
-        newErrors.clienteCuit = 'Debe ingresar el CUIT/DNI del cliente para facturar';
-      }
-      
-      // Si hay errores, no avanzar
       if (Object.keys(newErrors).length > 0) {
         setValidationErrors(newErrors);
         return;
       }
     }
     
-    // Limpiar errores y avanzar
     setValidationErrors({});
     setCurrentStep(currentStep + 1);
   };
@@ -416,7 +438,6 @@ const handlePaymentMethodChange = (index: number, methodId: string) => {
     setValidationErrors({});
     
     try {
-      // Verificar montos de pago
       const totalPaid = payments.reduce((sum, payment) => sum + payment.amount, 0);
       const total = getTotalWithDiscount();
       
@@ -424,13 +445,11 @@ const handlePaymentMethodChange = (index: number, methodId: string) => {
         throw new Error('El monto total de los pagos debe ser igual al total de la venta');
       }
       
-      // Obtener sucursalId
       const sucursalId = localStorage.getItem('sucursalId');
       if (!sucursalId) {
         throw new Error('No se ha definido una sucursal');
       }
       
-      // Calcular descuento total
       let descuentoTotal = 0;
       if (appliedDiscount) {
         if (appliedDiscount.type === 'porcentaje') {
@@ -444,7 +463,6 @@ const handlePaymentMethodChange = (index: number, methodId: string) => {
         descuentoTotal += getTotal() * (generalDiscount / 100);
       }
       
-      // Preparar datos para la venta
       const ventaData = {
         sucursalId,
         items: items.map(item => ({
@@ -456,9 +474,11 @@ const handlePaymentMethodChange = (index: number, methodId: string) => {
         total: getTotalWithDiscount(),
         descuento: descuentoTotal,
         codigoDescuento: appliedDiscount?.code,
-        facturar,
-        clienteNombre: facturar ? clienteNombre : null,
-        clienteCuit: facturar ? clienteCuit : null,
+        // 🔧 CORRECCIÓN: Separar facturar del tipo
+        facturar: facturar, // Boolean
+        tipoFactura: facturar ? tipoFactura : null, // String o null
+        clienteNombre: facturar ? (clienteNombre || null) : null,
+        clienteCuit: facturar ? (clienteCuit || null) : null,
         pagos: payments.map(payment => ({
           medioPago: payment.method,
           monto: payment.amount,
@@ -469,7 +489,6 @@ const handlePaymentMethodChange = (index: number, methodId: string) => {
         }))
       };
       
-      // Enviar la venta al servidor
       const response = await authenticatedFetch('/api/pdv/ventas', {
         method: 'POST',
         headers: {
@@ -485,19 +504,15 @@ const handlePaymentMethodChange = (index: number, methodId: string) => {
       
       const result = await response.json();
       
-      // Informar resultado
       onComplete({
         success: true,
         message: facturar 
-          ? 'Venta completada. Generando factura...' 
+          ? `Venta completada con factura ${tipoFactura}. ${result.cae ? 'CAE: ' + result.cae : 'Procesando facturación...'}` 
           : 'Venta completada correctamente',
         ventaId: result.id
       });
       
-      // Limpiar carrito
       clearCart();
-      
-      // Cerrar modal
       onClose();
     } catch (error) {
       onComplete({ 
@@ -509,7 +524,6 @@ const handlePaymentMethodChange = (index: number, methodId: string) => {
     }
   };
   
-  // Si el modal no está abierto, no renderizar
   if (!isOpen) return null;
   
   return (
@@ -789,123 +803,213 @@ const handlePaymentMethodChange = (index: number, methodId: string) => {
                     <p className="text-sm">{validationErrors.total}</p>
                   </div>
                 )}
+
+                {/* Error de límite de factura */}
+                {validationErrors.facturaLimite && (
+                  <div className="mb-4 p-2 bg-amber-50 text-amber-700 rounded-lg flex items-center">
+                    <AlertCircle size={16} className="mr-2 flex-shrink-0" />
+                    <p className="text-sm">{validationErrors.facturaLimite}</p>
+                  </div>
+                )}
                 
-                {/* Opción de facturación */}
-                <div className="flex items-center mt-4 mb-6 bg-gray-50 p-3 rounded-lg">
-                  <input
-                    id="facturar"
-                    type="checkbox"
-                    checked={facturar || facturacionObligatoria}
-                    onChange={(e) => setFacturar(e.target.checked)}
-                    disabled={facturacionObligatoria}
-                    className="h-4 w-4 text-[#311716] focus:ring-[#9c7561] border-gray-300 rounded"
-                  />
-                  <label htmlFor="facturar" className="ml-2 block text-gray-700">
-                    {facturacionObligatoria 
-                      ? 'Facturación obligatoria para pagos electrónicos' 
-                      : 'Generar factura'
-                    }
-                  </label>
+                {/* 🆕 SECCIÓN DE FACTURACIÓN MEJORADA */}
+                <div className="border-t border-gray-100 pt-4 mt-4">
+                  <div className="flex items-center p-3 bg-gray-50 rounded-lg mb-3">
+                    <input
+                      id="facturar"
+                      type="checkbox"
+                      checked={facturar || facturacionObligatoria}
+                      onChange={(e) => setFacturar(e.target.checked)}
+                      disabled={facturacionObligatoria}
+                      className="h-4 w-4 text-[#311716] focus:ring-[#9c7561] border-gray-300 rounded"
+                    />
+                    <label htmlFor="facturar" className="ml-2 block text-gray-700">
+                      {facturacionObligatoria 
+                        ? 'Facturación obligatoria para pagos electrónicos' 
+                        : 'Generar factura electrónica'
+                      }
+                    </label>
+                  </div>
+                  
+                  {/* 🆕 SELECTOR DE TIPO DE FACTURA */}
+                  {facturar && (
+                    <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Tipo de factura:
+                      </label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setTipoFactura('A')}
+                          className={`p-3 rounded-lg border-2 transition-colors ${
+                            tipoFactura === 'A' 
+                              ? 'border-[#311716] bg-[#311716] text-white' 
+                              : 'border-gray-200 hover:border-gray-300 bg-white'
+                          }`}
+                        >
+                          <div className="text-center">
+                            <FileText className="h-6 w-6 mx-auto mb-1" />
+                            <div className="font-bold">Factura A</div>
+                            <div className="text-xs opacity-75">
+                              {tipoFactura === 'A' ? 'IVA discriminado' : 'Responsable Inscripto'}
+                            </div>
+                          </div>
+                        </button>
+                        
+                        <button
+                          type="button"
+                          onClick={() => setTipoFactura('B')}
+                          className={`p-3 rounded-lg border-2 transition-colors ${
+                            tipoFactura === 'B' 
+                              ? 'border-[#311716] bg-[#311716] text-white' 
+                              : 'border-gray-200 hover:border-gray-300 bg-white'
+                          }`}
+                        >
+                          <div className="text-center">
+                            <Receipt className="h-6 w-6 mx-auto mb-1" />
+                            <div className="font-bold">Factura B</div>
+                            <div className="text-xs opacity-75">
+                              {tipoFactura === 'B' ? 'IVA incluido' : 'Consumidor Final'}
+                            </div>
+                          </div>
+                        </button>
+                      </div>
+                      
+                      {/* 🆕 INFORMACIÓN SOBRE TIPOS DE FACTURA */}
+                      <div className="mt-3 text-xs text-blue-700">
+                        {tipoFactura === 'A' ? (
+                          <div>
+                            <strong>Factura A:</strong> Requiere CUIT del cliente. IVA discriminado. 
+                            Para operaciones entre Responsables Inscriptos.
+                          </div>
+                        ) : (
+                          <div>
+                            <strong>Factura B:</strong> Para Consumidores Finales. IVA incluido en el precio. 
+                            {getTotalWithDiscount() >= 15380 && ' ⚠️ Requiere identificación del cliente para montos ≥ $15.380.'}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {facturacionObligatoria && (
+                    <div className="mt-2 text-sm text-amber-600 bg-amber-50 p-2 rounded">
+                      <span className="flex items-center">
+                        <AlertCircle className="mr-1 h-4 w-4" />
+                        Los pagos con tarjeta y transferencias requieren factura electrónica
+                      </span>
+                    </div>
+                  )}
                 </div>
-    {/* Agregar esta sección al final del Paso 1 */}
-    <div className="border-t border-gray-100 pt-4 mt-4">
-      <div className="flex items-center p-3 bg-gray-50 rounded-lg">
-        <input
-          id="facturar"
-          type="checkbox"
-          checked={facturar || facturacionObligatoria}
-          onChange={(e) => setFacturar(e.target.checked)}
-          disabled={facturacionObligatoria}
-          className="h-4 w-4 text-[#311716] focus:ring-[#9c7561] border-gray-300 rounded"
-        />
-        <label htmlFor="facturar" className="ml-2 block text-gray-700">
-          {facturacionObligatoria 
-            ? 'Facturación obligatoria para pagos electrónicos' 
-            : 'Generar factura electrónica'
-          }
-        </label>
-      </div>
-      
-      {facturacionObligatoria && (
-        <div className="mt-2 text-sm text-amber-600 bg-amber-50 p-2 rounded">
-          <span className="flex items-center">
-            <AlertCircle className="mr-1 h-4 w-4" />
-            Los pagos con tarjeta y transferencias requieren factura electrónica
-          </span>
-        </div>
-      )}
-    </div>
-  </>
-)}
+              </>
+            )}
             
-{/* Paso 2: Datos de cliente para facturación */}
-{currentStep === 2 && (
-  <>
-    {facturar ? (
-      <div className="space-y-4 bg-gray-50 p-4 rounded-lg">
-        <div className="flex items-center mb-2 text-[#311716]">
-          <Receipt className="h-5 w-5 mr-2" />
-          <h3 className="font-medium">Datos para facturación</h3>
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Nombre/Razón Social:
-          </label>
-          <div className="relative">
-            <User className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-            <input
-              type="text"
-              value={clienteNombre}
-              onChange={(e) => setClienteNombre(e.target.value)}
-              className={`w-full p-2 pl-10 border rounded-lg focus:ring-1 focus:ring-[#9c7561] focus:border-[#9c7561] ${
-                validationErrors.clienteNombre ? 'border-red-300 bg-red-50' : 'border-gray-300'
-              }`}
-              placeholder="Ingrese nombre o razón social"
-            />
-          </div>
-          {validationErrors.clienteNombre && (
-            <p className="text-xs text-red-500 mt-1">{validationErrors.clienteNombre}</p>
-          )}
-        </div>
-        
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            CUIT/DNI:
-          </label>
-          <input
-            type="text"
-            value={clienteCuit}
-            onChange={(e) => setClienteCuit(e.target.value)}
-            className={`w-full p-2 border rounded-lg focus:ring-1 focus:ring-[#9c7561] focus:border-[#9c7561] ${
-              validationErrors.clienteCuit ? 'border-red-300 bg-red-50' : 'border-gray-300'
-            }`}
-            placeholder="Ingrese CUIT o DNI sin guiones"
-          />
-          {validationErrors.clienteCuit && (
-            <p className="text-xs text-red-500 mt-1">{validationErrors.clienteCuit}</p>
-          )}
-        </div>
-        
-        <div className="bg-blue-50 p-3 rounded-lg text-blue-800 text-sm mt-2">
-          <div className="flex items-start">
-            <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 text-blue-500" />
-            <p>
-              Estos datos serán utilizados para generar la factura electrónica.
-              Asegúrese de que sean correctos.
-            </p>
-          </div>
-        </div>
-      </div>
-    ) : (
-      <div className="py-8 text-center bg-gray-50 rounded-lg">
-        <Receipt className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-        <p className="text-lg font-medium text-gray-700 mb-2">No se requiere facturación</p>
-        <p className="text-gray-500">Continúe para finalizar la venta sin generar factura.</p>
-      </div>
-    )}
-  </>
-)}
+            {/* Paso 2: Datos de cliente para facturación */}
+            {currentStep === 2 && (
+              <>
+                {facturar ? (
+                  <div className="space-y-4 bg-gray-50 p-4 rounded-lg">
+                    <div className="flex items-center mb-2 text-[#311716]">
+                      <Receipt className="h-5 w-5 mr-2" />
+                      <h3 className="font-medium">
+                        Datos para factura {tipoFactura}
+                      </h3>
+                    </div>
+                    
+                    {/* 🆕 INFORMACIÓN ESPECÍFICA SEGÚN TIPO */}
+                    <div className="text-sm text-gray-600 bg-white p-3 rounded-lg border-l-4 border-blue-400">
+                      {tipoFactura === 'A' ? (
+                        <>
+                          <strong>Factura A - Responsable Inscripto:</strong><br />
+                          • CUIT y Razón Social son obligatorios<br />
+                        </>
+                      ) : (
+                        <>
+                          <strong>Factura B - Consumidor Final:</strong><br />
+                          • CUIT/DNI opcional (excepto para montos ≥ $15.380)<br />
+                          • IVA incluido en el precio<br />
+                        </>
+                      )}
+                    </div>
+                    
+                    {/* Campo Nombre/Razón Social */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        {tipoFactura === 'A' ? 'Razón Social: *' : 'Nombre (opcional):'}
+                      </label>
+                      <div className="relative">
+                        <User className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                        <input
+                          type="text"
+                          value={clienteNombre}
+                          onChange={(e) => setClienteNombre(e.target.value)}
+                          className={`w-full p-2 pl-10 border rounded-lg focus:ring-1 focus:ring-[#9c7561] focus:border-[#9c7561] ${
+                            validationErrors.clienteNombre ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                          }`}
+                          placeholder={tipoFactura === 'A' ? 'Razón social del cliente' : 'Nombre del cliente (opcional)'}
+                        />
+                      </div>
+                      {validationErrors.clienteNombre && (
+                        <p className="text-xs text-red-500 mt-1">{validationErrors.clienteNombre}</p>
+                      )}
+                    </div>
+                    
+                    {/* Campo CUIT/DNI */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        {tipoFactura === 'A' ? 'CUIT: *' : 
+                         (getTotalWithDiscount() >= 15380 ? 'CUIT/DNI: *' : 'CUIT/DNI (opcional):')}
+                      </label>
+                      <input
+                        type="text"
+                        value={clienteCuit}
+                        onChange={(e) => setClienteCuit(e.target.value)}
+                        className={`w-full p-2 border rounded-lg focus:ring-1 focus:ring-[#9c7561] focus:border-[#9c7561] ${
+                          validationErrors.clienteCuit ? 'border-red-300 bg-red-50' : 'border-gray-300'
+                        }`}
+                        placeholder={tipoFactura === 'A' ? '20-12345678-9' : 'CUIT/DNI sin guiones'}
+                        maxLength={13}
+                      />
+                      {validationErrors.clienteCuit && (
+                        <p className="text-xs text-red-500 mt-1">{validationErrors.clienteCuit}</p>
+                      )}
+                      
+                      {/* Error de límite de factura B */}
+                      {validationErrors.facturaLimite && (
+                        <p className="text-xs text-amber-600 mt-1 bg-amber-50 p-2 rounded">
+                          {validationErrors.facturaLimite}
+                        </p>
+                      )}
+                    </div>
+                    
+                    {/* Información adicional según el tipo */}
+                    <div className="bg-blue-50 p-3 rounded-lg text-blue-800 text-sm mt-3">
+                      <div className="flex items-start">
+                        <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 text-blue-500" />
+                        <div>
+                          {tipoFactura === 'A' ? (
+                            <p>
+                              <strong>Importante:</strong> Verifique que la razón social y CUIT sean correctos. 
+                            </p>
+                          ) : (
+                            <p>
+                              <strong>Factura B:</strong> Si no proporciona datos, se emitirá como "Consumidor Final". 
+                              {getTotalWithDiscount() >= 15380 && ' Para este monto es obligatorio identificar al cliente.'}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="py-8 text-center bg-gray-50 rounded-lg">
+                    <Receipt className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                    <p className="text-lg font-medium text-gray-700 mb-2">No se requiere facturación</p>
+                    <p className="text-gray-500">Continúe para finalizar la venta sin generar factura.</p>
+                  </div>
+                )}
+              </>
+            )}
             
             {/* Paso 3: Confirmación */}
             {currentStep === 3 && (
@@ -953,14 +1057,32 @@ const handlePaymentMethodChange = (index: number, methodId: string) => {
                     {facturar && (
                       <div className="border-t border-gray-200 mt-2 pt-2">
                         <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Facturar a:</span>
-                          <span className="text-right">{clienteNombre}</span>
+                          <span className="text-gray-600">Tipo de factura:</span>
+                          <span className="font-medium">Factura {tipoFactura}</span>
                         </div>
                         
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">CUIT/DNI:</span>
-                          <span>{clienteCuit}</span>
-                        </div>
+                        {clienteNombre && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">
+                              {tipoFactura === 'A' ? 'Razón Social:' : 'Cliente:'}
+                            </span>
+                            <span className="text-right">{clienteNombre}</span>
+                          </div>
+                        )}
+                        
+                        {clienteCuit && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">CUIT/DNI:</span>
+                            <span>{clienteCuit}</span>
+                          </div>
+                        )}
+                        
+                        {!clienteNombre && !clienteCuit && tipoFactura === 'B' && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-600">Cliente:</span>
+                            <span className="text-gray-500 italic">Consumidor Final</span>
+                          </div>
+                        )}
                       </div>
                     )}
                     
@@ -980,7 +1102,9 @@ const handlePaymentMethodChange = (index: number, methodId: string) => {
                     <ul className="text-blue-700 text-sm list-disc pl-5 mt-1 space-y-1">
                       <li>Se descontará el stock de los productos</li>
                       <li>Se registrará en el historial de ventas</li>
-                      {facturar && <li>Se generará una factura electrónica</li>}
+                      {facturar && (
+                        <li>Se generará una factura electrónica tipo {tipoFactura}</li>
+                      )}
                     </ul>
                   </div>
                 </div>

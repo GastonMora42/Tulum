@@ -4,7 +4,6 @@ import prisma from '@/server/db/client';
 import { authMiddleware } from '@/server/api/middlewares/auth';
 import { checkPermission } from '@/server/api/middlewares/authorization';
 import { ventaService } from '@/server/services/venta/ventaService';
-import { v4 as uuidv4 } from 'uuid';
 
 // GET - Obtener ventas con filtros
 export async function GET(req: NextRequest) {
@@ -280,27 +279,54 @@ export async function POST(req: NextRequest) {
       total: body.total,
       descuento: body.descuento || 0,
       codigoDescuento: body.codigoDescuento,
-      facturar: body.facturar || false,
+      facturar: body.facturar || false, // ✅ Boolean
+      tipoFactura: body.tipoFactura, // 🆕 Tipo de factura
       clienteNombre: body.clienteNombre,
       clienteCuit: body.clienteCuit,
       pagos: body.pagos
     });
     
 
-if (body.facturar && venta) {
-  try {
-    console.log(`[VENTA] Iniciando facturación directa para venta ${venta.id}`);
-    
-    // Verificar datos para factura A
-    if (body.facturar === 'A' && (!body.clienteCuit || !body.clienteNombre)) {
-      throw new Error('Para facturas tipo A se requiere CUIT y nombre del cliente');
+    if (body.facturar && venta) {
+      try {
+        console.log(`[VENTA] Iniciando facturación directa para venta ${venta.id}`);
+        console.log(`[VENTA] Tipo de factura: ${body.tipoFactura}`);
+        
+        const tipoFactura = body.tipoFactura || 'B'; // Default a B
+        
+    if (tipoFactura === 'A') {
+      // Factura A requiere CUIT y nombre obligatorios
+      if (!body.clienteCuit || !body.clienteNombre) {
+        throw new Error('Para facturas tipo A se requiere CUIT y razón social del cliente');
+      }
+      
+      // Validar formato de CUIT
+      const cuitLimpio = body.clienteCuit.replace(/[-\s]/g, '');
+      if (cuitLimpio.length !== 11 || !/^\d{11}$/.test(cuitLimpio)) {
+        throw new Error('El CUIT debe tener 11 dígitos');
+      }
+    } else if (tipoFactura === 'B') {
+      // Factura B: verificar límites para consumidor final
+      const LIMITE_FACTURA_B = 15380;
+      if (venta.total >= LIMITE_FACTURA_B && (!body.clienteCuit || body.clienteCuit.trim() === '')) {
+        throw new Error(`Para facturas B con monto ≥ $${LIMITE_FACTURA_B.toLocaleString()} se requiere CUIT/DNI del cliente`);
+      }
     }
     
     // Obtener servicio de facturación
     const { getFacturacionService } = await import('@/server/services/facturacion/factoryService');
     const facturacionService = await getFacturacionService(sucursalId);
     
-    // Procesar factura DIRECTAMENTE
+    // 🆕 ACTUALIZAR VENTA CON TIPO DE FACTURA ANTES DE FACTURAR
+    await prisma.venta.update({
+      where: { id: venta.id },
+      data: {
+        clienteNombre: body.clienteNombre,
+        clienteCuit: body.clienteCuit
+      }
+    });
+    
+    // Procesar factura
     console.log(`[VENTA] Llamando a generarFactura...`);
     const resultadoFacturacion = await facturacionService.generarFactura(venta.id);
     
@@ -321,10 +347,9 @@ if (body.facturar && venta) {
         ...venta,
         facturaId: resultadoFacturacion.facturaId,
         cae: resultadoFacturacion.cae,
-        message: 'Venta creada y facturada exitosamente'
+        message: `Venta creada y facturada exitosamente (Factura ${tipoFactura})`
       }, { status: 201 });
     } else {
-      // Si falla la facturación, aún devolver la venta pero con error
       return NextResponse.json({
         ...venta,
         facturaError: resultadoFacturacion.message,
