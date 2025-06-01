@@ -1,9 +1,9 @@
-// src/app/(admin)/admin/productos/[id]/page.tsx - CORREGIDO
+// src/app/(admin)/admin/productos/[id]/page.tsx - VERSIÓN CORREGIDA
 'use client';
 
 import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, Package, Save, Loader2, Upload, Trash, AlertCircle } from 'lucide-react';
+import { ChevronLeft, Package, Save, Loader2, Upload, Trash, AlertCircle, RefreshCw } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -37,13 +37,13 @@ interface Producto {
 
 // Esquema de validación
 const productoSchema = z.object({
-    nombre: z.string().min(3, { message: 'El nombre debe tener al menos 3 caracteres' }),
-    descripcion: z.string().nullable(),
-    precio: z.number().positive({ message: 'El precio debe ser positivo' }),
-    codigoBarras: z.string().nullable(),
-    categoriaId: z.string().min(1, { message: 'Debe seleccionar una categoría' }),
-    stockMinimo: z.number().int().nonnegative({ message: 'El stock mínimo debe ser un número positivo o cero' }),
-    activo: z.boolean()
+  nombre: z.string().min(3, { message: 'El nombre debe tener al menos 3 caracteres' }),
+  descripcion: z.string().nullable(),
+  precio: z.number().positive({ message: 'El precio debe ser positivo' }),
+  codigoBarras: z.string().nullable(),
+  categoriaId: z.string().min(1, { message: 'Debe seleccionar una categoría' }),
+  stockMinimo: z.number().int().nonnegative({ message: 'El stock mínimo debe ser un número positivo o cero' }),
+  activo: z.boolean()
 });
 
 type ProductoFormData = z.infer<typeof productoSchema>;
@@ -59,17 +59,17 @@ export default function EditarProductoPage({ params }: { params: Promise<{ id: s
   const [isDeleting, setIsDeleting] = useState(false);
   const [isFetching, setIsFetching] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const router = useRouter();
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [isFormReady, setIsFormReady] = useState(false); // 🆕 Control de formulario
+  
+  const router = useRouter();
 
   const { 
     register, 
     handleSubmit, 
     formState: { errors },
-    reset
+    reset,
+    setValue // 🆕 Para establecer valores manualmente
   } = useForm<ProductoFormData>({
     resolver: zodResolver(productoSchema),
     defaultValues: {
@@ -83,93 +83,140 @@ export default function EditarProductoPage({ params }: { params: Promise<{ id: s
     }
   });
 
-  // 🔧 CORRECCIÓN: Usar productId en lugar de params.id
+  // 🔧 FUNCIÓN CORREGIDA - Cargar datos del producto
+  const cargarProducto = async () => {
+    try {
+      setIsFetching(true);
+      setError(null);
+      
+      console.log("🔍 Cargando producto con ID:", productId);
+      
+      const response = await authenticatedFetch(`/api/admin/productos/${productId}`);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("❌ Error en respuesta:", response.status, errorText);
+        
+        if (response.status === 404) {
+          setError('Producto no encontrado');
+          return;
+        }
+        
+        throw new Error(`Error ${response.status}: ${errorText}`);
+      }
+      
+      const productoData = await response.json();
+      console.log("✅ Datos del producto recibidos:", productoData);
+      
+      setProducto(productoData);
+      setImageUrl(productoData.imagen);
+      
+      // 🆕 ESTABLECER VALORES DEL FORMULARIO CORRECTAMENTE
+      setValue('nombre', productoData.nombre || '');
+      setValue('descripcion', productoData.descripcion || '');
+      setValue('precio', Number(productoData.precio) || 0);
+      setValue('codigoBarras', productoData.codigoBarras || '');
+      setValue('categoriaId', productoData.categoriaId || '');
+      setValue('stockMinimo', Number(productoData.stockMinimo) || 0);
+      setValue('activo', productoData.activo !== false);
+      
+      setIsFormReady(true);
+      console.log("📝 Formulario configurado con datos del producto");
+      
+    } catch (err) {
+      console.error('❌ Error detallado al cargar producto:', err);
+      setError(err instanceof Error ? err.message : 'Error al cargar datos del producto');
+    } finally {
+      setIsFetching(false);
+    }
+  };
+
+  // 🔧 FUNCIÓN CORREGIDA - Cargar categorías
+  const cargarCategorias = async () => {
+    try {
+      console.log("📂 Cargando categorías...");
+      
+      const response = await authenticatedFetch('/api/admin/categorias');
+      
+      if (!response.ok) {
+        throw new Error('Error al cargar categorías');
+      }
+      
+      const categoriasData = await response.json();
+      console.log("✅ Categorías cargadas:", categoriasData.length);
+      
+      setCategorias(categoriasData);
+    } catch (err) {
+      console.error('❌ Error al cargar categorías:', err);
+      setError('Error al cargar categorías');
+    }
+  };
+
+  // 🔧 EFECTO PRINCIPAL - Cargar datos al montar
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setIsLoading(true);
-        console.log("Cargando producto con ID:", productId);
-        
-        // Cargar producto
-        const productoResponse = await authenticatedFetch(`/api/admin/productos/${productId}`);
-        if (!productoResponse.ok) {
-          console.error("Error en respuesta:", await productoResponse.text());
-          throw new Error('Error al cargar producto');
-        }
-        const productoData = await productoResponse.json();
-        console.log("Datos del producto recibidos:", productoData);
-        setProducto(productoData);
-        
-        // Establecer previsualización de imagen
-        if (productoData.imagen) {
-          console.log("Estableciendo imagen previa:", productoData.imagen);
-          setPreviewUrl(productoData.imagen);
-          setImageUrl(productoData.imagen);
-        }
-        
-        // Cargar categorías
-        const categoriasResponse = await authenticatedFetch('/api/admin/categorias');
-        if (!categoriasResponse.ok) {
-          throw new Error('Error al cargar categorías');
-        }
-        const categoriasData = await categoriasResponse.json();
-        setCategorias(categoriasData);
-        
-        // Establecer valores del formulario con datos explícitos
-        reset({
-          nombre: productoData.nombre || '',
-          descripcion: productoData.descripcion || '',
-          precio: typeof productoData.precio === 'number' ? productoData.precio : 0,
-          codigoBarras: productoData.codigoBarras || '',
-          categoriaId: productoData.categoriaId || '',
-          stockMinimo: typeof productoData.stockMinimo === 'number' ? productoData.stockMinimo : 0,
-          activo: productoData.activo === false ? false : true
-        });
-        
-        console.log("Formulario resetado con datos:", productoData);
-      } catch (err) {
-        console.error('Error detallado:', err);
-        setError('Error al cargar datos del producto');
-      } finally {
-        setIsLoading(false);
+    const cargarDatos = async () => {
+      if (!productId) {
+        setError('ID de producto no válido');
         setIsFetching(false);
+        return;
+      }
+
+      console.log("🚀 Iniciando carga de datos para producto:", productId);
+      
+      try {
+        // Cargar categorías y producto en paralelo
+        await Promise.all([
+          cargarCategorias(),
+          cargarProducto()
+        ]);
+      } catch (err) {
+        console.error('❌ Error al cargar datos:', err);
+        setError('Error al cargar datos');
       }
     };
 
-    if (productId) {
-      fetchData();
-    }
-  }, [productId, reset]); // 🔧 CORRECCIÓN: Usar productId
+    cargarDatos();
+  }, [productId]); // Solo depende del productId
 
   const onSubmit = async (data: ProductoFormData) => {
     try {
       setIsLoading(true);
       setError(null);
       
-      // Usar la URL ya procesada por ImageUploader
+      console.log("💾 Guardando producto con datos:", data);
+      
       const productoData = {
         ...data,
-        imagen: imageUrl || undefined
+        descripcion: data.descripcion || null,
+        codigoBarras: data.codigoBarras || null,
+        imagen: imageUrl || null
       };
+      
+      console.log("📤 Enviando datos actualizados:", productoData);
       
       const response = await authenticatedFetch(`/api/admin/productos/${productId}`, {
         method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify(productoData)
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({ error: 'Error del servidor' }));
         throw new Error(errorData.error || 'Error al actualizar producto');
       }
       
-      // Actualizar datos locales
       const updatedProducto = await response.json();
+      console.log("✅ Producto actualizado:", updatedProducto);
+      
       setProducto(updatedProducto);
       
       // Mostrar mensaje de éxito
       alert('Producto actualizado correctamente');
+      
     } catch (err: any) {
-      console.error('Error:', err);
+      console.error('❌ Error al actualizar:', err);
       setError(err.message || 'Error al actualizar producto');
     } finally {
       setIsLoading(false);
@@ -187,11 +234,14 @@ export default function EditarProductoPage({ params }: { params: Promise<{ id: s
       
       const response = await authenticatedFetch(`/api/admin/productos/${productId}`, {
         method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({ activo: !producto?.activo })
       });
       
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json().catch(() => ({ error: 'Error del servidor' }));
         throw new Error(errorData.error || 'Error al cambiar estado del producto');
       }
       
@@ -205,31 +255,59 @@ export default function EditarProductoPage({ params }: { params: Promise<{ id: s
     }
   };
 
+  // 🔧 RENDERIZADO CONDICIONAL MEJORADO
   if (isFetching) {
     return (
       <ContrastEnhancer>
         <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
-          <span className="ml-2 text-black">Cargando producto...</span>
+          <div className="text-center">
+            <Loader2 className="h-12 w-12 animate-spin text-indigo-500 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold text-black mb-2">Cargando producto...</h2>
+            <p className="text-gray-600">Obteniendo datos del producto</p>
+          </div>
         </div>
       </ContrastEnhancer>
     );
   }
 
-  if (!producto && !isFetching) {
+  if (error) {
     return (
       <ContrastEnhancer>
         <div className="flex flex-col items-center justify-center h-64">
           <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
-          <h2 className="text-xl font-semibold text-black mb-2">Producto no encontrado</h2>
-          <p className="text-black mb-4">El producto que estás buscando no existe o ha sido eliminado.</p>
-          <button
-            onClick={() => router.push('/admin/productos')}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700"
-          >
-            <ChevronLeft className="h-4 w-4 mr-2" />
-            Volver a productos
-          </button>
+          <h2 className="text-xl font-semibold text-black mb-2">Error</h2>
+          <p className="text-red-600 mb-4 text-center">{error}</p>
+          
+          <div className="flex space-x-4">
+            <button
+              onClick={() => window.location.reload()}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700"
+            >
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Reintentar
+            </button>
+            
+            <button
+              onClick={() => router.push('/admin/productos')}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md shadow-sm text-gray-700 bg-white hover:bg-gray-50"
+            >
+              <ChevronLeft className="h-4 w-4 mr-2" />
+              Volver a productos
+            </button>
+          </div>
+        </div>
+      </ContrastEnhancer>
+    );
+  }
+
+  if (!producto || !isFormReady) {
+    return (
+      <ContrastEnhancer>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <Loader2 className="h-8 w-8 animate-spin text-indigo-500 mx-auto mb-4" />
+            <p className="text-gray-600">Preparando formulario...</p>
+          </div>
         </div>
       </ContrastEnhancer>
     );
@@ -254,12 +332,6 @@ export default function EditarProductoPage({ params }: { params: Promise<{ id: s
         </div>
 
         <div className="bg-white shadow overflow-hidden sm:rounded-lg p-6">
-          {error && (
-            <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded-md">
-              {error}
-            </div>
-          )}
-
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
@@ -351,7 +423,7 @@ export default function EditarProductoPage({ params }: { params: Promise<{ id: s
                   initialImage={producto?.imagen || null}
                   onImageUpload={(newImageUrl) => {
                     setImageUrl(newImageUrl);
-                    console.log('Nueva URL de imagen recibida:', newImageUrl);
+                    console.log('🖼️ Nueva URL de imagen recibida:', newImageUrl);
                   }}
                 />
               </div>

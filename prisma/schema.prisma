@@ -85,6 +85,7 @@ model Insumo {
 model Categoria {
   id        String     @id @default(uuid())
   nombre    String     @unique
+  imagen    String?    // 🆕 Campo para imagen de categoría
   productos Producto[]
 }
 

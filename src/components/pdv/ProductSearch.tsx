@@ -1,15 +1,24 @@
-// src/components/pdv/ProductSearch.tsx - VERSIÓN COMPLETAMENTE REDISEÑADA
+// src/components/pdv/ProductSearch.tsx - VERSIÓN CON IMÁGENES DE BD
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
 import { useOffline } from '@/hooks/useOffline';
-import { Search, Loader, Tag, Package, X, Star, TrendingUp } from 'lucide-react';
+import { Search, Loader, Tag, Package, X, Star, TrendingUp, ArrowLeft, Grid } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
 import { Producto } from '@/types/models/producto';
 
 interface ProductSearchProps {
   onProductSelect: (product: Producto) => void;
   className?: string;
+}
+
+interface Categoria {
+  id: string;
+  nombre: string;
+  imagen?: string; // URL de S3
+  _count?: {
+    productos: number;
+  };
 }
 
 export function ProductSearch({ onProductSelect, className = '' }: ProductSearchProps) {
@@ -21,13 +30,23 @@ export function ProductSearch({ onProductSelect, className = '' }: ProductSearch
   const [popularProducts, setPopularProducts] = useState<Producto[]>([]);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
   
+  // 🆕 ESTADOS PARA VISTA DE CATEGORÍAS CON IMÁGENES DE BD
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<Categoria | null>(null);
+  const [categoryProducts, setCategoryProducts] = useState<Producto[]>([]);
+  const [viewMode, setViewMode] = useState<'categories' | 'search' | 'category-products'>('categories');
+  const [imageErrors, setImageErrors] = useState<Set<string>>(new Set());
+  
   const { isOnline, searchProductosCache } = useOffline();
   const searchRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Cargar productos populares al inicio
+  // 🆕 IMAGEN POR DEFECTO PARA CATEGORÍAS
+  const DEFAULT_CATEGORY_IMAGE = '/images/categorias/default.jpg';
+
+  // Cargar categorías al inicio
   useEffect(() => {
-    loadPopularProducts();
+    loadCategorias();
     loadRecentSearches();
   }, []);
 
@@ -35,16 +54,20 @@ export function ProductSearch({ onProductSelect, className = '' }: ProductSearch
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
-        setShowResults(false);
+        if (viewMode === 'search') {
+          setShowResults(false);
+        }
       }
     };
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  }, [viewMode]);
 
   // Búsqueda con debounce
   useEffect(() => {
+    if (viewMode !== 'search') return;
+    
     const searchProducts = async () => {
       if (!searchTerm.trim()) {
         setResults([]);
@@ -82,23 +105,47 @@ export function ProductSearch({ onProductSelect, className = '' }: ProductSearch
 
     const handler = setTimeout(searchProducts, 300);
     return () => clearTimeout(handler);
-  }, [searchTerm, isOnline, searchProductosCache]);
+  }, [searchTerm, isOnline, searchProductosCache, viewMode]);
 
-  const loadPopularProducts = async () => {
+  // 🆕 CARGAR CATEGORÍAS DESDE BD CON IMÁGENES
+  const loadCategorias = async () => {
     try {
+      console.log('📂 Cargando categorías desde BD...');
+      const response = await authenticatedFetch('/api/admin/categorias');
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ Categorías cargadas:', data.length);
+        setCategorias(data);
+      }
+    } catch (error) {
+      console.error('❌ Error cargando categorías:', error);
+    }
+  };
+
+  // 🆕 CARGAR PRODUCTOS DE UNA CATEGORÍA
+  const loadCategoryProducts = async (categoria: Categoria) => {
+    try {
+      setIsLoading(true);
       const sucursalId = localStorage.getItem('sucursalId');
       if (!sucursalId) return;
 
+      console.log(`🔍 Cargando productos de categoría: ${categoria.nombre}`);
+
       const response = await authenticatedFetch(
-        `/api/pdv/productos-disponibles?popular=true&sucursalId=${sucursalId}`
+        `/api/pdv/productos-disponibles?categoriaId=${categoria.id}&sucursalId=${sucursalId}`
       );
       
       if (response.ok) {
         const data = await response.json();
-        setPopularProducts(Array.isArray(data) ? data.slice(0, 6) : []);
+        console.log(`✅ ${data.length} productos cargados para ${categoria.nombre}`);
+        setCategoryProducts(Array.isArray(data) ? data : []);
+        setSelectedCategory(categoria);
+        setViewMode('category-products');
       }
     } catch (error) {
-      console.error('Error cargando productos populares:', error);
+      console.error('Error cargando productos de categoría:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -139,148 +186,216 @@ export function ProductSearch({ onProductSelect, className = '' }: ProductSearch
     }, 2000);
   };
 
-  const handleRecentSearchClick = (term: string) => {
-    setSearchTerm(term);
-    inputRef.current?.focus();
+  // Manejar vista de búsqueda
+  const handleSearchMode = () => {
+    setViewMode('search');
+    setShowResults(true);
+    setTimeout(() => inputRef.current?.focus(), 100);
   };
 
-  const clearRecentSearches = () => {
-    setRecentSearches([]);
-    localStorage.removeItem('recentSearches');
+  // Volver a categorías
+  const backToCategories = () => {
+    setViewMode('categories');
+    setSelectedCategory(null);
+    setCategoryProducts([]);
+    setSearchTerm('');
+    setShowResults(false);
+  };
+
+  // 🆕 MANEJAR ERROR DE IMAGEN
+  const handleImageError = (categoriaId: string) => {
+    setImageErrors(prev => new Set([...prev, categoriaId]));
+  };
+
+  // 🆕 OBTENER IMAGEN DE CATEGORÍA
+  const getCategoryImageUrl = (categoria: Categoria): string => {
+    if (imageErrors.has(categoria.id)) {
+      return DEFAULT_CATEGORY_IMAGE;
+    }
+    return categoria.imagen || DEFAULT_CATEGORY_IMAGE;
   };
 
   return (
     <div ref={searchRef} className={`product-search relative w-full ${className}`}>
-      {/* Barra de búsqueda principal */}
-      <div className="relative">
-        <div className="absolute inset-y-0 left-0 pl-6 flex items-center pointer-events-none">
-          <Search className="h-6 w-6 text-gray-400" />
-        </div>
-        <input
-          ref={inputRef}
-          type="text"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          onFocus={() => setShowResults(true)}
-          placeholder="Buscar productos por nombre, descripción o código de barras..."
-          className="w-full pl-16 pr-16 py-4 text-lg border-2 border-gray-300 rounded-2xl focus:ring-4 focus:ring-[#eeb077]/20 focus:border-[#eeb077] transition-all bg-white shadow-sm"
-          aria-label="Buscar productos"
-        />
-        
-        <div className="absolute inset-y-0 right-0 pr-6 flex items-center">
-          {isLoading ? (
-            <Loader className="h-6 w-6 text-gray-400 animate-spin" />
-          ) : searchTerm && (
+      
+      {/* 🆕 VISTA DE CATEGORÍAS CON IMÁGENES DE BD */}
+      {viewMode === 'categories' && (
+        <div className="space-y-6">
+          {/* Header con búsqueda rápida */}
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">¿Qué estás buscando?</h2>
             <button
-              onClick={() => {
-                setSearchTerm('');
-                setResults([]);
-                setShowResults(false);
-              }}
-              className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+              onClick={handleSearchMode}
+              className="w-full max-w-md mx-auto flex items-center justify-center space-x-3 py-4 px-6 border-2 border-gray-300 rounded-2xl hover:border-[#eeb077] transition-colors bg-white"
             >
-              <X className="h-5 w-5" />
+              <Search className="h-6 w-6 text-gray-400" />
+              <span className="text-gray-500 text-lg">Buscar productos...</span>
             </button>
-          )}
-        </div>
-      </div>
+          </div>
 
-      {/* Panel de resultados y sugerencias */}
-      {showResults && (
-        <div className="absolute mt-3 bg-white border-2 border-gray-200 rounded-2xl shadow-2xl max-h-[600px] overflow-hidden w-full z-50">
-          
-          {/* Resultados de búsqueda */}
-          {searchTerm && results.length > 0 && (
-            <div className="border-b border-gray-100">
-              <div className="px-6 py-4 bg-gray-50 border-b border-gray-100">
-                <h3 className="text-sm font-semibold text-gray-700 flex items-center">
-                  <Search className="w-4 h-4 mr-2" />
-                  Resultados para "{searchTerm}" ({results.length})
-                </h3>
-              </div>
-              <div className="max-h-80 overflow-y-auto">
-                {results.map((product) => (
-                  <ProductResultItem
-                    key={product.id}
-                    product={product}
-                    onSelect={handleSelect}
-                    isRecentlyAdded={recentlyAdded.has(product.id)}
-                    searchTerm={searchTerm}
+          {/* Grid de categorías con imágenes de BD */}
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
+            {categorias.map((categoria) => (
+              <div
+                key={categoria.id}
+                onClick={() => loadCategoryProducts(categoria)}
+                className="group cursor-pointer bg-white rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden border border-gray-100 hover:border-[#eeb077] transform hover:scale-105"
+              >
+                <div className="aspect-square bg-gradient-to-br from-gray-100 to-gray-200 overflow-hidden relative">
+                  <img
+                    src={getCategoryImageUrl(categoria)}
+                    alt={categoria.nombre}
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    onError={() => handleImageError(categoria.id)}
                   />
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Sin resultados */}
-          {searchTerm && results.length === 0 && !isLoading && (
-            <div className="p-8 text-center">
-              <Package className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-700 mb-2">No se encontraron productos</h3>
-              <p className="text-gray-500">Intenta con términos diferentes</p>
-            </div>
-          )}
-
-          {/* Búsquedas recientes */}
-          {!searchTerm && recentSearches.length > 0 && (
-            <div className="border-b border-gray-100">
-              <div className="px-6 py-4 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-gray-700 flex items-center">
-                  <TrendingUp className="w-4 h-4 mr-2" />
-                  Búsquedas recientes
-                </h3>
-                <button
-                  onClick={clearRecentSearches}
-                  className="text-xs text-gray-500 hover:text-gray-700 font-medium"
-                >
-                  Limpiar
-                </button>
-              </div>
-              <div className="p-4">
-                <div className="flex flex-wrap gap-2">
-                  {recentSearches.map((term, index) => (
-                    <button
-                      key={index}
-                      onClick={() => handleRecentSearchClick(term)}
-                      className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors text-sm font-medium"
-                    >
-                      {term}
-                    </button>
-                  ))}
+                  <div className="absolute inset-0 bg-black/20 group-hover:bg-black/30 transition-colors"></div>
+                  <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/70 to-transparent">
+                    <h3 className="text-white text-xl font-bold text-center mb-1">
+                      {categoria.nombre}
+                    </h3>
+                    {categoria._count && (
+                      <p className="text-white/80 text-sm text-center">
+                        {categoria._count.productos} productos
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
+            ))}
+          </div>
+
+          {categorias.length === 0 && (
+            <div className="text-center py-12">
+              <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-xl font-medium text-gray-700 mb-2">No hay categorías disponibles</h3>
+              <p className="text-gray-500">Agrega categorías desde el panel de administración.</p>
             </div>
           )}
+        </div>
+      )}
 
-          {/* Productos populares */}
-          {!searchTerm && popularProducts.length > 0 && (
-            <div>
-              <div className="px-6 py-4 bg-gray-50 border-b border-gray-100">
-                <h3 className="text-sm font-semibold text-gray-700 flex items-center">
-                  <Star className="w-4 h-4 mr-2" />
-                  Productos populares
-                </h3>
-              </div>
-              <div className="max-h-80 overflow-y-auto">
-                {popularProducts.map((product) => (
-                  <ProductResultItem
-                    key={product.id}
-                    product={product}
-                    onSelect={handleSelect}
-                    isRecentlyAdded={recentlyAdded.has(product.id)}
-                    isPopular={true}
-                  />
-                ))}
-              </div>
+      {/* VISTA DE PRODUCTOS DE CATEGORÍA */}
+      {viewMode === 'category-products' && selectedCategory && (
+        <div className="space-y-6">
+          {/* Header con navegación */}
+          <div className="flex items-center justify-between">
+            <button
+              onClick={backToCategories}
+              className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5" />
+              <span>Volver a categorías</span>
+            </button>
+            
+            <div className="text-center flex-1 mx-6">
+              <h2 className="text-2xl font-bold text-gray-900">{selectedCategory.nombre}</h2>
+              <p className="text-gray-600">{categoryProducts.length} productos disponibles</p>
+            </div>
+
+            <button
+              onClick={handleSearchMode}
+              className="flex items-center space-x-2 px-4 py-2 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
+            >
+              <Search className="w-5 h-5" />
+              <span>Buscar</span>
+            </button>
+          </div>
+
+          {/* Grid de productos 3 por fila con más ancho */}
+          {isLoading ? (
+            <div className="text-center py-12">
+              <div className="inline-block animate-spin h-8 w-8 border-4 border-[#eeb077] border-t-transparent rounded-full"></div>
+              <p className="mt-4 text-gray-600">Cargando productos...</p>
+            </div>
+          ) : categoryProducts.length === 0 ? (
+            <div className="text-center py-12">
+              <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-xl font-medium text-gray-700 mb-2">Sin productos disponibles</h3>
+              <p className="text-gray-500">Esta categoría no tiene productos en stock.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-6">
+              {categoryProducts.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  onSelect={handleSelect}
+                  isRecentlyAdded={recentlyAdded.has(product.id)}
+                  categoryImage={selectedCategory.imagen}
+                />
+              ))}
             </div>
           )}
+        </div>
+      )}
 
-          {/* Estado vacío */}
-          {!searchTerm && recentSearches.length === 0 && popularProducts.length === 0 && (
-            <div className="p-8 text-center">
-              <Search className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-700 mb-2">Busca productos</h3>
-              <p className="text-gray-500">Escribe el nombre, descripción o código del producto</p>
+      {/* VISTA DE BÚSQUEDA (EXISTENTE MEJORADA) */}
+      {viewMode === 'search' && (
+        <div className="space-y-4">
+          {/* Barra de búsqueda */}
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={backToCategories}
+              className="p-3 text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              <ArrowLeft className="w-6 h-6" />
+            </button>
+            
+            <div className="relative flex-1">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <Search className="h-6 w-6 text-gray-400" />
+              </div>
+              <input
+                ref={inputRef}
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                onFocus={() => setShowResults(true)}
+                placeholder="Buscar productos..."
+                className="w-full pl-12 pr-12 py-4 text-lg border-2 border-gray-300 rounded-2xl focus:ring-4 focus:ring-[#eeb077]/20 focus:border-[#eeb077] transition-all bg-white"
+              />
+              
+              <div className="absolute inset-y-0 right-0 pr-4 flex items-center">
+                {isLoading ? (
+                  <Loader className="h-6 w-6 text-gray-400 animate-spin" />
+                ) : searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm('')}
+                    className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Resultados de búsqueda */}
+          {showResults && (
+            <div className="bg-white border-2 border-gray-200 rounded-2xl shadow-2xl max-h-[600px] overflow-hidden">
+              {searchTerm && results.length > 0 && (
+                <div className="max-h-80 overflow-y-auto p-4">
+                  <div className="grid grid-cols-3 gap-4">
+                    {results.map((product) => (
+                      <ProductCard
+                        key={product.id}
+                        product={product}
+                        onSelect={handleSelect}
+                        isRecentlyAdded={recentlyAdded.has(product.id)}
+                        searchTerm={searchTerm}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {searchTerm && results.length === 0 && !isLoading && (
+                <div className="p-8 text-center">
+                  <Package className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-gray-700 mb-2">No se encontraron productos</h3>
+                  <p className="text-gray-500">Intenta con términos diferentes</p>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -289,22 +404,22 @@ export function ProductSearch({ onProductSelect, className = '' }: ProductSearch
   );
 }
 
-// Componente para item de resultado
-interface ProductResultItemProps {
+// 🆕 COMPONENTE DE PRODUCTO MEJORADO
+interface ProductCardProps {
   product: Producto;
   onSelect: (product: Producto) => void;
   isRecentlyAdded: boolean;
   searchTerm?: string;
-  isPopular?: boolean;
+  categoryImage?: string;
 }
 
-function ProductResultItem({ 
+function ProductCard({ 
   product, 
   onSelect, 
   isRecentlyAdded, 
   searchTerm,
-  isPopular = false 
-}: ProductResultItemProps) {
+  categoryImage
+}: ProductCardProps) {
   const [imageError, setImageError] = useState(false);
   const stockValue = product.stock ?? 0;
 
@@ -320,78 +435,73 @@ function ProductResultItem({
   };
 
   return (
-    <button
+    <div
       onClick={() => onSelect(product)}
-      className={`w-full text-left p-6 hover:bg-gray-50 border-b border-gray-100 flex items-center transition-all group ${
-        isRecentlyAdded ? 'bg-green-50 border-green-200' : ''
+      className={`cursor-pointer bg-white rounded-2xl shadow-lg hover:shadow-2xl border border-gray-100 overflow-hidden transition-all duration-300 group hover:scale-105 ${
+        isRecentlyAdded ? 'ring-2 ring-green-400 bg-green-50' : ''
       }`}
     >
-      {/* Imagen */}
-      <div className="flex-shrink-0 h-16 w-16 mr-6 bg-gray-100 rounded-xl overflow-hidden">
+      {/* Imagen más grande */}
+      <div className="aspect-square bg-gray-100 overflow-hidden relative">
         {product.imagen && !imageError ? (
           <img
             src={product.imagen}
             alt={product.nombre}
-            className="h-full w-full object-cover group-hover:scale-105 transition-transform"
+            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+            onError={() => setImageError(true)}
+          />
+        ) : categoryImage ? (
+          <img
+            src={categoryImage}
+            alt={product.nombre}
+            className="w-full h-full object-cover opacity-80 group-hover:scale-110 transition-transform duration-300"
             onError={() => setImageError(true)}
           />
         ) : (
-          <div className="h-full w-full flex items-center justify-center">
-            <Package className="h-8 w-8 text-gray-500" />
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
+            <Package className="w-12 h-12 text-gray-400" />
           </div>
         )}
-      </div>
-
-      {/* Información */}
-      <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between">
-          <div className="flex-1 min-w-0">
-            <h4 className="font-semibold text-gray-900 truncate text-lg mb-1">
-              {highlightText(product.nombre, searchTerm)}
-            </h4>
-            {product.descripcion && (
-              <p className="text-sm text-gray-500 truncate mb-2">
-                {highlightText(product.descripcion, searchTerm)}
-              </p>
-            )}
-            
-            <div className="flex items-center space-x-3">
-              {product.codigoBarras && (
-                <span className="text-xs text-gray-400 font-mono bg-gray-100 px-2 py-1 rounded">
-                  {highlightText(product.codigoBarras, searchTerm)}
-                </span>
-              )}
-              {product.categoria && (
-                <span className="flex items-center text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
-                  <Tag className="h-3 w-3 mr-1" />
-                  {product.categoria.nombre}
-                </span>
-              )}
-              {isPopular && (
-                <span className="flex items-center text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full">
-                  <Star className="h-3 w-3 mr-1" />
-                  Popular
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="ml-6 flex flex-col items-end">
-            <span className="text-xl font-bold text-[#311716] mb-2">
-              ${product.precio.toFixed(2)}
-            </span>
-            <span className={`text-xs px-3 py-1 rounded-full font-medium ${
-              stockValue > 5 
-                ? 'bg-green-100 text-green-700'
-                : stockValue > 0
-                ? 'bg-yellow-100 text-yellow-700' 
-                : 'bg-red-100 text-red-700'
-            }`}>
-              Stock: {stockValue}
-            </span>
-          </div>
+        
+        {/* Badge de stock */}
+        <div className="absolute top-4 right-4">
+          <span className={`px-3 py-1 rounded-full text-xs font-bold text-white ${
+            stockValue > 5 
+              ? 'bg-green-500' 
+              : stockValue > 0 
+              ? 'bg-amber-500' 
+              : 'bg-red-500'
+          }`}>
+            {stockValue} disp.
+          </span>
         </div>
       </div>
-    </button>
+
+      {/* Información del producto con más espacio */}
+      <div className="p-6">
+        <h4 className="font-bold text-gray-900 text-lg mb-2 min-h-[3.5rem] leading-tight">
+          {highlightText(product.nombre, searchTerm)}
+        </h4>
+        
+        {product.descripcion && (
+          <p className="text-sm text-gray-500 mb-4 line-clamp-2">
+            {highlightText(product.descripcion, searchTerm)}
+          </p>
+        )}
+
+        <div className="flex items-center justify-between">
+          <span className="text-2xl font-bold text-[#311716]">
+            ${product.precio.toFixed(2)}
+          </span>
+
+          {product.categoria && (
+            <span className="flex items-center text-xs bg-blue-100 text-blue-700 px-3 py-2 rounded-full">
+              <Tag className="h-3 w-3 mr-1" />
+              {product.categoria.nombre}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

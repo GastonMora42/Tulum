@@ -273,7 +273,7 @@ export async function PATCH(req: NextRequest) {
     // 🚨 DETERMINAR SI SE REQUIERE CONTINGENCIA
     const diferenciaAbsEfectivo = Math.abs(diferenciaEfectivo);
     const hayDiferenciasOtrosMedios = diferencias.length > 0;
-    const shouldGenerateContingency = diferenciaAbsEfectivo > 1 || hayDiferenciasOtrosMedios;
+    const shouldGenerateContingency = diferenciaAbsEfectivo > 200 || diferencias.some(d => Math.abs(d.diferencia) > 200);
     
     // 💸 CALCULAR SALDO PARA PRÓXIMO TURNO
     let saldoPendienteActual = 0;

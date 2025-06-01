@@ -1,13 +1,14 @@
-// src/app/api/admin/categorias/route.ts
+// src/app/api/admin/categorias/route.ts - VERSIÓN CON IMÁGENES
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/server/db/client';
 import { authMiddleware } from '@/server/api/middlewares/auth';
 import { checkPermission } from '@/server/api/middlewares/authorization';
 import { z } from 'zod';
 
-// Esquema de validación para crear/actualizar categoría
+// Esquema de validación para crear/actualizar categoría con imagen
 const categoriaSchema = z.object({
-  nombre: z.string().min(2, { message: 'El nombre debe tener al menos 2 caracteres' })
+  nombre: z.string().min(2, { message: 'El nombre debe tener al menos 2 caracteres' }),
+  imagen: z.string().nullable().optional() // 🆕 Campo imagen opcional
 });
 
 export async function GET(req: NextRequest) {
@@ -19,6 +20,13 @@ export async function GET(req: NextRequest) {
     const categorias = await prisma.categoria.findMany({
       orderBy: {
         nombre: 'asc'
+      },
+      include: {
+        _count: {
+          select: {
+            productos: true
+          }
+        }
       }
     });
     
@@ -65,9 +73,12 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    // Crear categoría
+    // Crear categoría con imagen
     const categoria = await prisma.categoria.create({
-      data: validation.data
+      data: {
+        nombre: validation.data.nombre,
+        imagen: validation.data.imagen
+      }
     });
     
     return NextResponse.json(categoria, { status: 201 });

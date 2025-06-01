@@ -32,13 +32,13 @@ export async function GET(req: NextRequest) {
     });
     
     // 📊 CALCULAR SUGERENCIA PARA APERTURA
-    let sugerenciaApertura = 5000; // Base default
+    let sugerenciaApertura = 10000;
     let requiereRecupero = false;
     let saldoPendiente = 0;
     
     if (ultimoCierre && ultimoCierre.saldoPendienteActual > 0) {
       saldoPendiente = ultimoCierre.saldoPendienteActual;
-      sugerenciaApertura = 5000 + saldoPendiente;
+      sugerenciaApertura = 10000 + saldoPendiente;
       requiereRecupero = true;
     }
     
