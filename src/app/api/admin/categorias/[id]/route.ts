@@ -1,4 +1,4 @@
-// src/app/api/admin/categorias/[id]/route.ts
+// src/app/api/admin/categorias/[id]/route.ts - VERSIÓN CORREGIDA
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/server/db/client';
 import { authMiddleware } from '@/server/api/middlewares/auth';
@@ -7,20 +7,22 @@ import { z } from 'zod';
 
 // Esquema de validación para actualizar categoría
 const updateCategoriaSchema = z.object({
-  nombre: z.string().min(2, { message: 'El nombre debe tener al menos 2 caracteres' })
+  nombre: z.string().min(2, { message: 'El nombre debe tener al menos 2 caracteres' }),
+  imagen: z.string().nullable().optional() // 🆕 Agregar campo imagen
 });
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> } // 🔧 Cambiar a Promise
 ) {
   // Aplicar middleware de autenticación
   const authError = await authMiddleware(req);
   if (authError) return authError;
 
   try {
+    const resolvedParams = await params; // 🔧 Await params
     const categoria = await prisma.categoria.findUnique({
-      where: { id: params.id }
+      where: { id: resolvedParams.id }
     });
     
     if (!categoria) {
@@ -42,7 +44,7 @@ export async function GET(
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> } // 🔧 Cambiar a Promise
 ) {
   // Aplicar middleware de autenticación
   const authError = await authMiddleware(req);
@@ -53,6 +55,7 @@ export async function PATCH(
   if (permissionError) return permissionError;
   
   try {
+    const resolvedParams = await params; // 🔧 Await params
     const body = await req.json();
     
     // Validar datos de entrada
@@ -66,7 +69,7 @@ export async function PATCH(
     
     // Verificar si la categoría existe
     const existingCategoria = await prisma.categoria.findUnique({
-      where: { id: params.id }
+      where: { id: resolvedParams.id }
     });
     
     if (!existingCategoria) {
@@ -90,10 +93,13 @@ export async function PATCH(
       }
     }
     
-    // Actualizar categoría
+    // Actualizar categoría con imagen
     const categoria = await prisma.categoria.update({
-      where: { id: params.id },
-      data: validation.data
+      where: { id: resolvedParams.id },
+      data: {
+        nombre: validation.data.nombre,
+        imagen: validation.data.imagen
+      }
     });
     
     return NextResponse.json(categoria);
@@ -108,7 +114,7 @@ export async function PATCH(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> } // 🔧 Cambiar a Promise
 ) {
   // Aplicar middleware de autenticación
   const authError = await authMiddleware(req);
@@ -119,9 +125,11 @@ export async function DELETE(
   if (permissionError) return permissionError;
   
   try {
+    const resolvedParams = await params; // 🔧 Await params
+    
     // Verificar si la categoría existe
     const existingCategoria = await prisma.categoria.findUnique({
-      where: { id: params.id }
+      where: { id: resolvedParams.id }
     });
     
     if (!existingCategoria) {
@@ -133,7 +141,7 @@ export async function DELETE(
     
     // Verificar si hay productos asociados a esta categoría
     const productosAsociados = await prisma.producto.count({
-      where: { categoriaId: params.id }
+      where: { categoriaId: resolvedParams.id }
     });
     
     if (productosAsociados > 0) {
@@ -145,7 +153,7 @@ export async function DELETE(
     
     // Eliminar categoría
     await prisma.categoria.delete({
-      where: { id: params.id }
+      where: { id: resolvedParams.id }
     });
     
     return NextResponse.json({ message: 'Categoría eliminada correctamente' });

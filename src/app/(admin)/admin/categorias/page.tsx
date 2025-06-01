@@ -1,9 +1,9 @@
-// src/app/(admin)/admin/categorias/page.tsx - NUEVA PÁGINA PARA GESTIONAR CATEGORÍAS
+// src/app/(admin)/admin/categorias/page.tsx - VERSIÓN CORREGIDA
 'use client';
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Package, Plus, Search, Edit, Trash, Image as ImageIcon } from 'lucide-react';
+import { Package, Plus, Search, Edit, Trash, Image as ImageIcon, Save, X } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
 import { ContrastEnhancer } from '@/components/ui/ContrastEnhancer';
 import { ImageUploader } from '@/components/ui/ImageUploader';
@@ -27,6 +27,8 @@ export default function CategoriasPage() {
     nombre: '',
     imagen: ''
   });
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadCategorias();
@@ -42,6 +44,7 @@ export default function CategoriasPage() {
       }
     } catch (error) {
       console.error('Error cargando categorías:', error);
+      setError('Error al cargar categorías');
     } finally {
       setIsLoading(false);
     }
@@ -52,7 +55,15 @@ export default function CategoriasPage() {
   );
 
   const handleSave = async () => {
+    if (!formData.nombre.trim()) {
+      setError('El nombre es obligatorio');
+      return;
+    }
+
     try {
+      setIsSaving(true);
+      setError(null);
+      
       const url = editingCategoria 
         ? `/api/admin/categorias/${editingCategoria.id}`
         : '/api/admin/categorias';
@@ -62,17 +73,26 @@ export default function CategoriasPage() {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({
+          nombre: formData.nombre,
+          imagen: formData.imagen || null
+        })
       });
 
-      if (response.ok) {
-        loadCategorias();
-        setShowModal(false);
-        setEditingCategoria(null);
-        setFormData({ nombre: '', imagen: '' });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al guardar categoría');
       }
+
+      await loadCategorias();
+      setShowModal(false);
+      setEditingCategoria(null);
+      setFormData({ nombre: '', imagen: '' });
     } catch (error) {
       console.error('Error guardando categoría:', error);
+      setError(error instanceof Error ? error.message : 'Error al guardar categoría');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -82,7 +102,16 @@ export default function CategoriasPage() {
       nombre: categoria?.nombre || '',
       imagen: categoria?.imagen || ''
     });
+    setError(null);
     setShowModal(true);
+  };
+
+  const handleImageUpload = (imageUrl: string) => {
+    console.log('🖼️ Imagen cargada para categoría:', imageUrl);
+    setFormData(prev => ({
+      ...prev,
+      imagen: imageUrl
+    }));
   };
 
   return (
@@ -112,63 +141,89 @@ export default function CategoriasPage() {
         </div>
 
         {/* Grid de categorías */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredCategorias.map((categoria) => (
-            <div key={categoria.id} className="bg-white rounded-lg shadow overflow-hidden">
-              <div className="aspect-video bg-gray-100 relative">
-                {categoria.imagen ? (
-                  <img
-                    src={categoria.imagen}
-                    alt={categoria.nombre}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <Package className="w-12 h-12 text-gray-400" />
-                  </div>
-                )}
-              </div>
-              
-              <div className="p-4">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                  {categoria.nombre}
-                </h3>
-                <p className="text-sm text-gray-500 mb-4">
-                  {categoria._count.productos} productos
-                </p>
+        {isLoading ? (
+          <div className="text-center py-12">
+            <div className="inline-block animate-spin h-8 w-8 border-4 border-indigo-500 border-t-transparent rounded-full"></div>
+            <p className="mt-4 text-gray-600">Cargando categorías...</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredCategorias.map((categoria) => (
+              <div key={categoria.id} className="bg-white rounded-lg shadow overflow-hidden">
+                <div className="aspect-video bg-gray-100 relative">
+                  {categoria.imagen ? (
+                    <img
+                      src={categoria.imagen}
+                      alt={categoria.nombre}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        console.error('Error cargando imagen de categoría:', categoria.imagen);
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Package className="w-12 h-12 text-gray-400" />
+                    </div>
+                  )}
+                </div>
                 
-                <div className="flex justify-end space-x-2">
-                  <button
-                    onClick={() => openModal(categoria)}
-                    className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded text-indigo-600 hover:text-indigo-900"
-                  >
-                    <Edit className="h-4 w-4 mr-1" />
-                    Editar
-                  </button>
+                <div className="p-4">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    {categoria.nombre}
+                  </h3>
+                  <p className="text-sm text-gray-500 mb-4">
+                    {categoria._count.productos} productos
+                  </p>
+                  
+                  <div className="flex justify-end space-x-2">
+                    <button
+                      onClick={() => openModal(categoria)}
+                      className="inline-flex items-center px-3 py-1 border border-transparent text-sm font-medium rounded text-indigo-600 hover:text-indigo-900"
+                    >
+                      <Edit className="h-4 w-4 mr-1" />
+                      Editar
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
-        {/* Modal */}
+        {/* Modal mejorado */}
         {showModal && (
           <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-lg max-w-md w-full p-6">
-              <h2 className="text-lg font-semibold mb-4">
-                {editingCategoria ? 'Editar Categoría' : 'Nueva Categoría'}
-              </h2>
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-lg font-semibold">
+                  {editingCategoria ? 'Editar Categoría' : 'Nueva Categoría'}
+                </h2>
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+              
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md">
+                  {error}
+                </div>
+              )}
               
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nombre
+                    Nombre *
                   </label>
                   <input
                     type="text"
                     value={formData.nombre}
                     onChange={(e) => setFormData({...formData, nombre: e.target.value})}
                     className="block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                    placeholder="Nombre de la categoría"
                   />
                 </div>
                 
@@ -177,25 +232,46 @@ export default function CategoriasPage() {
                     Imagen
                   </label>
                   <ImageUploader
-                    type="category"
+                    type="product"
                     initialImage={formData.imagen}
-                    onImageUpload={(url) => setFormData({...formData, imagen: url})}
+                    onImageUpload={handleImageUpload}
                   />
+                  {formData.imagen && (
+                    <div className="mt-2">
+                      <img 
+                        src={formData.imagen} 
+                        alt="Preview" 
+                        className="w-full h-32 object-cover rounded-md border border-gray-200"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
               
               <div className="flex justify-end space-x-3 mt-6">
                 <button
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                  disabled={isSaving}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={handleSave}
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                  disabled={isSaving || !formData.nombre.trim()}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50 flex items-center"
                 >
-                  Guardar
+                  {isSaving ? (
+                    <>
+                      <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+                      Guardando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Guardar
+                    </>
+                  )}
                 </button>
               </div>
             </div>
