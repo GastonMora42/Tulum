@@ -264,7 +264,7 @@ export function CierreCaja({ id, onSuccess }: CierreCajaProfesionalProps) {
             <div>
               <h1 className="text-3xl font-bold text-gray-900 flex items-center">
                 <PiggyBank className="w-8 h-8 text-blue-600 mr-3" />
-                Cierre Profesional de Caja
+                Cierre de Caja
               </h1>
               <p className="text-gray-600 mt-1">
                 Fecha: {format(new Date(cierreCaja?.fechaApertura), 'dd/MM/yyyy HH:mm')}

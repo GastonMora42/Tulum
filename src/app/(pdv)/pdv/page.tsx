@@ -1,4 +1,4 @@
-// src/app/(pdv)/pdv/page.tsx - VERSIÓN COMPLETA CORREGIDA
+// src/app/(pdv)/pdv/page.tsx - VERSIÓN CORREGIDA COMPLETA
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -195,8 +195,10 @@ export default function PDVPage() {
 
   // 🔧 FUNCIÓN CORREGIDA - Manejar apertura de caja
   const handleAbrirCaja = async () => {
+    console.log('🎯 handleAbrirCaja llamado');
     try {
       await verificarInfoApertura();
+      console.log('✅ verificarInfoApertura completado, abriendo modal');
       setShowAperturaModal(true);
     } catch (error) {
       console.error('Error al preparar apertura:', error);
@@ -204,18 +206,35 @@ export default function PDVPage() {
     }
   };
 
+  // Debug de estados
+  useEffect(() => {
+    console.log('🔍 Estado actual:', {
+      hayCajaAbierta,
+      isLoading,
+      showAperturaModal,
+      aperturaInfo: !!aperturaInfo,
+      sucursalId: localStorage.getItem('sucursalId')
+    });
+  }, [hayCajaAbierta, isLoading, showAperturaModal, aperturaInfo]);
+
   // 🔧 FUNCIÓN CORREGIDA - Completar apertura
   const handleAperturaComplete = async (aperturaData: {
     montoInicial: number;
     recuperarSaldo: boolean;
   }) => {
+    console.log('🎯 handleAperturaComplete LLAMADO con:', aperturaData);
+    
     try {
       setIsLoading(true);
       const sucursalId = localStorage.getItem('sucursalId');
       
+      console.log('📍 SucursalId obtenido:', sucursalId);
+      
       if (!sucursalId) {
         throw new Error('No se ha definido una sucursal para este punto de venta');
       }
+      
+      console.log('📡 Enviando solicitud de apertura...');
       
       const response = await authenticatedFetch('/api/pdv/apertura', {
         method: 'POST',
@@ -227,12 +246,16 @@ export default function PDVPage() {
         })
       });
       
+      console.log('📨 Response status:', response.status);
+      
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Error del servidor' }));
+        console.error('❌ Error del servidor:', errorData);
         throw new Error(errorData.error || 'Error al abrir la caja');
       }
       
       const result = await response.json();
+      console.log('✅ Resultado exitoso:', result);
       
       setHayCajaAbierta(true);
       setShowAperturaModal(false);
@@ -245,7 +268,7 @@ export default function PDVPage() {
       }, 1000);
       
     } catch (error) {
-      console.error('Error al abrir caja:', error);
+      console.error('❌ Error en handleAperturaComplete:', error);
       showNotification('error', error instanceof Error ? error.message : 'Error al abrir la caja');
     } finally {
       setIsLoading(false);
@@ -420,398 +443,414 @@ export default function PDVPage() {
     setCurrentPage(1);
   }, [activeCategory, searchTerm, sortMode]);
 
-  // 🖥️ Pantallas de estado
-  if (isLoading) {
-    return (
-      <div className="h-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
-        <div className="text-center">
-          <div className="w-20 h-20 border-4 border-gray-200 border-t-[#311716] rounded-full animate-spin mx-auto mb-6"></div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-3">Configurando PDV</h2>
-          <p className="text-gray-600">Preparando el sistema de ventas...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (hayCajaAbierta === false) {
-    return (
-      <div className="h-full flex items-center justify-center p-6 bg-gradient-to-br from-gray-50 to-gray-100">
-        <div className="text-center bg-white p-12 rounded-3xl shadow-xl border border-gray-200 max-w-2xl w-full">
-          <div className="w-24 h-24 bg-gradient-to-br from-[#311716] to-[#9c7561] rounded-3xl flex items-center justify-center mx-auto mb-8">
-            <Clock className="w-12 h-12 text-white" />
+  // 🔧 FUNCIÓN PARA RENDERIZAR CONTENIDO PRINCIPAL
+  const renderMainContent = () => {
+    // 🖥️ Pantalla de loading
+    if (isLoading) {
+      return (
+        <div className="h-full flex items-center justify-center bg-gradient-to-br from-gray-50 to-gray-100">
+          <div className="text-center">
+            <div className="w-20 h-20 border-4 border-gray-200 border-t-[#311716] rounded-full animate-spin mx-auto mb-6"></div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-3">Configurando PDV</h2>
+            <p className="text-gray-600">Preparando el sistema de ventas...</p>
           </div>
-          
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">Caja Cerrada</h2>
-          <p className="text-gray-600 text-lg mb-6 leading-relaxed">
-            Para comenzar a realizar ventas, necesitas abrir la caja registradora del día.
-          </p>
-          
-          {aperturaInfo && (
-            <div className="mb-8 space-y-4">
-              {aperturaInfo.requiereRecupero && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-6">
-                  <div className="flex items-center justify-center mb-3">
-                    <AlertTriangle className="w-6 h-6 text-yellow-600 mr-2" />
-                    <span className="font-semibold text-yellow-800">Recupero Requerido</span>
-                  </div>
-                  <p className="text-yellow-700 text-sm">
-                    El turno anterior tiene un saldo pendiente de <strong>${aperturaInfo.saldoPendiente.toFixed(2)}</strong>
-                  </p>
-                  {aperturaInfo.ultimoCierre && (
-                    <p className="text-yellow-600 text-xs mt-2">
-                      Cierre del {new Date(aperturaInfo.ultimoCierre.fechaCierre).toLocaleDateString()}
+        </div>
+      );
+    }
+
+    // 🖥️ Pantalla de caja cerrada
+    if (hayCajaAbierta === false) {
+      return (
+        <div className="h-full flex items-center justify-center p-6 bg-gradient-to-br from-gray-50 to-gray-100">
+          <div className="text-center bg-white p-12 rounded-3xl shadow-xl border border-gray-200 max-w-2xl w-full">
+            <div className="w-24 h-24 bg-gradient-to-br from-[#311716] to-[#9c7561] rounded-3xl flex items-center justify-center mx-auto mb-8">
+              <Clock className="w-12 h-12 text-white" />
+            </div>
+            
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">Caja Cerrada</h2>
+            <p className="text-gray-600 text-lg mb-6 leading-relaxed">
+              Para comenzar a realizar ventas, necesitas abrir la caja registradora del día.
+            </p>
+            
+            {aperturaInfo && (
+              <div className="mb-8 space-y-4">
+                {aperturaInfo.requiereRecupero && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-6">
+                    <div className="flex items-center justify-center mb-3">
+                      <AlertTriangle className="w-6 h-6 text-yellow-600 mr-2" />
+                      <span className="font-semibold text-yellow-800">Recupero Requerido</span>
+                    </div>
+                    <p className="text-yellow-700 text-sm">
+                      El turno anterior tiene un saldo pendiente de <strong>${aperturaInfo.saldoPendiente.toFixed(2)}</strong>
                     </p>
-                  )}
+                    {aperturaInfo.ultimoCierre && (
+                      <p className="text-yellow-600 text-xs mt-2">
+                        Cierre del {new Date(aperturaInfo.ultimoCierre.fechaCierre).toLocaleDateString()}
+                      </p>
+                    )}
+                  </div>
+                )}
+                
+                <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6">
+                  <div className="flex items-center justify-center mb-3">
+                    <DollarSign className="w-6 h-6 text-blue-600 mr-2" />
+                    <span className="font-semibold text-blue-800">Sugerencia de Apertura</span>
+                  </div>
+                  <p className="text-blue-700">
+                    Monto recomendado: <strong>${aperturaInfo.sugerenciaApertura.toFixed(2)}</strong>
+                  </p>
+                  <p className="text-blue-600 text-sm mt-1">
+                    {aperturaInfo.requiereRecupero 
+                      ? `Incluye $${aperturaInfo.saldoPendiente.toFixed(2)} de recupero + $${(aperturaInfo.sugerenciaApertura - aperturaInfo.saldoPendiente).toFixed(2)} de cambio`
+                      : 'Monto suficiente para cambio durante el día'
+                    }
+                  </p>
                 </div>
-              )}
-              
-              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6">
-                <div className="flex items-center justify-center mb-3">
-                  <DollarSign className="w-6 h-6 text-blue-600 mr-2" />
-                  <span className="font-semibold text-blue-800">Sugerencia de Apertura</span>
-                </div>
-                <p className="text-blue-700">
-                  Monto recomendado: <strong>${aperturaInfo.sugerenciaApertura.toFixed(2)}</strong>
-                </p>
-                <p className="text-blue-600 text-sm mt-1">
-                  {aperturaInfo.requiereRecupero 
-                    ? `Incluye $${aperturaInfo.saldoPendiente.toFixed(2)} de recupero + $${(aperturaInfo.sugerenciaApertura - aperturaInfo.saldoPendiente).toFixed(2)} de cambio`
-                    : 'Monto suficiente para cambio durante el día'
-                  }
-                </p>
-              </div>
-            </div>
-          )}
-          
-          <div className="space-y-4">
-            <button
-              onClick={handleAbrirCaja}
-              disabled={isLoading}
-              className="w-full py-4 px-8 bg-gradient-to-r from-[#311716] to-[#462625] text-white rounded-2xl hover:from-[#462625] hover:to-[#311716] transition-all font-bold text-lg flex items-center justify-center space-x-3 disabled:opacity-50 shadow-lg hover:shadow-xl"
-            >
-              <Zap className="w-6 h-6" />
-              <span>{isLoading ? 'Preparando...' : 'Abrir Caja del Día'}</span>
-            </button>
-            
-            <button
-              onClick={() => {
-                verificarEstadoCaja();
-                verificarInfoApertura();
-              }}
-              className="w-full py-3 px-6 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-all font-medium"
-            >
-              Verificar Estado de Caja
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (hayCajaAbierta === null) {
-    return (
-      <div className="h-full flex items-center justify-center p-6 bg-gradient-to-br from-gray-50 to-gray-100">
-        <div className="text-center bg-white p-12 rounded-3xl shadow-xl border border-gray-200 max-w-lg w-full">
-          <div className="w-24 h-24 bg-gradient-to-br from-amber-500 to-orange-500 rounded-3xl flex items-center justify-center mx-auto mb-8">
-            <AlertTriangle className="w-12 h-12 text-white" />
-          </div>
-          
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">Verificando Estado</h2>
-          <p className="text-gray-600 text-lg mb-8 leading-relaxed">
-            No se pudo verificar el estado de la caja. Esto puede deberse a problemas de conectividad.
-          </p>
-          
-          <div className="space-y-4">
-            <button
-              onClick={verificarEstadoCaja}
-              disabled={isLoading}
-              className="w-full py-4 px-8 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-2xl hover:from-blue-700 hover:to-blue-800 transition-all font-bold text-lg flex items-center justify-center space-x-3 disabled:opacity-50 shadow-lg"
-            >
-              <RefreshCw className={`w-6 h-6 ${isLoading ? 'animate-spin' : ''}`} />
-              <span>{isLoading ? 'Verificando...' : 'Reintentar Verificación'}</span>
-            </button>
-            
-            <button
-              onClick={handleAbrirCaja}
-              className="w-full py-3 px-6 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-all font-medium"
-            >
-              Abrir Nueva Caja
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // 🎨 INTERFAZ PRINCIPAL REDISEÑADA PARA TABLET
-  return (
-    <div className="h-full flex flex-col overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100">
-      {/* 📱 Header Superior - Información de Sucursal y Estado */}
-      <div className="bg-white shadow-sm border-b border-gray-200 p-4 lg:p-6">
-        <div className="flex items-center justify-between">
-          {/* Info de sucursal */}
-          <div className="flex items-center space-x-4">
-            <div className="w-14 h-14 bg-gradient-to-br from-[#311716] to-[#9c7561] rounded-2xl flex items-center justify-center">
-              <Building2 className="w-7 h-7 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">{sucursalInfo.nombre}</h1>
-              <div className="flex items-center space-x-3 text-sm text-gray-500">
-                <div className="flex items-center space-x-1">
-                  <MapPin className="w-4 h-4" />
-                  <span>{sucursalInfo.direccion}</span>
-                </div>
-                <span>•</span>
-                <div className="flex items-center space-x-1">
-                  {isOnline ? (
-                    <>
-                      <Wifi className="w-4 h-4 text-green-500" />
-                      <span className="text-green-600">Online</span>
-                    </>
-                  ) : (
-                    <>
-                      <WifiOff className="w-4 h-4 text-amber-500" />
-                      <span className="text-amber-600">Offline</span>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Estado y acciones rápidas */}
-          <div className="flex items-center space-x-4">
-            {pendingOperations > 0 && (
-              <div className="bg-amber-100 text-amber-800 px-4 py-2 rounded-xl border border-amber-200">
-                <span className="text-sm font-medium">{pendingOperations} pendientes</span>
               </div>
             )}
             
-            <div className="bg-green-100 text-green-800 px-4 py-2 rounded-xl border border-green-200">
-              <span className="text-sm font-medium">Caja Abierta</span>
+            <div className="space-y-4">
+              <button
+                onClick={() => {
+                  console.log('🖱️ Click en Abrir Caja del Día');
+                  handleAbrirCaja();
+                }}
+                disabled={isLoading}
+                className="w-full py-4 px-8 bg-gradient-to-r from-[#311716] to-[#462625] text-white rounded-2xl hover:from-[#462625] hover:to-[#311716] transition-all font-bold text-lg flex items-center justify-center space-x-3 disabled:opacity-50 shadow-lg hover:shadow-xl"
+              >
+                <Zap className="w-6 h-6" />
+                <span>{isLoading ? 'Preparando...' : 'Abrir Caja del Día'}</span>
+              </button>
+              
+              <button
+                onClick={() => {
+                  verificarEstadoCaja();
+                  verificarInfoApertura();
+                }}
+                className="w-full py-3 px-6 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-all font-medium"
+              >
+                Verificar Estado de Caja
+              </button>
             </div>
           </div>
         </div>
-      </div>
+      );
+    }
 
-      {/* 🖥️ LAYOUT PRINCIPAL OPTIMIZADO PARA TABLET */}
-      <div className="flex-1 flex overflow-hidden">
-        
-        {/* 📋 PANEL IZQUIERDO - Búsqueda y Productos */}
-        <div className="flex-1 flex flex-col min-w-0 bg-white">
-          
-          {/* Barra de herramientas de productos */}
-          <div className="p-6 border-b border-gray-200 bg-gray-50">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center space-x-3">
-                <Package className="w-6 h-6 text-[#311716]" />
-                <h2 className="text-xl font-bold text-gray-900">Productos</h2>
-                <span className="bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-sm font-medium">
-                  {filteredProducts.length}
-                </span>
-              </div>
-              
-              <div className="flex items-center space-x-3">
-                {/* Controles de vista */}
-                <div className="flex items-center bg-gray-200 rounded-xl p-1">
-                  <button
-                    onClick={() => setViewMode('grid')}
-                    className={`p-3 rounded-lg transition-all ${
-                      viewMode === 'grid' 
-                        ? 'bg-white text-[#311716] shadow-sm' 
-                        : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    <Grid className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={() => setViewMode('list')}
-                    className={`p-3 rounded-lg transition-all ${
-                      viewMode === 'list' 
-                        ? 'bg-white text-[#311716] shadow-sm' 
-                        : 'text-gray-500 hover:text-gray-700'
-                    }`}
-                  >
-                    <List className="w-5 h-5" />
-                  </button>
-                </div>
-                
-                {/* Botón de scanner */}
-                <button
-                  onClick={() => setShowScanner(!showScanner)}
-                  className={`p-3 rounded-xl transition-all flex items-center space-x-2 ${
-                    showScanner
-                      ? 'bg-[#311716] text-white shadow-lg'
-                      : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-                  }`}
-                  title="Activar escáner de código de barras"
-                >
-                  <svg 
-                    className="w-7 h-7" 
-                    fill="none" 
-                    stroke="currentColor" 
-                    viewBox="0 0 24 24"
-                  >
-                    <path 
-                      strokeLinecap="round" 
-                      strokeLinejoin="round" 
-                      strokeWidth={2} 
-                      d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h2M4 4h4m12 0h2M4 20h4m12 0h2" 
-                    />
-                  </svg>
-                  <span className="hidden lg:inline text-sm font-medium">Escáner</span>
-                </button>
-              </div>
+    // 🖥️ Pantalla de estado desconocido
+    if (hayCajaAbierta === null) {
+      return (
+        <div className="h-full flex items-center justify-center p-6 bg-gradient-to-br from-gray-50 to-gray-100">
+          <div className="text-center bg-white p-12 rounded-3xl shadow-xl border border-gray-200 max-w-lg w-full">
+            <div className="w-24 h-24 bg-gradient-to-br from-amber-500 to-orange-500 rounded-3xl flex items-center justify-center mx-auto mb-8">
+              <AlertTriangle className="w-12 h-12 text-white" />
             </div>
             
-            {/* Búsqueda principal */}
-            <ProductSearch 
-              onProductSelect={handleProductSelect}
-              className="mb-4"
-            />
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">Verificando Estado</h2>
+            <p className="text-gray-600 text-lg mb-8 leading-relaxed">
+              No se pudo verificar el estado de la caja. Esto puede deberse a problemas de conectividad.
+            </p>
             
-            {/* Categorías horizontales */}
-            <div className="flex items-center space-x-3 overflow-x-auto pb-2">
+            <div className="space-y-4">
               <button
-                onClick={() => setActiveCategory('todos')}
-                className={`flex-shrink-0 px-6 py-3 rounded-xl font-medium transition-all ${
-                  activeCategory === 'todos'
-                    ? 'bg-[#311716] text-white shadow-lg'
-                    : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
-                }`}
+                onClick={verificarEstadoCaja}
+                disabled={isLoading}
+                className="w-full py-4 px-8 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-2xl hover:from-blue-700 hover:to-blue-800 transition-all font-bold text-lg flex items-center justify-center space-x-3 disabled:opacity-50 shadow-lg"
               >
-                Todos ({productos.length})
+                <RefreshCw className={`w-6 h-6 ${isLoading ? 'animate-spin' : ''}`} />
+                <span>{isLoading ? 'Verificando...' : 'Reintentar Verificación'}</span>
               </button>
               
-              {categorias.map(categoria => (
+              <button
+                onClick={handleAbrirCaja}
+                className="w-full py-3 px-6 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-all font-medium"
+              >
+                Abrir Nueva Caja
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // 🎨 INTERFAZ PRINCIPAL - CAJA ABIERTA
+    return (
+      <div className="h-full flex flex-col overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100">
+        {/* 📱 Header Superior - Información de Sucursal y Estado */}
+        <div className="bg-white shadow-sm border-b border-gray-200 p-4 lg:p-6">
+          <div className="flex items-center justify-between">
+            {/* Info de sucursal */}
+            <div className="flex items-center space-x-4">
+              <div className="w-14 h-14 bg-gradient-to-br from-[#311716] to-[#9c7561] rounded-2xl flex items-center justify-center">
+                <Building2 className="w-7 h-7 text-white" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">{sucursalInfo.nombre}</h1>
+                <div className="flex items-center space-x-3 text-sm text-gray-500">
+                  <div className="flex items-center space-x-1">
+                    <MapPin className="w-4 h-4" />
+                    <span>{sucursalInfo.direccion}</span>
+                  </div>
+                  <span>•</span>
+                  <div className="flex items-center space-x-1">
+                    {isOnline ? (
+                      <>
+                        <Wifi className="w-4 h-4 text-green-500" />
+                        <span className="text-green-600">Online</span>
+                      </>
+                    ) : (
+                      <>
+                        <WifiOff className="w-4 h-4 text-amber-500" />
+                        <span className="text-amber-600">Offline</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Estado y acciones rápidas */}
+            <div className="flex items-center space-x-4">
+              {pendingOperations > 0 && (
+                <div className="bg-amber-100 text-amber-800 px-4 py-2 rounded-xl border border-amber-200">
+                  <span className="text-sm font-medium">{pendingOperations} pendientes</span>
+                </div>
+              )}
+              
+              <div className="bg-green-100 text-green-800 px-4 py-2 rounded-xl border border-green-200">
+                <span className="text-sm font-medium">Caja Abierta</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 🖥️ LAYOUT PRINCIPAL OPTIMIZADO PARA TABLET */}
+        <div className="flex-1 flex overflow-hidden">
+          
+          {/* 📋 PANEL IZQUIERDO - Búsqueda y Productos */}
+          <div className="flex-1 flex flex-col min-w-0 bg-white">
+            
+            {/* Barra de herramientas de productos */}
+            <div className="p-6 border-b border-gray-200 bg-gray-50">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center space-x-3">
+                  <Package className="w-6 h-6 text-[#311716]" />
+                  <h2 className="text-xl font-bold text-gray-900">Productos</h2>
+                  <span className="bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-sm font-medium">
+                    {filteredProducts.length}
+                  </span>
+                </div>
+                
+                <div className="flex items-center space-x-3">
+                  {/* Controles de vista */}
+                  <div className="flex items-center bg-gray-200 rounded-xl p-1">
+                    <button
+                      onClick={() => setViewMode('grid')}
+                      className={`p-3 rounded-lg transition-all ${
+                        viewMode === 'grid' 
+                          ? 'bg-white text-[#311716] shadow-sm' 
+                          : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      <Grid className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={() => setViewMode('list')}
+                      className={`p-3 rounded-lg transition-all ${
+                        viewMode === 'list' 
+                          ? 'bg-white text-[#311716] shadow-sm' 
+                          : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      <List className="w-5 h-5" />
+                    </button>
+                  </div>
+                  
+                  {/* Botón de scanner */}
+                  <button
+                    onClick={() => setShowScanner(!showScanner)}
+                    className={`p-3 rounded-xl transition-all flex items-center space-x-2 ${
+                      showScanner
+                        ? 'bg-[#311716] text-white shadow-lg'
+                        : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+                    }`}
+                    title="Activar escáner de código de barras"
+                  >
+                    <svg 
+                      className="w-7 h-7" 
+                      fill="none" 
+                      stroke="currentColor" 
+                      viewBox="0 0 24 24"
+                    >
+                      <path 
+                        strokeLinecap="round" 
+                        strokeLinejoin="round" 
+                        strokeWidth={2} 
+                        d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h2M4 4h4m12 0h2M4 20h4m12 0h2" 
+                      />
+                    </svg>
+                    <span className="hidden lg:inline text-sm font-medium">Escáner</span>
+                  </button>
+                </div>
+              </div>
+              
+              {/* Búsqueda principal */}
+              <ProductSearch 
+                onProductSelect={handleProductSelect}
+                className="mb-4"
+              />
+              
+              {/* Categorías horizontales */}
+              <div className="flex items-center space-x-3 overflow-x-auto pb-2">
                 <button
-                  key={categoria.id}
-                  onClick={() => setActiveCategory(categoria.id)}
+                  onClick={() => setActiveCategory('todos')}
                   className={`flex-shrink-0 px-6 py-3 rounded-xl font-medium transition-all ${
-                    activeCategory === categoria.id
+                    activeCategory === 'todos'
                       ? 'bg-[#311716] text-white shadow-lg'
                       : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
                   }`}
                 >
-                  {categoria.nombre} ({productos.filter(p => p.categoriaId === categoria.id).length})
+                  Todos ({productos.length})
                 </button>
-              ))}
+                
+                {categorias.map(categoria => (
+                  <button
+                    key={categoria.id}
+                    onClick={() => setActiveCategory(categoria.id)}
+                    className={`flex-shrink-0 px-6 py-3 rounded-xl font-medium transition-all ${
+                      activeCategory === categoria.id
+                        ? 'bg-[#311716] text-white shadow-lg'
+                        : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                    }`}
+                  >
+                    {categoria.nombre} ({productos.filter(p => p.categoriaId === categoria.id).length})
+                  </button>
+                ))}
+              </div>
+              
+              {/* Ordenación */}
+              <div className="flex items-center justify-between mt-4">
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-600 font-medium">Ordenar por:</span>
+                  <select
+                    value={sortMode}
+                    onChange={(e) => setSortMode(e.target.value as SortMode)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#eeb077] focus:border-[#eeb077] bg-white"
+                  >
+                    <option value="name">Nombre</option>
+                    <option value="price">Precio</option>
+                    <option value="popularity">Popularidad</option>
+                    <option value="recent">Recientes</option>
+                  </select>
+                </div>
+              </div>
             </div>
             
-            {/* Ordenación */}
-            <div className="flex items-center justify-between mt-4">
-              <div className="flex items-center space-x-2">
-                <span className="text-sm text-gray-600 font-medium">Ordenar por:</span>
-                <select
-                  value={sortMode}
-                  onChange={(e) => setSortMode(e.target.value as SortMode)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#eeb077] focus:border-[#eeb077] bg-white"
-                >
-                  <option value="name">Nombre</option>
-                  <option value="price">Precio</option>
-                  <option value="popularity">Popularidad</option>
-                  <option value="recent">Recientes</option>
-                </select>
+            {/* Scanner expandible */}
+            {showScanner && (
+              <div className="p-6 bg-yellow-50 border-b border-yellow-200">
+                <BarcodeScanner 
+                  onScan={handleBarcodeScanned}
+                  onError={(error) => showNotification('error', `Error del scanner: ${error.message}`)}
+                  autoStart={true}
+                  className="bg-white rounded-xl"
+                />
+              </div>
+            )}
+            
+            {/* Grid de productos optimizado */}
+            <div className="flex-1 overflow-hidden flex flex-col">
+              <div className="flex-1 overflow-y-auto p-6">
+                {filteredProducts.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-center py-12">
+                    <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-6">
+                      <Package className="w-12 h-12 text-gray-400" />
+                    </div>
+                    <h3 className="text-xl font-semibold text-gray-700 mb-3">No se encontraron productos</h3>
+                    <p className="text-gray-500 max-w-md">
+                      {searchTerm || activeCategory !== 'todos' 
+                        ? 'Intenta ajustar los filtros de búsqueda'
+                        : 'No hay productos disponibles en este momento'
+                      }
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {/* Grid de productos */}
+                    <div className={`${
+                      viewMode === 'grid' 
+                        ? 'grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6' 
+                        : 'space-y-4'
+                    }`}>
+                      {filteredProducts.map(producto => (
+                        <ProductCard
+                          key={producto.id}
+                          producto={producto}
+                          viewMode={viewMode}
+                          onSelect={handleProductSelect}
+                          onToggleFavorite={toggleFavorite}
+                          isFavorite={favorites.has(producto.id)}
+                          isRecentlyAdded={recentlyAdded.has(producto.id)}
+                        />
+                      ))}
+                    </div>
+                    
+                    {/* Botón para cargar más productos */}
+                    {hasMoreProducts && (
+                      <div className="flex justify-center py-8">
+                        <button
+                          onClick={loadMoreProducts}
+                          className="px-8 py-4 bg-white border-2 border-[#311716] text-[#311716] rounded-2xl hover:bg-[#311716] hover:text-white transition-all font-semibold flex items-center space-x-3 shadow-lg hover:shadow-xl"
+                        >
+                          <Plus className="w-5 h-5" />
+                          <span>Cargar más productos</span>
+                          <span className="bg-[#311716] text-white px-2 py-1 rounded-full text-xs">
+                            {productsPerPage}+
+                          </span>
+                        </button>
+                      </div>
+                    )}
+                    
+                    {/* Indicador de total de productos */}
+                    <div className="text-center py-4 border-t border-gray-200 bg-gray-50 rounded-xl">
+                      <p className="text-sm text-gray-600">
+                        Mostrando {filteredProducts.length} de {productos.filter(p => {
+                          if (activeCategory !== 'todos' && p.categoriaId !== activeCategory) return false;
+                          if (searchTerm) {
+                            const term = searchTerm.toLowerCase();
+                            return p.nombre.toLowerCase().includes(term) ||
+                                   p.descripcion?.toLowerCase().includes(term) ||
+                                   p.codigoBarras?.includes(term);
+                          }
+                          return true;
+                        }).length} productos
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
           
-          {/* Scanner expandible */}
-          {showScanner && (
-            <div className="p-6 bg-yellow-50 border-b border-yellow-200">
-              <BarcodeScanner 
-                onScan={handleBarcodeScanned}
-                onError={(error) => showNotification('error', `Error del scanner: ${error.message}`)}
-                autoStart={true}
-                className="bg-white rounded-xl"
-              />
-            </div>
-          )}
-          
-          {/* Grid de productos optimizado */}
-          <div className="flex-1 overflow-hidden flex flex-col">
-            <div className="flex-1 overflow-y-auto p-6">
-              {filteredProducts.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-center py-12">
-                  <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mb-6">
-                    <Package className="w-12 h-12 text-gray-400" />
-                  </div>
-                  <h3 className="text-xl font-semibold text-gray-700 mb-3">No se encontraron productos</h3>
-                  <p className="text-gray-500 max-w-md">
-                    {searchTerm || activeCategory !== 'todos' 
-                      ? 'Intenta ajustar los filtros de búsqueda'
-                      : 'No hay productos disponibles en este momento'
-                    }
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  {/* Grid de productos */}
-                  <div className={`${
-                    viewMode === 'grid' 
-                      ? 'grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6' 
-                      : 'space-y-4'
-                  }`}>
-                    {filteredProducts.map(producto => (
-                      <ProductCard
-                        key={producto.id}
-                        producto={producto}
-                        viewMode={viewMode}
-                        onSelect={handleProductSelect}
-                        onToggleFavorite={toggleFavorite}
-                        isFavorite={favorites.has(producto.id)}
-                        isRecentlyAdded={recentlyAdded.has(producto.id)}
-                      />
-                    ))}
-                  </div>
-                  
-                  {/* Botón para cargar más productos */}
-                  {hasMoreProducts && (
-                    <div className="flex justify-center py-8">
-                      <button
-                        onClick={loadMoreProducts}
-                        className="px-8 py-4 bg-white border-2 border-[#311716] text-[#311716] rounded-2xl hover:bg-[#311716] hover:text-white transition-all font-semibold flex items-center space-x-3 shadow-lg hover:shadow-xl"
-                      >
-                        <Plus className="w-5 h-5" />
-                        <span>Cargar más productos</span>
-                        <span className="bg-[#311716] text-white px-2 py-1 rounded-full text-xs">
-                          {productsPerPage}+
-                        </span>
-                      </button>
-                    </div>
-                  )}
-                  
-                  {/* Indicador de total de productos */}
-                  <div className="text-center py-4 border-t border-gray-200 bg-gray-50 rounded-xl">
-                    <p className="text-sm text-gray-600">
-                      Mostrando {filteredProducts.length} de {productos.filter(p => {
-                        if (activeCategory !== 'todos' && p.categoriaId !== activeCategory) return false;
-                        if (searchTerm) {
-                          const term = searchTerm.toLowerCase();
-                          return p.nombre.toLowerCase().includes(term) ||
-                                 p.descripcion?.toLowerCase().includes(term) ||
-                                 p.codigoBarras?.includes(term);
-                        }
-                        return true;
-                      }).length} productos
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
+          {/* 🔄 CARRITO CON ANCHO REDUCIDO */}
+          <div className="w-80 xl:w-96 border-l border-gray-200 bg-white">
+            <CartDisplay 
+              onCheckout={handleCheckout} 
+              className="h-full"
+            />
           </div>
         </div>
-        
-        {/* 🔄 CARRITO CON ANCHO REDUCIDO */}
-        <div className="w-80 xl:w-96 border-l border-gray-200 bg-white">
-          <CartDisplay 
-            onCheckout={handleCheckout} 
-            className="h-full"
-          />
-        </div>
       </div>
+    );
+  };
 
-      {/* Modales */}
+  // 🎨 RENDER PRINCIPAL - ESTRUCTURA CORREGIDA
+  return (
+    <>
+      {/* 🔧 CONTENIDO PRINCIPAL */}
+      {renderMainContent()}
+
+      {/* 🔧 MODALES - SIEMPRE RENDERIZADOS */}
       <CheckoutModal
         isOpen={isCheckoutOpen}
         onClose={() => setIsCheckoutOpen(false)}
@@ -826,21 +865,25 @@ export default function PDVPage() {
         }}
       />
 
+      {/* 🚨 APERTURA MODAL - SIEMPRE RENDERIZADO */}
       <AperturaModal
         isOpen={showAperturaModal}
-        onClose={() => setShowAperturaModal(false)}
+        onClose={() => {
+          console.log('🔴 Cerrando AperturaModal');
+          setShowAperturaModal(false);
+        }}
         onComplete={handleAperturaComplete}
         aperturaInfo={aperturaInfo}
       />
 
-      {/* Notificaciones */}
+      {/* 📢 NOTIFICACIONES - SIEMPRE RENDERIZADAS */}
       {notification && (
         <NotificationToast
           notification={notification}
           onClose={() => setNotification(null)}
         />
       )}
-    </div>
+    </>
   );
 }
 
