@@ -42,6 +42,7 @@ export default function PDVPage() {
   const [showSucursalModal, setShowSucursalModal] = useState(false);
   const [showAperturaModal, setShowAperturaModal] = useState(false);
   const [aperturaInfo, setAperturaInfo] = useState<any>(null);
+  const [isLoadingApertura, setIsLoadingApertura] = useState(false);
   const [sucursalInfo, setSucursalInfo] = useState({
     nombre: '',
     direccion: '',
@@ -200,6 +201,95 @@ const handleCategorySelect = async (categoria: Categoria) => {
     localStorage.setItem('favoriteProducts', JSON.stringify(Array.from(newFavorites)));
   };
 
+    // 🆕 FUNCIÓN PARA CARGAR INFO DE APERTURA
+    const loadAperturaInfo = async () => {
+      try {
+        setIsLoadingApertura(true);
+        const sucursalId = localStorage.getItem('sucursalId');
+        
+        if (!sucursalId) {
+          showNotification('error', 'No se ha configurado una sucursal');
+          return;
+        }
+  
+        const response = await authenticatedFetch(`/api/pdv/apertura?sucursalId=${encodeURIComponent(sucursalId)}`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          setAperturaInfo(data);
+          console.log('📊 Información de apertura cargada:', data);
+        } else {
+          const errorData = await response.json();
+          console.error('❌ Error al cargar info de apertura:', errorData);
+          showNotification('error', errorData.error || 'Error al cargar información de apertura');
+        }
+      } catch (error) {
+        console.error('❌ Error al cargar información de apertura:', error);
+        showNotification('error', 'Error al conectar con el servidor');
+      } finally {
+        setIsLoadingApertura(false);
+      }
+    };
+  
+    // 🔧 CORREGIR FUNCIÓN DE APERTURA
+    const handleAbrirCaja = async () => {
+      console.log('🚀 Iniciando proceso de apertura de caja...');
+      
+      // Cargar información de apertura primero
+      await loadAperturaInfo();
+      
+      // Mostrar modal de apertura
+      setShowAperturaModal(true);
+    };
+  
+    // 🔧 CORREGIR onComplete DEL MODAL
+    const handleAperturaComplete = async (data: { montoInicial: number; recuperarSaldo: boolean }) => {
+      try {
+        console.log('💰 Ejecutando apertura con datos:', data);
+        
+        const sucursalId = localStorage.getItem('sucursalId');
+        if (!sucursalId) {
+          throw new Error('No se ha configurado una sucursal');
+        }
+  
+        const response = await authenticatedFetch('/api/pdv/apertura', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            sucursalId,
+            montoInicial: data.montoInicial,
+            recuperarSaldo: data.recuperarSaldo
+          })
+        });
+  
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Error al abrir la caja');
+        }
+  
+        const result = await response.json();
+        console.log('✅ Caja abierta exitosamente:', result);
+        
+        // Cerrar modal
+        setShowAperturaModal(false);
+        
+        // Mostrar notificación de éxito
+        showNotification('success', result.message || 'Caja abierta correctamente');
+        
+        // Verificar estado de caja actualizado
+        setTimeout(() => {
+          verificarEstadoCaja();
+        }, 1000);
+        
+      } catch (error) {
+        console.error('❌ Error en apertura de caja:', error);
+        showNotification('error', error instanceof Error ? error.message : 'Error desconocido al abrir caja');
+        throw error; // Re-throw para que el modal maneje el error
+      }
+    };  
+
   const handleBarcodeScanned = async (code: string) => {
     try {
       const sucursalId = localStorage.getItem('sucursalId');
@@ -278,11 +368,21 @@ const handleCategorySelect = async (categoria: Categoria) => {
             </p>
             
             <button
-              onClick={() => setShowAperturaModal(true)}
-              className="w-full py-4 px-8 bg-gradient-to-r from-[#311716] to-[#462625] text-white rounded-2xl hover:from-[#462625] hover:to-[#311716] transition-all font-bold text-lg flex items-center justify-center space-x-3 shadow-lg hover:shadow-xl"
+              onClick={handleAbrirCaja} // 🔧 USAR NUEVA FUNCIÓN
+              disabled={isLoadingApertura}
+              className="w-full py-4 px-8 bg-gradient-to-r from-[#311716] to-[#462625] text-white rounded-2xl hover:from-[#462625] hover:to-[#311716] transition-all font-bold text-lg flex items-center justify-center space-x-3 shadow-lg hover:shadow-xl disabled:opacity-50"
             >
-              <Zap className="w-6 h-6" />
-              <span>Abrir Caja del Día</span>
+              {isLoadingApertura ? (
+                <>
+                  <div className="animate-spin rounded-full h-6 w-6 border-2 border-white border-t-transparent"></div>
+                  <span>Preparando...</span>
+                </>
+              ) : (
+                <>
+                  <Zap className="w-6 h-6" />
+                  <span>Abrir Caja del Día</span>
+                </>
+              )}
             </button>
           </div>
         </div>
@@ -512,14 +612,10 @@ const handleCategorySelect = async (categoria: Categoria) => {
         onComplete={handleCheckoutComplete}
       />
 
-      <AperturaModal
+<AperturaModal
         isOpen={showAperturaModal}
         onClose={() => setShowAperturaModal(false)}
-        onComplete={async (data) => {
-          // Lógica de apertura aquí
-          setShowAperturaModal(false);
-          verificarEstadoCaja();
-        }}
+        onComplete={handleAperturaComplete} // 🔧 USAR NUEVA FUNCIÓN
         aperturaInfo={aperturaInfo}
       />
 
