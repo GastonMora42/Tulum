@@ -1,4 +1,4 @@
-// src/components/pdv/CheckoutModal.tsx - VERSIÓN MEJORADA CON SELECCIÓN A/B
+// src/components/pdv/CheckoutModal.tsx - VERSIÓN CON SALTO DE PASO INTELIGENTE
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -34,9 +34,9 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
   const [change, setChange] = useState<number>(0);
   const [isProcessing, setIsProcessing] = useState(false);
   
-  // 🆕 ESTADOS PARA FACTURACIÓN MEJORADA
+  // Estados para facturación mejorada
   const [facturar, setFacturar] = useState(false);
-  const [tipoFactura, setTipoFactura] = useState<'A' | 'B'>('B'); // Por defecto factura B
+  const [tipoFactura, setTipoFactura] = useState<'A' | 'B'>('B');
   const [clienteNombre, setClienteNombre] = useState('');
   const [clienteCuit, setClienteCuit] = useState('');
   
@@ -64,6 +64,26 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
     { id: 'qr', name: 'Pago con QR', icon: <QrCode size={24} className="text-indigo-600" /> },
     { id: 'transferencia', name: 'Transferencia', icon: <Smartphone size={24} className="text-orange-600" /> }
   ];
+
+  // 🆕 FUNCIÓN PARA DETERMINAR SI SALTAR EL PASO 2
+  const shouldSkipStep2 = () => {
+    // Si no se factura y solo hay pagos en efectivo, saltar paso 2
+    const allPaymentsAreCash = payments.every(p => p.method === 'efectivo');
+    return !facturar && !facturacionObligatoria && allPaymentsAreCash;
+  };
+
+  // 🆕 FUNCIÓN PARA OBTENER EL TOTAL DE PASOS (DINÁMICO)
+  const getTotalSteps = () => {
+    return shouldSkipStep2() ? 2 : 3; // Si salta paso 2, solo hay 2 pasos
+  };
+
+  // 🆕 FUNCIÓN PARA OBTENER EL NÚMERO DE PASO VISUAL
+  const getVisualStep = (step: number) => {
+    if (shouldSkipStep2() && step === 3) {
+      return 2; // Si saltamos paso 2, el paso 3 se muestra como paso 2
+    }
+    return step;
+  };
   
   // Inicializar al abrir modal
   useEffect(() => {
@@ -77,7 +97,7 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
       setDiscountCode('');
       setValidationErrors({});
       setFacturar(false);
-      setTipoFactura('B'); // 🆕 Resetear a factura B por defecto
+      setTipoFactura('B');
       setClienteNombre('');
       setClienteCuit('');
       
@@ -99,11 +119,10 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
     };
   }, [isOpen, getTotal]);
   
-  // 🆕 FUNCIÓN PARA VALIDAR LÍMITES DE FACTURAS B
+  // Función para validar límites de facturas B
   const validarLimiteFacturaB = () => {
     const total = getTotalWithDiscount();
-    // Las facturas B tienen un límite para consumidores finales 
-    const LIMITE_FACTURA_B = 15380; // Según el código de facturación
+    const LIMITE_FACTURA_B = 15380;
     
     if (tipoFactura === 'B' && total >= LIMITE_FACTURA_B && (!clienteCuit || clienteCuit.trim() === '')) {
       return `Para montos ≥ $${LIMITE_FACTURA_B.toLocaleString()} se requiere CUIT del cliente`;
@@ -111,17 +130,14 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
     return null;
   };
 
-  // 🆕 FUNCIÓN PARA VALIDAR CUIT
+  // Función para validar CUIT
   const validarCuit = (cuit: string): boolean => {
-    // Eliminar guiones y espacios
     const cuitLimpio = cuit.replace(/[-\s]/g, '');
     
-    // Verificar que tenga 11 dígitos
     if (cuitLimpio.length !== 11 || !/^\d{11}$/.test(cuitLimpio)) {
       return false;
     }
     
-    // Algoritmo de validación de CUIT
     const multiplicadores = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
     let suma = 0;
     
@@ -151,12 +167,11 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
     newPayments[index] = { ...newPayments[index], method: methodId, reference: '' };
     setPayments(newPayments);
     
-    // 🆕 VERIFICAR FACTURACIÓN OBLIGATORIA SEGÚN MEDIO DE PAGO
+    // Verificar facturación obligatoria según medio de pago
     const requiresInvoice = ['tarjeta_credito', 'tarjeta_debito', 'qr', 'transferencia'].includes(methodId);
     setFacturacionObligatoria(requiresInvoice);
     if (requiresInvoice) {
       setFacturar(true);
-      // Para pagos electrónicos, sugerir factura A si el monto lo justifica
       if (getTotalWithDiscount() > 50000) {
         setTipoFactura('A');
       }
@@ -285,17 +300,6 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
       }
     }
   };
-
-  // Manejar cambio en referencia de pago
-  const handleReferenceChange = (index: number, value: string) => {
-    const newPayments = [...payments];
-    newPayments[index] = { ...newPayments[index], reference: value };
-    setPayments(newPayments);
-    
-    if (value && validationErrors.reference) {
-      setValidationErrors({ ...validationErrors, reference: '' });
-    }
-  };
   
   // Verificar código de descuento
   const handleApplyDiscount = async () => {
@@ -343,7 +347,7 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
     }
   };
   
-  // Ir al siguiente paso
+  // 🔧 FUNCIÓN MODIFICADA PARA SALTAR PASO 2
   const goToNextStep = () => {
     const newErrors: Record<string, string> = {};
     
@@ -365,16 +369,7 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
         }
       }
       
-      // Validar que los pagos con tarjeta tienen referencia
-      const cardPayments = payments.filter(p => 
-        p.method === 'tarjeta_credito' || p.method === 'tarjeta_debito'
-      );
-      
-      if (cardPayments.some(p => !p.reference)) {
-        newErrors.reference = 'Debe ingresar un número de referencia para los pagos con tarjeta';
-      }
-      
-      // 🆕 VALIDAR LÍMITES DE FACTURA B
+      // Validar límites de factura B
       if (facturar && tipoFactura === 'B') {
         const errorLimite = validarLimiteFacturaB();
         if (errorLimite) {
@@ -386,12 +381,18 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
         setValidationErrors(newErrors);
         return;
       }
+
+      // 🆕 LÓGICA DE SALTO DE PASO
+      if (shouldSkipStep2()) {
+        console.log('🚀 Saltando paso 2 - Pago en efectivo sin factura');
+        setCurrentStep(3); // Saltar directamente al paso 3
+        return;
+      }
     }
     
     if (currentStep === 2 && facturar) {
-      // 🆕 VALIDACIONES MEJORADAS SEGÚN TIPO DE FACTURA
+      // Validaciones según tipo de factura
       if (tipoFactura === 'A') {
-        // Factura A: CUIT y Razón Social obligatorios
         if (!clienteNombre || clienteNombre.trim() === '') {
           newErrors.clienteNombre = 'La razón social es obligatoria para facturas A';
         }
@@ -402,19 +403,14 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
           newErrors.clienteCuit = 'El CUIT ingresado no es válido';
         }
       } else if (tipoFactura === 'B') {
-        // Factura B: Validar límites y CUIT si es necesario
         const errorLimite = validarLimiteFacturaB();
         if (errorLimite) {
           newErrors.facturaLimite = errorLimite;
         }
         
-        // Si se proporciona CUIT, validarlo
         if (clienteCuit && clienteCuit.trim() !== '' && !validarCuit(clienteCuit)) {
           newErrors.clienteCuit = 'El CUIT ingresado no es válido';
         }
-        
-        // Si no hay CUIT pero sí hay nombre, está bien (consumidor final con nombre)
-        // Si no hay ninguno, será consumidor final genérico
       }
       
       if (Object.keys(newErrors).length > 0) {
@@ -427,9 +423,15 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
     setCurrentStep(currentStep + 1);
   };
   
-  // Volver al paso anterior
+  // 🔧 FUNCIÓN MODIFICADA PARA MANEJAR SALTO HACIA ATRÁS
   const goToPreviousStep = () => {
-    setCurrentStep(currentStep - 1);
+    if (currentStep === 3 && shouldSkipStep2()) {
+      // Si estamos en paso 3 y habíamos saltado el paso 2, volver al paso 1
+      console.log('🔙 Volviendo del paso 3 al paso 1 (saltando paso 2)');
+      setCurrentStep(1);
+    } else {
+      setCurrentStep(currentStep - 1);
+    }
   };
   
   // Procesar pago
@@ -474,15 +476,13 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
         total: getTotalWithDiscount(),
         descuento: descuentoTotal,
         codigoDescuento: appliedDiscount?.code,
-        // 🔧 CORRECCIÓN: Separar facturar del tipo
-        facturar: facturar, // Boolean
-        tipoFactura: facturar ? tipoFactura : null, // String o null
+        facturar: facturar,
+        tipoFactura: facturar ? tipoFactura : null,
         clienteNombre: facturar ? (clienteNombre || null) : null,
         clienteCuit: facturar ? (clienteCuit || null) : null,
         pagos: payments.map(payment => ({
           medioPago: payment.method,
           monto: payment.amount,
-          referencia: payment.reference || undefined,
           datosPago: payment.method === 'efectivo' 
             ? { entregado: parseFloat(amountTendered), cambio: change } 
             : {}
@@ -531,7 +531,7 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
       aria-modal="true" role="dialog" aria-labelledby="checkout-title">
       <div 
         ref={modalRef}
-        className="bg-white rounded-xl shadow-xl w-full max-w-lg transform transition-all"
+        className="bg-white rounded-xl shadow-xl w-full max-w-6xl transform transition-all"
       >
         <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-[#311716] text-white rounded-t-xl">
           <h2 id="checkout-title" className="text-xl font-bold">Procesar Pago</h2>
@@ -546,137 +546,224 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
         </div>
         
         <div className="p-6">
-          {/* Pasos de la venta */}
-          <div className="flex items-center mb-6">
+          {/* 🔧 INDICADOR DE PASOS DINÁMICO */}
+          <div className="flex items-center justify-center mb-6 max-w-lg mx-auto">
             <div 
               className={`flex-1 flex flex-col items-center ${
-                currentStep >= 1 ? 'text-[#311716]' : 'text-gray-400'
+                getVisualStep(currentStep) >= 1 ? 'text-[#311716]' : 'text-gray-400'
               }`}
             >
               <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 mb-1
-                ${currentStep >= 1 ? 'border-[#311716] bg-[#311716] text-white' : 'border-gray-300'}`}>
+                ${getVisualStep(currentStep) >= 1 ? 'border-[#311716] bg-[#311716] text-white' : 'border-gray-300'}`}>
                 1
               </div>
               <span className="text-xs font-medium">Pago</span>
             </div>
             
-            <div className={`w-12 h-0.5 ${currentStep >= 2 ? 'bg-[#311716]' : 'bg-gray-300'}`}></div>
+            {/* 🆕 MOSTRAR PASO 2 SOLO SI NO SE SALTA */}
+            {!shouldSkipStep2() && (
+              <>
+                <div className={`w-12 h-0.5 ${getVisualStep(currentStep) >= 2 ? 'bg-[#311716]' : 'bg-gray-300'}`}></div>
+                
+                <div 
+                  className={`flex-1 flex flex-col items-center ${
+                    getVisualStep(currentStep) >= 2 ? 'text-[#311716]' : 'text-gray-400'
+                  }`}
+                >
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 mb-1
+                    ${getVisualStep(currentStep) >= 2 ? 'border-[#311716] bg-[#311716] text-white' : 'border-gray-300'}`}>
+                    2
+                  </div>
+                  <span className="text-xs font-medium">Cliente</span>
+                </div>
+              </>
+            )}
+            
+            <div className={`w-12 h-0.5 ${getVisualStep(currentStep) >= getTotalSteps() ? 'bg-[#311716]' : 'bg-gray-300'}`}></div>
             
             <div 
               className={`flex-1 flex flex-col items-center ${
-                currentStep >= 2 ? 'text-[#311716]' : 'text-gray-400'
+                getVisualStep(currentStep) >= getTotalSteps() ? 'text-[#311716]' : 'text-gray-400'
               }`}
             >
               <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 mb-1
-                ${currentStep >= 2 ? 'border-[#311716] bg-[#311716] text-white' : 'border-gray-300'}`}>
-                2
-              </div>
-              <span className="text-xs font-medium">Cliente</span>
-            </div>
-            
-            <div className={`w-12 h-0.5 ${currentStep >= 3 ? 'bg-[#311716]' : 'bg-gray-300'}`}></div>
-            
-            <div 
-              className={`flex-1 flex flex-col items-center ${
-                currentStep >= 3 ? 'text-[#311716]' : 'text-gray-400'
-              }`}
-            >
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center border-2 mb-1
-                ${currentStep >= 3 ? 'border-[#311716] bg-[#311716] text-white' : 'border-gray-300'}`}>
-                3
+                ${getVisualStep(currentStep) >= getTotalSteps() ? 'border-[#311716] bg-[#311716] text-white' : 'border-gray-300'}`}>
+                {getTotalSteps()}
               </div>
               <span className="text-xs font-medium">Confirmar</span>
             </div>
           </div>
           
-          <div className="max-h-[60vh] overflow-y-auto px-1 pb-4">
+          <div className="h-[70vh] overflow-y-auto">
             {/* Paso 1: Método de pago */}
             {currentStep === 1 && (
-              <>
-                {/* Total y descuentos */}
-                <div className="mb-5 bg-gray-50 rounded-lg p-4">
-                  <div className="flex justify-between mb-2">
-                    <span className="font-medium text-gray-700">Subtotal:</span>
-                    <span>${getTotal().toFixed(2)}</span>
-                  </div>
-                  
-                  {/* Descuento por código */}
-                  <div className="mb-2">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="flex-1">
-                        <input
-                          type="text"
-                          placeholder="Código de descuento"
-                          value={discountCode}
-                          onChange={(e) => setDiscountCode(e.target.value)}
-                          disabled={!!appliedDiscount || isApplyingDiscount}
-                          className="w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-[#9c7561] focus:border-[#9c7561]"
-                        />
-                      </div>
-                      <button
-                        onClick={handleApplyDiscount}
-                        disabled={!discountCode || !!appliedDiscount || isApplyingDiscount}
-                        className="px-3 py-2 bg-[#9c7561] text-white rounded-lg text-sm hover:bg-[#8a6550] disabled:opacity-50 disabled:hover:bg-[#9c7561]"
-                      >
-                        {isApplyingDiscount ? (
-                          <span className="flex items-center">
-                            <Loader size={14} className="animate-spin mr-1" />
-                            Verificando...
-                          </span>
-                        ) : (
-                          'Aplicar'
-                        )}
-                      </button>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                
+                {/* COLUMNA IZQUIERDA: Total y descuentos */}
+                <div className="space-y-6">
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h3 className="font-medium text-gray-900 mb-4">Resumen de Venta</h3>
+                    
+                    <div className="flex justify-between mb-2">
+                      <span className="font-medium text-gray-700">Subtotal:</span>
+                      <span className="font-bold">${getTotal().toFixed(2)}</span>
                     </div>
                     
-                    {validationErrors.discount && (
-                      <p className="text-xs text-red-500 mt-1">{validationErrors.discount}</p>
-                    )}
-                    
-                    {appliedDiscount && (
-                      <div className="flex items-center justify-between text-sm mb-2 text-green-600 bg-green-50 p-2 rounded">
-                        <span className="flex items-center">
-                          <Percent size={14} className="mr-1" />
-                          Descuento aplicado: 
-                          {appliedDiscount.type === 'porcentaje' 
-                            ? ` ${appliedDiscount.value}%` 
-                            : ` $${appliedDiscount.value}`}
-                        </span>
-                        <button 
-                          onClick={() => setAppliedDiscount(null)}
-                          className="text-gray-500 hover:text-red-500"
+                    {/* Descuento por código */}
+                    <div className="mb-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="flex-1">
+                          <input
+                            type="text"
+                            placeholder="Código de descuento"
+                            value={discountCode}
+                            onChange={(e) => setDiscountCode(e.target.value)}
+                            disabled={!!appliedDiscount || isApplyingDiscount}
+                            className="w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-[#9c7561] focus:border-[#9c7561]"
+                          />
+                        </div>
+                        <button
+                          onClick={handleApplyDiscount}
+                          disabled={!discountCode || !!appliedDiscount || isApplyingDiscount}
+                          className="px-3 py-2 bg-[#9c7561] text-white rounded-lg text-sm hover:bg-[#8a6550] disabled:opacity-50"
                         >
-                          <X size={14} />
+                          {isApplyingDiscount ? (
+                            <span className="flex items-center">
+                              <Loader size={14} className="animate-spin mr-1" />
+                              Verificando...
+                            </span>
+                          ) : (
+                            'Aplicar'
+                          )}
                         </button>
                       </div>
+                      
+                      {validationErrors.discount && (
+                        <p className="text-xs text-red-500 mt-1">{validationErrors.discount}</p>
+                      )}
+                      
+                      {appliedDiscount && (
+                        <div className="flex items-center justify-between text-sm mb-2 text-green-600 bg-green-50 p-2 rounded">
+                          <span className="flex items-center">
+                            <Percent size={14} className="mr-1" />
+                            Descuento aplicado: 
+                            {appliedDiscount.type === 'porcentaje' 
+                              ? ` ${appliedDiscount.value}%` 
+                              : ` $${appliedDiscount.value}`}
+                          </span>
+                          <button 
+                            onClick={() => setAppliedDiscount(null)}
+                            className="text-gray-500 hover:text-red-500"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Descuento manual porcentual */}
+                    <div className="mb-4">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Descuento manual (%):
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="1"
+                        value={generalDiscount}
+                        onChange={(e) => setGeneralDiscount(Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
+                        className="w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-[#9c7561] focus:border-[#9c7561]"
+                      />
+                    </div>
+                    
+                    {/* Total final */}
+                    <div className="mt-4 pt-4 border-t border-gray-200 flex justify-between font-bold text-lg">
+                      <span>Total a pagar:</span>
+                      <span className="text-[#311716]">${getTotalWithDiscount().toFixed(2)}</span>
+                    </div>
+                  </div>
+
+                  {/* Sección de facturación */}
+                  <div className="border-t border-gray-100 pt-4">
+                    <div className="flex items-center p-3 bg-gray-50 rounded-lg mb-3">
+                      <input
+                        id="facturar"
+                        type="checkbox"
+                        checked={facturar || facturacionObligatoria}
+                        onChange={(e) => setFacturar(e.target.checked)}
+                        disabled={facturacionObligatoria}
+                        className="h-4 w-4 text-[#311716] focus:ring-[#9c7561] border-gray-300 rounded"
+                      />
+                      <label htmlFor="facturar" className="ml-2 block text-gray-700">
+                        {facturacionObligatoria 
+                          ? 'Facturación obligatoria para pagos electrónicos' 
+                          : 'Generar factura electrónica'
+                        }
+                      </label>
+                    </div>
+
+                    {/* 🆕 INDICADOR DE SALTO DE PASO */}
+                    {shouldSkipStep2() && (
+                      <div className="mt-2 text-sm text-green-600 bg-green-50 p-2 rounded flex items-center">
+                        <Check className="mr-1 h-4 w-4" />
+                        <span>Pago en efectivo sin factura - Se omitirá paso de datos del cliente</span>
+                      </div>
                     )}
-                  </div>
-                  
-                  {/* Descuento manual porcentual */}
-                  <div className="mb-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Descuento manual (%):
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="1"
-                      value={generalDiscount}
-                      onChange={(e) => setGeneralDiscount(Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
-                      className="w-full p-2 border border-gray-300 rounded-lg text-sm focus:ring-1 focus:ring-[#9c7561] focus:border-[#9c7561]"
-                    />
-                  </div>
-                  
-                  {/* Total final */}
-                  <div className="mt-3 pt-3 border-t border-gray-200 flex justify-between font-bold">
-                    <span className="text-lg">Total a pagar:</span>
-                    <span className="text-lg text-[#311716]">${getTotalWithDiscount().toFixed(2)}</span>
+                    
+                    {/* Selector de tipo de factura */}
+                    {facturar && (
+                      <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Tipo de factura:
+                        </label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setTipoFactura('A')}
+                            className={`p-3 rounded-lg border-2 transition-colors ${
+                              tipoFactura === 'A' 
+                                ? 'border-[#311716] bg-[#311716] text-white' 
+                                : 'border-gray-200 hover:border-gray-300 bg-white'
+                            }`}
+                          >
+                            <div className="text-center">
+                              <FileText className="h-6 w-6 mx-auto mb-1" />
+                              <div className="font-bold">Factura A</div>
+                              <div className="text-xs opacity-75">
+                                {tipoFactura === 'A' ? 'IVA discriminado' : 'Responsable Inscripto'}
+                              </div>
+                            </div>
+                          </button>
+                          
+                          <button
+                            type="button"
+                            onClick={() => setTipoFactura('B')}
+                            className={`p-3 rounded-lg border-2 transition-colors ${
+                              tipoFactura === 'B' 
+                                ? 'border-[#311716] bg-[#311716] text-white' 
+                                : 'border-gray-200 hover:border-gray-300 bg-white'
+                            }`}
+                          >
+                            <div className="text-center">
+                              <Receipt className="h-6 w-6 mx-auto mb-1" />
+                              <div className="font-bold">Factura B</div>
+                              <div className="text-xs opacity-75">
+                                {tipoFactura === 'B' ? 'IVA incluido' : 'Consumidor Final'}
+                              </div>
+                            </div>
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                    
                   </div>
                 </div>
                 
-                {/* Métodos de pago */}
-                <div className="space-y-4 mb-4">
+                {/* COLUMNA DERECHA: Métodos de pago */}
+                <div className="space-y-4">
+                  <h3 className="font-medium text-gray-900 mb-4">Métodos de Pago</h3>
+                  
                   {payments.map((payment, index) => (
                     <div key={index} className="border rounded-lg p-4 bg-gray-50">
                       <div className="flex justify-between items-center mb-3">
@@ -695,12 +782,12 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                         )}
                       </div>
                       
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-4">
+                      <div className="grid grid-cols-2 gap-2 mb-4">
                         {paymentMethods.map((method) => (
                           <button
                             key={method.id}
                             onClick={() => handlePaymentMethodChange(index, method.id)}
-                            className={`p-2 rounded-lg border flex items-center gap-2 transition-colors ${
+                            className={`p-3 rounded-lg border flex items-center gap-2 transition-colors ${
                               payment.method === method.id
                                 ? 'border-[#9c7561] bg-[#eeb077]/10 text-[#311716]'
                                 : 'border-gray-200 hover:bg-gray-50'
@@ -708,7 +795,7 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                             disabled={payments.some((p, i) => i !== index && p.method === method.id)}
                           >
                             {method.icon}
-                            <span className="font-medium text-sm whitespace-nowrap overflow-hidden text-ellipsis">{method.name}</span>
+                            <span className="font-medium text-sm">{method.name}</span>
                           </button>
                         ))}
                       </div>
@@ -728,7 +815,7 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                             step="0.01"
                             value={payment.amount}
                             onChange={(e) => handlePaymentAmountChange(index, e.target.value)}
-                            className="w-full p-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#9c7561] focus:border-[#9c7561]"
+                            className="w-full p-3 border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#9c7561] focus:border-[#9c7561] text-lg font-bold"
                           />
                         </div>
                         
@@ -742,7 +829,7 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                               value={amountTendered}
                               onChange={(e) => setAmountTendered(e.target.value)}
                               placeholder="0.00"
-                              className="w-full p-2 border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#9c7561] focus:border-[#9c7561]"
+                              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-1 focus:ring-[#9c7561] focus:border-[#9c7561] text-lg font-bold"
                             />
                             
                             {validationErrors.tendered && (
@@ -750,174 +837,60 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                             )}
                             
                             {change > 0 && (
-                              <div className="mt-2 p-2 bg-green-50 text-green-800 rounded-lg flex items-center justify-between">
+                              <div className="mt-3 p-3 bg-green-50 text-green-800 rounded-lg flex items-center justify-between">
                                 <span className="font-medium">Cambio a devolver:</span>
-                                <span className="text-lg font-bold">${change.toFixed(2)}</span>
+                                <span className="text-xl font-bold">${change.toFixed(2)}</span>
                               </div>
-                            )}
-                          </div>
-                        )}
-                        
-                        {(['tarjeta_credito', 'tarjeta_debito', 'transferencia'].includes(payment.method)) && (
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              {payment.method.includes('tarjeta') ? 'Número de referencia:' : 'Número de transferencia:'}
-                            </label>
-                            <input
-                              type="text"
-                              value={payment.reference}
-                              onChange={(e) => handleReferenceChange(index, e.target.value)}
-                              placeholder="Número de operación"
-                              className={`w-full p-2 border rounded-lg focus:ring-1 focus:ring-[#9c7561] focus:border-[#9c7561] ${
-                                validationErrors.reference && !payment.reference 
-                                  ? 'border-red-300 bg-red-50' 
-                                  : 'border-gray-300'
-                              }`}
-                            />
-                            
-                            {validationErrors.reference && !payment.reference && (
-                              <p className="text-xs text-red-500 mt-1">{validationErrors.reference}</p>
                             )}
                           </div>
                         )}
                       </div>
                     </div>
                   ))}
-                </div>
-                
-                {/* Botón para agregar método adicional */}
-                {payments.length < 2 && remainingAmount > 0 && (
-                  <button
-                    onClick={addPaymentMethod}
-                    className="w-full py-2 px-4 border border-[#9c7561] text-[#311716] rounded-lg flex items-center justify-center hover:bg-[#eeb077]/10 mb-4"
-                  >
-                    <Plus size={18} className="mr-2" />
-                    Agregar método de pago adicional
-                  </button>
-                )}
-                
-                {/* Mensaje de error de total */}
-                {validationErrors.total && (
-                  <div className="mb-4 p-2 bg-red-50 text-red-600 rounded-lg flex items-center">
-                    <AlertCircle size={16} className="mr-2 flex-shrink-0" />
-                    <p className="text-sm">{validationErrors.total}</p>
-                  </div>
-                )}
+                  
+                  {/* Botón para agregar método adicional */}
+                  {payments.length < 2 && remainingAmount > 0 && (
+                    <button
+                      onClick={addPaymentMethod}
+                      className="w-full py-3 px-4 border border-[#9c7561] text-[#311716] rounded-lg flex items-center justify-center hover:bg-[#eeb077]/10"
+                    >
+                      <Plus size={18} className="mr-2" />
+                      Agregar método de pago adicional
+                    </button>
+                  )}
+                  
+                  {/* Mensajes de error */}
+                  {validationErrors.total && (
+                    <div className="p-3 bg-red-50 text-red-600 rounded-lg flex items-center">
+                      <AlertCircle size={16} className="mr-2 flex-shrink-0" />
+                      <p className="text-sm">{validationErrors.total}</p>
+                    </div>
+                  )}
 
-                {/* Error de límite de factura */}
-                {validationErrors.facturaLimite && (
-                  <div className="mb-4 p-2 bg-amber-50 text-amber-700 rounded-lg flex items-center">
-                    <AlertCircle size={16} className="mr-2 flex-shrink-0" />
-                    <p className="text-sm">{validationErrors.facturaLimite}</p>
-                  </div>
-                )}
-                
-                {/* 🆕 SECCIÓN DE FACTURACIÓN MEJORADA */}
-                <div className="border-t border-gray-100 pt-4 mt-4">
-                  <div className="flex items-center p-3 bg-gray-50 rounded-lg mb-3">
-                    <input
-                      id="facturar"
-                      type="checkbox"
-                      checked={facturar || facturacionObligatoria}
-                      onChange={(e) => setFacturar(e.target.checked)}
-                      disabled={facturacionObligatoria}
-                      className="h-4 w-4 text-[#311716] focus:ring-[#9c7561] border-gray-300 rounded"
-                    />
-                    <label htmlFor="facturar" className="ml-2 block text-gray-700">
-                      {facturacionObligatoria 
-                        ? 'Facturación obligatoria para pagos electrónicos' 
-                        : 'Generar factura electrónica'
-                      }
-                    </label>
-                  </div>
-                  
-                  {/* 🆕 SELECTOR DE TIPO DE FACTURA */}
-                  {facturar && (
-                    <div className="mt-3 p-3 bg-blue-50 rounded-lg">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Tipo de factura:
-                      </label>
-                      <div className="grid grid-cols-2 gap-3">
-                        <button
-                          type="button"
-                          onClick={() => setTipoFactura('A')}
-                          className={`p-3 rounded-lg border-2 transition-colors ${
-                            tipoFactura === 'A' 
-                              ? 'border-[#311716] bg-[#311716] text-white' 
-                              : 'border-gray-200 hover:border-gray-300 bg-white'
-                          }`}
-                        >
-                          <div className="text-center">
-                            <FileText className="h-6 w-6 mx-auto mb-1" />
-                            <div className="font-bold">Factura A</div>
-                            <div className="text-xs opacity-75">
-                              {tipoFactura === 'A' ? 'IVA discriminado' : 'Responsable Inscripto'}
-                            </div>
-                          </div>
-                        </button>
-                        
-                        <button
-                          type="button"
-                          onClick={() => setTipoFactura('B')}
-                          className={`p-3 rounded-lg border-2 transition-colors ${
-                            tipoFactura === 'B' 
-                              ? 'border-[#311716] bg-[#311716] text-white' 
-                              : 'border-gray-200 hover:border-gray-300 bg-white'
-                          }`}
-                        >
-                          <div className="text-center">
-                            <Receipt className="h-6 w-6 mx-auto mb-1" />
-                            <div className="font-bold">Factura B</div>
-                            <div className="text-xs opacity-75">
-                              {tipoFactura === 'B' ? 'IVA incluido' : 'Consumidor Final'}
-                            </div>
-                          </div>
-                        </button>
-                      </div>
-                      
-                      {/* 🆕 INFORMACIÓN SOBRE TIPOS DE FACTURA */}
-                      <div className="mt-3 text-xs text-blue-700">
-                        {tipoFactura === 'A' ? (
-                          <div>
-                            <strong>Factura A:</strong> Requiere CUIT del cliente. IVA discriminado. 
-                            Para operaciones entre Responsables Inscriptos.
-                          </div>
-                        ) : (
-                          <div>
-                            <strong>Factura B:</strong> Para Consumidores Finales. IVA incluido en el precio. 
-                            {getTotalWithDiscount() >= 15380 && ' ⚠️ Requiere identificación del cliente para montos ≥ $15.380.'}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {facturacionObligatoria && (
-                    <div className="mt-2 text-sm text-amber-600 bg-amber-50 p-2 rounded">
-                      <span className="flex items-center">
-                        <AlertCircle className="mr-1 h-4 w-4" />
-                        Los pagos con tarjeta y transferencias requieren factura electrónica
-                      </span>
+                  {validationErrors.facturaLimite && (
+                    <div className="p-3 bg-amber-50 text-amber-700 rounded-lg flex items-center">
+                      <AlertCircle size={16} className="mr-2 flex-shrink-0" />
+                      <p className="text-sm">{validationErrors.facturaLimite}</p>
                     </div>
                   )}
                 </div>
-              </>
+              </div>
             )}
             
-            {/* Paso 2: Datos de cliente para facturación */}
-            {currentStep === 2 && (
-              <>
+            {/* Paso 2: Datos de cliente para facturación - SOLO SI NO SE SALTA */}
+            {currentStep === 2 && !shouldSkipStep2() && (
+              <div className="max-w-2xl mx-auto">
                 {facturar ? (
-                  <div className="space-y-4 bg-gray-50 p-4 rounded-lg">
-                    <div className="flex items-center mb-2 text-[#311716]">
-                      <Receipt className="h-5 w-5 mr-2" />
-                      <h3 className="font-medium">
+                  <div className="space-y-4 bg-gray-50 p-6 rounded-lg">
+                    <div className="flex items-center mb-4 text-[#311716]">
+                      <Receipt className="h-6 w-6 mr-2" />
+                      <h3 className="text-xl font-medium">
                         Datos para factura {tipoFactura}
                       </h3>
                     </div>
                     
-                    {/* 🆕 INFORMACIÓN ESPECÍFICA SEGÚN TIPO */}
-                    <div className="text-sm text-gray-600 bg-white p-3 rounded-lg border-l-4 border-blue-400">
+                    {/* Información específica según tipo */}
+                    <div className="text-sm text-gray-600 bg-white p-4 rounded-lg border-l-4 border-blue-400">
                       {tipoFactura === 'A' ? (
                         <>
                           <strong>Factura A - Responsable Inscripto:</strong><br />
@@ -934,29 +907,29 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                     
                     {/* Campo Nombre/Razón Social */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
                         {tipoFactura === 'A' ? 'Razón Social: *' : 'Nombre (opcional):'}
                       </label>
                       <div className="relative">
-                        <User className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                        <User className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
                         <input
                           type="text"
                           value={clienteNombre}
                           onChange={(e) => setClienteNombre(e.target.value)}
-                          className={`w-full p-2 pl-10 border rounded-lg focus:ring-1 focus:ring-[#9c7561] focus:border-[#9c7561] ${
+                          className={`w-full p-3 pl-12 border rounded-lg focus:ring-1 focus:ring-[#9c7561] focus:border-[#9c7561] text-lg ${
                             validationErrors.clienteNombre ? 'border-red-300 bg-red-50' : 'border-gray-300'
                           }`}
                           placeholder={tipoFactura === 'A' ? 'Razón social del cliente' : 'Nombre del cliente (opcional)'}
                         />
                       </div>
                       {validationErrors.clienteNombre && (
-                        <p className="text-xs text-red-500 mt-1">{validationErrors.clienteNombre}</p>
+                        <p className="text-sm text-red-500 mt-1">{validationErrors.clienteNombre}</p>
                       )}
                     </div>
                     
                     {/* Campo CUIT/DNI */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
                         {tipoFactura === 'A' ? 'CUIT: *' : 
                          (getTotalWithDiscount() >= 15380 ? 'CUIT/DNI: *' : 'CUIT/DNI (opcional):')}
                       </label>
@@ -964,26 +937,25 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                         type="text"
                         value={clienteCuit}
                         onChange={(e) => setClienteCuit(e.target.value)}
-                        className={`w-full p-2 border rounded-lg focus:ring-1 focus:ring-[#9c7561] focus:border-[#9c7561] ${
+                        className={`w-full p-3 border rounded-lg focus:ring-1 focus:ring-[#9c7561] focus:border-[#9c7561] text-lg ${
                           validationErrors.clienteCuit ? 'border-red-300 bg-red-50' : 'border-gray-300'
                         }`}
                         placeholder={tipoFactura === 'A' ? '20-12345678-9' : 'CUIT/DNI sin guiones'}
                         maxLength={13}
                       />
                       {validationErrors.clienteCuit && (
-                        <p className="text-xs text-red-500 mt-1">{validationErrors.clienteCuit}</p>
+                        <p className="text-sm text-red-500 mt-1">{validationErrors.clienteCuit}</p>
                       )}
                       
-                      {/* Error de límite de factura B */}
                       {validationErrors.facturaLimite && (
-                        <p className="text-xs text-amber-600 mt-1 bg-amber-50 p-2 rounded">
+                        <p className="text-sm text-amber-600 mt-2 bg-amber-50 p-3 rounded">
                           {validationErrors.facturaLimite}
                         </p>
                       )}
                     </div>
                     
                     {/* Información adicional según el tipo */}
-                    <div className="bg-blue-50 p-3 rounded-lg text-blue-800 text-sm mt-3">
+                    <div className="bg-blue-50 p-4 rounded-lg text-blue-800 text-sm">
                       <div className="flex items-start">
                         <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 text-blue-500" />
                         <div>
@@ -1002,94 +974,107 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                     </div>
                   </div>
                 ) : (
-                  <div className="py-8 text-center bg-gray-50 rounded-lg">
-                    <Receipt className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                    <p className="text-lg font-medium text-gray-700 mb-2">No se requiere facturación</p>
+                  <div className="py-12 text-center bg-gray-50 rounded-lg">
+                    <Receipt className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                    <p className="text-xl font-medium text-gray-700 mb-2">No se requiere facturación</p>
                     <p className="text-gray-500">Continúe para finalizar la venta sin generar factura.</p>
                   </div>
                 )}
-              </>
+              </div>
             )}
             
             {/* Paso 3: Confirmación */}
             {currentStep === 3 && (
-              <>
-                <div className="bg-gray-50 rounded-lg p-4 mb-6">
-                  <h3 className="font-medium text-[#311716] mb-3 flex items-center">
-                    <Check className="h-5 w-5 mr-2 text-green-500" />
+              <div className="max-w-4xl mx-auto">
+                <div className="bg-gray-50 rounded-lg p-6 mb-6">
+                  <h3 className="font-medium text-[#311716] mb-4 flex items-center text-xl">
+                    <Check className="h-6 w-6 mr-2 text-green-500" />
                     Resumen de la venta
                   </h3>
                   
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Productos:</span>
-                      <span>{items.length} {items.length === 1 ? 'item' : 'items'}</span>
-                    </div>
-                    
-                    <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Subtotal:</span>
-                      <span>${getTotal().toFixed(2)}</span>
-                    </div>
-                    
-                    {(appliedDiscount || generalDiscount > 0) && (
-                      <div className="flex justify-between text-sm text-green-600">
-                        <span>Descuento:</span>
-                        <span>-${(getTotal() - getTotalWithDiscount()).toFixed(2)}</span>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {/* Detalles de productos y pagos */}
+                    <div className="space-y-3">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Productos:</span>
+                        <span className="font-medium">{items.length} {items.length === 1 ? 'item' : 'items'}</span>
                       </div>
-                    )}
-                    
-                    {payments.map((payment, index) => (
-                      <div key={index} className="flex justify-between text-sm">
-                        <span className="text-gray-600">
-                          {paymentMethods.find(m => m.id === payment.method)?.name || payment.method}:
-                        </span>
-                        <span>${payment.amount.toFixed(2)}</span>
+                      
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Subtotal:</span>
+                        <span className="font-medium">${getTotal().toFixed(2)}</span>
                       </div>
-                    ))}
-                    
-                    {payments.some(p => p.method === 'efectivo') && change > 0 && (
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">Cambio:</span>
-                        <span>${change.toFixed(2)}</span>
-                      </div>
-                    )}
-                    
-                    {facturar && (
-                      <div className="border-t border-gray-200 mt-2 pt-2">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-gray-600">Tipo de factura:</span>
-                          <span className="font-medium">Factura {tipoFactura}</span>
+                      
+                      {(appliedDiscount || generalDiscount > 0) && (
+                        <div className="flex justify-between text-green-600">
+                          <span>Descuento:</span>
+                          <span className="font-medium">-${(getTotal() - getTotalWithDiscount()).toFixed(2)}</span>
                         </div>
+                      )}
+                      
+                      {payments.map((payment, index) => (
+                        <div key={index} className="flex justify-between">
+                          <span className="text-gray-600">
+                            {paymentMethods.find(m => m.id === payment.method)?.name || payment.method}:
+                          </span>
+                          <span className="font-medium">${payment.amount.toFixed(2)}</span>
+                        </div>
+                      ))}
+                      
+                      {payments.some(p => p.method === 'efectivo') && change > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Cambio:</span>
+                          <span className="font-medium">${change.toFixed(2)}</span>
+                        </div>
+                      )}
+                      
+                      <div className="border-t border-gray-200 mt-4 pt-4 flex justify-between font-bold text-lg">
+                        <span>Total:</span>
+                        <span className="text-[#311716]">${getTotalWithDiscount().toFixed(2)}</span>
+                      </div>
+                    </div>
+                    
+                    {/* Información de facturación */}
+                    {facturar ? (
+                      <div className="bg-white p-4 rounded-lg border">
+                        <h4 className="font-medium text-gray-900 mb-3">Información de Facturación</h4>
                         
-                        {clienteNombre && (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">
-                              {tipoFactura === 'A' ? 'Razón Social:' : 'Cliente:'}
-                            </span>
-                            <span className="text-right">{clienteNombre}</span>
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Tipo de factura:</span>
+                            <span className="font-medium">Factura {tipoFactura}</span>
                           </div>
-                        )}
-                        
-                        {clienteCuit && (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">CUIT/DNI:</span>
-                            <span>{clienteCuit}</span>
-                          </div>
-                        )}
-                        
-                        {!clienteNombre && !clienteCuit && tipoFactura === 'B' && (
-                          <div className="flex justify-between text-sm">
-                            <span className="text-gray-600">Cliente:</span>
-                            <span className="text-gray-500 italic">Consumidor Final</span>
-                          </div>
-                        )}
+                          
+                          {clienteNombre && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">
+                                {tipoFactura === 'A' ? 'Razón Social:' : 'Cliente:'}
+                              </span>
+                              <span className="text-right">{clienteNombre}</span>
+                            </div>
+                          )}
+                          
+                          {clienteCuit && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">CUIT/DNI:</span>
+                              <span>{clienteCuit}</span>
+                            </div>
+                          )}
+                          
+                          {!clienteNombre && !clienteCuit && tipoFactura === 'B' && (
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Cliente:</span>
+                              <span className="text-gray-500 italic">Consumidor Final</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="bg-white p-4 rounded-lg border text-center">
+                        <Receipt className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                        <h4 className="font-medium text-gray-900 mb-1">Venta en efectivo</h4>
                       </div>
                     )}
-                    
-                    <div className="border-t border-gray-200 mt-2 pt-2 flex justify-between font-bold">
-                      <span>Total:</span>
-                      <span className="text-[#311716]">${getTotalWithDiscount().toFixed(2)}</span>
-                    </div>
                   </div>
                 </div>
                 
@@ -1108,17 +1093,17 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                     </ul>
                   </div>
                 </div>
-              </>
+              </div>
             )}
           </div>
           
           {/* Botones de navegación */}
-          <div className="flex justify-between gap-3 mt-4 border-t border-gray-100 pt-4">
+          <div className="flex justify-between gap-3 mt-6 border-t border-gray-100 pt-4">
             {currentStep > 1 ? (
               <button
                 onClick={goToPreviousStep}
                 disabled={isProcessing}
-                className="py-2 px-4 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 flex items-center transition-colors"
+                className="py-3 px-6 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 flex items-center transition-colors"
               >
                 <ArrowLeft size={16} className="mr-1" />
                 Volver
@@ -1127,25 +1112,25 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
               <button
                 onClick={onClose}
                 disabled={isProcessing}
-                className="py-2 px-4 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                className="py-3 px-6 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 Cancelar
               </button>
             )}
             
-            {currentStep < 3 ? (
+            {currentStep < getTotalSteps() ? (
               <button
                 ref={initialFocusRef}
                 onClick={goToNextStep}
-                className="py-2 px-4 bg-[#311716] text-white rounded-lg hover:bg-[#462625] disabled:opacity-70 transition-colors"
+                className="py-3 px-6 bg-[#311716] text-white rounded-lg hover:bg-[#462625] disabled:opacity-70 transition-colors font-medium"
               >
-                Siguiente
+                {shouldSkipStep2() && currentStep === 1 ? 'Confirmar' : 'Siguiente'}
               </button>
             ) : (
               <button
                 onClick={handleProcessPayment}
                 disabled={isProcessing}
-                className="py-2 px-4 bg-[#311716] text-white rounded-lg hover:bg-[#462625] disabled:opacity-70 flex items-center transition-colors"
+                className="py-3 px-6 bg-[#311716] text-white rounded-lg hover:bg-[#462625] disabled:opacity-70 flex items-center transition-colors font-medium"
               >
                 {isProcessing ? (
                   <>

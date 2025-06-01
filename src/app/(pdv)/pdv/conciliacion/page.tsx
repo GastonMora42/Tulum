@@ -645,7 +645,6 @@ export default function ConciliacionPage() {
                             {producto.nombre}
                           </h4>
                           <div className="flex items-center space-x-4 text-sm text-gray-600">
-                            <span>Stock teórico: {producto.stockTeorico}</span>
                             {viewMode === 'all' && (
                               <span className="px-2 py-1 bg-gray-100 rounded-full text-xs">
                                 {producto.categoria.nombre}
