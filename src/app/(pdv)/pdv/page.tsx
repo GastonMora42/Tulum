@@ -1,4 +1,4 @@
-// src/app/(pdv)/pdv/page.tsx - VERSIÓN COMPLETAMENTE REDISEÑADA
+// src/app/(pdv)/pdv/page.tsx - VERSIÓN COMPLETA CORREGIDA
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -6,6 +6,7 @@ import { ProductSearch } from '@/components/pdv/ProductSearch';
 import { CartDisplay } from '@/components/pdv/CartDisplay';
 import { CheckoutModal } from '@/components/pdv/CheckoutModal';
 import { BarcodeScanner } from '@/components/pdv/BarcodeScanner';
+import { AperturaModal } from '@/components/pdv/AperturaModal';
 import { useCartStore } from '@/stores/cartStore';
 import { useOffline } from '@/hooks/useOffline';
 import { SucursalSetupModal } from '@/components/pdv/SucursalSetupModal';
@@ -14,7 +15,7 @@ import {
   AlertCircle, CheckCircle, X, Package, ShoppingCart as CartIcon, 
   Search, Grid, List, Star, TrendingUp, Clock, Zap, AlertTriangle,
   Camera, Scan, Plus, Minus, Heart, Tag, Users, Building2, MapPin,
-  RefreshCw, Wifi, WifiOff, Settings, BarChart3
+  RefreshCw, Wifi, WifiOff, Settings, BarChart3, DollarSign
 } from 'lucide-react';
 import { Producto } from '@/types/models/producto';
 
@@ -34,6 +35,13 @@ export default function PDVPage() {
   const [hayCajaAbierta, setHayCajaAbierta] = useState<boolean | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showSucursalModal, setShowSucursalModal] = useState(false);
+  const [showAperturaModal, setShowAperturaModal] = useState(false);
+  const [aperturaInfo, setAperturaInfo] = useState<{
+    sugerenciaApertura: number;
+    requiereRecupero: boolean;
+    saldoPendiente: number;
+    ultimoCierre?: any;
+  } | null>(null);
   const [sucursalInfo, setSucursalInfo] = useState({
     nombre: '',
     direccion: '',
@@ -48,7 +56,7 @@ export default function PDVPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [sortMode, setSortMode] = useState<SortMode>('name');
-  const [productsPerPage] = useState(8); // Límite de productos por página
+  const [productsPerPage] = useState(8);
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMoreProducts, setHasMoreProducts] = useState(false);
 
@@ -64,20 +72,71 @@ export default function PDVPage() {
   const { addItem, items, getTotal } = useCartStore();
   const { isOnline, pendingOperations } = useOffline();
 
-  // 🎯 Efectos de inicialización
-  useEffect(() => {
-    loadInitialData();
-    loadSucursalInfo();
-    loadFavorites();
-  }, []);
+  // 🔧 FUNCIÓN CORREGIDA - Verificar estado de caja abierta
+  const verificarEstadoCaja = async () => {
+    try {
+      setIsLoading(true);
+      const sucursalId = localStorage.getItem('sucursalId');
+      
+      if (!sucursalId) {
+        setShowSucursalModal(true);
+        setIsLoading(false);
+        return;
+      }
+      
+      if (!isOnline) {
+        setHayCajaAbierta(true);
+        setIsLoading(false);
+        return;
+      }
+      
+      const response = await authenticatedFetch(`/api/pdv/cierre?sucursalId=${encodeURIComponent(sucursalId)}`);
+      
+      if (response.status === 404) {
+        setHayCajaAbierta(false);
+      } else if (response.ok) {
+        const data = await response.json();
+        setHayCajaAbierta(data.cierreCaja?.estado === 'abierto');
+      } else {
+        setHayCajaAbierta(null);
+      }
+    } catch (error) {
+      console.error('Error al verificar caja:', error);
+      setHayCajaAbierta(null);
+      showNotification('error', 'Error al verificar el estado de la caja');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-  useEffect(() => {
-    checkCajaAbierta();
-  }, [isOnline]);
+  // 🔧 FUNCIÓN CORREGIDA - Verificar información de apertura
+  const verificarInfoApertura = async () => {
+    try {
+      const sucursalId = localStorage.getItem('sucursalId');
+      if (!sucursalId) {
+        setShowSucursalModal(true);
+        return;
+      }
 
-  useEffect(() => {
-    filterAndSortProducts();
-  }, [productos, activeCategory, searchTerm, sortMode]);
+      const response = await authenticatedFetch(`/api/pdv/apertura?sucursalId=${encodeURIComponent(sucursalId)}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        setAperturaInfo(data);
+        
+        console.log('Información de apertura:', data);
+        
+        if (data.requiereRecupero) {
+          showNotification('warning', 
+            `Turno anterior con saldo pendiente: $${data.saldoPendiente.toFixed(2)}`
+          );
+        }
+      }
+    } catch (error) {
+      console.error('Error al verificar apertura:', error);
+      showNotification('error', 'Error al verificar información de apertura');
+    }
+  };
 
   // 📊 Cargar información de sucursal
   const loadSucursalInfo = async () => {
@@ -134,43 +193,22 @@ export default function PDVPage() {
     }
   };
 
-  const checkCajaAbierta = async () => {
+  // 🔧 FUNCIÓN CORREGIDA - Manejar apertura de caja
+  const handleAbrirCaja = async () => {
     try {
-      setIsLoading(true);
-      const sucursalId = localStorage.getItem('sucursalId');
-      
-      if (!sucursalId) {
-        setShowSucursalModal(true);
-        setIsLoading(false);
-        return;
-      }
-      
-      if (!isOnline) {
-        setHayCajaAbierta(true);
-        setIsLoading(false);
-        return;
-      }
-      
-      const response = await authenticatedFetch(`/api/pdv/cierre?sucursalId=${encodeURIComponent(sucursalId)}`);
-      
-      if (response.status === 404) {
-        setHayCajaAbierta(false);
-      } else if (response.ok) {
-        const data = await response.json();
-        setHayCajaAbierta(data.cierreCaja?.estado === 'abierto');
-      } else {
-        setHayCajaAbierta(null);
-      }
+      await verificarInfoApertura();
+      setShowAperturaModal(true);
     } catch (error) {
-      console.error('Error al verificar caja:', error);
-      setHayCajaAbierta(null);
-      showNotification('error', 'Error al verificar el estado de la caja');
-    } finally {
-      setIsLoading(false);
+      console.error('Error al preparar apertura:', error);
+      showNotification('error', 'Error al preparar apertura de caja');
     }
   };
 
-  const handleAbrirCaja = async () => {
+  // 🔧 FUNCIÓN CORREGIDA - Completar apertura
+  const handleAperturaComplete = async (aperturaData: {
+    montoInicial: number;
+    recuperarSaldo: boolean;
+  }) => {
     try {
       setIsLoading(true);
       const sucursalId = localStorage.getItem('sucursalId');
@@ -179,18 +217,14 @@ export default function PDVPage() {
         throw new Error('No se ha definido una sucursal para este punto de venta');
       }
       
-      const montoInicial = prompt('Ingrese el monto inicial de la caja:');
-      if (montoInicial === null) return;
-      
-      const montoInicialNum = parseFloat(montoInicial);
-      if (isNaN(montoInicialNum) || montoInicialNum < 0) {
-        throw new Error('El monto inicial debe ser un número válido mayor o igual a cero');
-      }
-      
-      const response = await authenticatedFetch('/api/pdv/cierre', {
+      const response = await authenticatedFetch('/api/pdv/apertura', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sucursalId, montoInicial: montoInicialNum })
+        body: JSON.stringify({
+          sucursalId,
+          montoInicial: aperturaData.montoInicial,
+          recuperarSaldo: aperturaData.recuperarSaldo
+        })
       });
       
       if (!response.ok) {
@@ -198,9 +232,17 @@ export default function PDVPage() {
         throw new Error(errorData.error || 'Error al abrir la caja');
       }
       
+      const result = await response.json();
+      
       setHayCajaAbierta(true);
-      showNotification('success', '¡Caja abierta correctamente!');
-      setTimeout(() => checkCajaAbierta(), 1000);
+      setShowAperturaModal(false);
+      
+      showNotification('success', result.message || '¡Caja abierta correctamente!');
+      
+      setTimeout(() => {
+        verificarEstadoCaja();
+        verificarInfoApertura();
+      }, 1000);
       
     } catch (error) {
       console.error('Error al abrir caja:', error);
@@ -244,28 +286,21 @@ export default function PDVPage() {
       }
     });
     
-    // 🆕 APLICAR PAGINACIÓN
+    // Aplicar paginación
     const totalProducts = filtered.length;
     const startIndex = (currentPage - 1) * productsPerPage;
     const endIndex = startIndex + productsPerPage;
-    const paginatedProducts = filtered.slice(0, endIndex); // Mostrar desde el inicio hasta la página actual
+    const paginatedProducts = filtered.slice(0, endIndex);
     
     setHasMoreProducts(endIndex < totalProducts);
     setFilteredProducts(paginatedProducts);
   }, [productos, activeCategory, searchTerm, sortMode, favorites, currentPage, productsPerPage]);
 
-  // 🆕 FUNCIÓN PARA CARGAR MÁS PRODUCTOS
   const loadMoreProducts = () => {
     if (hasMoreProducts) {
       setCurrentPage(prev => prev + 1);
     }
   };
-
-  // 🆕 RESETEAR PÁGINA CUANDO CAMBIAN LOS FILTROS
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [activeCategory, searchTerm, sortMode]);
-
 
   // 🛒 Manejo de productos
   const handleProductSelect = (producto: Producto) => {
@@ -328,7 +363,7 @@ export default function PDVPage() {
   const handleCheckout = () => {
     if (hayCajaAbierta === null) {
       showNotification('warning', 'Verificando estado de la caja...');
-      checkCajaAbierta();
+      verificarEstadoCaja();
       return;
     }
     
@@ -351,7 +386,7 @@ export default function PDVPage() {
     }
     
     if (result.success) {
-      setTimeout(() => checkCajaAbierta(), 500);
+      setTimeout(() => verificarEstadoCaja(), 500);
     }
   };
 
@@ -364,6 +399,26 @@ export default function PDVPage() {
       setTimeout(() => setNotification(null), 4000);
     }
   };
+
+  // 🎯 Efectos de inicialización
+  useEffect(() => {
+    loadInitialData();
+    loadSucursalInfo();
+    loadFavorites();
+    verificarInfoApertura();
+  }, []);
+
+  useEffect(() => {
+    verificarEstadoCaja();
+  }, [isOnline]);
+
+  useEffect(() => {
+    filterAndSortProducts();
+  }, [productos, activeCategory, searchTerm, sortMode]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeCategory, searchTerm, sortMode]);
 
   // 🖥️ Pantallas de estado
   if (isLoading) {
@@ -381,15 +436,52 @@ export default function PDVPage() {
   if (hayCajaAbierta === false) {
     return (
       <div className="h-full flex items-center justify-center p-6 bg-gradient-to-br from-gray-50 to-gray-100">
-        <div className="text-center bg-white p-12 rounded-3xl shadow-xl border border-gray-200 max-w-lg w-full">
+        <div className="text-center bg-white p-12 rounded-3xl shadow-xl border border-gray-200 max-w-2xl w-full">
           <div className="w-24 h-24 bg-gradient-to-br from-[#311716] to-[#9c7561] rounded-3xl flex items-center justify-center mx-auto mb-8">
             <Clock className="w-12 h-12 text-white" />
           </div>
           
           <h2 className="text-3xl font-bold text-gray-900 mb-4">Caja Cerrada</h2>
-          <p className="text-gray-600 text-lg mb-8 leading-relaxed">
+          <p className="text-gray-600 text-lg mb-6 leading-relaxed">
             Para comenzar a realizar ventas, necesitas abrir la caja registradora del día.
           </p>
+          
+          {aperturaInfo && (
+            <div className="mb-8 space-y-4">
+              {aperturaInfo.requiereRecupero && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-6">
+                  <div className="flex items-center justify-center mb-3">
+                    <AlertTriangle className="w-6 h-6 text-yellow-600 mr-2" />
+                    <span className="font-semibold text-yellow-800">Recupero Requerido</span>
+                  </div>
+                  <p className="text-yellow-700 text-sm">
+                    El turno anterior tiene un saldo pendiente de <strong>${aperturaInfo.saldoPendiente.toFixed(2)}</strong>
+                  </p>
+                  {aperturaInfo.ultimoCierre && (
+                    <p className="text-yellow-600 text-xs mt-2">
+                      Cierre del {new Date(aperturaInfo.ultimoCierre.fechaCierre).toLocaleDateString()}
+                    </p>
+                  )}
+                </div>
+              )}
+              
+              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-6">
+                <div className="flex items-center justify-center mb-3">
+                  <DollarSign className="w-6 h-6 text-blue-600 mr-2" />
+                  <span className="font-semibold text-blue-800">Sugerencia de Apertura</span>
+                </div>
+                <p className="text-blue-700">
+                  Monto recomendado: <strong>${aperturaInfo.sugerenciaApertura.toFixed(2)}</strong>
+                </p>
+                <p className="text-blue-600 text-sm mt-1">
+                  {aperturaInfo.requiereRecupero 
+                    ? `Incluye $${aperturaInfo.saldoPendiente.toFixed(2)} de recupero + $${(aperturaInfo.sugerenciaApertura - aperturaInfo.saldoPendiente).toFixed(2)} de cambio`
+                    : 'Monto suficiente para cambio durante el día'
+                  }
+                </p>
+              </div>
+            </div>
+          )}
           
           <div className="space-y-4">
             <button
@@ -398,11 +490,14 @@ export default function PDVPage() {
               className="w-full py-4 px-8 bg-gradient-to-r from-[#311716] to-[#462625] text-white rounded-2xl hover:from-[#462625] hover:to-[#311716] transition-all font-bold text-lg flex items-center justify-center space-x-3 disabled:opacity-50 shadow-lg hover:shadow-xl"
             >
               <Zap className="w-6 h-6" />
-              <span>{isLoading ? 'Abriendo...' : 'Abrir Caja del Día'}</span>
+              <span>{isLoading ? 'Preparando...' : 'Abrir Caja del Día'}</span>
             </button>
             
             <button
-              onClick={checkCajaAbierta}
+              onClick={() => {
+                verificarEstadoCaja();
+                verificarInfoApertura();
+              }}
               className="w-full py-3 px-6 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-all font-medium"
             >
               Verificar Estado de Caja
@@ -428,7 +523,7 @@ export default function PDVPage() {
           
           <div className="space-y-4">
             <button
-              onClick={checkCajaAbierta}
+              onClick={verificarEstadoCaja}
               disabled={isLoading}
               className="w-full py-4 px-8 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-2xl hover:from-blue-700 hover:to-blue-800 transition-all font-bold text-lg flex items-center justify-center space-x-3 disabled:opacity-50 shadow-lg"
             >
@@ -517,7 +612,7 @@ export default function PDVPage() {
               </div>
               
               <div className="flex items-center space-x-3">
-                {/* Controles de vista existentes */}
+                {/* Controles de vista */}
                 <div className="flex items-center bg-gray-200 rounded-xl p-1">
                   <button
                     onClick={() => setViewMode('grid')}
@@ -541,7 +636,7 @@ export default function PDVPage() {
                   </button>
                 </div>
                 
-                {/* 🔄 BOTÓN DE SCANNER MEJORADO */}
+                {/* Botón de scanner */}
                 <button
                   onClick={() => setShowScanner(!showScanner)}
                   className={`p-3 rounded-xl transition-all flex items-center space-x-2 ${
@@ -551,7 +646,6 @@ export default function PDVPage() {
                   }`}
                   title="Activar escáner de código de barras"
                 >
-                  {/* 🆕 ICONO MÁS RECONOCIBLE Y GRANDE */}
                   <svg 
                     className="w-7 h-7" 
                     fill="none" 
@@ -599,7 +693,7 @@ export default function PDVPage() {
                       : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
                   }`}
                 >
-                  {categoria.nombre} ({filteredProducts.filter(p => p.categoriaId === categoria.id).length})
+                  {categoria.nombre} ({productos.filter(p => p.categoriaId === categoria.id).length})
                 </button>
               ))}
             </div>
@@ -671,7 +765,7 @@ export default function PDVPage() {
                     ))}
                   </div>
                   
-                  {/* 🆕 BOTÓN PARA CARGAR MÁS PRODUCTOS */}
+                  {/* Botón para cargar más productos */}
                   {hasMoreProducts && (
                     <div className="flex justify-center py-8">
                       <button
@@ -687,7 +781,7 @@ export default function PDVPage() {
                     </div>
                   )}
                   
-                  {/* 🆕 INDICADOR DE TOTAL DE PRODUCTOS */}
+                  {/* Indicador de total de productos */}
                   <div className="text-center py-4 border-t border-gray-200 bg-gray-50 rounded-xl">
                     <p className="text-sm text-gray-600">
                       Mostrando {filteredProducts.length} de {productos.filter(p => {
@@ -730,6 +824,13 @@ export default function PDVPage() {
           setShowSucursalModal(false);
           if (sucursalId) window.location.reload();
         }}
+      />
+
+      <AperturaModal
+        isOpen={showAperturaModal}
+        onClose={() => setShowAperturaModal(false)}
+        onComplete={handleAperturaComplete}
+        aperturaInfo={aperturaInfo}
       />
 
       {/* Notificaciones */}

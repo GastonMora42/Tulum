@@ -34,6 +34,7 @@ model User {
   movimientosStockInsumoPdv MovimientoStockInsumoPdv[]
   solicitudesInsumoPdv      SolicitudInsumoPdv[]
   egresosInsumoPdv          EgresoInsumoPdv[]
+  recuperosFondo RecuperoFondo[]
 }
 
 model Role {
@@ -316,7 +317,48 @@ model CierreCaja {
   estado          String // abierto, cerrado, con_contingencia
   observaciones   String?
 
+  // 🆕 NUEVOS CAMPOS PARA CONTEOS MANUALES
+  conteoEfectivo     Float?  // Efectivo contado manualmente
+  conteoTarjetaCredito Float? // Ventas con tarjeta de crédito (para verificación)
+  conteoTarjetaDebito  Float? // Ventas con tarjeta de débito
+  conteoTransferencia  Float? // Transferencias
+  conteoQR            Float? // Pagos QR
+  conteoOtros         Float? // Otros medios de pago
+
+  // 🆕 CAMPOS PARA CONTROL DE EFECTIVO
+  totalEgresos        Float  @default(0) // Total de egresos del turno
+  efectivoEsperado    Float? // Efectivo que debería haber
+  efectivoReal        Float? // Efectivo contado físicamente
+  diferenciaEfectivo  Float? // Diferencia específica en efectivo
+  
+  // 🆕 CAMPOS PARA RECUPERO DE FONDO
+  saldoPendienteAnterior Float @default(0) // Saldo negativo del turno anterior
+  recuperoFondo          Float @default(0) // Monto a recuperar en este turno
+  saldoPendienteActual   Float @default(0) // Saldo negativo generado en este turno
+  recuperosAplicados RecuperoFondo[] @relation("RecuperoDestino")
+  recuperosGenerados RecuperoFondo[] @relation("RecuperoOrigen")
+  
+  // 🆕 CAMPOS PARA SUGERENCIAS
+  sugerenciaProximaApertura Float? // Monto sugerido para próxima apertura
+  requiereRecupero          Boolean @default(false) // Si requiere recupero en próximo turno
+
   egresos CajaEgreso[]
+  
+  @@index([sucursalId, fechaApertura])
+}
+
+model RecuperoFondo {
+  id              String   @id @default(uuid())
+  cierreCajaId    String   // Caja donde se aplica el recupero
+  cierreCajaOrigenId String // Caja que generó el saldo negativo
+  monto           Float    // Monto recuperado
+  fecha           DateTime @default(now())
+  usuarioId       String
+  observaciones   String?
+  
+  cierreCaja       CierreCaja @relation("RecuperoDestino", fields: [cierreCajaId], references: [id])
+  cierreCajaOrigen CierreCaja @relation("RecuperoOrigen", fields: [cierreCajaOrigenId], references: [id])
+  usuario          User       @relation(fields: [usuarioId], references: [id])
 }
 
 model Contingencia {
