@@ -8,7 +8,6 @@ import { BarcodeScanner } from '@/components/pdv/BarcodeScanner';
 import { AperturaModal } from '@/components/pdv/AperturaModal';
 import { useCartStore } from '@/stores/cartStore';
 import { useOffline } from '@/hooks/useOffline';
-import { SucursalSetupModal } from '@/components/pdv/SucursalSetupModal';
 import { authenticatedFetch } from '@/hooks/useAuth';
 import { 
   AlertCircle, CheckCircle, X, Package, Search, 
@@ -511,14 +510,6 @@ const handleCategorySelect = async (categoria: Categoria) => {
         isOpen={isCheckoutOpen}
         onClose={() => setIsCheckoutOpen(false)}
         onComplete={handleCheckoutComplete}
-      />
-
-      <SucursalSetupModal
-        isOpen={showSucursalModal}
-        onClose={(sucursalId) => {
-          setShowSucursalModal(false);
-          if (sucursalId) window.location.reload();
-        }}
       />
 
       <AperturaModal
