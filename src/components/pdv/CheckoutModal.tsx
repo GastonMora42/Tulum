@@ -60,9 +60,8 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
   const paymentMethods: PaymentMethod[] = [
     { id: 'efectivo', name: 'Efectivo', icon: <DollarSign size={24} className="text-green-600" /> },
     { id: 'tarjeta_credito', name: 'Tarjeta de Crédito', icon: <CreditCard size={24} className="text-blue-600" /> },
-    { id: 'tarjeta_debito', name: 'Tarjeta de Débito', icon: <CreditCard size={24} className="text-purple-600" /> },
+    { id: 'tarjeta_debito', name: 'Tarjeta de Débito', icon: <CreditCard size={24} className="text-orange-600" /> },
     { id: 'qr', name: 'Pago con QR', icon: <QrCode size={24} className="text-indigo-600" /> },
-    { id: 'transferencia', name: 'Transferencia', icon: <Smartphone size={24} className="text-orange-600" /> }
   ];
 
   // 🆕 FUNCIÓN PARA VERIFICAR SI TODOS LOS PAGOS SON EN EFECTIVO

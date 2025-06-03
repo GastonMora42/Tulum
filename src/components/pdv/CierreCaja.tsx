@@ -1,4 +1,4 @@
-// src/components/pdv/CierreCaja.tsx - VERSIÓN COMPLETAMENTE REDISEÑADA
+// src/components/pdv/CierreCaja.tsx - VERSIÓN MEJORADA CON CONTADOR DE BILLETES
 'use client';
 
 import { useState, useEffect, useCallback, JSX } from 'react';
@@ -9,9 +9,11 @@ import {
   TrendingUp, AlertTriangle, Eye, EyeOff, FileText, 
   ChevronRight, RefreshCw, Zap, Target, PiggyBank,
   CreditCard, Banknote, Smartphone, Activity, Coins,
-  ArrowDownLeft, ArrowUpRight, Info, ExternalLink
+  ArrowDownLeft, ArrowUpRight, Info, ExternalLink, Check,
+  XCircle, Settings, Loader
 } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
+import { BillCounter } from './BillCounter';
 
 interface CierreCajaProfesionalProps {
   id: string;
@@ -25,7 +27,9 @@ interface MedioPagoConteo {
   ventas: number;
   conteo: number;
   diferencia: number;
-  editable: boolean; // 🆕 Ahora todos son editables
+  editable: boolean;
+  isCorrect: boolean;
+  canForce?: boolean; // 🆕 Para forzar cierre si está en rojo
 }
 
 interface EgresoInfo {
@@ -43,21 +47,21 @@ export function CierreCaja({ id, onSuccess }: CierreCajaProfesionalProps) {
   const [ventasResumen, setVentasResumen] = useState<any>(null);
   const [egresos, setEgresos] = useState<EgresoInfo[]>([]);
   
-  // 🆕 Estados de conteos manuales para TODOS los medios
+  // 🆕 Estados de conteos manuales SIMPLIFICADOS (sin transferencia)
   const [conteoEfectivo, setConteoEfectivo] = useState<string>('');
   const [conteoTarjetaCredito, setConteoTarjetaCredito] = useState<string>('');
   const [conteoTarjetaDebito, setConteoTarjetaDebito] = useState<string>('');
-  const [conteoTransferencia, setConteoTransferencia] = useState<string>('');
   const [conteoQR, setConteoQR] = useState<string>('');
-  const [conteoOtros, setConteoOtros] = useState<string>('');
   const [recuperoFondo, setRecuperoFondo] = useState<string>('');
+  
+  // 🆕 Estados para forzar cierre
+  const [forcedMethods, setForcedMethods] = useState<Set<string>>(new Set());
   
   const [observaciones, setObservaciones] = useState<string>('');
   
-  // Estados de UI - 🆕 SIN STEPS, DIRECTO A CONTEO
+  // Estados de UI
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [showCalculator, setShowCalculator] = useState(false);
   const [showEgresosDetail, setShowEgresosDetail] = useState(false);
   const [notification, setNotification] = useState<any>(null);
   
@@ -89,14 +93,12 @@ export function CierreCaja({ id, onSuccess }: CierreCajaProfesionalProps) {
       setVentasResumen(data.ventasResumen);
       setEgresos(data.egresos || []);
       
-      // 🆕 Pre-llenar TODOS los conteos con valores esperados
+      // 🆕 Pre-llenar conteos con valores esperados (SIN TRANSFERENCIA)
       const totales = data.ventasResumen.totalesPorMedioPago;
       setConteoEfectivo(data.ventasResumen.efectivoEsperado?.toFixed(2) || '0.00');
       setConteoTarjetaCredito(totales?.tarjeta_credito?.monto?.toFixed(2) || '0.00');
       setConteoTarjetaDebito(totales?.tarjeta_debito?.monto?.toFixed(2) || '0.00');
-      setConteoTransferencia(totales?.transferencia?.monto?.toFixed(2) || '0.00');
       setConteoQR(totales?.qr?.monto?.toFixed(2) || '0.00');
-      setConteoOtros('0.00');
       
       // Configurar recupero de fondo si es necesario
       if (data.ventasResumen.saldoPendienteAnterior > 0) {
@@ -121,7 +123,7 @@ export function CierreCaja({ id, onSuccess }: CierreCajaProfesionalProps) {
     }
   }, [id, loadCierreCaja]);
   
-  // 🧮 CALCULAR DIFERENCIAS EN TIEMPO REAL - 🆕 TODOS EDITABLES
+  // 🧮 CALCULAR MEDIOS DE PAGO SIMPLIFICADO (SIN TRANSFERENCIA)
   const calcularMediosPago = useCallback((): MedioPagoConteo[] => {
     if (!ventasResumen) return [];
     
@@ -135,7 +137,9 @@ export function CierreCaja({ id, onSuccess }: CierreCajaProfesionalProps) {
         ventas: ventasResumen.efectivoEsperado || 0,
         conteo: parseFloat(conteoEfectivo) || 0,
         diferencia: (parseFloat(conteoEfectivo) || 0) - (ventasResumen.efectivoEsperado || 0),
-        editable: true
+        editable: true,
+        isCorrect: Math.abs((parseFloat(conteoEfectivo) || 0) - (ventasResumen.efectivoEsperado || 0)) < 0.01,
+        canForce: true
       },
       {
         nombre: 'Tarjeta de Crédito',
@@ -144,7 +148,9 @@ export function CierreCaja({ id, onSuccess }: CierreCajaProfesionalProps) {
         ventas: totales.tarjeta_credito?.monto || 0,
         conteo: parseFloat(conteoTarjetaCredito) || 0,
         diferencia: (parseFloat(conteoTarjetaCredito) || 0) - (totales.tarjeta_credito?.monto || 0),
-        editable: true // 🆕 Ahora editable
+        editable: true,
+        isCorrect: Math.abs((parseFloat(conteoTarjetaCredito) || 0) - (totales.tarjeta_credito?.monto || 0)) < 0.01,
+        canForce: true
       },
       {
         nombre: 'Tarjeta de Débito',
@@ -153,16 +159,9 @@ export function CierreCaja({ id, onSuccess }: CierreCajaProfesionalProps) {
         ventas: totales.tarjeta_debito?.monto || 0,
         conteo: parseFloat(conteoTarjetaDebito) || 0,
         diferencia: (parseFloat(conteoTarjetaDebito) || 0) - (totales.tarjeta_debito?.monto || 0),
-        editable: true // 🆕 Ahora editable
-      },
-      {
-        nombre: 'Transferencia',
-        icon: <Activity className="w-5 h-5" />,
-        color: 'text-indigo-600',
-        ventas: totales.transferencia?.monto || 0,
-        conteo: parseFloat(conteoTransferencia) || 0,
-        diferencia: (parseFloat(conteoTransferencia) || 0) - (totales.transferencia?.monto || 0),
-        editable: true // 🆕 Ahora editable
+        editable: true,
+        isCorrect: Math.abs((parseFloat(conteoTarjetaDebito) || 0) - (totales.tarjeta_debito?.monto || 0)) < 0.01,
+        canForce: true
       },
       {
         nombre: 'QR / Digital',
@@ -171,10 +170,12 @@ export function CierreCaja({ id, onSuccess }: CierreCajaProfesionalProps) {
         ventas: totales.qr?.monto || 0,
         conteo: parseFloat(conteoQR) || 0,
         diferencia: (parseFloat(conteoQR) || 0) - (totales.qr?.monto || 0),
-        editable: true // 🆕 Ahora editable
+        editable: true,
+        isCorrect: Math.abs((parseFloat(conteoQR) || 0) - (totales.qr?.monto || 0)) < 0.01,
+        canForce: true
       }
-    ];
-  }, [ventasResumen, conteoEfectivo, conteoTarjetaCredito, conteoTarjetaDebito, conteoTransferencia, conteoQR]);
+    ].filter(medio => medio.ventas > 0 || medio.conteo > 0); // Solo mostrar medios con movimiento
+  }, [ventasResumen, conteoEfectivo, conteoTarjetaCredito, conteoTarjetaDebito, conteoQR]);
   
   // 🆕 FUNCIÓN PARA ACTUALIZAR CONTEO DE MEDIO ESPECÍFICO
   const updateMedioPagoConteo = (medioNombre: string, valor: string) => {
@@ -188,16 +189,29 @@ export function CierreCaja({ id, onSuccess }: CierreCajaProfesionalProps) {
       case 'Tarjeta de Débito':
         setConteoTarjetaDebito(valor);
         break;
-      case 'Transferencia':
-        setConteoTransferencia(valor);
-        break;
       case 'QR / Digital':
         setConteoQR(valor);
         break;
     }
   };
+
+  // 🆕 FUNCIÓN PARA FORZAR CIERRE DE UN MEDIO
+  const toggleForceMethod = (medioNombre: string) => {
+    const newForcedMethods = new Set(forcedMethods);
+    if (newForcedMethods.has(medioNombre)) {
+      newForcedMethods.delete(medioNombre);
+    } else {
+      newForcedMethods.add(medioNombre);
+    }
+    setForcedMethods(newForcedMethods);
+  };
+
+  // 🆕 FUNCIÓN PARA MANEJAR CAMBIO DEL CONTADOR DE BILLETES
+  const handleBillCounterChange = (total: number) => {
+    setConteoEfectivo(total.toFixed(2));
+  };
   
-  // 🔐 CERRAR CAJA - 🆕 NUEVA LÓGICA DE CONTINGENCIAS
+  // 🔐 CERRAR CAJA CON NUEVA LÓGICA
   const handleCerrarCaja = async () => {
     try {
       setIsSaving(true);
@@ -206,28 +220,33 @@ export function CierreCaja({ id, onSuccess }: CierreCajaProfesionalProps) {
         throw new Error('No hay una caja para cerrar');
       }
       
-      // 🆕 VALIDAR DIFERENCIAS ANTES DE ENVIAR
       const mediosPago = calcularMediosPago();
+      const mediosIncorrectos = mediosPago.filter(medio => !medio.isCorrect);
+      const mediosForzados = mediosIncorrectos.filter(medio => forcedMethods.has(medio.nombre));
+      const mediosSinForzar = mediosIncorrectos.filter(medio => !forcedMethods.has(medio.nombre));
+      
+      // Si hay medios incorrectos sin forzar, mostrar error
+      if (mediosSinForzar.length > 0) {
+        setNotification({
+          type: 'error',
+          message: 'Hay diferencias sin resolver',
+          details: `Los siguientes medios tienen diferencias: ${mediosSinForzar.map(m => m.nombre).join(', ')}. Corrígelos o marca "Forzar cierre" si es necesario.`
+        });
+        return;
+      }
+      
+      // Determinar si se genera contingencia
+      const hayDiferenciasForzadas = mediosForzados.length > 0;
       const totalDiferencias = mediosPago.reduce((sum, medio) => sum + Math.abs(medio.diferencia), 0);
       
-      // 🆕 NUEVA LÓGICA: Solo contingencia si diferencia > $200
-      const diferenciaSignificativa = totalDiferencias > 200;
-      
-      if (diferenciaSignificativa) {
+      if (hayDiferenciasForzadas || totalDiferencias > 200) {
         const confirmacion = confirm(
-          `Se detectaron diferencias significativas por $${totalDiferencias.toFixed(2)}. Esto generará una contingencia para revisión. ¿Deseas continuar?`
+          `${hayDiferenciasForzadas ? 'Se forzará el cierre con diferencias.' : 'Las diferencias superan $200.'} Esto generará una contingencia para revisión. ¿Deseas continuar?`
         );
         if (!confirmacion) {
           setIsSaving(false);
           return;
         }
-      } else if (totalDiferencias > 0) {
-        // 🆕 Para diferencias menores, solo mostrar info
-        setNotification({
-          type: 'info',
-          message: `Diferencias menores detectadas: $${totalDiferencias.toFixed(2)}`,
-          details: 'Diferencia aceptable, no se generará contingencia.'
-        });
       }
       
       const response = await authenticatedFetch('/api/pdv/cierre', {
@@ -237,14 +256,14 @@ export function CierreCaja({ id, onSuccess }: CierreCajaProfesionalProps) {
         },
         body: JSON.stringify({
           id: cierreCaja.id,
-          observaciones,
+          observaciones: observaciones + (hayDiferenciasForzadas ? `\n\nMedios forzados: ${mediosForzados.map(m => m.nombre).join(', ')}` : ''),
           conteoEfectivo: parseFloat(conteoEfectivo),
           conteoTarjetaCredito: parseFloat(conteoTarjetaCredito),
           conteoTarjetaDebito: parseFloat(conteoTarjetaDebito),
-          conteoTransferencia: parseFloat(conteoTransferencia),
           conteoQR: parseFloat(conteoQR),
-          conteoOtros: parseFloat(conteoOtros),
-          recuperoFondo: parseFloat(recuperoFondo) || 0
+          conteoOtros: 0, // Ya no usamos transferencia
+          recuperoFondo: parseFloat(recuperoFondo) || 0,
+          forzarContingencia: hayDiferenciasForzadas
         })
       });
       
@@ -258,8 +277,8 @@ export function CierreCaja({ id, onSuccess }: CierreCajaProfesionalProps) {
       setNotification({
         type: 'success',
         message: '🎉 Caja cerrada correctamente',
-        details: diferenciaSignificativa 
-          ? 'Se generó una contingencia debido a las diferencias encontradas.'
+        details: hayDiferenciasForzadas 
+          ? 'Se generó una contingencia debido a las diferencias forzadas.'
           : totalDiferencias > 0 
           ? 'Diferencias menores registradas, sin contingencia.'
           : 'Cierre perfecto sin diferencias.',
@@ -281,7 +300,7 @@ export function CierreCaja({ id, onSuccess }: CierreCajaProfesionalProps) {
     }
   };
   
-  // 🖼️ RENDERIZADO - 🆕 SIN STEPS, DIRECTO AL CONTEO
+  // 🖼️ RENDERIZADO
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-blue-50">
@@ -298,18 +317,16 @@ export function CierreCaja({ id, onSuccess }: CierreCajaProfesionalProps) {
   }
   
   const mediosPago = calcularMediosPago();
-  const totalDiferencias = mediosPago.reduce((sum, medio) => sum + Math.abs(medio.diferencia), 0);
-  
-  // 🆕 NUEVA LÓGICA DE ALERTAS
-  const diferenciaSignificativa = totalDiferencias > 200;
-  const hayDiferenciasMenores = totalDiferencias > 0 && totalDiferencias <= 200;
-  
+  const allCorrect = mediosPago.every(medio => medio.isCorrect);
+  const hasIncorrect = mediosPago.some(medio => !medio.isCorrect);
+  const canClose = allCorrect || mediosPago.filter(m => !m.isCorrect).every(m => forcedMethods.has(m.nombre));
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-4">
       <div className="max-w-7xl mx-auto">
-        {/* 🎯 HEADER SIMPLIFICADO */}
+        {/* 🎯 HEADER COMPACTO */}
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 flex items-center">
                 <PiggyBank className="w-8 h-8 text-blue-600 mr-3" />
@@ -320,23 +337,26 @@ export function CierreCaja({ id, onSuccess }: CierreCajaProfesionalProps) {
               </p>
             </div>
             
-            {/* 🆕 INDICADOR DE DIFERENCIAS SIMPLIFICADO */}
+            {/* 🆕 INDICADOR DE ESTADO GLOBAL */}
             <div className="flex items-center space-x-4">
-              {diferenciaSignificativa && (
-                <div className="px-4 py-2 bg-red-100 text-red-800 rounded-full text-sm font-medium">
-                  ⚠️ Diferencias significativas: ${totalDiferencias.toFixed(2)}
+              {allCorrect && (
+                <div className="px-4 py-2 bg-green-100 text-green-800 rounded-full text-sm font-medium flex items-center">
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Todo correcto
                 </div>
               )}
               
-              {hayDiferenciasMenores && (
-                <div className="px-4 py-2 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium">
-                  ✓ Diferencias aceptables: ${totalDiferencias.toFixed(2)}
+              {hasIncorrect && !canClose && (
+                <div className="px-4 py-2 bg-red-100 text-red-800 rounded-full text-sm font-medium flex items-center">
+                  <XCircle className="w-4 h-4 mr-2" />
+                  Diferencias pendientes
                 </div>
               )}
-              
-              {totalDiferencias === 0 && (
-                <div className="px-4 py-2 bg-green-100 text-green-800 rounded-full text-sm font-medium">
-                  ✅ Cierre perfecto
+
+              {hasIncorrect && canClose && (
+                <div className="px-4 py-2 bg-amber-100 text-amber-800 rounded-full text-sm font-medium flex items-center">
+                  <AlertTriangle className="w-4 h-4 mr-2" />
+                  Cierre forzado
                 </div>
               )}
             </div>
@@ -387,39 +407,26 @@ export function CierreCaja({ id, onSuccess }: CierreCajaProfesionalProps) {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* 📈 PANEL PRINCIPAL */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Información de apertura y egresos */}
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold text-gray-900 flex items-center">
-                  <Clock className="w-6 h-6 text-blue-600 mr-2" />
-                  Información del Turno
-                </h3>
-                <div className="flex items-center space-x-2">
-                  <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-sm font-medium">
-                    Caja Abierta
-                  </span>
-                  {ventasResumen?.saldoPendienteAnterior > 0 && (
-                    <span className="px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm font-medium">
-                      Requiere Recupero
-                    </span>
-                  )}
-                </div>
-              </div>
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+          {/* 📈 INFORMACIÓN DEL TURNO */}
+          <div className="xl:col-span-1">
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 mb-6">
+              <h3 className="text-xl font-bold text-gray-900 flex items-center mb-6">
+                <Clock className="w-6 h-6 text-blue-600 mr-2" />
+                Resumen del Turno
+              </h3>
               
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <div className="space-y-4">
                 <div className="bg-blue-50 rounded-xl p-4 text-center">
                   <p className="text-sm text-blue-600 mb-1">Monto Inicial</p>
-                  <p className="text-xl font-bold text-blue-700">
+                  <p className="text-2xl font-bold text-blue-700">
                     ${cierreCaja?.montoInicial?.toFixed(2)}
                   </p>
                 </div>
                 
                 <div className="bg-green-50 rounded-xl p-4 text-center">
                   <p className="text-sm text-green-600 mb-1">Total Ventas</p>
-                  <p className="text-xl font-bold text-green-700">
+                  <p className="text-2xl font-bold text-green-700">
                     ${ventasResumen?.total?.toFixed(2)}
                   </p>
                   <p className="text-xs text-gray-500">{ventasResumen?.cantidadVentas} ventas</p>
@@ -427,23 +434,16 @@ export function CierreCaja({ id, onSuccess }: CierreCajaProfesionalProps) {
                 
                 <div className="bg-red-50 rounded-xl p-4 text-center">
                   <p className="text-sm text-red-600 mb-1">Total Egresos</p>
-                  <p className="text-xl font-bold text-red-700">
+                  <p className="text-2xl font-bold text-red-700">
                     ${ventasResumen?.totalEgresos?.toFixed(2)}
                   </p>
                   <p className="text-xs text-gray-500">{egresos.length} movimientos</p>
-                </div>
-                
-                <div className="bg-purple-50 rounded-xl p-4 text-center">
-                  <p className="text-sm text-purple-600 mb-1">Efectivo Esperado</p>
-                  <p className="text-xl font-bold text-purple-700">
-                    ${ventasResumen?.efectivoEsperado?.toFixed(2)}
-                  </p>
                 </div>
               </div>
               
               {/* Detalle de egresos */}
               {egresos.length > 0 && (
-                <div className="border-t border-gray-100 pt-4">
+                <div className="border-t border-gray-100 pt-4 mt-6">
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="font-semibold text-gray-900 flex items-center">
                       <ArrowDownLeft className="w-5 h-5 mr-2 text-red-600" />
@@ -479,97 +479,7 @@ export function CierreCaja({ id, onSuccess }: CierreCajaProfesionalProps) {
                 </div>
               )}
             </div>
-            
-            {/* 🆕 CONTEO POR MEDIOS DE PAGO - TODOS EDITABLES */}
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold text-gray-900 flex items-center">
-                  <Target className="w-6 h-6 text-orange-600 mr-2" />
-                  Conteo Manual por Medio de Pago
-                </h3>
-                
-                {/* 🆕 INDICADOR DE ESTADO SIMPLIFICADO */}
-                <div className="text-right">
-                  <p className="text-sm text-gray-600">Total diferencias:</p>
-                  <p className={`text-xl font-bold ${
-                    diferenciaSignificativa ? 'text-red-600' :
-                    hayDiferenciasMenores ? 'text-yellow-600' : 'text-green-600'
-                  }`}>
-                    ${totalDiferencias.toFixed(2)}
-                  </p>
-                </div>
-              </div>
-              
-              <div className="space-y-4">
-                {mediosPago.map((medio, index) => (
-                  <div key={index} className={`p-6 rounded-xl border-2 transition-all ${
-                    Math.abs(medio.diferencia) > 200 ? 'border-red-300 bg-red-50' :
-                    Math.abs(medio.diferencia) > 0 ? 'border-yellow-300 bg-yellow-50' :
-                    'border-green-300 bg-green-50'
-                  }`}>
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center">
-                        <div className={`p-3 rounded-xl bg-white ${medio.color}`}>
-                          {medio.icon}
-                        </div>
-                        <h4 className="ml-4 font-semibold text-gray-900 text-lg">{medio.nombre}</h4>
-                      </div>
-                      
-                      {/* 🆕 INDICADOR DE DIFERENCIA MÁS CLARO */}
-                      {Math.abs(medio.diferencia) > 0 && (
-                        <div className={`px-4 py-2 rounded-xl text-sm font-bold ${
-                          Math.abs(medio.diferencia) > 200 ? 'bg-red-200 text-red-800' :
-                          'bg-yellow-200 text-yellow-800'
-                        }`}>
-                          {medio.diferencia > 0 ? '+' : ''}${medio.diferencia.toFixed(2)}
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="grid grid-cols-3 gap-6">
-                      <div className="bg-white rounded-xl p-4 border border-gray-200">
-                        <p className="text-sm text-gray-500 mb-2 font-medium">Sistema registra:</p>
-                        <p className="text-xl font-bold text-gray-900">${medio.ventas.toFixed(2)}</p>
-                      </div>
-                      
-                      <div className="bg-white rounded-xl p-4 border border-gray-200">
-                        <p className="text-sm text-gray-500 mb-2 font-medium">Conteo manual:</p>
-                        {/* 🆕 TODOS LOS MEDIOS SON EDITABLES AHORA */}
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={
-                            medio.nombre === 'Efectivo' ? conteoEfectivo : 
-                            medio.nombre === 'Tarjeta de Crédito' ? conteoTarjetaCredito :
-                            medio.nombre === 'Tarjeta de Débito' ? conteoTarjetaDebito :
-                            medio.nombre === 'Transferencia' ? conteoTransferencia :
-                            medio.nombre === 'QR / Digital' ? conteoQR : '0.00'
-                          }
-                          onChange={(e) => updateMedioPagoConteo(medio.nombre, e.target.value)}
-                          className="w-full text-xl font-bold border-0 bg-transparent focus:ring-2 focus:ring-blue-500 rounded-lg p-2 text-center"
-                          placeholder="0.00"
-                        />
-                      </div>
-                      
-                      <div className="bg-white rounded-xl p-4 border border-gray-200">
-                        <p className="text-sm text-gray-500 mb-2 font-medium">Diferencia:</p>
-                        <p className={`text-xl font-bold ${
-                          Math.abs(medio.diferencia) > 200 ? 'text-red-600' :
-                          Math.abs(medio.diferencia) > 0 ? 'text-yellow-600' :
-                          'text-green-600'
-                        }`}>
-                          {medio.diferencia > 0 ? '+' : ''}${medio.diferencia.toFixed(2)}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-          
-          {/* 🔧 PANEL DE CONTROL */}
-          <div className="space-y-6">
+
             {/* Recupero de fondo */}
             {ventasResumen?.saldoPendienteAnterior > 0 && (
               <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
@@ -608,105 +518,178 @@ export function CierreCaja({ id, onSuccess }: CierreCajaProfesionalProps) {
                 </div>
               </div>
             )}
+          </div>
+          
+          {/* 🆕 PANEL PRINCIPAL SIMPLIFICADO */}
+          <div className="xl:col-span-2 space-y-6">
+            {/* Contador de billetes para efectivo */}
+            {mediosPago.find(m => m.nombre === 'Efectivo') && (
+              <BillCounter
+                expectedAmount={ventasResumen?.efectivoEsperado || 0}
+                onTotalChange={handleBillCounterChange}
+                className="shadow-lg"
+              />
+            )}
             
-            {/* Calculadora */}
+            {/* 🆕 CONTEO SIMPLIFICADO POR MEDIOS DE PAGO */}
             <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-gray-900 flex items-center">
-                  <Calculator className="w-5 h-5 text-orange-600 mr-2" />
-                  Herramientas
-                </h3>
-                <button
-                  onClick={() => setShowCalculator(!showCalculator)}
-                  className="px-3 py-2 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors text-sm"
-                >
-                  {showCalculator ? 'Ocultar' : 'Mostrar'} Calculadora
-                </button>
-              </div>
-              
-              {showCalculator && (
-                <div className="bg-gray-50 rounded-xl p-4">
-                  <div className="grid grid-cols-4 gap-2">
-                    {['7', '8', '9', 'C', '4', '5', '6', '÷', '1', '2', '3', '×', '0', '.', '=', '+'].map((btn) => (
-                      <button
-                        key={btn}
-                        className={`p-3 rounded-lg font-semibold transition-colors ${
-                          ['C', '÷', '×', '+', '='].includes(btn)
-                            ? 'bg-orange-500 text-white hover:bg-orange-600'
-                            : 'bg-white text-gray-900 hover:bg-gray-100 border border-gray-200'
-                        }`}
-                      >
-                        {btn}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            {/* Observaciones */}
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
-              <h3 className="text-lg font-bold text-gray-900 flex items-center mb-4">
-                <FileText className="w-5 h-5 text-gray-600 mr-2" />
-                Observaciones
+              <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center">
+                <Target className="w-6 h-6 text-orange-600 mr-2" />
+                Verificación por Medio de Pago
               </h3>
               
-              <textarea
-                value={observaciones}
-                onChange={(e) => setObservaciones(e.target.value)}
-                rows={4}
-                className="w-full p-4 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
-                placeholder="Agregar observaciones sobre el cierre, diferencias encontradas, o cualquier situación especial del turno..."
-              />
-            </div>
-            
-            {/* 🆕 BOTÓN DE CIERRE SIMPLIFICADO */}
-            <div className="space-y-4">
-              <button
-                onClick={handleCerrarCaja}
-                disabled={isSaving}
-                className={`w-full py-6 px-6 rounded-2xl text-white font-bold text-lg flex items-center justify-center space-x-3 transition-all shadow-lg hover:shadow-xl ${
-                  diferenciaSignificativa 
-                    ? 'bg-red-600 hover:bg-red-700' 
-                    : 'bg-green-600 hover:bg-green-700'
-                }`}
-              >
-                {isSaving ? (
-                  <>
-                    <div className="animate-spin rounded-full h-6 w-6 border-2 border-white border-t-transparent"></div>
-                    <span>Procesando Cierre...</span>
-                  </>
-                ) : (
-                  <>
-                    <Zap className="w-6 h-6" />
-                    <span>
-                      {diferenciaSignificativa 
-                        ? 'Cerrar con Contingencia' 
-                        : 'Cerrar Caja'}
-                    </span>
-                  </>
-                )}
-              </button>
-              
-              <button
-                onClick={() => router.push('/pdv')}
-                disabled={isSaving}
-                className="w-full py-3 px-6 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 disabled:opacity-50 transition-colors font-medium"
-              >
-                Cancelar
-              </button>
-            </div>
-            
-            {/* 🆕 INFORMACIÓN SOBRE CONTINGENCIAS */}
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-              <div className="flex items-center mb-2">
-                <Info className="w-5 h-5 text-blue-600 mr-2" />
-                <p className="font-medium text-blue-800">Información sobre diferencias</p>
+              <div className="space-y-4">
+                {mediosPago.filter(m => m.nombre !== 'Efectivo').map((medio, index) => (
+                  <div key={index} className={`p-6 rounded-xl border-2 transition-all ${
+                    medio.isCorrect || forcedMethods.has(medio.nombre)
+                      ? 'border-green-300 bg-green-50' 
+                      : 'border-red-300 bg-red-50'
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <div className={`p-3 rounded-xl bg-white ${medio.color}`}>
+                          {medio.icon}
+                        </div>
+                        <div>
+                          <h4 className="font-semibold text-gray-900 text-lg">{medio.nombre}</h4>
+                          <p className="text-sm text-gray-600">Monto esperado: ${medio.ventas.toFixed(2)}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center space-x-4">
+                        {/* 🆕 CONTEO MANUAL ÚNICO */}
+                        <div className="text-center">
+                          <label className="block text-xs font-medium text-gray-600 mb-2">
+                            Conteo Manual:
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={
+                              medio.nombre === 'Tarjeta de Crédito' ? conteoTarjetaCredito :
+                              medio.nombre === 'Tarjeta de Débito' ? conteoTarjetaDebito :
+                              medio.nombre === 'QR / Digital' ? conteoQR : '0.00'
+                            }
+                            onChange={(e) => updateMedioPagoConteo(medio.nombre, e.target.value)}
+                            className={`w-32 p-3 text-center font-bold border-2 rounded-lg ${
+                              medio.isCorrect
+                                ? 'border-green-500 bg-green-50 text-green-900'
+                                : 'border-red-500 bg-red-50 text-red-900'
+                            }`}
+                            placeholder="0.00"
+                          />
+                        </div>
+                        
+                        {/* 🆕 INDICADOR DE ESTADO VISUAL */}
+                        <div className="text-center">
+                          {medio.isCorrect ? (
+                            <div className="flex flex-col items-center text-green-700">
+                              <CheckCircle className="w-8 h-8 mb-1" />
+                              <span className="text-sm font-medium">Correcto</span>
+                            </div>
+                          ) : forcedMethods.has(medio.nombre) ? (
+                            <div className="flex flex-col items-center text-amber-700">
+                              <Settings className="w-8 h-8 mb-1" />
+                              <span className="text-sm font-medium">Forzado</span>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center text-red-700">
+                              <XCircle className="w-8 h-8 mb-1" />
+                              <span className="text-sm font-medium">
+                                Diferencia: ${Math.abs(medio.diferencia).toFixed(2)}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* 🆕 BOTÓN FORZAR CIERRE */}
+                        {!medio.isCorrect && (
+                          <button
+                            onClick={() => toggleForceMethod(medio.nombre)}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                              forcedMethods.has(medio.nombre)
+                                ? 'bg-amber-600 text-white hover:bg-amber-700'
+                                : 'bg-red-100 text-red-700 hover:bg-red-200'
+                            }`}
+                          >
+                            {forcedMethods.has(medio.nombre) ? 'Cancelar Forzado' : 'Forzar Cierre'}
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
-              <div className="text-sm text-blue-700 space-y-1">
-                <p>• <strong>Diferencias ≤ $200:</strong> Se registran como aceptables</p>
-                <p>• <strong>Diferencias {'>'} $200:</strong> Se genera contingencia para revisión</p>
-                <p>• <strong>Sin diferencias:</strong> Cierre perfecto ✅</p>
+            </div>
+
+            {/* Footer con observaciones y finalizar */}
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Observaciones (opcional):
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={observaciones}
+                    onChange={(e) => setObservaciones(e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Cualquier observación sobre el cierre, diferencias encontradas, o situaciones especiales..."
+                  />
+                </div>
+                
+                <div className="flex justify-end space-x-4">
+                  <button
+                    onClick={() => router.push('/pdv')}
+                    disabled={isSaving}
+                    className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 disabled:opacity-50 transition-colors font-medium"
+                  >
+                    Cancelar
+                  </button>
+                  
+                  <button
+                    onClick={handleCerrarCaja}
+                    disabled={isSaving || !canClose}
+                    className={`px-8 py-3 rounded-xl text-white font-bold text-lg shadow-lg hover:shadow-xl transition-all flex items-center space-x-2 ${
+                      canClose
+                        ? allCorrect
+                          ? 'bg-green-600 hover:bg-green-700'
+                          : 'bg-amber-600 hover:bg-amber-700'
+                        : 'bg-gray-400 cursor-not-allowed'
+                    }`}
+                  >
+                    {isSaving ? (
+                      <>
+                        <Loader className="animate-spin h-5 w-5" />
+                        <span>Procesando...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Zap className="h-5 w-5" />
+                        <span>
+                          {allCorrect ? 'Cerrar Caja' : hasIncorrect && canClose ? 'Forzar Cierre' : 'Resolver Diferencias'}
+                        </span>
+                      </>
+                    )}
+                  </button>
+                </div>
+                
+                {/* 🆕 INFORMACIÓN SOBRE EL CIERRE */}
+                {hasIncorrect && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                    <div className="flex items-center mb-2">
+                      <AlertTriangle className="w-5 h-5 text-amber-600 mr-2" />
+                      <p className="font-medium text-amber-800">Estado del cierre</p>
+                    </div>
+                    <div className="text-sm text-amber-700 space-y-1">
+                      {canClose ? (
+                        <p>✅ Puedes cerrar la caja. Los medios forzados generarán una contingencia.</p>
+                      ) : (
+                        <p>⚠️ Hay diferencias sin resolver. Corrige los montos o marca "Forzar Cierre".</p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
