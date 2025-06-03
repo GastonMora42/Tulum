@@ -1,8 +1,8 @@
 {
   "/api/productos/cache/route": "app/api/productos/cache/route.js",
   "/api/auth/refresh/route": "app/api/auth/refresh/route.js",
-  "/page": "app/page.js",
   "/(auth)/login/page": "app/(auth)/login/page.js",
-  "/(pdv)/pdv/conciliacion/page": "app/(pdv)/pdv/conciliacion/page.js",
+  "/page": "app/page.js",
+  "/(admin)/admin/page": "app/(admin)/admin/page.js",
   "/(pdv)/pdv/page": "app/(pdv)/pdv/page.js"
 }

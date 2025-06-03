@@ -1,4 +1,4 @@
-// src/app/(pdv)/pdv/page.tsx - VERSIÓN COMPLETAMENTE REDISEÑADA
+// src/app/(pdv)/pdv/page.tsx - VERSIÓN MEJORADA CON LAYOUT HORIZONTAL
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -12,7 +12,7 @@ import { authenticatedFetch } from '@/hooks/useAuth';
 import { 
   AlertCircle, CheckCircle, X, Package, Search, 
   ArrowLeft, Grid, List, Plus, Heart, Tag, Camera,
-  Building2, MapPin, Wifi, WifiOff, Zap
+  Building2, MapPin, Wifi, WifiOff, Zap, ChevronDown
 } from 'lucide-react';
 import { Producto } from '@/types/models/producto';
 
@@ -56,6 +56,12 @@ export default function PDVPage() {
   const [productos, setProductos] = useState<Producto[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [favorites, setFavorites] = useState<Set<string>>(new Set());
+  
+  // 🆕 ESTADO PARA COLAPSAR CARRITO
+  const [cartCollapsed, setCartCollapsed] = useState(false);
+  
+  // 🆕 REF PARA SCROLL AL TOP
+  const pageTopRef = useRef<HTMLDivElement>(null);
   
   // Hooks
   const { addItem, items } = useCartStore();
@@ -167,7 +173,6 @@ const handleCategorySelect = async (categoria: Categoria) => {
     if (response.ok) {
       const data = await response.json();
       console.log(`✅ Productos cargados para "${categoria.nombre}":`, data.length);
-      console.log('Productos:', data.map((p: { nombre: any; categoria: { nombre: any; }; }) => `${p.nombre} (Cat: ${p.categoria?.nombre})`));
       
       setProductos(data);
       setSelectedCategory(categoria);
@@ -185,9 +190,18 @@ const handleCategorySelect = async (categoria: Categoria) => {
   }
 };
 
+  // 🆕 FUNCIÓN MEJORADA PARA AGREGAR PRODUCTO CON SCROLL
   const handleProductSelect = (producto: Producto) => {
     addItem(producto);
     showNotification('success', `"${producto.nombre}" agregado al carrito`);
+    
+    // 🆕 SCROLL AL TOP PARA VER EL CARRITO
+    pageTopRef.current?.scrollIntoView({ behavior: 'smooth' });
+    
+    // 🆕 EXPANDIR CARRITO SI ESTÁ COLAPSADO
+    if (cartCollapsed) {
+      setCartCollapsed(false);
+    }
   };
 
   const toggleFavorite = (productId: string) => {
@@ -201,94 +215,83 @@ const handleCategorySelect = async (categoria: Categoria) => {
     localStorage.setItem('favoriteProducts', JSON.stringify(Array.from(newFavorites)));
   };
 
-    // 🆕 FUNCIÓN PARA CARGAR INFO DE APERTURA
-    const loadAperturaInfo = async () => {
-      try {
-        setIsLoadingApertura(true);
-        const sucursalId = localStorage.getItem('sucursalId');
-        
-        if (!sucursalId) {
-          showNotification('error', 'No se ha configurado una sucursal');
-          return;
-        }
-  
-        const response = await authenticatedFetch(`/api/pdv/apertura?sucursalId=${encodeURIComponent(sucursalId)}`);
-        
-        if (response.ok) {
-          const data = await response.json();
-          setAperturaInfo(data);
-          console.log('📊 Información de apertura cargada:', data);
-        } else {
-          const errorData = await response.json();
-          console.error('❌ Error al cargar info de apertura:', errorData);
-          showNotification('error', errorData.error || 'Error al cargar información de apertura');
-        }
-      } catch (error) {
-        console.error('❌ Error al cargar información de apertura:', error);
-        showNotification('error', 'Error al conectar con el servidor');
-      } finally {
-        setIsLoadingApertura(false);
-      }
-    };
-  
-    // 🔧 CORREGIR FUNCIÓN DE APERTURA
-    const handleAbrirCaja = async () => {
-      console.log('🚀 Iniciando proceso de apertura de caja...');
+  const loadAperturaInfo = async () => {
+    try {
+      setIsLoadingApertura(true);
+      const sucursalId = localStorage.getItem('sucursalId');
       
-      // Cargar información de apertura primero
-      await loadAperturaInfo();
-      
-      // Mostrar modal de apertura
-      setShowAperturaModal(true);
-    };
-  
-    // 🔧 CORREGIR onComplete DEL MODAL
-    const handleAperturaComplete = async (data: { montoInicial: number; recuperarSaldo: boolean }) => {
-      try {
-        console.log('💰 Ejecutando apertura con datos:', data);
-        
-        const sucursalId = localStorage.getItem('sucursalId');
-        if (!sucursalId) {
-          throw new Error('No se ha configurado una sucursal');
-        }
-  
-        const response = await authenticatedFetch('/api/pdv/apertura', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            sucursalId,
-            montoInicial: data.montoInicial,
-            recuperarSaldo: data.recuperarSaldo
-          })
-        });
-  
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Error al abrir la caja');
-        }
-  
-        const result = await response.json();
-        console.log('✅ Caja abierta exitosamente:', result);
-        
-        // Cerrar modal
-        setShowAperturaModal(false);
-        
-        // Mostrar notificación de éxito
-        showNotification('success', result.message || 'Caja abierta correctamente');
-        
-        // Verificar estado de caja actualizado
-        setTimeout(() => {
-          verificarEstadoCaja();
-        }, 1000);
-        
-      } catch (error) {
-        console.error('❌ Error en apertura de caja:', error);
-        showNotification('error', error instanceof Error ? error.message : 'Error desconocido al abrir caja');
-        throw error; // Re-throw para que el modal maneje el error
+      if (!sucursalId) {
+        showNotification('error', 'No se ha configurado una sucursal');
+        return;
       }
-    };  
+
+      const response = await authenticatedFetch(`/api/pdv/apertura?sucursalId=${encodeURIComponent(sucursalId)}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        setAperturaInfo(data);
+        console.log('📊 Información de apertura cargada:', data);
+      } else {
+        const errorData = await response.json();
+        console.error('❌ Error al cargar info de apertura:', errorData);
+        showNotification('error', errorData.error || 'Error al cargar información de apertura');
+      }
+    } catch (error) {
+      console.error('❌ Error al cargar información de apertura:', error);
+      showNotification('error', 'Error al conectar con el servidor');
+    } finally {
+      setIsLoadingApertura(false);
+    }
+  };
+
+  const handleAbrirCaja = async () => {
+    console.log('🚀 Iniciando proceso de apertura de caja...');
+    await loadAperturaInfo();
+    setShowAperturaModal(true);
+  };
+
+  const handleAperturaComplete = async (data: { montoInicial: number; recuperarSaldo: boolean }) => {
+    try {
+      console.log('💰 Ejecutando apertura con datos:', data);
+      
+      const sucursalId = localStorage.getItem('sucursalId');
+      if (!sucursalId) {
+        throw new Error('No se ha configurado una sucursal');
+      }
+
+      const response = await authenticatedFetch('/api/pdv/apertura', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          sucursalId,
+          montoInicial: data.montoInicial,
+          recuperarSaldo: data.recuperarSaldo
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al abrir la caja');
+      }
+
+      const result = await response.json();
+      console.log('✅ Caja abierta exitosamente:', result);
+      
+      setShowAperturaModal(false);
+      showNotification('success', result.message || 'Caja abierta correctamente');
+      
+      setTimeout(() => {
+        verificarEstadoCaja();
+      }, 1000);
+      
+    } catch (error) {
+      console.error('❌ Error en apertura de caja:', error);
+      showNotification('error', error instanceof Error ? error.message : 'Error desconocido al abrir caja');
+      throw error;
+    }
+  };
 
   const handleBarcodeScanned = async (code: string) => {
     try {
@@ -368,7 +371,7 @@ const handleCategorySelect = async (categoria: Categoria) => {
             </p>
             
             <button
-              onClick={handleAbrirCaja} // 🔧 USAR NUEVA FUNCIÓN
+              onClick={handleAbrirCaja}
               disabled={isLoadingApertura}
               className="w-full py-4 px-8 bg-gradient-to-r from-[#311716] to-[#462625] text-white rounded-2xl hover:from-[#462625] hover:to-[#311716] transition-all font-bold text-lg flex items-center justify-center space-x-3 shadow-lg hover:shadow-xl disabled:opacity-50"
             >
@@ -390,62 +393,91 @@ const handleCategorySelect = async (categoria: Categoria) => {
     }
 
     return (
-      <div className="h-full flex flex-col overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100">
-        {/* Header Superior */}
-        <div className="bg-white shadow-sm border-b border-gray-200 p-4 lg:p-6">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+        {/* 🆕 REF PARA SCROLL AL TOP */}
+        <div ref={pageTopRef} className="h-0 w-0"></div>
+        
+        {/* 🆕 HEADER COMPACTO */}
+        <div className="bg-white shadow-sm border-b border-gray-200 py-3 px-6">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="w-14 h-14 bg-gradient-to-br from-[#311716] to-[#9c7561] rounded-2xl flex items-center justify-center">
-                <Building2 className="w-7 h-7 text-white" />
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-[#311716] to-[#9c7561] rounded-xl flex items-center justify-center">
+                <Building2 className="w-5 h-5 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">{sucursalInfo.nombre}</h1>
-                <div className="flex items-center space-x-3 text-sm text-gray-500">
-                  <div className="flex items-center space-x-1">
-                    <MapPin className="w-4 h-4" />
-                    <span>{sucursalInfo.direccion}</span>
-                  </div>
+                <h1 className="text-lg font-bold text-gray-900">{sucursalInfo.nombre}</h1>
+                <div className="flex items-center space-x-2 text-xs text-gray-500">
+                  <MapPin className="w-3 h-3" />
+                  <span>{sucursalInfo.direccion}</span>
                   <span>•</span>
-                  <div className="flex items-center space-x-1">
-                    {isOnline ? (
-                      <>
-                        <Wifi className="w-4 h-4 text-green-500" />
-                        <span className="text-green-600">Online</span>
-                      </>
-                    ) : (
-                      <>
-                        <WifiOff className="w-4 h-4 text-amber-500" />
-                        <span className="text-amber-600">Offline</span>
-                      </>
-                    )}
-                  </div>
+                  {isOnline ? (
+                    <div className="flex items-center space-x-1 text-green-600">
+                      <Wifi className="w-3 h-3" />
+                      <span>Online</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center space-x-1 text-amber-600">
+                      <WifiOff className="w-3 h-3" />
+                      <span>Offline</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
 
             <div className="flex items-center space-x-4">
-              <div className="bg-green-100 text-green-800 px-4 py-2 rounded-xl border border-green-200">
-                <span className="text-sm font-medium">Caja Abierta</span>
+              <div className="bg-green-100 text-green-800 px-3 py-1 rounded-lg border border-green-200 text-sm font-medium">
+                Caja Abierta
               </div>
             </div>
           </div>
         </div>
 
-        {/* Layout Principal */}
-        <div className="flex-1 flex overflow-hidden">
-          
-          {/* Panel Principal */}
-          <div className="flex-1 flex flex-col min-w-0 bg-white">
-            {renderCurrentView()}
+        {/* 🆕 CARRITO HORIZONTAL */}
+        <div className="bg-white border-b border-gray-200 shadow-sm">
+          <div className="px-6">
+            <div className="flex items-center justify-between py-3">
+              <div className="flex items-center space-x-3">
+                <h2 className="text-lg font-bold text-gray-900">Carrito de Compras</h2>
+                <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-sm">
+                  {items.length} productos
+                </span>
+              </div>
+              
+              <div className="flex items-center space-x-4">
+                {items.length > 0 && (
+                  <div className="text-right">
+                    <div className="text-xl font-bold text-[#311716]">
+                      ${items.reduce((sum, item) => sum + (item.precio * item.cantidad), 0).toFixed(2)}
+                    </div>
+                  </div>
+                )}
+                
+                <button
+                  onClick={() => setCartCollapsed(!cartCollapsed)}
+                  className="p-2 text-gray-500 hover:text-gray-700 transition-colors"
+                >
+                  <ChevronDown className={`w-5 h-5 transition-transform ${cartCollapsed ? 'rotate-180' : ''}`} />
+                </button>
+              </div>
+            </div>
+            
+            {/* 🆕 CARRITO COLAPSABLE */}
+            <div className={`transition-all duration-300 overflow-hidden ${cartCollapsed ? 'max-h-0' : 'max-h-96'}`}>
+              <div className="pb-4">
+                <CartDisplay 
+                  onCheckout={handleCheckout} 
+                  className="w-full"
+                  horizontal={true}
+                />
+              </div>
+            </div>
           </div>
-          
-          {/* Carrito */}
-          <div className="w-80 xl:w-96 border-l border-gray-200 bg-white">
-            <CartDisplay 
-              onCheckout={handleCheckout} 
-              className="h-full"
-            />
-          </div>
+        </div>
+
+        {/* 🆕 CONTENIDO PRINCIPAL CON MÁS ESPACIO */}
+        <div className="p-6">
+          {renderCurrentView()}
         </div>
       </div>
     );
@@ -467,8 +499,8 @@ const handleCategorySelect = async (categoria: Categoria) => {
 
   // 🆕 VISTA DE CATEGORÍAS
   const renderCategoriesView = () => (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-900">¿Qué estás buscando?</h2>
         <button
           onClick={() => setCurrentView('scanner')}
@@ -479,7 +511,7 @@ const handleCategorySelect = async (categoria: Categoria) => {
         </button>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-6">
         {categorias.map((categoria) => (
           <div
             key={categoria.id}
@@ -499,12 +531,12 @@ const handleCategorySelect = async (categoria: Categoria) => {
                 </div>
               )}
               <div className="absolute inset-0 bg-black/20 group-hover:bg-black/30 transition-colors"></div>
-              <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/70 to-transparent">
-                <h3 className="text-white text-xl font-bold text-center mb-1">
+              <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent">
+                <h3 className="text-white text-lg font-bold text-center mb-1 leading-tight">
                   {categoria.nombre}
                 </h3>
                 {categoria._count && (
-                  <p className="text-white/80 text-sm text-center">
+                  <p className="text-white/80 text-xs text-center">
                     {categoria._count.productos} productos
                   </p>
                 )}
@@ -516,10 +548,10 @@ const handleCategorySelect = async (categoria: Categoria) => {
     </div>
   );
 
-  // 🆕 VISTA DE PRODUCTOS
+  // 🆕 VISTA DE PRODUCTOS MEJORADA CON 6 COLUMNAS
   const renderProductsView = () => (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <button
             onClick={() => setCurrentView('categories')}
@@ -542,7 +574,7 @@ const handleCategorySelect = async (categoria: Categoria) => {
       </div>
 
       {/* Búsqueda en productos */}
-      <div className="mb-6">
+      <div className="max-w-md">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
           <input
@@ -555,8 +587,8 @@ const handleCategorySelect = async (categoria: Categoria) => {
         </div>
       </div>
 
-      {/* Grid de productos */}
-      <div className="grid grid-cols-3 gap-6">
+      {/* 🆕 GRID DE PRODUCTOS CON 6 COLUMNAS MÁXIMO */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6">
         {productos
           .filter(product => 
             product.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -575,10 +607,9 @@ const handleCategorySelect = async (categoria: Categoria) => {
     </div>
   );
 
-  // 🆕 VISTA DEL ESCÁNER
   const renderScannerView = () => (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <button
             onClick={() => setCurrentView('categories')}
@@ -612,10 +643,10 @@ const handleCategorySelect = async (categoria: Categoria) => {
         onComplete={handleCheckoutComplete}
       />
 
-<AperturaModal
+      <AperturaModal
         isOpen={showAperturaModal}
         onClose={() => setShowAperturaModal(false)}
-        onComplete={handleAperturaComplete} // 🔧 USAR NUEVA FUNCIÓN
+        onComplete={handleAperturaComplete}
         aperturaInfo={aperturaInfo}
       />
 
@@ -630,7 +661,7 @@ const handleCategorySelect = async (categoria: Categoria) => {
   );
 }
 
-// 🆕 COMPONENTE DE PRODUCTO SIMPLIFICADO
+// 🆕 COMPONENTE DE PRODUCTO MEJORADO CON TÍTULOS MÁS LEGIBLES
 interface ProductCardProps {
   product: Producto;
   onSelect: (product: Producto) => void;
@@ -699,19 +730,19 @@ function ProductCard({ product, onSelect, onToggleFavorite, isFavorite }: Produc
         </div>
       </div>
       
-      {/* Información */}
-      <div className="p-6">
-        <h4 className="font-bold text-gray-900 text-lg mb-2 min-h-[3.5rem] leading-tight">
+      {/* 🆕 INFORMACIÓN MEJORADA CON TÍTULOS MÁS LEGIBLES */}
+      <div className="p-4">
+        <h4 className="font-bold text-gray-900 text-base mb-3 leading-tight min-h-[2.5rem] line-clamp-2">
           {product.nombre}
         </h4>
         
         <div className="flex items-center justify-between">
-          <span className="text-2xl font-bold text-[#311716]">
+          <span className="text-xl font-bold text-[#311716]">
             ${product.precio.toFixed(2)}
           </span>
 
           {product.categoria && (
-            <span className="flex items-center text-xs bg-blue-100 text-blue-700 px-3 py-2 rounded-full">
+            <span className="flex items-center text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
               <Tag className="h-3 w-3 mr-1" />
               {product.categoria.nombre}
             </span>

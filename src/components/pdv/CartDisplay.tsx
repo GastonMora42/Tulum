@@ -1,4 +1,4 @@
-// src/components/pdv/CartDisplay.tsx - VERSIÓN COMPLETAMENTE REDISEÑADA PARA TABLET
+// src/components/pdv/CartDisplay.tsx - VERSIÓN CON SOPORTE HORIZONTAL
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -11,9 +11,10 @@ import {
 interface CartDisplayProps {
   onCheckout: () => void;
   className?: string;
+  horizontal?: boolean; // 🆕 Prop para modo horizontal
 }
 
-export function CartDisplay({ onCheckout, className = '' }: CartDisplayProps) {
+export function CartDisplay({ onCheckout, className = '', horizontal = false }: CartDisplayProps) {
   const { 
     items, 
     removeItem, 
@@ -58,6 +59,146 @@ export function CartDisplay({ onCheckout, className = '' }: CartDisplayProps) {
     setShowClearConfirm(false);
   };
 
+  // 🆕 RENDERIZADO HORIZONTAL
+  if (horizontal) {
+    if (items.length === 0) {
+      return (
+        <div className="text-center py-8">
+          <div className="flex items-center justify-center space-x-3 text-gray-500">
+            <CartIcon className="h-8 w-8" />
+            <p className="text-lg">Carrito vacío - Busca productos para agregar</p>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className={`cart-display-horizontal ${className}`}>
+        {/* Items en scroll horizontal */}
+        <div className="flex space-x-4 overflow-x-auto pb-4 mb-4" style={{ scrollbarWidth: 'thin' }}>
+          {items.map((item, index) => (
+            <div 
+              key={item.id}
+              className={`flex-shrink-0 w-80 bg-gray-50 rounded-xl p-4 transition-all duration-300 ${
+                animateItem === item.id ? 'ring-2 ring-[#eeb077] ring-opacity-50 bg-[#eeb077]/5 scale-[1.02]' : ''
+              }`}
+            >
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex-1 min-w-0 mr-3">
+                  <h4 className="font-bold text-gray-900 text-sm leading-tight mb-1 line-clamp-2">
+                    {item.nombre}
+                  </h4>
+                  <div className="flex items-center space-x-2 text-xs">
+                    <span className="bg-white px-2 py-1 rounded-full border border-gray-200 font-medium">
+                      ${item.precio.toFixed(2)} c/u
+                    </span>
+                    {item.descuento > 0 && (
+                      <span className="bg-green-100 text-green-700 px-2 py-1 rounded-full flex items-center font-medium">
+                        <Tag className="h-3 w-3 mr-1" />
+                        -{item.descuento}%
+                      </span>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="text-right">
+                  <div className="font-bold text-[#311716] text-lg">
+                    ${(item.precio * item.cantidad).toFixed(2)}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Controles compactos */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center bg-white rounded-xl border border-gray-200 overflow-hidden">
+                  <button
+                    onClick={() => handleUpdateWithAnimation(item.id, item.cantidad - 1)}
+                    className="p-2 hover:bg-gray-100 active:bg-gray-200 transition-colors text-gray-600"
+                  >
+                    <Minus size={16} />
+                  </button>
+                  
+                  <div className="px-3 py-2 min-w-[3rem] text-center bg-gray-50">
+                    <span className="font-bold text-gray-800">{item.cantidad}</span>
+                  </div>
+                  
+                  <button
+                    onClick={() => handleUpdateWithAnimation(item.id, item.cantidad + 1)}
+                    className="p-2 hover:bg-gray-100 active:bg-gray-200 transition-colors text-gray-600"
+                  >
+                    <Plus size={16} />
+                  </button>
+                </div>
+                
+                <button
+                  onClick={() => removeItem(item.id)}
+                  className="p-2 rounded-xl text-red-500 hover:bg-red-50 active:bg-red-100 transition-colors"
+                  aria-label="Eliminar producto"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+        
+        {/* Resumen y acciones en horizontal */}
+        <div className="flex items-center justify-between bg-gray-50 rounded-xl p-4">
+          <div className="flex items-center space-x-6">
+            <div className="text-center">
+              <p className="text-sm text-gray-600">Productos</p>
+              <p className="text-lg font-bold text-gray-900">{items.length}</p>
+            </div>
+            
+            <div className="text-center">
+              <p className="text-sm text-gray-600">Subtotal</p>
+              <p className="text-lg font-bold text-gray-900">${subtotal.toFixed(2)}</p>
+            </div>
+            
+            {descuentoGeneral > 0 && (
+              <div className="text-center">
+                <p className="text-sm text-green-600">Descuento</p>
+                <p className="text-lg font-bold text-green-600">-${(subtotal - total).toFixed(2)}</p>
+              </div>
+            )}
+            
+            <div className="text-center">
+              <p className="text-sm text-gray-600">Total</p>
+              <p className="text-2xl font-bold text-[#311716]">${total.toFixed(2)}</p>
+            </div>
+          </div>
+          
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={handleClearCart}
+              className="px-4 py-2 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
+            >
+              Vaciar
+            </button>
+            
+            <button
+              onClick={onCheckout}
+              disabled={items.length === 0}
+              className="px-6 py-2 bg-gradient-to-r from-[#311716] to-[#462625] text-white rounded-xl hover:from-[#462625] hover:to-[#311716] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg font-bold flex items-center space-x-2"
+            >
+              <Receipt className="h-5 w-5" />
+              <span>Procesar Venta</span>
+            </button>
+          </div>
+        </div>
+        
+        {/* Modal de confirmación */}
+        {showClearConfirm && (
+          <ClearConfirmModal 
+            onConfirm={confirmClearCart} 
+            onCancel={() => setShowClearConfirm(false)} 
+          />
+        )}
+      </div>
+    );
+  }
+
+  // 🔄 RENDERIZADO VERTICAL ORIGINAL
   return (
     <div className={`cart-display flex flex-col h-full bg-white ${className}`}>
       {/* Header mejorado */}
@@ -233,35 +374,10 @@ export function CartDisplay({ onCheckout, className = '' }: CartDisplayProps) {
       
       {/* Modal de confirmación para limpiar carrito */}
       {showClearConfirm && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl">
-            <div className="text-center">
-              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <AlertCircle className="w-8 h-8 text-red-600" />
-              </div>
-              
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">¿Vaciar carrito?</h3>
-              <p className="text-gray-600 text-lg mb-8">
-                Se eliminarán todos los productos del carrito. Esta acción no se puede deshacer.
-              </p>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <button
-                  onClick={() => setShowClearConfirm(false)}
-                  className="py-3 px-6 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-semibold"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={confirmClearCart}
-                  className="py-3 px-6 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors font-semibold"
-                >
-                  Vaciar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ClearConfirmModal 
+          onConfirm={confirmClearCart} 
+          onCancel={() => setShowClearConfirm(false)} 
+        />
       )}
       
       <style jsx>{`
@@ -283,6 +399,46 @@ export function CartDisplay({ onCheckout, className = '' }: CartDisplayProps) {
           overflow: hidden;
         }
       `}</style>
+    </div>
+  );
+}
+
+// 🆕 COMPONENTE MODAL DE CONFIRMACIÓN SEPARADO
+interface ClearConfirmModalProps {
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+function ClearConfirmModal({ onConfirm, onCancel }: ClearConfirmModalProps) {
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <AlertCircle className="w-8 h-8 text-red-600" />
+          </div>
+          
+          <h3 className="text-2xl font-bold text-gray-900 mb-4">¿Vaciar carrito?</h3>
+          <p className="text-gray-600 text-lg mb-8">
+            Se eliminarán todos los productos del carrito. Esta acción no se puede deshacer.
+          </p>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <button
+              onClick={onCancel}
+              className="py-3 px-6 border-2 border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-semibold"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={onConfirm}
+              className="py-3 px-6 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors font-semibold"
+            >
+              Vaciar
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

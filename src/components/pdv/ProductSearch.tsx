@@ -1,4 +1,4 @@
-// src/components/pdv/ProductSearch.tsx - VERSIÓN CON IMÁGENES DE BD
+// src/components/pdv/ProductSearch.tsx - VERSIÓN MEJORADA CON 6 COLUMNAS MÁXIMO
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -10,18 +10,23 @@ import { Producto } from '@/types/models/producto';
 interface ProductSearchProps {
   onProductSelect: (product: Producto) => void;
   className?: string;
+  maxColumns?: number; // 🆕 Prop para controlar el número máximo de columnas
 }
 
 interface Categoria {
   id: string;
   nombre: string;
-  imagen?: string; // URL de S3
+  imagen?: string;
   _count?: {
     productos: number;
   };
 }
 
-export function ProductSearch({ onProductSelect, className = '' }: ProductSearchProps) {
+export function ProductSearch({ 
+  onProductSelect, 
+  className = '', 
+  maxColumns = 6 // 🆕 Por defecto 6 columnas máximo
+}: ProductSearchProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [results, setResults] = useState<Producto[]>([]);
@@ -43,6 +48,23 @@ export function ProductSearch({ onProductSelect, className = '' }: ProductSearch
 
   // 🆕 IMAGEN POR DEFECTO PARA CATEGORÍAS
   const DEFAULT_CATEGORY_IMAGE = '/images/categorias/default.jpg';
+
+  // 🆕 GENERAR CLASES DE GRID DINÁMICAS BASADAS EN maxColumns
+  const getGridClasses = () => {
+    const baseClasses = 'grid gap-6';
+    switch (maxColumns) {
+      case 6:
+        return `${baseClasses} grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6`;
+      case 5:
+        return `${baseClasses} grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5`;
+      case 4:
+        return `${baseClasses} grid-cols-2 md:grid-cols-3 lg:grid-cols-4`;
+      case 3:
+        return `${baseClasses} grid-cols-2 md:grid-cols-3`;
+      default:
+        return `${baseClasses} grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6`;
+    }
+  };
 
   // Cargar categorías al inicio
   useEffect(() => {
@@ -215,10 +237,15 @@ export function ProductSearch({ onProductSelect, className = '' }: ProductSearch
     return categoria.imagen || DEFAULT_CATEGORY_IMAGE;
   };
 
+  // 🆕 GENERAR CLASES DE GRID PARA CATEGORÍAS (MÁXIMO 6)
+  const getCategoryGridClasses = () => {
+    return 'grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-6 gap-6';
+  };
+
   return (
     <div ref={searchRef} className={`product-search relative w-full ${className}`}>
       
-      {/* 🆕 VISTA DE CATEGORÍAS CON IMÁGENES DE BD */}
+      {/* 🆕 VISTA DE CATEGORÍAS CON IMÁGENES DE BD Y GRID CONTROLADO */}
       {viewMode === 'categories' && (
         <div className="space-y-6">
           {/* Header con búsqueda rápida */}
@@ -233,8 +260,8 @@ export function ProductSearch({ onProductSelect, className = '' }: ProductSearch
             </button>
           </div>
 
-          {/* Grid de categorías con imágenes de BD */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* 🆕 GRID DE CATEGORÍAS CONTROLADO */}
+          <div className={getCategoryGridClasses()}>
             {categorias.map((categoria) => (
               <div
                 key={categoria.id}
@@ -249,8 +276,8 @@ export function ProductSearch({ onProductSelect, className = '' }: ProductSearch
                     onError={() => handleImageError(categoria.id)}
                   />
                   <div className="absolute inset-0 bg-black/20 group-hover:bg-black/30 transition-colors"></div>
-                  <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black/70 to-transparent">
-                    <h3 className="text-white text-xl font-bold text-center mb-1">
+                  <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent">
+                    <h3 className="text-white text-lg font-bold text-center mb-1 leading-tight">
                       {categoria.nombre}
                     </h3>
                     {categoria._count && (
@@ -274,7 +301,7 @@ export function ProductSearch({ onProductSelect, className = '' }: ProductSearch
         </div>
       )}
 
-      {/* VISTA DE PRODUCTOS DE CATEGORÍA */}
+      {/* 🆕 VISTA DE PRODUCTOS DE CATEGORÍA CON GRID CONTROLADO */}
       {viewMode === 'category-products' && selectedCategory && (
         <div className="space-y-6">
           {/* Header con navegación */}
@@ -301,7 +328,7 @@ export function ProductSearch({ onProductSelect, className = '' }: ProductSearch
             </button>
           </div>
 
-          {/* Grid de productos 3 por fila con más ancho */}
+          {/* 🆕 GRID DE PRODUCTOS CON MÁXIMO CONTROLADO */}
           {isLoading ? (
             <div className="text-center py-12">
               <div className="inline-block animate-spin h-8 w-8 border-4 border-[#eeb077] border-t-transparent rounded-full"></div>
@@ -314,9 +341,9 @@ export function ProductSearch({ onProductSelect, className = '' }: ProductSearch
               <p className="text-gray-500">Esta categoría no tiene productos en stock.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-3 gap-6">
+            <div className={getGridClasses()}>
               {categoryProducts.map((product) => (
-                <ProductCard
+                <ImprovedProductCard
                   key={product.id}
                   product={product}
                   onSelect={handleSelect}
@@ -329,7 +356,7 @@ export function ProductSearch({ onProductSelect, className = '' }: ProductSearch
         </div>
       )}
 
-      {/* VISTA DE BÚSQUEDA (EXISTENTE MEJORADA) */}
+      {/* VISTA DE BÚSQUEDA MEJORADA */}
       {viewMode === 'search' && (
         <div className="space-y-4">
           {/* Barra de búsqueda */}
@@ -375,9 +402,9 @@ export function ProductSearch({ onProductSelect, className = '' }: ProductSearch
             <div className="bg-white border-2 border-gray-200 rounded-2xl shadow-2xl max-h-[600px] overflow-hidden">
               {searchTerm && results.length > 0 && (
                 <div className="max-h-80 overflow-y-auto p-4">
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className={getGridClasses()}>
                     {results.map((product) => (
-                      <ProductCard
+                      <ImprovedProductCard
                         key={product.id}
                         product={product}
                         onSelect={handleSelect}
@@ -404,8 +431,8 @@ export function ProductSearch({ onProductSelect, className = '' }: ProductSearch
   );
 }
 
-// 🆕 COMPONENTE DE PRODUCTO MEJORADO
-interface ProductCardProps {
+// 🆕 COMPONENTE DE PRODUCTO MEJORADO CON TÍTULOS MÁS LEGIBLES
+interface ImprovedProductCardProps {
   product: Producto;
   onSelect: (product: Producto) => void;
   isRecentlyAdded: boolean;
@@ -413,13 +440,13 @@ interface ProductCardProps {
   categoryImage?: string;
 }
 
-function ProductCard({ 
+function ImprovedProductCard({ 
   product, 
   onSelect, 
   isRecentlyAdded, 
   searchTerm,
   categoryImage
-}: ProductCardProps) {
+}: ImprovedProductCardProps) {
   const [imageError, setImageError] = useState(false);
   const stockValue = product.stock ?? 0;
 
@@ -441,7 +468,7 @@ function ProductCard({
         isRecentlyAdded ? 'ring-2 ring-green-400 bg-green-50' : ''
       }`}
     >
-      {/* Imagen más grande */}
+      {/* Imagen optimizada */}
       <div className="aspect-square bg-gray-100 overflow-hidden relative">
         {product.imagen && !imageError ? (
           <img
@@ -463,9 +490,9 @@ function ProductCard({
           </div>
         )}
         
-        {/* Badge de stock */}
-        <div className="absolute top-4 right-4">
-          <span className={`px-3 py-1 rounded-full text-xs font-bold text-white ${
+        {/* Badge de stock mejorado */}
+        <div className="absolute top-3 right-3">
+          <span className={`px-3 py-1 rounded-full text-xs font-bold text-white shadow-lg ${
             stockValue > 5 
               ? 'bg-green-500' 
               : stockValue > 0 
@@ -475,27 +502,37 @@ function ProductCard({
             {stockValue} disp.
           </span>
         </div>
+        
+        {/* Overlay de selección */}
+        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center">
+          <div className="bg-white text-[#311716] px-4 py-2 rounded-lg font-bold shadow-lg transform scale-95 group-hover:scale-100 transition-transform">
+            Agregar al carrito
+          </div>
+        </div>
       </div>
 
-      {/* Información del producto con más espacio */}
-      <div className="p-6">
-        <h4 className="font-bold text-gray-900 text-lg mb-2 min-h-[3.5rem] leading-tight">
+      {/* 🆕 INFORMACIÓN DEL PRODUCTO MEJORADA CON TÍTULOS MÁS LEGIBLES */}
+      <div className="p-4">
+        {/* 🆕 TÍTULO MÁS LEGIBLE CON MEJOR ESPACIADO */}
+        <h4 className="font-bold text-gray-900 text-base mb-3 leading-snug min-h-[3rem] line-clamp-2">
           {highlightText(product.nombre, searchTerm)}
         </h4>
         
+        {/* Descripción opcional */}
         {product.descripcion && (
-          <p className="text-sm text-gray-500 mb-4 line-clamp-2">
+          <p className="text-sm text-gray-500 mb-3 line-clamp-2 leading-relaxed">
             {highlightText(product.descripcion, searchTerm)}
           </p>
         )}
 
+        {/* Precio y categoría */}
         <div className="flex items-center justify-between">
-          <span className="text-2xl font-bold text-[#311716]">
+          <span className="text-xl font-bold text-[#311716]">
             ${product.precio.toFixed(2)}
           </span>
 
           {product.categoria && (
-            <span className="flex items-center text-xs bg-blue-100 text-blue-700 px-3 py-2 rounded-full">
+            <span className="flex items-center text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
               <Tag className="h-3 w-3 mr-1" />
               {product.categoria.nombre}
             </span>

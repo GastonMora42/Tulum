@@ -1,4 +1,4 @@
-// src/components/pdv/CheckoutModal.tsx - VERSIÓN CON SALTO DE PASO INTELIGENTE
+// src/components/pdv/CheckoutModal.tsx - VERSIÓN CON AUTO-DESTILDAR FACTURA PARA EFECTIVO
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -65,6 +65,35 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
     { id: 'transferencia', name: 'Transferencia', icon: <Smartphone size={24} className="text-orange-600" /> }
   ];
 
+  // 🆕 FUNCIÓN PARA VERIFICAR SI TODOS LOS PAGOS SON EN EFECTIVO
+  const isAllPaymentsCash = () => {
+    return payments.every(p => p.method === 'efectivo');
+  };
+
+  // 🆕 FUNCIÓN PARA MANEJAR LÓGICA DE FACTURACIÓN AUTOMÁTICA
+  const updateBillingLogic = (newPayments: Payment[]) => {
+    const allPaymentsAreCash = newPayments.every(p => p.method === 'efectivo');
+    const hasNonCashPayments = newPayments.some(p => p.method !== 'efectivo');
+    
+    // Si todos los pagos son en efectivo, destildar facturación automáticamente
+    if (allPaymentsAreCash) {
+      console.log('🎯 Todos los pagos son en efectivo - Destildando facturación automáticamente');
+      setFacturacionObligatoria(false);
+      setFacturar(false); // 🆕 Auto-destildar cuando es solo efectivo
+    } 
+    // Si hay pagos no-efectivo, facturación obligatoria
+    else if (hasNonCashPayments) {
+      console.log('💳 Pagos electrónicos detectados - Facturación obligatoria');
+      setFacturacionObligatoria(true);
+      setFacturar(true);
+      
+      // Cambiar a factura A si el monto es alto
+      if (getTotalWithDiscount() > 50000) {
+        setTipoFactura('A');
+      }
+    }
+  };
+
   // 🆕 FUNCIÓN PARA DETERMINAR SI SALTAR EL PASO 2
   const shouldSkipStep2 = () => {
     // Si no se factura y solo hay pagos en efectivo, saltar paso 2
@@ -96,16 +125,21 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
       setAppliedDiscount(null);
       setDiscountCode('');
       setValidationErrors({});
-      setFacturar(false);
+      setFacturar(false); // 🆕 Inicializar destildado
+      setFacturacionObligatoria(false); // 🆕 Inicializar sin obligación
       setTipoFactura('B');
       setClienteNombre('');
       setClienteCuit('');
       
       // Inicializar el primer método de pago con el total
       const total = getTotal();
-      setPayments([{ method: 'efectivo', amount: total, reference: '' }]);
+      const initialPayments = [{ method: 'efectivo', amount: total, reference: '' }];
+      setPayments(initialPayments);
       setAmountTendered(total.toFixed(2));
       setRemainingAmount(0);
+      
+      // 🆕 Aplicar lógica de facturación inicial
+      updateBillingLogic(initialPayments);
       
       setTimeout(() => {
         initialFocusRef.current?.focus();
@@ -151,7 +185,7 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
     return parseInt(cuitLimpio[10]) === digitoVerificador;
   };
 
-  // Manejar cambio de método de pago
+  // 🔧 FUNCIÓN MODIFICADA - Manejar cambio de método de pago
   const handlePaymentMethodChange = (index: number, methodId: string) => {
     if (payments.some(p => p.method === methodId) && methodId !== payments[index].method) {
       setValidationErrors({
@@ -167,14 +201,19 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
     newPayments[index] = { ...newPayments[index], method: methodId, reference: '' };
     setPayments(newPayments);
     
-    // Verificar facturación obligatoria según medio de pago
-    const requiresInvoice = ['tarjeta_credito', 'tarjeta_debito', 'qr', 'transferencia'].includes(methodId);
-    setFacturacionObligatoria(requiresInvoice);
-    if (requiresInvoice) {
-      setFacturar(true);
-      if (getTotalWithDiscount() > 50000) {
-        setTipoFactura('A');
-      }
+    // 🆕 APLICAR NUEVA LÓGICA DE FACTURACIÓN
+    updateBillingLogic(newPayments);
+    
+    console.log(`💰 Método de pago cambiado a: ${methodId}`);
+    console.log(`🧾 Facturación obligatoria: ${newPayments.some(p => p.method !== 'efectivo')}`);
+  };
+
+  // 🆕 FUNCIÓN PARA MANEJAR CAMBIO MANUAL DEL CHECKBOX DE FACTURACIÓN
+  const handleFacturarChange = (checked: boolean) => {
+    // Solo permitir cambio manual si no es obligatorio
+    if (!facturacionObligatoria) {
+      console.log(`🎯 Facturación cambiada manualmente a: ${checked}`);
+      setFacturar(checked);
     }
   };
 
@@ -251,7 +290,7 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
     }
   };
 
-  // Agregar método de pago adicional
+  // 🔧 FUNCIÓN MODIFICADA - Agregar método de pago adicional
   const addPaymentMethod = () => {
     if (payments.length >= 2) {
       setValidationErrors({
@@ -277,11 +316,14 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
         });
         setPayments(newPayments);
         setRemainingAmount(0);
+        
+        // 🆕 APLICAR LÓGICA DE FACTURACIÓN AL AGREGAR MÉTODO
+        updateBillingLogic(newPayments);
       }
     }
   };
 
-  // Eliminar método de pago
+  // 🔧 FUNCIÓN MODIFICADA - Eliminar método de pago
   const removePaymentMethod = (index: number) => {
     if (payments.length > 1) {
       const removedPayment = payments[index];
@@ -291,6 +333,9 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
       
       setPayments(newPayments);
       setRemainingAmount(newRemainingAmount);
+      
+      // 🆕 APLICAR LÓGICA DE FACTURACIÓN AL ELIMINAR MÉTODO
+      updateBillingLogic(newPayments);
       
       if (newPayments.length === 1 && newPayments[0].method === 'efectivo') {
         const totalAmount = getTotalWithDiscount();
@@ -684,14 +729,14 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                     </div>
                   </div>
 
-                  {/* Sección de facturación */}
+                  {/* 🆕 SECCIÓN DE FACTURACIÓN MEJORADA */}
                   <div className="border-t border-gray-100 pt-4">
                     <div className="flex items-center p-3 bg-gray-50 rounded-lg mb-3">
                       <input
                         id="facturar"
                         type="checkbox"
                         checked={facturar || facturacionObligatoria}
-                        onChange={(e) => setFacturar(e.target.checked)}
+                        onChange={(e) => handleFacturarChange(e.target.checked)} // 🆕 Nueva función
                         disabled={facturacionObligatoria}
                         className="h-4 w-4 text-[#311716] focus:ring-[#9c7561] border-gray-300 rounded"
                       />
@@ -703,13 +748,17 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                       </label>
                     </div>
 
-                    {/* 🆕 INDICADOR DE SALTO DE PASO */}
-                    {shouldSkipStep2() && (
-                      <div className="mt-2 text-sm text-green-600 bg-green-50 p-2 rounded flex items-center">
-                        <Check className="mr-1 h-4 w-4" />
-                        <span>Pago en efectivo sin factura - Se omitirá paso de datos del cliente</span>
+                    {/* 🆕 INDICADORES MEJORADOS */}
+                    {isAllPaymentsCash() && !facturar && (
+                      <div className="mt-2 text-sm text-blue-600 bg-blue-50 p-3 rounded flex items-center">
+                        <DollarSign className="mr-2 h-4 w-4" />
+                        <span>
+                          Pago en efectivo -  
+                          {shouldSkipStep2() && ' Se omitirá paso de datos del cliente.'}
+                        </span>
                       </div>
                     )}
+                    
                     
                     {/* Selector de tipo de factura */}
                     {facturar && (
@@ -1071,8 +1120,9 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                       </div>
                     ) : (
                       <div className="bg-white p-4 rounded-lg border text-center">
-                        <Receipt className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                        <DollarSign className="w-12 h-12 text-green-600 mx-auto mb-2" />
                         <h4 className="font-medium text-gray-900 mb-1">Venta en efectivo</h4>
+                        <p className="text-sm text-gray-600">Corroborar cambio y monto entregado</p>
                       </div>
                     )}
                   </div>
