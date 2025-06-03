@@ -209,12 +209,6 @@ export default function PDVLayout({
   // Definición de los enlaces de navegación
   const navLinks = [
     { 
-      href: '/pdv/dashboard', 
-      icon: <BarChart2 className="h-5 w-5" />, 
-      text: 'Dashboard',
-      description: 'Resumen general'
-    },
-    { 
       href: '/pdv', 
       icon: <ShoppingCart className="h-5 w-5" />, 
       text: 'Venta', 
