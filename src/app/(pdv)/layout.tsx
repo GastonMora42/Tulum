@@ -1,4 +1,4 @@
-// src/app/(pdv)/layout.tsx - Con información de sucursal mejorada
+// src/app/(pdv)/layout.tsx - VERSIÓN RESPONSIVE MEJORADA PARA TABLETS
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -10,7 +10,7 @@ import {
   ShoppingCart, Tag, Home, Clock, Settings, LogOut, Menu, X, ChevronLeft, ChevronRight,
   Package, AlertTriangle, Archive, Truck, FileText, Database, BarChart2, User,
   WifiOff, Wifi, RefreshCw, ArrowDownLeft, Factory, Bell, Search, Grid3x3,
-  MapPin, Building2
+  MapPin, Building2, ChevronDown
 } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
 
@@ -23,8 +23,13 @@ export default function PDVLayout({
   const [isLoading, setIsLoading] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [isTablet, setIsTablet] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [notifications, setNotifications] = useState(0);
+  
+  // 🆕 Estados para dropdown de usuario mejorado en tablets
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
   
   // Estados para información de sucursal
   const [sucursalInfo, setSucursalInfo] = useState({
@@ -40,12 +45,62 @@ export default function PDVLayout({
   const { setUser } = useAuthStore();
   const sidebarRef = useRef<HTMLDivElement>(null);
   
+  // 🆕 DETECCIÓN MEJORADA DE DISPOSITIVOS
+  useEffect(() => {
+    const handleResize = () => {
+      const width = window.innerWidth;
+      const mobile = width < 768;
+      const tablet = width >= 768 && width < 1024;
+      
+      setIsMobile(mobile);
+      setIsTablet(tablet);
+      setSidebarCollapsed(mobile || tablet);
+    };
+    
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // 🆕 MANEJO MEJORADO DE CLICKS FUERA DEL DROPDOWN DE USUARIO
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setShowUserMenu(false);
+      }
+    };
+
+    if (showUserMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside as EventListener);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside as EventListener);
+    };
+  }, [showUserMenu]);
+
+  // Cerrar sidebar al hacer clic fuera en móvil
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (isMobile && 
+          showMobileMenu && 
+          sidebarRef.current && 
+          !sidebarRef.current.contains(e.target as Node)) {
+        setShowMobileMenu(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isMobile, showMobileMenu]);
+
   // Cargar información de la sucursal
   useEffect(() => {
     const loadSucursalInfo = async () => {
       if (typeof window !== 'undefined') {
         try {
-          // Obtener datos del localStorage
           const sucursalId = localStorage.getItem('sucursalId');
           const sucursalNombre = localStorage.getItem('sucursalNombre');
           const sucursalDireccion = localStorage.getItem('sucursalDireccion');
@@ -59,7 +114,6 @@ export default function PDVLayout({
               tipo: sucursalTipo || 'punto_venta'
             });
           } else {
-            // Si no hay sucursal configurada, intentar obtener de API
             try {
               const response = await authenticatedFetch('/api/pdv/sucursal-actual');
               if (response.ok) {
@@ -71,7 +125,6 @@ export default function PDVLayout({
                   tipo: data.tipo || 'punto_venta'
                 });
                 
-                // Guardar en localStorage
                 localStorage.setItem('sucursalId', data.id);
                 localStorage.setItem('sucursalNombre', data.nombre);
                 localStorage.setItem('sucursalDireccion', data.direccion || '');
@@ -89,35 +142,6 @@ export default function PDVLayout({
     
     loadSucursalInfo();
   }, []);
-  
-  // Detectar tamaño de pantalla
-  useEffect(() => {
-    const handleResize = () => {
-      const mobile = window.innerWidth < 768;
-      const tablet = window.innerWidth >= 768 && window.innerWidth < 1024;
-      setIsMobile(mobile);
-      setSidebarCollapsed(mobile || tablet);
-    };
-    
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  // Cerrar sidebar al hacer clic fuera en móvil
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (isMobile && 
-          showMobileMenu && 
-          sidebarRef.current && 
-          !sidebarRef.current.contains(e.target as Node)) {
-        setShowMobileMenu(false);
-      }
-    };
-    
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [isMobile, showMobileMenu]);
 
   // Verificar autenticación
   useEffect(() => {
@@ -165,6 +189,19 @@ export default function PDVLayout({
       await syncNow();
     } catch (error) {
       console.error('Error al sincronizar:', error);
+    }
+  };
+
+  // 🆕 FUNCIÓN PARA MANEJAR LOGOUT
+  const handleLogout = async () => {
+    setShowUserMenu(false);
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+    } catch (error) {
+      console.error('Error al cerrar sesión:', error);
+    } finally {
+      useAuthStore.getState().clearAuth();
+      router.push('/login');
     }
   };
 
@@ -261,7 +298,7 @@ export default function PDVLayout({
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-50 to-gray-100">
-      {/* Header moderno con información de sucursal */}
+      {/* Header moderno con información de sucursal - MEJORADO PARA TABLETS */}
       <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-30">
         <div className="mx-auto px-4">
           <div className="flex justify-between h-16 items-center">
@@ -286,16 +323,13 @@ export default function PDVLayout({
                     {sucursalInfo.nombre || 'Punto de Venta'}
                   </h1>
                   <div className="flex items-center space-x-2 text-xs text-gray-500">
-                    {/* Información de ubicación */}
                     <div className="flex items-center space-x-1">
                       <MapPin className="w-3 h-3" />
                       <span className="truncate max-w-[200px] md:max-w-[300px]">
                         {sucursalInfo.direccion || 'Ubicación no especificada'}
                       </span>
                     </div>
-                    {/* Separador */}
                     <span className="hidden md:inline">•</span>
-                    {/* Tipo de sucursal */}
                     <div className="hidden md:flex items-center space-x-1">
                       {getTipoIcon(sucursalInfo.tipo)}
                       <span>{getTipoSucursal(sucursalInfo.tipo)}</span>
@@ -357,9 +391,16 @@ export default function PDVLayout({
                 )}
               </div>
               
-              {/* Menú de usuario */}
-              <div className="relative group">
-                <button className="flex items-center space-x-2 p-2 rounded-xl hover:bg-gray-100 transition-colors">
+              {/* 🆕 MENÚ DE USUARIO MEJORADO PARA TABLETS */}
+              <div className="relative" ref={userMenuRef}>
+                <button 
+                  onClick={() => setShowUserMenu(!showUserMenu)}
+                  className={`flex items-center space-x-2 p-2 rounded-xl transition-colors ${
+                    showUserMenu ? 'bg-gray-100' : 'hover:bg-gray-100'
+                  }`}
+                  aria-expanded={showUserMenu}
+                  aria-haspopup="true"
+                >
                   <div className="w-8 h-8 bg-gradient-to-br from-[#9c7561] to-[#eeb077] rounded-lg flex items-center justify-center">
                     <User className="w-4 h-4 text-white" />
                   </div>
@@ -367,37 +408,51 @@ export default function PDVLayout({
                     <p className="text-sm font-medium text-gray-900 truncate max-w-[100px]">{user?.name}</p>
                     <p className="text-xs text-gray-500">Vendedor</p>
                   </div>
+                  <ChevronDown className={`w-4 h-4 text-gray-500 transition-transform ${
+                    showUserMenu ? 'rotate-180' : ''
+                  }`} />
                 </button>
                 
-                <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-40 hidden group-hover:block">
-                  <div className="px-4 py-3 border-b border-gray-100">
-                    <p className="text-sm font-medium text-gray-900">{user?.name}</p>
-                    <p className="text-xs text-gray-500">{user?.email}</p>
-                    {/* Información de sucursal en el menú de usuario */}
-                    <div className="mt-2 pt-2 border-t border-gray-100">
-                      <div className="flex items-center space-x-2 text-xs text-gray-600">
-                        <Building2 className="w-3 h-3" />
-                        <span className="font-medium">{sucursalInfo.nombre}</span>
+                {/* 🆕 DROPDOWN MEJORADO CON MEJOR SOPORTE PARA TABLETS */}
+                {showUserMenu && (
+                  <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-lg border border-gray-200 py-2 z-50 animate-in slide-in-from-top-5">
+                    {/* Información del usuario */}
+                    <div className="px-4 py-3 border-b border-gray-100">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-10 h-10 bg-gradient-to-br from-[#9c7561] to-[#eeb077] rounded-lg flex items-center justify-center">
+                          <User className="w-5 h-5 text-white" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-900 truncate">{user?.name}</p>
+                          <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                        </div>
                       </div>
-                      <div className="flex items-center space-x-2 text-xs text-gray-500 mt-1">
-                        <MapPin className="w-3 h-3" />
+                    </div>
+                    
+                    {/* Información de sucursal */}
+                    <div className="px-4 py-3 border-b border-gray-100">
+                      <div className="flex items-center space-x-2 text-xs text-gray-600 mb-1">
+                        <Building2 className="w-3 h-3" />
+                        <span className="font-medium truncate">{sucursalInfo.nombre}</span>
+                      </div>
+                      <div className="flex items-center space-x-2 text-xs text-gray-500">
+                        <MapPin className="w-3 h-3 flex-shrink-0" />
                         <span className="truncate">{sucursalInfo.direccion}</span>
                       </div>
                     </div>
+                    
+                    {/* Acciones */}
+                    <div className="py-1">
+                      <button 
+                        onClick={handleLogout}
+                        className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-3 transition-colors"
+                      >
+                        <LogOut className="w-4 h-4 text-gray-400" />
+                        <span>Cerrar sesión</span>
+                      </button>
+                    </div>
                   </div>
-                  <button 
-                    onClick={() => {
-                      fetch('/api/auth/logout', { method: 'POST' }).then(() => {
-                        useAuthStore.getState().clearAuth();
-                        router.push('/login');
-                      });
-                    }}
-                    className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-2"
-                  >
-                    <LogOut className="w-4 h-4 text-gray-400" />
-                    <span>Cerrar sesión</span>
-                  </button>
-                </div>
+                )}
               </div>
             </div>
           </div>
@@ -548,7 +603,6 @@ export default function PDVLayout({
             <p className="text-gray-500 text-xs">
               Sistema Tulum PDV &copy; {new Date().getFullYear()}
             </p>
-            {/* Información de sucursal en footer */}
             <div className="hidden lg:flex items-center space-x-2 text-xs text-gray-500">
               <span>•</span>
               <Building2 className="w-3 h-3" />

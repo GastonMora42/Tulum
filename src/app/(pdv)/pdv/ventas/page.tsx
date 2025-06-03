@@ -1,4 +1,4 @@
-// src/app/(pdv)/pdv/ventas/page.tsx
+// src/app/(pdv)/pdv/ventas/page.tsx - VERSIÓN CORREGIDA
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -9,7 +9,7 @@ import {
   ChevronLeft, ChevronRight, RefreshCw, Filter, CreditCard,
   DollarSign, QrCode, Smartphone, Check, AlertTriangle,
   TrendingUp, BarChart3, Clock, ArrowUpRight, Grid, List,
-  ChevronDown
+  ChevronDown, User, MapPin, Building, Receipt
 } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
 
@@ -21,6 +21,8 @@ interface Venta {
   facturada: boolean;
   numeroFactura: string | null;
   clienteNombre: string | null;
+  clienteCuit: string | null;
+  tipoFactura: string | null;
   items: {
     id: string;
     cantidad: number;
@@ -35,6 +37,7 @@ interface Venta {
     id: string;
     medioPago: string;
     monto: number;
+    referencia?: string;
   }[];
 }
 
@@ -116,32 +119,63 @@ export default function HistorialVentasPage() {
     return Array.from(medios);
   };
   
-  // Cargar ventas
+  // 🔧 CARGAR VENTAS - CORREGIDO PARA MANEJAR LA RESPUESTA
   useEffect(() => {
     const loadVentas = async () => {
       try {
         setIsLoading(true);
         setError(null);
         
-        let url = '/api/pdv/ventas?';
-        
         const sucursalId = localStorage.getItem('sucursalId');
+        let url = '/api/pdv/ventas';
+        
         if (sucursalId) {
-          url += `sucursalId=${sucursalId}&`;
+          url += `?sucursalId=${encodeURIComponent(sucursalId)}`;
         }
+        
+        console.log('🔄 Cargando ventas desde:', url);
         
         const response = await authenticatedFetch(url);
         
         if (!response.ok) {
-          throw new Error('Error al cargar ventas');
+          const errorText = await response.text();
+          console.error('❌ Error en respuesta:', response.status, errorText);
+          throw new Error(`Error ${response.status}: ${errorText}`);
         }
         
         const data = await response.json();
-        setVentas(data);
+        console.log('📦 Datos recibidos:', typeof data, data);
         
+        // 🆕 VERIFICAR Y CORREGIR EL FORMATO DE RESPUESTA
+        let ventasArray: Venta[] = [];
+        
+        if (Array.isArray(data)) {
+          // Si es un array directo
+          ventasArray = data;
+        } else if (data && typeof data === 'object') {
+          // Si es un objeto que contiene las ventas
+          if (Array.isArray(data.ventas)) {
+            ventasArray = data.ventas;
+          } else if (Array.isArray(data.data)) {
+            ventasArray = data.data;
+          } else {
+            console.warn('⚠️ Estructura de datos inesperada:', Object.keys(data));
+            ventasArray = [];
+          }
+        } else {
+          console.warn('⚠️ Datos no válidos recibidos:', data);
+          ventasArray = [];
+        }
+        
+        console.log(`✅ Ventas procesadas: ${ventasArray.length} elementos`);
+        
+        setVentas(ventasArray);
+        
+        // Calcular totales
         let total = 0;
         let totalFacturas = 0;
-        data.forEach((venta: Venta) => {
+        
+        ventasArray.forEach((venta: Venta) => {
           total += venta.total;
           if (venta.facturada) {
             totalFacturas += venta.total;
@@ -151,10 +185,14 @@ export default function HistorialVentasPage() {
         setTotalVentas(total);
         setTotalFacturado(totalFacturas);
         
-        applyFilters(data);
+        // Aplicar filtros iniciales
+        applyFilters(ventasArray);
+        
       } catch (err) {
-        console.error('Error al cargar ventas:', err);
-        setError('Error al cargar el historial de ventas');
+        console.error('❌ Error al cargar ventas:', err);
+        setError(err instanceof Error ? err.message : 'Error desconocido al cargar ventas');
+        setVentas([]);
+        setFilteredVentas([]);
       } finally {
         setIsLoading(false);
       }
@@ -214,29 +252,30 @@ export default function HistorialVentasPage() {
     setIsDetalleOpen(true);
   };
   
-  // Exportar a PDF
-  const handleExportPdf = async (venta: Venta) => {
+  // 🆕 FUNCIÓN PARA REIMPRIMIR FACTURA/TICKET
+  const handleReimprimirFactura = async (venta: Venta) => {
     setExportingPdf(true);
     
     try {
-      let facturaId = null;
-      if (venta.facturada) {
+      if (venta.facturada && venta.numeroFactura) {
+        // Buscar la factura electrónica
         const facturaResp = await authenticatedFetch(`/api/pdv/facturas?ventaId=${venta.id}`);
         if (facturaResp.ok) {
           const facturas = await facturaResp.json();
           if (facturas && facturas.length > 0) {
-            facturaId = facturas[0].id;
+            // Abrir PDF de factura
+            window.open(`/api/pdv/facturas/${facturas[0].id}/pdf`, '_blank');
+            return;
           }
         }
       }
       
-      if (facturaId) {
-        window.open(`/api/pdv/facturas/${facturaId}/pdf`, '_blank');
-      } else {
-        alert('Función de exportación sin factura disponible próximamente');
-      }
+      // Si no hay factura, generar ticket de venta
+      alert('Función de ticket de venta disponible próximamente');
+      
     } catch (error) {
-      console.error('Error al exportar a PDF:', error);
+      console.error('Error al reimprimir:', error);
+      alert('Error al generar el comprobante');
     } finally {
       setExportingPdf(false);
     }
@@ -280,7 +319,10 @@ export default function HistorialVentasPage() {
       <div className="bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-xl">
         <div className="flex items-center">
           <AlertTriangle className="h-5 w-5 mr-2 text-red-500" />
-          <p>{error}</p>
+          <div>
+            <p className="font-medium">Error al cargar ventas</p>
+            <p className="text-sm mt-1">{error}</p>
+          </div>
         </div>
         <button
           onClick={() => window.location.reload()}
@@ -294,34 +336,20 @@ export default function HistorialVentasPage() {
   }
 
   return (
-    <div className="h-full flex flex-col space-y-6">
+    <div className="h-full flex flex-col space-y-4 md:space-y-6">
       {/* Header con estadísticas */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-6">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 md:gap-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Historial de Ventas</h1>
-            <p className="text-gray-600">Gestiona y consulta todas las ventas realizadas</p>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Historial de Ventas</h1>
+            <p className="text-gray-600">Gestiona y consulta todas las ventas del turno actual</p>
           </div>
           
           {/* Estadísticas rápidas */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl text-center">
-              <p className="text-2xl font-bold text-blue-700">{filteredVentas.length}</p>
-              <p className="text-sm text-blue-600">Ventas</p>
-            </div>
-            <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-xl text-center">
-              <p className="text-2xl font-bold text-green-700">${totalVentas.toFixed(0)}</p>
-              <p className="text-sm text-green-600">Total</p>
-            </div>
-            <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-xl text-center">
-              <p className="text-2xl font-bold text-purple-700">${totalFacturado.toFixed(0)}</p>
-              <p className="text-sm text-purple-600">Facturado</p>
-            </div>
-            <div className="bg-gradient-to-br from-amber-50 to-amber-100 p-4 rounded-xl text-center">
-              <p className="text-2xl font-bold text-amber-700">
-                {totalVentas > 0 ? ((totalFacturado / totalVentas) * 100).toFixed(0) : 0}%
-              </p>
-              <p className="text-sm text-amber-600">Facturación</p>
+          <div className="grid grid-cols-2 lg:grid-cols-4">
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-3 md:p-4 rounded-xl text-center">
+              <p className="text-xl md:text-2xl font-bold text-blue-700">{filteredVentas.length}</p>
+              <p className="text-xs md:text-sm text-blue-600">Ventas</p>
             </div>
           </div>
         </div>
@@ -439,21 +467,26 @@ export default function HistorialVentasPage() {
       </div>
 
       {/* Lista de ventas */}
-      <div className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-200 p-6 overflow-hidden">
+      <div className="flex-1 bg-white rounded-2xl shadow-sm border border-gray-200 p-4 md:p-6 overflow-hidden">
         {filteredVentas.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center">
             <div className="w-24 h-24 bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl flex items-center justify-center mb-4">
               <FileText className="h-12 w-12 text-gray-400" />
             </div>
             <h3 className="text-lg font-medium text-gray-900 mb-2">No se encontraron ventas</h3>
-            <p className="text-gray-500">Prueba con otros filtros o realiza una nueva venta</p>
+            <p className="text-gray-500">
+              {ventas.length === 0 
+                ? 'No hay ventas registradas en este turno' 
+                : 'Prueba con otros filtros o realiza una nueva venta'
+              }
+            </p>
           </div>
         ) : (
           <>
             {viewMode === 'grid' ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 h-full overflow-y-auto">
                 {currentItems.map(venta => (
-                  <div key={venta.id} className="group bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md hover:border-[#eeb077] transition-all cursor-pointer">
+                  <div key={venta.id} className="group bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md hover:border-[#eeb077] transition-all">
                     <div className="flex justify-between items-start mb-3">
                       <div>
                         <span className="inline-flex items-center text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
@@ -474,12 +507,18 @@ export default function HistorialVentasPage() {
                     <div className="mb-3">
                       <p className="text-2xl font-bold text-gray-900">${venta.total.toFixed(2)}</p>
                       <p className="text-sm text-gray-600">{venta.items.length} productos</p>
+                      {venta.clienteNombre && (
+                        <div className="flex items-center text-xs text-gray-500 mt-1">
+                          <User className="w-3 h-3 mr-1" />
+                          <span className="truncate">{venta.clienteNombre}</span>
+                        </div>
+                      )}
                     </div>
                     
                     <div className="flex items-center justify-between">
                       <div className="flex space-x-1">
                         {venta.pagos.slice(0, 2).map((pago, idx) => (
-                          <div key={idx} className="flex items-center space-x-1">
+                          <div key={idx} className="flex items-center space-x-1" title={formatMedioPago(pago.medioPago)}>
                             {getMedioPagoIcon(pago.medioPago)}
                           </div>
                         ))}
@@ -494,11 +533,18 @@ export default function HistorialVentasPage() {
                           <Eye size={16} />
                         </button>
                         <button
-                          onClick={() => handleExportPdf(venta)}
-                          className="p-1 text-gray-600 hover:text-[#311716] transition-colors"
-                          title="Descargar"
+                          onClick={() => handleReimprimirFactura(venta)}
+                          disabled={exportingPdf}
+                          className="p-1 text-gray-600 hover:text-[#311716] transition-colors disabled:opacity-50"
+                          title={venta.facturada ? "Reimprimir factura" : "Imprimir ticket"}
                         >
-                          <Download size={16} />
+                          {exportingPdf ? (
+                            <RefreshCw size={16} className="animate-spin" />
+                          ) : venta.facturada ? (
+                            <Receipt size={16} />
+                          ) : (
+                            <Printer size={16} />
+                          )}
                         </button>
                       </div>
                     </div>
@@ -519,6 +565,12 @@ export default function HistorialVentasPage() {
                         <div>
                           <p className="font-semibold text-gray-900">${venta.total.toFixed(2)}</p>
                           <p className="text-sm text-gray-600">{venta.items.length} productos</p>
+                          {venta.clienteNombre && (
+                            <div className="flex items-center text-xs text-gray-500">
+                              <User className="w-3 h-3 mr-1" />
+                              <span>{venta.clienteNombre}</span>
+                            </div>
+                          )}
                         </div>
                         
                         <div className="flex items-center space-x-2">
@@ -547,11 +599,18 @@ export default function HistorialVentasPage() {
                           <Eye size={18} />
                         </button>
                         <button
-                          onClick={() => handleExportPdf(venta)}
-                          className="p-2 text-gray-600 hover:text-[#311716] hover:bg-white rounded-lg transition-all"
-                          title="Descargar"
+                          onClick={() => handleReimprimirFactura(venta)}
+                          disabled={exportingPdf}
+                          className="p-2 text-gray-600 hover:text-[#311716] hover:bg-white rounded-lg transition-all disabled:opacity-50"
+                          title={venta.facturada ? "Reimprimir factura" : "Imprimir ticket"}
                         >
-                          <Download size={18} />
+                          {exportingPdf ? (
+                            <RefreshCw size={18} className="animate-spin" />
+                          ) : venta.facturada ? (
+                            <Receipt size={18} />
+                          ) : (
+                            <Printer size={18} />
+                          )}
                         </button>
                       </div>
                     </div>
@@ -624,7 +683,7 @@ export default function HistorialVentasPage() {
         )}
       </div>
       
-      {/* Modal de detalle de venta */}
+      {/* Modal de detalle de venta - MEJORADO */}
       {isDetalleOpen && selectedVenta && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
           <div 
@@ -690,17 +749,34 @@ export default function HistorialVentasPage() {
                 </div>
                 
                 <div className="bg-gray-50 p-6 rounded-xl">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Cliente y Facturación</h3>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                    <User className="h-5 w-5 mr-2 text-[#9c7561]" />
+                    Cliente y Facturación
+                  </h3>
                   <div className="space-y-3">
                     <div className="flex justify-between py-2 border-b border-gray-200">
                       <span className="text-gray-600">Cliente:</span>
                       <span className="font-semibold">{selectedVenta.clienteNombre || 'Consumidor Final'}</span>
                     </div>
                     
+                    {selectedVenta.clienteCuit && (
+                      <div className="flex justify-between py-2 border-b border-gray-200">
+                        <span className="text-gray-600">CUIT:</span>
+                        <span className="font-semibold">{selectedVenta.clienteCuit}</span>
+                      </div>
+                    )}
+                    
                     {selectedVenta.facturada && selectedVenta.numeroFactura && (
                       <div className="flex justify-between py-2 border-b border-gray-200">
                         <span className="text-gray-600">N° Factura:</span>
                         <span className="font-semibold">{selectedVenta.numeroFactura}</span>
+                      </div>
+                    )}
+                    
+                    {selectedVenta.tipoFactura && (
+                      <div className="flex justify-between py-2 border-b border-gray-200">
+                        <span className="text-gray-600">Tipo:</span>
+                        <span className="font-semibold">Factura {selectedVenta.tipoFactura}</span>
                       </div>
                     )}
                     
@@ -777,7 +853,7 @@ export default function HistorialVentasPage() {
               </button>
               
               <button
-                onClick={() => handleExportPdf(selectedVenta)}
+                onClick={() => handleReimprimirFactura(selectedVenta)}
                 className="px-6 py-2 bg-[#311716] text-white rounded-xl hover:bg-[#462625] flex items-center space-x-2 transition-all"
                 disabled={exportingPdf}
               >
@@ -786,10 +862,15 @@ export default function HistorialVentasPage() {
                     <RefreshCw size={18} className="animate-spin" />
                     <span>Generando...</span>
                   </>
+                ) : selectedVenta.facturada ? (
+                  <>
+                    <Receipt size={18} />
+                    <span>Reimprimir Factura</span>
+                  </>
                 ) : (
                   <>
-                    <Download size={18} />
-                    <span>{selectedVenta.facturada ? 'Descargar Factura' : 'Exportar Comprobante'}</span>
+                    <Printer size={18} />
+                    <span>Imprimir Ticket</span>
                   </>
                 )}
               </button>
