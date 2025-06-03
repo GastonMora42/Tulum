@@ -1,4 +1,4 @@
-// src/app/api/pdv/cierre/route.ts - VERSIÓN PROFESIONAL MEJORADA
+// src/app/api/pdv/cierre/route.ts - VERSIÓN ACTUALIZADA CON NUEVA LÓGICA
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/server/db/client';
 import { authMiddleware } from '@/server/api/middlewares/auth';
@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
       );
     }
     
-    // 🔍 BUSCAR CAJA ABIERTA ACTUAL
+    // BUSCAR CAJA ABIERTA ACTUAL
     const cierreCaja = await prisma.cierreCaja.findFirst({
       where: { 
         sucursalId, 
@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
       );
     }
     
-    // 📊 OBTENER VENTAS Y CALCULAR TOTALES POR MEDIO DE PAGO
+    // OBTENER VENTAS Y CALCULAR TOTALES POR MEDIO DE PAGO
     const ventas = await prisma.venta.findMany({
       where: {
         sucursalId,
@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
       }
     });
     
-    // 💰 CALCULAR TOTALES POR MEDIO DE PAGO
+    // CALCULAR TOTALES POR MEDIO DE PAGO
     const totalesPorMedioPago: Record<string, { monto: number; cantidad: number }> = {};
     let totalVentas = 0;
     
@@ -76,14 +76,14 @@ export async function GET(req: NextRequest) {
       }
     }
     
-    // 🧮 CALCULAR EGRESOS TOTALES
+    // CALCULAR EGRESOS TOTALES
     const totalEgresos = cierreCaja.egresos.reduce((sum, egreso) => sum + egreso.monto, 0);
     
-    // 💵 CALCULAR EFECTIVO ESPERADO
+    // CALCULAR EFECTIVO ESPERADO
     const ventasEfectivo = totalesPorMedioPago['efectivo']?.monto || 0;
     const efectivoEsperado = cierreCaja.montoInicial + ventasEfectivo - totalEgresos;
     
-    // 🔄 VERIFICAR SI HAY SALDO PENDIENTE DE TURNO ANTERIOR
+    // VERIFICAR SI HAY SALDO PENDIENTE DE TURNO ANTERIOR
     const ultimoCierre = await prisma.cierreCaja.findFirst({
       where: {
         sucursalId,
@@ -129,15 +129,16 @@ export async function PATCH(req: NextRequest) {
     const { 
       id, 
       observaciones,
-      // 🆕 CONTEOS MANUALES POR MEDIO DE PAGO
+      // CONTEOS MANUALES POR MEDIO DE PAGO
       conteoEfectivo,
       conteoTarjetaCredito,
       conteoTarjetaDebito,
-      conteoTransferencia,
       conteoQR,
       conteoOtros,
-      // 🆕 RECUPERO DE FONDO
-      recuperoFondo = 0
+      // RECUPERO DE FONDO
+      recuperoFondo = 0,
+      // NUEVO: Indicador de si se está forzando algún método
+      forzarContingencia = false
     } = body;
     
     if (!id) {
@@ -162,7 +163,7 @@ export async function PATCH(req: NextRequest) {
       );
     }
     
-    // 🔍 OBTENER CAJA Y VALIDAR
+    // OBTENER CAJA Y VALIDAR
     const cierreCaja = await prisma.cierreCaja.findUnique({
       where: { id },
       include: {
@@ -184,7 +185,7 @@ export async function PATCH(req: NextRequest) {
       );
     }
     
-    // 📊 RECALCULAR TODOS LOS TOTALES
+    // RECALCULAR TODOS LOS TOTALES
     const ventas = await prisma.venta.findMany({
       where: {
         sucursalId: cierreCaja.sucursalId,
@@ -197,11 +198,10 @@ export async function PATCH(req: NextRequest) {
       }
     });
     
-    // 💰 CALCULAR VENTAS POR MEDIO DE PAGO
+    // CALCULAR VENTAS POR MEDIO DE PAGO
     let ventasEfectivo = 0;
     let ventasTarjetaCredito = 0;
     let ventasTarjetaDebito = 0;
-    let ventasTransferencia = 0;
     let ventasQR = 0;
     let ventasOtros = 0;
     
@@ -227,9 +227,6 @@ export async function PATCH(req: NextRequest) {
           case 'tarjeta_debito':
             ventasTarjetaDebito += pago.monto;
             break;
-          case 'transferencia':
-            ventasTransferencia += pago.monto;
-            break;
           case 'qr':
             ventasQR += pago.monto;
             break;
@@ -239,63 +236,89 @@ export async function PATCH(req: NextRequest) {
       }
     }
     
-    // 🧮 CALCULAR EGRESOS Y EFECTIVO ESPERADO
+    // CALCULAR EGRESOS Y EFECTIVO ESPERADO
     const totalEgresos = cierreCaja.egresos.reduce((sum, egreso) => sum + egreso.monto, 0);
     const efectivoEsperado = cierreCaja.montoInicial + ventasEfectivo - totalEgresos - recuperoFondo;
     const diferenciaEfectivo = conteoEfectivoNum - efectivoEsperado;
     
-    // 🔍 VERIFICAR DIFERENCIAS EN OTROS MEDIOS DE PAGO
+    // 🆕 NUEVA LÓGICA: VERIFICAR DIFERENCIAS EN TODOS LOS MEDIOS DE PAGO
     const diferencias: Array<{
       medioPago: string;
       esperado: number;
       contado: number;
       diferencia: number;
+      significativa: boolean; // Nueva propiedad para identificar diferencias > $200
     }> = [];
     
+    // Verificar efectivo
+    if (Math.abs(diferenciaEfectivo) > 0.01) {
+      diferencias.push({
+        medioPago: 'Efectivo',
+        esperado: efectivoEsperado,
+        contado: conteoEfectivoNum,
+        diferencia: diferenciaEfectivo,
+        significativa: Math.abs(diferenciaEfectivo) >= 200
+      });
+    }
+    
+    // Verificar tarjetas de crédito
     if (conteoTarjetaCredito !== undefined && Math.abs(conteoTarjetaCredito - ventasTarjetaCredito) > 0.01) {
+      const diff = conteoTarjetaCredito - ventasTarjetaCredito;
       diferencias.push({
         medioPago: 'Tarjeta de Crédito',
         esperado: ventasTarjetaCredito,
         contado: conteoTarjetaCredito,
-        diferencia: conteoTarjetaCredito - ventasTarjetaCredito
+        diferencia: diff,
+        significativa: Math.abs(diff) >= 200
       });
     }
     
+    // Verificar tarjetas de débito
     if (conteoTarjetaDebito !== undefined && Math.abs(conteoTarjetaDebito - ventasTarjetaDebito) > 0.01) {
+      const diff = conteoTarjetaDebito - ventasTarjetaDebito;
       diferencias.push({
         medioPago: 'Tarjeta de Débito',
         esperado: ventasTarjetaDebito,
         contado: conteoTarjetaDebito,
-        diferencia: conteoTarjetaDebito - ventasTarjetaDebito
+        diferencia: diff,
+        significativa: Math.abs(diff) >= 200
       });
     }
     
-    // 🚨 DETERMINAR SI SE REQUIERE CONTINGENCIA
-    const diferenciaAbsEfectivo = Math.abs(diferenciaEfectivo);
-    const hayDiferenciasOtrosMedios = diferencias.length > 0;
-    const shouldGenerateContingency = diferenciaAbsEfectivo > 200 || diferencias.some(d => Math.abs(d.diferencia) > 200);
+    // Verificar QR
+    if (conteoQR !== undefined && Math.abs(conteoQR - ventasQR) > 0.01) {
+      const diff = conteoQR - ventasQR;
+      diferencias.push({
+        medioPago: 'QR / Digital',
+        esperado: ventasQR,
+        contado: conteoQR,
+        diferencia: diff,
+        significativa: Math.abs(diff) >= 200
+      });
+    }
     
-    // 💸 CALCULAR SALDO PARA PRÓXIMO TURNO
+    // 🆕 NUEVA LÓGICA: Solo generar contingencia si hay diferencias >= $200 O si se fuerza
+    const diferenciasMayores = diferencias.filter(d => d.significativa);
+    const shouldGenerateContingency = diferenciasMayores.length > 0 || forzarContingencia;
+    
+    // CALCULAR SALDO PARA PRÓXIMO TURNO
     let saldoPendienteActual = 0;
-    let sugerenciaProximaApertura = 5000; // Valor base sugerido
+    let sugerenciaProximaApertura = 5000; 
     let requiereRecupero = false;
     
     if (efectivoEsperado < 0) {
-      // Caja negativa - se necesitará recupero
       saldoPendienteActual = Math.abs(efectivoEsperado);
       requiereRecupero = true;
       sugerenciaProximaApertura = 5000 + saldoPendienteActual;
     } else if (efectivoEsperado < 2000) {
-      // Poco efectivo - sugerir más para el próximo turno
       sugerenciaProximaApertura = 5000;
     } else {
-      // Efectivo suficiente
       sugerenciaProximaApertura = Math.max(3000, efectivoEsperado * 0.6);
     }
     
     const user = (req as any).user;
     
-    // 🗃️ ACTUALIZAR CAJA EN LA BASE DE DATOS
+    // ACTUALIZAR CAJA EN LA BASE DE DATOS
     const result = await prisma.$transaction(async (tx) => {
       // Actualizar el cierre de caja
       const cierreCajaUpdated = await tx.cierreCaja.update({
@@ -305,7 +328,6 @@ export async function PATCH(req: NextRequest) {
           conteoEfectivo: conteoEfectivoNum,
           conteoTarjetaCredito: conteoTarjetaCredito || 0,
           conteoTarjetaDebito: conteoTarjetaDebito || 0,
-          conteoTransferencia: conteoTransferencia || 0,
           conteoQR: conteoQR || 0,
           conteoOtros: conteoOtros || 0,
           
@@ -331,19 +353,14 @@ export async function PATCH(req: NextRequest) {
         }
       });
       
-      // 🚨 GENERAR CONTINGENCIA SI ES NECESARIO
+      // 🆕 GENERAR CONTINGENCIA SOLO SI HAY DIFERENCIAS SIGNIFICATIVAS O SE FUERZA
       if (shouldGenerateContingency) {
-        const detallesDiferencia = [];
-        
-        if (diferenciaAbsEfectivo > 1) {
-          detallesDiferencia.push(
-            `💵 EFECTIVO: Esperado $${efectivoEsperado.toFixed(2)}, Contado $${conteoEfectivoNum.toFixed(2)}, Diferencia ${diferenciaEfectivo > 0 ? '+' : ''}$${diferenciaEfectivo.toFixed(2)}`
-          );
-        }
+        const detallesDiferencia: string[] = [];
         
         diferencias.forEach(diff => {
+          const esSignificativa = diff.significativa ? '🚨 SIGNIFICATIVA' : '⚠️ MENOR';
           detallesDiferencia.push(
-            `💳 ${diff.medioPago.toUpperCase()}: Esperado $${diff.esperado.toFixed(2)}, Contado $${diff.contado.toFixed(2)}, Diferencia ${diff.diferencia > 0 ? '+' : ''}$${diff.diferencia.toFixed(2)}`
+            `${diff.medioPago}: Esperado $${diff.esperado.toFixed(2)}, Contado $${diff.contado.toFixed(2)}, Diferencia ${diff.diferencia > 0 ? '+' : ''}$${diff.diferencia.toFixed(2)} ${esSignificativa}`
           );
         });
         
@@ -355,11 +372,14 @@ export async function PATCH(req: NextRequest) {
           minute: '2-digit' 
         });
         
+        // Determinar urgencia basada en diferencias significativas
+        const esUrgente = diferenciasMayores.length > 0 || Math.abs(diferenciaEfectivo) > 500;
+        
         await tx.contingencia.create({
           data: {
-            titulo: `Diferencias en Cierre de Caja - ${fechaFormateada}`,
+            titulo: `${diferenciasMayores.length > 0 ? 'Diferencias Significativas' : 'Cierre Forzado'} - Cierre de Caja - ${fechaFormateada}`,
             descripcion: `
-🏪 CIERRE DE CAJA CON DIFERENCIAS
+🏪 CIERRE DE CAJA ${diferenciasMayores.length > 0 ? 'CON DIFERENCIAS SIGNIFICATIVAS' : 'FORZADO'}
 
 📅 Fecha: ${fechaFormateada}
 🏪 Sucursal: ${cierreCaja.sucursalId}
@@ -374,6 +394,8 @@ export async function PATCH(req: NextRequest) {
 
 🔍 DIFERENCIAS ENCONTRADAS:
 ${detallesDiferencia.join('\n')}
+
+${diferenciasMayores.length > 0 ? '🚨 REQUIERE ATENCIÓN URGENTE - Diferencias mayores a $200' : '⚠️ Cierre forzado por el usuario'}
 
 📊 DETALLE DE VENTAS POR MEDIO DE PAGO:
 ${Object.entries(detallesPorMedioPago).map(([medio, datos]) => 
@@ -401,14 +423,13 @@ ${requiereRecupero ? `\n⚠️ IMPORTANTE: Este turno generó un saldo negativo 
             estado: 'pendiente',
             tipo: 'caja',
             ubicacionId: cierreCaja.sucursalId,
-            urgente: diferenciaAbsEfectivo > 50 || diferencias.some(d => Math.abs(d.diferencia) > 100)
+            urgente: esUrgente
           }
         });
       }
       
-      // 💳 REGISTRAR RECUPERO DE FONDO SI APLICA
+      // REGISTRAR RECUPERO DE FONDO SI APLICA
       if (recuperoFondo > 0) {
-        // Buscar la caja que generó el saldo negativo
         const cierreCajaAnterior = await tx.cierreCaja.findFirst({
           where: {
             sucursalId: cierreCaja.sucursalId,
@@ -431,7 +452,6 @@ ${requiereRecupero ? `\n⚠️ IMPORTANTE: Este turno generó un saldo negativo 
             }
           });
           
-          // Actualizar el saldo pendiente de la caja anterior
           await tx.cierreCaja.update({
             where: { id: cierreCajaAnterior.id },
             data: {
@@ -444,12 +464,22 @@ ${requiereRecupero ? `\n⚠️ IMPORTANTE: Este turno generó un saldo negativo 
       return cierreCajaUpdated;
     });
     
-    // 📄 PREPARAR RESPUESTA COMPLETA
+    // PREPARAR RESPUESTA COMPLETA
+    const mensajeBase = shouldGenerateContingency 
+      ? diferenciasMayores.length > 0 
+        ? `Caja cerrada con diferencias significativas (≥$200). Se ha generado una contingencia para revisión.`
+        : `Caja cerrada con cierre forzado. Se ha generado una contingencia para revisión.`
+      : diferencias.length > 0
+        ? `Caja cerrada correctamente. Las diferencias menores a $200 son aceptables.`
+        : `Caja cerrada correctamente sin diferencias.`;
+    
+    const recuperoInfo = requiereRecupero 
+      ? ` IMPORTANTE: Se requiere recupero de $${saldoPendienteActual.toFixed(2)} en el próximo turno.` 
+      : '';
+    
     return NextResponse.json({
       success: true,
-      message: shouldGenerateContingency 
-        ? `Caja cerrada con diferencias. Se ha generado una contingencia para revisión.${requiereRecupero ? ` IMPORTANTE: Se requiere recupero de $${saldoPendienteActual.toFixed(2)} en el próximo turno.` : ''}`
-        : `Caja cerrada correctamente sin diferencias.${requiereRecupero ? ` Se requiere recupero de $${saldoPendienteActual.toFixed(2)} en el próximo turno.` : ''}`,
+      message: mensajeBase + recuperoInfo,
       cierreCaja: result,
       contingenciaGenerada: shouldGenerateContingency,
       diferencias: {
@@ -458,7 +488,7 @@ ${requiereRecupero ? `\n⚠️ IMPORTANTE: Este turno generó un saldo negativo 
           contado: conteoEfectivoNum,
           diferencia: diferenciaEfectivo
         },
-        otrosMedios: diferencias
+        otrosMedios: diferencias.filter(d => d.medioPago !== 'Efectivo')
       },
       recuperoInfo: {
         requiereRecupero,
@@ -474,7 +504,10 @@ ${requiereRecupero ? `\n⚠️ IMPORTANTE: Este turno generó un saldo negativo 
           medioPago: medio,
           monto: datos.monto,
           cantidad: datos.cantidad
-        }))
+        })),
+        // 🆕 NUEVA INFO: Clasificación de diferencias
+        diferenciasSignificativas: diferenciasMayores.length,
+        diferenciasMenores: diferencias.length - diferenciasMayores.length
       }
     });
   } catch (error: any) {
