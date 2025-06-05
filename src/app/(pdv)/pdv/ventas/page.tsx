@@ -1,4 +1,4 @@
-// src/app/(pdv)/pdv/ventas/page.tsx - VERSIÓN CORREGIDA
+// src/app/(pdv)/pdv/ventas/page.tsx - VERSIÓN CORREGIDA Y COMPLETA
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -9,9 +9,11 @@ import {
   ChevronLeft, ChevronRight, RefreshCw, Filter, CreditCard,
   DollarSign, QrCode, Smartphone, Check, AlertTriangle,
   TrendingUp, BarChart3, Clock, ArrowUpRight, Grid, List,
-  ChevronDown, User, MapPin, Building, Receipt
+  ChevronDown, User, MapPin, Building, Receipt, Settings
 } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
+import { usePrint } from '@/hooks/usePrint';
+import { PrinterConfigModal } from '@/components/PrinterConfigModal';
 
 interface Venta {
   id: string;
@@ -39,6 +41,12 @@ interface Venta {
     monto: number;
     referencia?: string;
   }[];
+  facturaElectronica?: {
+    id: string;
+    numeroFactura: string;
+    cae: string;
+    estado: string;
+  };
 }
 
 export default function HistorialVentasPage() {
@@ -52,6 +60,13 @@ export default function HistorialVentasPage() {
   const [totalFacturado, setTotalFacturado] = useState(0);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   
+  // Estados para el sistema de impresión
+  const [showPrinterConfig, setShowPrinterConfig] = useState(false);
+  const [printingFacturas, setPrintingFacturas] = useState<Set<string>>(new Set());
+  
+  // Hook de impresión
+  const { printFactura, reprintFactura, availablePrinters, isInitialized } = usePrint();
+  
   // Filtros
   const [fechaDesde, setFechaDesde] = useState<string>('');
   const [fechaHasta, setFechaHasta] = useState<string>('');
@@ -64,8 +79,6 @@ export default function HistorialVentasPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(12);
   const modalRef = useRef<HTMLDivElement>(null);
-  
-  const [exportingPdf, setExportingPdf] = useState(false);
   
   // Formatear métodos de pago
   const formatMedioPago = (medioPago: string): string => {
@@ -119,7 +132,7 @@ export default function HistorialVentasPage() {
     return Array.from(medios);
   };
   
-  // 🔧 CARGAR VENTAS - CORREGIDO PARA MANEJAR LA RESPUESTA
+  // Cargar ventas
   useEffect(() => {
     const loadVentas = async () => {
       try {
@@ -146,18 +159,16 @@ export default function HistorialVentasPage() {
         const data = await response.json();
         console.log('📦 Datos recibidos:', typeof data, data);
         
-        // 🆕 VERIFICAR Y CORREGIR EL FORMATO DE RESPUESTA
+        // Verificar y corregir el formato de respuesta
         let ventasArray: Venta[] = [];
         
         if (Array.isArray(data)) {
-          // Si es un array directo
           ventasArray = data;
         } else if (data && typeof data === 'object') {
-          // Si es un objeto que contiene las ventas
-          if (Array.isArray(data.ventas)) {
-            ventasArray = data.ventas;
-          } else if (Array.isArray(data.data)) {
+          if (Array.isArray(data.data)) {
             ventasArray = data.data;
+          } else if (Array.isArray(data.ventas)) {
+            ventasArray = data.ventas;
           } else {
             console.warn('⚠️ Estructura de datos inesperada:', Object.keys(data));
             ventasArray = [];
@@ -252,70 +263,138 @@ export default function HistorialVentasPage() {
     setIsDetalleOpen(true);
   };
   
-// 🆕 FUNCIÓN MEJORADA PARA REIMPRIMIR FACTURA/TICKET
-const handleReimprimirFactura = async (venta: Venta) => {
-  setExportingPdf(true);
-  
-  try {
-    if (venta.facturada && venta.numeroFactura) {
-      // Buscar la factura electrónica
-      const facturaResp = await authenticatedFetch(`/api/pdv/facturas?ventaId=${venta.id}`);
-      if (facturaResp.ok) {
-        const facturas = await facturaResp.json();
-        if (facturas && facturas.length > 0) {
-          const facturaId = facturas[0].id;
-          
-          // Intentar imprimir directamente si hay servicio de impresión disponible
-          if (reprintFactura && availablePrinters.length > 0) {
-            console.log('🖨️ Reimprimiendo factura:', facturaId);
-            
-            const printResult = await reprintFactura(facturaId);
-            
-            if (printResult.success) {
-              alert('✅ Factura reimpresa correctamente');
-              return;
-            } else {
-              console.warn('Impresión falló, abriendo PDF:', printResult.message);
-            }
-          }
-          
-          // Fallback: abrir PDF
-          window.open(`/api/pdv/facturas/${facturaId}/pdf`, '_blank');
-          return;
-        }
-      }
+  // 🆕 FUNCIÓN MEJORADA PARA REIMPRIMIR FACTURA/TICKET
+  const handleReimprimirFactura = async (venta: Venta) => {
+    const ventaId = venta.id;
+    
+    // Prevenir múltiples clics
+    if (printingFacturas.has(ventaId)) {
+      return;
     }
     
-    // Si no hay factura, generar ticket de venta usando el servicio de impresión
-    if (reprintFactura && availablePrinters.length > 0) {
-      try {
-        // Crear ticket temporal para la venta
-        const ticketResp = await authenticatedFetch('/api/pdv/tickets/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ventaId: venta.id })
-        });
+    setPrintingFacturas(prev => new Set(prev).add(ventaId));
+    
+    try {
+      console.log(`🖨️ Iniciando reimpresión para venta ${ventaId}...`);
+      
+      if (venta.facturada && venta.facturaElectronica) {
+        // Caso 1: Tiene factura electrónica - Reimprimir factura
+        console.log(`📄 Reimprimiendo factura electrónica: ${venta.facturaElectronica.id}`);
         
-        if (ticketResp.ok) {
-          const ticket = await ticketResp.json();
-          alert('✅ Ticket de venta impreso');
-          return;
+        if (isInitialized && reprintFactura && availablePrinters.length > 0) {
+          // Usar sistema de impresión avanzado
+          const printResult = await reprintFactura(venta.facturaElectronica.id);
+          
+          if (printResult.success) {
+            showNotification('✅ Factura reimpresa correctamente', 'success');
+            return;
+          } else {
+            console.warn('Impresión falló, abriendo PDF:', printResult.message);
+            showNotification('⚠️ Error en impresión, abriendo PDF...', 'warning');
+          }
         }
-      } catch (ticketError) {
-        console.warn('Error generando ticket:', ticketError);
+        
+        // Fallback: abrir PDF de factura
+        window.open(`/api/pdv/facturas/${venta.facturaElectronica.id}/pdf`, '_blank');
+        showNotification('📄 PDF de factura abierto', 'info');
+        
+      } else {
+        // Caso 2: Sin factura - Generar e imprimir ticket de venta
+        console.log(`🎫 Generando ticket para venta sin factura: ${ventaId}`);
+        
+        if (isInitialized && availablePrinters.length > 0) {
+          try {
+            // Crear ticket temporal usando el servicio avanzado
+            const ticketResp = await authenticatedFetch('/api/pdv/tickets/generate', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ 
+                ventaId: ventaId,
+                format: 'thermal',
+                paperWidth: 80 
+              })
+            });
+            
+            if (ticketResp.ok) {
+              showNotification('✅ Ticket de venta generado e impreso', 'success');
+              return;
+            }
+          } catch (ticketError) {
+            console.warn('Error generando ticket:', ticketError);
+          }
+        }
+        
+        // Fallback final: mostrar información de la venta
+        const ventaInfo = `
+TICKET VENTA #${venta.id.slice(-6)}
+===============================
+Total: $${venta.total.toFixed(2)}
+Fecha: ${format(new Date(venta.fecha), 'dd/MM/yyyy HH:mm')}
+Productos: ${venta.items.length}
+===============================
+        `.trim();
+        
+        // Crear y descargar archivo de texto
+        const blob = new Blob([ventaInfo], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `ticket_venta_${venta.id.slice(-6)}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        showNotification('📄 Ticket descargado como archivo de texto', 'info');
       }
+      
+    } catch (error) {
+      console.error('Error al reimprimir:', error);
+      showNotification('❌ Error al generar el comprobante', 'error');
+    } finally {
+      setPrintingFacturas(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(ventaId);
+        return newSet;
+      });
     }
+  };
+  
+  // Función para mostrar notificaciones
+  const showNotification = (message: string, type: 'success' | 'error' | 'info' | 'warning' = 'info') => {
+    const colors = {
+      success: { bg: '#10b981', border: '#059669' },
+      error: { bg: '#ef4444', border: '#dc2626' },
+      info: { bg: '#3b82f6', border: '#2563eb' },
+      warning: { bg: '#f59e0b', border: '#d97706' }
+    };
+
+    const notification = document.createElement('div');
+    notification.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: ${colors[type].bg};
+      color: white;
+      padding: 12px 20px;
+      border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      z-index: 10000;
+      max-width: 350px;
+      font-size: 14px;
+      font-weight: 500;
+      border-left: 4px solid ${colors[type].border};
+    `;
+    notification.textContent = message;
     
-    // Fallback final: mostrar información de la venta
-    alert(`Venta #${venta.id.slice(-6)}\nTotal: $${venta.total.toFixed(2)}\nFecha: ${new Date(venta.fecha).toLocaleString()}`);
+    document.body.appendChild(notification);
     
-  } catch (error) {
-    console.error('Error al reimprimir:', error);
-    alert('Error al generar el comprobante');
-  } finally {
-    setExportingPdf(false);
-  }
-};
+    setTimeout(() => {
+      if (notification.parentElement) {
+        notification.remove();
+      }
+    }, 5000);
+  };
   
   // Paginación
   const indexOfLastItem = currentPage * itemsPerPage;
@@ -382,10 +461,29 @@ const handleReimprimirFactura = async (venta: Venta) => {
           </div>
           
           {/* Estadísticas rápidas */}
-          <div className="grid grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-3 md:p-4 rounded-xl text-center">
               <p className="text-xl md:text-2xl font-bold text-blue-700">{filteredVentas.length}</p>
               <p className="text-xs md:text-sm text-blue-600">Ventas</p>
+            </div>
+            
+            <div className="bg-gradient-to-br from-green-50 to-green-100 p-3 md:p-4 rounded-xl text-center">
+              <p className="text-xl md:text-2xl font-bold text-green-700">${totalVentas.toFixed(0)}</p>
+              <p className="text-xs md:text-sm text-green-600">Total</p>
+            </div>
+            
+            <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-3 md:p-4 rounded-xl text-center">
+              <p className="text-xl md:text-2xl font-bold text-purple-700">
+                {filteredVentas.filter(v => v.facturada).length}
+              </p>
+              <p className="text-xs md:text-sm text-purple-600">Facturadas</p>
+            </div>
+            
+            <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-3 md:p-4 rounded-xl text-center">
+              <p className="text-xl md:text-2xl font-bold text-orange-700">
+                {isInitialized ? availablePrinters.length : 0}
+              </p>
+              <p className="text-xs md:text-sm text-orange-600">Impresoras</p>
             </div>
           </div>
         </div>
@@ -418,6 +516,16 @@ const handleReimprimirFactura = async (venta: Venta) => {
           </div>
           
           <div className="flex items-center space-x-2">
+            {/* Configuración de impresoras */}
+            <button
+              onClick={() => setShowPrinterConfig(true)}
+              className="flex items-center space-x-2 px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all"
+              title="Configurar impresoras"
+            >
+              <Settings className="w-4 h-4" />
+              <span className="hidden sm:inline">Impresoras</span>
+            </button>
+            
             <button
               onClick={() => setViewMode('grid')}
               className={`p-2 rounded-lg transition-all ${
@@ -570,11 +678,11 @@ const handleReimprimirFactura = async (venta: Venta) => {
                         </button>
                         <button
                           onClick={() => handleReimprimirFactura(venta)}
-                          disabled={exportingPdf}
+                          disabled={printingFacturas.has(venta.id)}
                           className="p-1 text-gray-600 hover:text-[#311716] transition-colors disabled:opacity-50"
                           title={venta.facturada ? "Reimprimir factura" : "Imprimir ticket"}
                         >
-                          {exportingPdf ? (
+                          {printingFacturas.has(venta.id) ? (
                             <RefreshCw size={16} className="animate-spin" />
                           ) : venta.facturada ? (
                             <Receipt size={16} />
@@ -636,11 +744,11 @@ const handleReimprimirFactura = async (venta: Venta) => {
                         </button>
                         <button
                           onClick={() => handleReimprimirFactura(venta)}
-                          disabled={exportingPdf}
+                          disabled={printingFacturas.has(venta.id)}
                           className="p-2 text-gray-600 hover:text-[#311716] hover:bg-white rounded-lg transition-all disabled:opacity-50"
                           title={venta.facturada ? "Reimprimir factura" : "Imprimir ticket"}
                         >
-                          {exportingPdf ? (
+                          {printingFacturas.has(venta.id) ? (
                             <RefreshCw size={18} className="animate-spin" />
                           ) : venta.facturada ? (
                             <Receipt size={18} />
@@ -719,7 +827,7 @@ const handleReimprimirFactura = async (venta: Venta) => {
         )}
       </div>
       
-      {/* Modal de detalle de venta - MEJORADO */}
+      {/* Modal de detalle de venta */}
       {isDetalleOpen && selectedVenta && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
           <div 
@@ -891,9 +999,9 @@ const handleReimprimirFactura = async (venta: Venta) => {
               <button
                 onClick={() => handleReimprimirFactura(selectedVenta)}
                 className="px-6 py-2 bg-[#311716] text-white rounded-xl hover:bg-[#462625] flex items-center space-x-2 transition-all"
-                disabled={exportingPdf}
+                disabled={printingFacturas.has(selectedVenta.id)}
               >
-                {exportingPdf ? (
+                {printingFacturas.has(selectedVenta.id) ? (
                   <>
                     <RefreshCw size={18} className="animate-spin" />
                     <span>Generando...</span>
@@ -914,6 +1022,12 @@ const handleReimprimirFactura = async (venta: Venta) => {
           </div>
         </div>
       )}
+      
+      {/* Modal de configuración de impresoras */}
+      <PrinterConfigModal 
+        isOpen={showPrinterConfig}
+        onClose={() => setShowPrinterConfig(false)}
+      />
     </div>
   );
 }

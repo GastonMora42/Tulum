@@ -1,3 +1,4 @@
+// src/app/(admin)/layout.tsx - VERSIÓN ACTUALIZADA CON IMPRESORAS
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -27,7 +28,8 @@ import {
   FileText,
   MapPin,
   TrendingUp,
-  CheckSquare
+  CheckSquare,
+  Printer
 } from 'lucide-react';
 
 export default function AdminLayout({
@@ -225,21 +227,23 @@ export default function AdminLayout({
         { href: '/admin/envios-insumos', label: 'Pedidos' }
       ]
     },
-{ 
-  label: 'Insumos PDV', 
-  icon: <Package className="w-5 h-5" />,
-  submenu: [
-    { href: '/admin/insumos-pdv', label: 'Lista de insumos' },
-    { href: '/admin/solicitudes-insumos-pdv', label: 'Solicitudes' },
-    { href: '/admin/stock-insumos-pdv', label: 'Stock por ubicacion' }
-  ]
-},
+    { 
+      label: 'Insumos PDV', 
+      icon: <Package className="w-5 h-5" />,
+      submenu: [
+        { href: '/admin/insumos-pdv', label: 'Lista de insumos' },
+        { href: '/admin/solicitudes-insumos-pdv', label: 'Solicitudes' },
+        { href: '/admin/stock-insumos-pdv', label: 'Stock por ubicacion' }
+      ]
+    },
     { href: '/admin/usuarios', label: 'Usuarios', icon: <Users className="w-5 h-5" /> },
     { href: '/admin/ubicaciones', label: 'Ubicaciones', icon: <MapPin className="w-5 h-5" /> },
     { href: '/admin/contingencias', label: 'Contingencias', icon: <AlertTriangle className="w-5 h-5" /> },
     { href: '/admin/conciliaciones', label: 'Conciliaciones', icon: <CheckSquare className="w-5 h-5" /> },
     { href: '/admin/punto-equilibrio', label: 'Punto de Equilibrio', icon: <TrendingUp className="w-5 h-5" /> },
     { href: '/admin/facturas', label: 'Facturas', icon: <FileText className="h-5 w-5" /> },
+    // 🆕 NUEVA ENTRADA PARA IMPRESORAS
+    { href: '/admin/printer', label: 'Impresoras', icon: <Printer className="w-5 h-5" /> },
     { href: '/admin/descuentos', label: 'Códigos de Descuento', icon: <Tag className="w-5 h-5" /> },
     { href: '/admin/reportes', label: 'Reportes', icon: <BarChart2 className="w-5 h-5" /> },
     { href: '/admin/configuracion/afip', label: 'ARCA', icon: <Settings className="w-5 h-5" /> },

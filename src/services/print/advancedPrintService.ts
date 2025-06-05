@@ -1,4 +1,4 @@
-// src/services/print/advancedPrintService.ts
+// src/services/print/advancedPrintService.ts - VERSIÓN CORREGIDA
 import { authenticatedFetch } from '@/hooks/useAuth';
 import { printService } from './printService';
 
@@ -26,6 +26,7 @@ export interface PrintJob {
   retryCount: number;
   maxRetries: number;
 }
+
 class AdvancedPrintService {
   private printQueue: PrintJob[] = [];
   private isProcessing = false;
@@ -37,6 +38,8 @@ class AdvancedPrintService {
     this.initializeTemplates();
     this.startBatchProcessor();
   }
+
+  
 
   /**
    * Inicializar plantillas de impresión
@@ -128,7 +131,7 @@ class AdvancedPrintService {
 
       const job: PrintJob = {
         id: `summary_${Date.now()}`,
-        type: 'batch',
+        type: 'resumen_diario',
         status: 'pending',
         priority: 'normal',
         data: { summaryData, options },
@@ -229,11 +232,66 @@ class AdvancedPrintService {
       throw error;
     }
   }
-  processFacturaJob(job: PrintJob) {
-    throw new Error('Method not implemented.');
+
+  /**
+   * Procesar trabajo de factura individual - IMPLEMENTADO
+   */
+  private async processFacturaJob(job: PrintJob): Promise<void> {
+    const { facturaId, options = {} } = job.data;
+    
+    console.log(`📄 Procesando factura individual: ${facturaId}`);
+
+    // Usar el servicio base para imprimir
+    const result = await printService.printFactura(facturaId, {
+      printerName: job.printerName,
+      copies: job.copies,
+      auto: false
+    });
+
+    if (!result.success) {
+      throw new Error(result.message || 'Error en impresión de factura');
+    }
+
+    console.log(`✅ Factura ${facturaId} impresa correctamente`);
   }
-  processTicketJob(job: PrintJob) {
-    throw new Error('Method not implemented.');
+
+  /**
+   * Procesar trabajo de ticket - IMPLEMENTADO
+   */
+  private async processTicketJob(job: PrintJob): Promise<void> {
+    const { ventaId, options = {} } = job.data;
+    
+    console.log(`🎫 Procesando ticket de venta: ${ventaId}`);
+
+    try {
+      // Generar ticket temporal para la venta
+      const response = await authenticatedFetch('/api/pdv/tickets/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          ventaId,
+          format: 'thermal',
+          paperWidth: 80
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('No se pudo generar el ticket');
+      }
+
+      const ticketData = await response.json();
+
+      // Si hay impresora configurada, enviar a imprimir
+      if (job.printerName) {
+        await this.printTicketContent(ticketData, job.printerName);
+      } else {
+        console.log('✅ Ticket generado (sin impresión automática)');
+      }
+
+    } catch (error) {
+      console.error('Error procesando ticket:', error);
+      throw error;
+    }
   }
 
   /**
@@ -274,6 +332,8 @@ class AdvancedPrintService {
     if (errors > 0) {
       throw new Error(`Lote completado con errores: ${processed} exitosas, ${errors} fallidas`);
     }
+
+    console.log(`✅ Lote completado: ${processed} facturas procesadas`);
   }
 
   /**
@@ -281,6 +341,8 @@ class AdvancedPrintService {
    */
   private async processSummaryJob(job: PrintJob): Promise<void> {
     const { summaryData, options } = job.data;
+    
+    console.log(`📊 Procesando resumen diario...`);
     
     // Generar contenido HTML del resumen
     const htmlContent = this.generateSummaryHTML(summaryData, options);
@@ -302,6 +364,91 @@ class AdvancedPrintService {
     }
 
     await this.printPdfToThermal(pdfBlob, printer);
+    console.log(`✅ Resumen diario impreso correctamente`);
+  }
+
+  /**
+   * Imprimir contenido de ticket - NUEVA FUNCIÓN
+   */
+  private async printTicketContent(ticketData: any, printerName: string): Promise<void> {
+    try {
+      // Crear blob con el contenido del ticket
+      const content = this.formatTicketForPrint(ticketData);
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      
+      // Crear URL temporal y abrir para impresión
+      const url = URL.createObjectURL(blob);
+      
+      const printWindow = window.open(url, '_blank');
+      if (!printWindow) {
+        throw new Error('No se pudo abrir ventana de impresión');
+      }
+
+      return new Promise((resolve, reject) => {
+        printWindow.onload = () => {
+          setTimeout(() => {
+            try {
+              printWindow.print();
+              printWindow.close();
+              resolve();
+            } catch (error) {
+              reject(error);
+            }
+          }, 500);
+        };
+      });
+    } catch (error) {
+      console.error('Error imprimiendo ticket:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Formatear ticket para impresión térmica
+   */
+  private formatTicketForPrint(ticketData: any): string {
+    const { venta } = ticketData;
+    const fecha = new Date(venta.fecha).toLocaleString('es-AR');
+    
+    let content = '';
+    content += '========================================\n';
+    content += '           TULUM AROMATERAPIA          \n';
+    content += '              TICKET VENTA             \n';
+    content += '========================================\n';
+    content += `Ticket: #${venta.id.slice(-6)}\n`;
+    content += `Fecha: ${fecha}\n`;
+    content += `Vendedor: ${venta.usuario?.name || 'N/A'}\n`;
+    content += '----------------------------------------\n';
+    
+    // Items
+    venta.items.forEach((item: any) => {
+      const producto = item.producto.nombre.substring(0, 25);
+      const cantidad = item.cantidad;
+      const precio = item.precioUnitario;
+      const subtotal = cantidad * precio;
+      
+      
+      content += `${producto}\n`;
+      content += `  ${cantidad} x $${precio.toFixed(2)} = $${subtotal.toFixed(2)}\n`;
+    });
+    
+    content += '----------------------------------------\n';
+    content += `TOTAL: $${venta.total.toFixed(2)}\n`;
+    content += '========================================\n';
+    
+    // Métodos de pago
+    if (venta.pagos?.length > 0) {
+      content += 'PAGOS:\n';
+      venta.pagos.forEach((pago: any) => {
+        content += `  ${this.formatMedioPago(pago.medioPago)}: $${pago.monto.toFixed(2)}\n`;
+      });
+      content += '----------------------------------------\n';
+    }
+    
+    content += '         ¡Gracias por su compra!       \n';
+    content += '========================================\n';
+    
+    return content;
   }
 
   /**
@@ -529,11 +676,11 @@ class AdvancedPrintService {
     failed: number;
     avgProcessingTime: number;
   } {
-    const total = this.printQueue.length;
-    const pending = this.printQueue.filter(j => j.status === 'pending').length;
-    const printing = this.printQueue.filter(j => j.status === 'printing').length;
-    const completed = this.printQueue.filter(j => j.status === 'completed').length;
-    const failed = this.printQueue.filter(j => j.status === 'failed').length;
+    const totalCount = this.printQueue.length;
+    const pendingCount = this.printQueue.filter(j => j.status === 'pending').length;
+    const printingCount = this.printQueue.filter(j => j.status === 'printing').length;
+    const completedCount = this.printQueue.filter(j => j.status === 'completed').length;
+    const failedCount = this.printQueue.filter(j => j.status === 'failed').length;
     
     // Calcular tiempo promedio de procesamiento
     const completedJobs = this.printQueue.filter(j => 
@@ -548,12 +695,12 @@ class AdvancedPrintService {
       : 0;
 
     return {
-      total,
-      pending,
-      printing,
-      completed,
-      failed,
-      avgProcessingTime
+      total: totalCount,
+      pending: pendingCount,
+      printing: printingCount,
+      completed: completedCount,
+      failed: failedCount,
+      avgProcessingTime: avgProcessingTime
     };
   }
 
