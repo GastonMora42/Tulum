@@ -1,4 +1,4 @@
-// src/components/providers/PrintProvider.tsx
+// src/components/providers/PrintProvider.tsx - VERSIÓN CORREGIDA
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
@@ -11,6 +11,7 @@ interface PrintContextType {
   availablePrinters: PrinterConfig[];
   printFactura: (facturaId: string, options?: any) => Promise<any>;
   reprintFactura: (facturaId: string, printerName?: string) => Promise<any>;
+  refreshPrinters: () => Promise<void>;
 }
 
 const PrintContext = createContext<PrintContextType | null>(null);
@@ -30,7 +31,7 @@ export function PrintProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(true);
       setError(undefined);
       
-      console.log('🖨️ Inicializando sistema de impresión...');
+      console.log('🖨️ Inicializando sistema de impresión desde Provider...');
       
       // Inicializar el servicio
       await printService.initialize();
@@ -40,10 +41,10 @@ export function PrintProvider({ children }: { children: React.ReactNode }) {
       setAvailablePrinters(printers);
       
       setIsInitialized(true);
-      console.log('✅ Sistema de impresión inicializado correctamente');
+      console.log('✅ Sistema de impresión inicializado correctamente desde Provider');
       
     } catch (err) {
-      console.error('❌ Error inicializando sistema de impresión:', err);
+      console.error('❌ Error inicializando sistema de impresión desde Provider:', err);
       setError(err instanceof Error ? err.message : 'Error desconocido');
     } finally {
       setIsLoading(false);
@@ -51,11 +52,32 @@ export function PrintProvider({ children }: { children: React.ReactNode }) {
   };
 
   const printFactura = async (facturaId: string, options: any = {}) => {
-    return await printService.printFactura(facturaId, options);
+    try {
+      console.log(`🖨️ PrintProvider: Imprimiendo factura ${facturaId}...`);
+      const result = await printService.printFactura(facturaId, options);
+      console.log(`📄 PrintProvider: Resultado impresión:`, result);
+      return result;
+    } catch (error) {
+      console.error('❌ PrintProvider: Error en impresión:', error);
+      throw error;
+    }
   };
 
   const reprintFactura = async (facturaId: string, printerName?: string) => {
-    return await printService.printFactura(facturaId, { auto: false, printerName });
+    console.log(`🔄 PrintProvider: Reimprimiendo factura ${facturaId}...`);
+    return await printFactura(facturaId, { auto: false, printerName });
+  };
+
+  const refreshPrinters = async () => {
+    try {
+      console.log('🔄 PrintProvider: Actualizando lista de impresoras...');
+      await printService.initialize();
+      const printers = printService.getAvailablePrinters();
+      setAvailablePrinters(printers);
+      console.log(`✅ PrintProvider: ${printers.length} impresoras disponibles`);
+    } catch (error) {
+      console.error('❌ PrintProvider: Error actualizando impresoras:', error);
+    }
   };
 
   const value: PrintContextType = {
@@ -64,7 +86,8 @@ export function PrintProvider({ children }: { children: React.ReactNode }) {
     error,
     availablePrinters,
     printFactura,
-    reprintFactura
+    reprintFactura,
+    refreshPrinters
   };
 
   return (
@@ -81,41 +104,3 @@ export function usePrintContext() {
   }
   return context;
 }
-
-
-// Agregar al schema.prisma:
-/*
-model ConfiguracionImpresora {
-  id            String   @id @default(uuid())
-  nombre        String
-  tipo          String   // thermal, laser, inkjet
-  sucursalId    String
-  sucursal      Ubicacion @relation(fields: [sucursalId], references: [id])
-  esPorDefecto  Boolean  @default(false)
-  configuracion Json     // { paperWidth, autocut, encoding, etc. }
-  activa        Boolean  @default(true)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  
-  @@unique([sucursalId, nombre])
-  @@map("configuracion_impresora")
-}
-*/
-
-// Modificación en layout principal para incluir PrintProvider:
-// src/app/(pdv)/layout.tsx
-/*
-import { PrintProvider } from '@/components/providers/PrintProvider';
-import { PrintInitializer } from '@/components/pdv/PrintInitializer';
-
-export default function PDVLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <PrintProvider>
-      <div className="min-h-screen bg-gray-50">
-        {children}
-        <PrintInitializer />
-      </div>
-    </PrintProvider>
-  );
-}
-*/

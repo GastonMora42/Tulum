@@ -633,9 +633,9 @@ class AdvancedPrintService {
           <div class="line"></div>
           {{detalleProductos}}
           <div class="line"></div>
-          <div class="center">
-            <strong>TOTAL: ${{total}}</strong>
-          </div>
+          <table>
+            <tr><td><strong>TOTAL:</strong></td><td style="text-align: right;"><strong>${{total}}</strong></td></tr>
+          </table>
         </body>
       </html>
     `;

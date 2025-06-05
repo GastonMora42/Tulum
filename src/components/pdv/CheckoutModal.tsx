@@ -1,13 +1,15 @@
-// src/components/pdv/CheckoutModal.tsx - VERSIÓN CON AUTO-DESTILDAR FACTURA PARA EFECTIVO
+// src/components/pdv/CheckoutModal.tsx - CON SISTEMA DE IMPRESIÓN INTEGRADO
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
 import { useCartStore } from '@/stores/cartStore';
 import { 
   CreditCard, DollarSign, QrCode, Smartphone, X, Check, Loader, 
-  Plus, Trash, ArrowLeft, Receipt, AlertCircle, Percent, User, FileText
+  Plus, Trash, ArrowLeft, Receipt, AlertCircle, Percent, User, FileText,
+  Printer, Settings as SettingsIcon, CheckCircle, AlertTriangle, Wifi
 } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
+import { usePrint } from '@/hooks/usePrint';
 
 interface PaymentMethod {
   id: string;
@@ -24,7 +26,7 @@ interface Payment {
 interface CheckoutModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onComplete: (result: { success: boolean; message?: string; ventaId?: string }) => void;
+  onComplete: (result: { success: boolean; message?: string; ventaId?: string; facturaId?: string }) => void;
 }
 
 export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProps) {
@@ -39,6 +41,24 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
   const [tipoFactura, setTipoFactura] = useState<'A' | 'B'>('B');
   const [clienteNombre, setClienteNombre] = useState('');
   const [clienteCuit, setClienteCuit] = useState('');
+  
+  // 🆕 ESTADOS PARA SISTEMA DE IMPRESIÓN
+  const [printConfig, setPrintConfig] = useState({
+    autoPrint: true, // Por defecto habilitado
+    selectedPrinter: '',
+    copies: 1,
+    showPreview: false
+  });
+  const [showPrinterSettings, setShowPrinterSettings] = useState(false);
+  
+  // 🆕 HOOK DE IMPRESIÓN
+  const { 
+    isInitialized: printInitialized, 
+    availablePrinters, 
+    printFactura, 
+    isLoading: printLoading,
+    lastError: printError 
+  } = usePrint();
   
   const [currentStep, setCurrentStep] = useState(1);
   const [facturacionObligatoria, setFacturacionObligatoria] = useState(false);
@@ -78,7 +98,7 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
     if (allPaymentsAreCash) {
       console.log('🎯 Todos los pagos son en efectivo - Destildando facturación automáticamente');
       setFacturacionObligatoria(false);
-      setFacturar(false); // 🆕 Auto-destildar cuando es solo efectivo
+      setFacturar(false);
     } 
     // Si hay pagos no-efectivo, facturación obligatoria
     else if (hasNonCashPayments) {
@@ -95,20 +115,19 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
 
   // 🆕 FUNCIÓN PARA DETERMINAR SI SALTAR EL PASO 2
   const shouldSkipStep2 = () => {
-    // Si no se factura y solo hay pagos en efectivo, saltar paso 2
     const allPaymentsAreCash = payments.every(p => p.method === 'efectivo');
     return !facturar && !facturacionObligatoria && allPaymentsAreCash;
   };
 
   // 🆕 FUNCIÓN PARA OBTENER EL TOTAL DE PASOS (DINÁMICO)
   const getTotalSteps = () => {
-    return shouldSkipStep2() ? 2 : 3; // Si salta paso 2, solo hay 2 pasos
+    return shouldSkipStep2() ? 2 : 3;
   };
 
   // 🆕 FUNCIÓN PARA OBTENER EL NÚMERO DE PASO VISUAL
   const getVisualStep = (step: number) => {
     if (shouldSkipStep2() && step === 3) {
-      return 2; // Si saltamos paso 2, el paso 3 se muestra como paso 2
+      return 2;
     }
     return step;
   };
@@ -124,11 +143,20 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
       setAppliedDiscount(null);
       setDiscountCode('');
       setValidationErrors({});
-      setFacturar(false); // 🆕 Inicializar destildado
-      setFacturacionObligatoria(false); // 🆕 Inicializar sin obligación
+      setFacturar(false);
+      setFacturacionObligatoria(false);
       setTipoFactura('B');
       setClienteNombre('');
       setClienteCuit('');
+      
+      // 🆕 CONFIGURACIÓN INICIAL DE IMPRESIÓN
+      const defaultPrinter = availablePrinters.find(p => p.isDefault);
+      setPrintConfig(prev => ({
+        ...prev,
+        autoPrint: printInitialized && availablePrinters.length > 0, // Auto-habilitar si hay impresoras
+        selectedPrinter: defaultPrinter?.name || '',
+        copies: 1
+      }));
       
       // Inicializar el primer método de pago con el total
       const total = getTotal();
@@ -137,7 +165,6 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
       setAmountTendered(total.toFixed(2));
       setRemainingAmount(0);
       
-      // 🆕 Aplicar lógica de facturación inicial
       updateBillingLogic(initialPayments);
       
       setTimeout(() => {
@@ -150,7 +177,7 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
     return () => {
       document.body.style.overflow = '';
     };
-  }, [isOpen, getTotal]);
+  }, [isOpen, getTotal, printInitialized, availablePrinters]);
   
   // Función para validar límites de facturas B
   const validarLimiteFacturaB = () => {
@@ -200,16 +227,13 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
     newPayments[index] = { ...newPayments[index], method: methodId, reference: '' };
     setPayments(newPayments);
     
-    // 🆕 APLICAR NUEVA LÓGICA DE FACTURACIÓN
     updateBillingLogic(newPayments);
     
     console.log(`💰 Método de pago cambiado a: ${methodId}`);
-    console.log(`🧾 Facturación obligatoria: ${newPayments.some(p => p.method !== 'efectivo')}`);
   };
 
   // 🆕 FUNCIÓN PARA MANEJAR CAMBIO MANUAL DEL CHECKBOX DE FACTURACIÓN
   const handleFacturarChange = (checked: boolean) => {
-    // Solo permitir cambio manual si no es obligatorio
     if (!facturacionObligatoria) {
       console.log(`🎯 Facturación cambiada manualmente a: ${checked}`);
       setFacturar(checked);
@@ -316,7 +340,6 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
         setPayments(newPayments);
         setRemainingAmount(0);
         
-        // 🆕 APLICAR LÓGICA DE FACTURACIÓN AL AGREGAR MÉTODO
         updateBillingLogic(newPayments);
       }
     }
@@ -333,7 +356,6 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
       setPayments(newPayments);
       setRemainingAmount(newRemainingAmount);
       
-      // 🆕 APLICAR LÓGICA DE FACTURACIÓN AL ELIMINAR MÉTODO
       updateBillingLogic(newPayments);
       
       if (newPayments.length === 1 && newPayments[0].method === 'efectivo') {
@@ -429,7 +451,7 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
       // 🆕 LÓGICA DE SALTO DE PASO
       if (shouldSkipStep2()) {
         console.log('🚀 Saltando paso 2 - Pago en efectivo sin factura');
-        setCurrentStep(3); // Saltar directamente al paso 3
+        setCurrentStep(3);
         return;
       }
     }
@@ -470,7 +492,6 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
   // 🔧 FUNCIÓN MODIFICADA PARA MANEJAR SALTO HACIA ATRÁS
   const goToPreviousStep = () => {
     if (currentStep === 3 && shouldSkipStep2()) {
-      // Si estamos en paso 3 y habíamos saltado el paso 2, volver al paso 1
       console.log('🔙 Volviendo del paso 3 al paso 1 (saltando paso 2)');
       setCurrentStep(1);
     } else {
@@ -478,7 +499,7 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
     }
   };
   
-  // Procesar pago
+  // 🆕 FUNCIÓN MODIFICADA - Procesar pago CON IMPRESIÓN AUTOMÁTICA
   const handleProcessPayment = async () => {
     setIsProcessing(true);
     setValidationErrors({});
@@ -533,6 +554,7 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
         }))
       };
       
+      console.log('🔄 Procesando venta...');
       const response = await authenticatedFetch('/api/pdv/ventas', {
         method: 'POST',
         headers: {
@@ -547,18 +569,51 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
       }
       
       const result = await response.json();
+      console.log('✅ Venta creada:', result.id);
+      
+      let finalMessage = '';
+      let printResult = null;
+      
+      // 🆕 LÓGICA DE IMPRESIÓN AUTOMÁTICA
+      if (facturar && result.facturaId && printConfig.autoPrint && printInitialized) {
+        try {
+          console.log('🖨️ Iniciando impresión automática...');
+          
+          printResult = await printFactura(result.facturaId, {
+            auto: true,
+            printerName: printConfig.selectedPrinter || undefined,
+            copies: printConfig.copies
+          });
+          
+          if (printResult.success) {
+            finalMessage = `✅ Venta completada y factura impresa correctamente`;
+            console.log('✅ Impresión automática exitosa');
+          } else {
+            finalMessage = `⚠️ Venta completada. Impresión falló: ${printResult.message}`;
+            console.warn('⚠️ Impresión automática falló:', printResult.message);
+          }
+        } catch (printError) {
+          console.error('❌ Error en impresión automática:', printError);
+          finalMessage = `⚠️ Venta completada. Error de impresión: ${printError instanceof Error ? printError.message : 'Error desconocido'}`;
+        }
+      } else if (facturar) {
+        finalMessage = `✅ Venta completada con factura ${tipoFactura}. ${result.cae ? 'CAE: ' + result.cae : 'Procesando facturación...'}`;
+      } else {
+        finalMessage = '✅ Venta completada correctamente';
+      }
       
       onComplete({
         success: true,
-        message: facturar 
-          ? `Venta completada con factura ${tipoFactura}. ${result.cae ? 'CAE: ' + result.cae : 'Procesando facturación...'}` 
-          : 'Venta completada correctamente',
-        ventaId: result.id
+        message: finalMessage,
+        ventaId: result.id,
+        facturaId: result.facturaId
       });
       
       clearCart();
       onClose();
+      
     } catch (error) {
+      console.error('❌ Error procesando pago:', error);
       onComplete({ 
         success: false, 
         message: error instanceof Error ? error.message : 'Error al procesar el pago' 
@@ -589,8 +644,31 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
           </button>
         </div>
         
+        {/* 🆕 INDICADOR DE ESTADO DE IMPRESIÓN */}
+        {printInitialized && (
+          <div className="px-6 py-2 bg-green-50 border-b border-green-200">
+            <div className="flex items-center space-x-2 text-sm">
+              <CheckCircle className="w-4 h-4 text-green-600" />
+              <span className="text-green-700">
+                Sistema de impresión activo - {availablePrinters.length} impresora{availablePrinters.length !== 1 ? 's' : ''} disponible{availablePrinters.length !== 1 ? 's' : ''}
+              </span>
+            </div>
+          </div>
+        )}
+        
+        {printError && (
+          <div className="px-6 py-2 bg-yellow-50 border-b border-yellow-200">
+            <div className="flex items-center space-x-2 text-sm">
+              <AlertTriangle className="w-4 h-4 text-yellow-600" />
+              <span className="text-yellow-700">
+                Advertencia de impresión: {printError}
+              </span>
+            </div>
+          </div>
+        )}
+        
         <div className="p-6">
-          {/* 🔧 INDICADOR DE PASOS DINÁMICO */}
+          {/* Indicador de pasos dinámico */}
           <div className="flex items-center justify-center mb-6 max-w-lg mx-auto">
             <div 
               className={`flex-1 flex flex-col items-center ${
@@ -604,7 +682,6 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
               <span className="text-xs font-medium">Pago</span>
             </div>
             
-            {/* 🆕 MOSTRAR PASO 2 SOLO SI NO SE SALTA */}
             {!shouldSkipStep2() && (
               <>
                 <div className={`w-12 h-0.5 ${getVisualStep(currentStep) >= 2 ? 'bg-[#311716]' : 'bg-gray-300'}`}></div>
@@ -728,14 +805,14 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                     </div>
                   </div>
 
-                  {/* 🆕 SECCIÓN DE FACTURACIÓN MEJORADA */}
+                  {/* SECCIÓN DE FACTURACIÓN MEJORADA */}
                   <div className="border-t border-gray-100 pt-4">
                     <div className="flex items-center p-3 bg-gray-50 rounded-lg mb-3">
                       <input
                         id="facturar"
                         type="checkbox"
                         checked={facturar || facturacionObligatoria}
-                        onChange={(e) => handleFacturarChange(e.target.checked)} // 🆕 Nueva función
+                        onChange={(e) => handleFacturarChange(e.target.checked)}
                         disabled={facturacionObligatoria}
                         className="h-4 w-4 text-[#311716] focus:ring-[#9c7561] border-gray-300 rounded"
                       />
@@ -747,17 +824,98 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                       </label>
                     </div>
 
-                    {/* 🆕 INDICADORES MEJORADOS */}
+                    {/* 🆕 SECCIÓN DE CONFIGURACIÓN DE IMPRESIÓN */}
+                    {facturar && (
+                      <div className="mt-3 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="font-medium text-blue-900 flex items-center">
+                            <Printer className="w-4 h-4 mr-2" />
+                            Configuración de Impresión
+                          </h4>
+                          <button
+                            onClick={() => setShowPrinterSettings(!showPrinterSettings)}
+                            className="text-blue-600 hover:text-blue-800 text-sm"
+                          >
+                            <SettingsIcon className="w-4 h-4" />
+                          </button>
+                        </div>
+                        
+                        <div className="space-y-3">
+                          <div className="flex items-center space-x-3">
+                            <input
+                              id="autoPrint"
+                              type="checkbox"
+                              checked={printConfig.autoPrint && printInitialized}
+                              onChange={(e) => setPrintConfig(prev => ({ ...prev, autoPrint: e.target.checked }))}
+                              disabled={!printInitialized || availablePrinters.length === 0}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            />
+                            <label htmlFor="autoPrint" className="text-sm text-blue-800">
+                              Imprimir automáticamente
+                            </label>
+                            
+                            {!printInitialized && (
+                              <span className="text-xs text-red-600 bg-red-100 px-2 py-1 rounded">
+                                Sistema no disponible
+                              </span>
+                            )}
+                            
+                            {printInitialized && availablePrinters.length === 0 && (
+                              <span className="text-xs text-yellow-600 bg-yellow-100 px-2 py-1 rounded">
+                                Sin impresoras
+                              </span>
+                            )}
+                          </div>
+                          
+                          {showPrinterSettings && printInitialized && (
+                            <div className="grid grid-cols-2 gap-3 pt-3 border-t border-blue-200">
+                              <div>
+                                <label className="block text-sm font-medium text-blue-800 mb-1">
+                                  Impresora:
+                                </label>
+                                <select
+                                  value={printConfig.selectedPrinter}
+                                  onChange={(e) => setPrintConfig(prev => ({ ...prev, selectedPrinter: e.target.value }))}
+                                  className="w-full p-2 border border-blue-300 rounded text-sm focus:ring-1 focus:ring-blue-500"
+                                  disabled={availablePrinters.length === 0}
+                                >
+                                  <option value="">Por defecto</option>
+                                  {availablePrinters.map(printer => (
+                                    <option key={printer.id} value={printer.name}>
+                                      {printer.name} {printer.isDefault ? '(Predeterminada)' : ''}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              
+                              <div>
+                                <label className="block text-sm font-medium text-blue-800 mb-1">
+                                  Copias:
+                                </label>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max="5"
+                                  value={printConfig.copies}
+                                  onChange={(e) => setPrintConfig(prev => ({ ...prev, copies: parseInt(e.target.value) || 1 }))}
+                                  className="w-full p-2 border border-blue-300 rounded text-sm focus:ring-1 focus:ring-blue-500"
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Indicadores mejorados */}
                     {isAllPaymentsCash() && !facturar && (
                       <div className="mt-2 text-sm text-blue-600 bg-blue-50 p-3 rounded flex items-center">
                         <DollarSign className="mr-2 h-4 w-4" />
                         <span>
-                          Pago en efectivo -  
-                          {shouldSkipStep2() && ' Se omitirá paso de datos del cliente.'}
+                          Pago en efectivo - {shouldSkipStep2() && 'Se omitirá paso de datos del cliente.'}
                         </span>
                       </div>
                     )}
-                    
                     
                     {/* Selector de tipo de factura */}
                     {facturar && (
@@ -804,7 +962,6 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                         </div>
                       </div>
                     )}
-                    
                   </div>
                 </div>
                 
@@ -1082,48 +1239,82 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                       </div>
                     </div>
                     
-                    {/* Información de facturación */}
-                    {facturar ? (
-                      <div className="bg-white p-4 rounded-lg border">
-                        <h4 className="font-medium text-gray-900 mb-3">Información de Facturación</h4>
-                        
-                        <div className="space-y-2">
-                          <div className="flex justify-between">
-                            <span className="text-gray-600">Tipo de factura:</span>
-                            <span className="font-medium">Factura {tipoFactura}</span>
+                    {/* Información de facturación Y configuración de impresión */}
+                    <div className="space-y-4">
+                      {facturar ? (
+                        <div className="bg-white p-4 rounded-lg border">
+                          <h4 className="font-medium text-gray-900 mb-3">Información de Facturación</h4>
+                          
+                          <div className="space-y-2">
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Tipo de factura:</span>
+                              <span className="font-medium">Factura {tipoFactura}</span>
+                            </div>
+                            
+                            {clienteNombre && (
+                              <div className="flex justify-between">
+                                <span className="text-gray-600">
+                                  {tipoFactura === 'A' ? 'Razón Social:' : 'Cliente:'}
+                                </span>
+                                <span className="text-right">{clienteNombre}</span>
+                              </div>
+                            )}
+                            
+                            {clienteCuit && (
+                              <div className="flex justify-between">
+                                <span className="text-gray-600">CUIT/DNI:</span>
+                                <span>{clienteCuit}</span>
+                              </div>
+                            )}
+                            
+                            {!clienteNombre && !clienteCuit && tipoFactura === 'B' && (
+                              <div className="flex justify-between">
+                                <span className="text-gray-600">Cliente:</span>
+                                <span className="text-gray-500 italic">Consumidor Final</span>
+                              </div>
+                            )}
                           </div>
-                          
-                          {clienteNombre && (
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">
-                                {tipoFactura === 'A' ? 'Razón Social:' : 'Cliente:'}
-                              </span>
-                              <span className="text-right">{clienteNombre}</span>
-                            </div>
-                          )}
-                          
-                          {clienteCuit && (
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">CUIT/DNI:</span>
-                              <span>{clienteCuit}</span>
-                            </div>
-                          )}
-                          
-                          {!clienteNombre && !clienteCuit && tipoFactura === 'B' && (
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Cliente:</span>
-                              <span className="text-gray-500 italic">Consumidor Final</span>
-                            </div>
-                          )}
                         </div>
-                      </div>
-                    ) : (
-                      <div className="bg-white p-4 rounded-lg border text-center">
-                        <DollarSign className="w-12 h-12 text-green-600 mx-auto mb-2" />
-                        <h4 className="font-medium text-gray-900 mb-1">Venta en efectivo</h4>
-                        <p className="text-sm text-gray-600">Corroborar cambio y monto entregado</p>
-                      </div>
-                    )}
+                      ) : (
+                        <div className="bg-white p-4 rounded-lg border text-center">
+                          <DollarSign className="w-12 h-12 text-green-600 mx-auto mb-2" />
+                          <h4 className="font-medium text-gray-900 mb-1">Venta en efectivo</h4>
+                          <p className="text-sm text-gray-600">Corroborar cambio y monto entregado</p>
+                        </div>
+                      )}
+                      
+                      {/* 🆕 RESUMEN DE CONFIGURACIÓN DE IMPRESIÓN */}
+                      {facturar && printInitialized && (
+                        <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                          <h4 className="font-medium text-blue-900 mb-2 flex items-center">
+                            <Printer className="w-4 h-4 mr-2" />
+                            Configuración de Impresión
+                          </h4>
+                          
+                          <div className="space-y-1 text-sm text-blue-800">
+                            <div className="flex justify-between">
+                              <span>Impresión automática:</span>
+                              <span className={printConfig.autoPrint ? 'text-green-600' : 'text-red-600'}>
+                                {printConfig.autoPrint ? '✓ Habilitada' : '✗ Deshabilitada'}
+                              </span>
+                            </div>
+                            
+                            {printConfig.autoPrint && (
+                              <>
+                                <div className="flex justify-between">
+                                  <span>Impresora:</span>
+                                  <span>{printConfig.selectedPrinter || 'Por defecto'}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span>Copias:</span>
+                                  <span>{printConfig.copies}</span>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
                 
@@ -1138,6 +1329,9 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                       <li>Se registrará en el historial de ventas</li>
                       {facturar && (
                         <li>Se generará una factura electrónica tipo {tipoFactura}</li>
+                      )}
+                      {facturar && printConfig.autoPrint && printInitialized && (
+                        <li>Se imprimirá automáticamente la factura</li>
                       )}
                     </ul>
                   </div>

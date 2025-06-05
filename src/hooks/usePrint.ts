@@ -1,6 +1,7 @@
 // src/hooks/usePrint.ts - VERSIÓN CORREGIDA
 import { useState, useEffect, useCallback } from 'react';
 import { printService, PrinterConfig } from '@/services/print/printService';
+import { authenticatedFetch } from '@/hooks/useAuth';
 
 export interface PrintStatus {
   isInitialized: boolean;
@@ -27,6 +28,8 @@ export function usePrint() {
 
     const initializePrintService = async () => {
       try {
+        console.log('🖨️ Inicializando servicio de impresión...');
+        
         await printService.initialize();
         
         if (mounted) {
@@ -36,9 +39,11 @@ export function usePrint() {
             isLoading: false,
             availablePrinters: printService.getAvailablePrinters()
           }));
+          
+          console.log('✅ Servicio de impresión inicializado');
         }
       } catch (error) {
-        console.error('Error inicializando servicio de impresión:', error);
+        console.error('❌ Error inicializando servicio de impresión:', error);
         
         if (mounted) {
           setStatus(prev => ({
@@ -79,6 +84,7 @@ export function usePrint() {
     options: { auto?: boolean; printerName?: string; copies?: number } = {}
   ) => {
     try {
+      console.log(`🖨️ Imprimiendo factura ${facturaId}...`);
       setStatus(prev => ({ ...prev, lastError: undefined }));
       
       const result = await printService.printFactura(facturaId, options);
@@ -101,22 +107,33 @@ export function usePrint() {
 
   // Reimprimir factura desde historial
   const reprintFactura = useCallback(async (facturaId: string, printerName?: string) => {
+    console.log(`🔄 Reimprimiendo factura ${facturaId}...`);
     return await printFactura(facturaId, { auto: false, printerName });
   }, [printFactura]);
 
   // Configurar nueva impresora
   const addPrinter = useCallback(async (config: Omit<PrinterConfig, 'id'>) => {
     try {
-      const success = await printService.addPrinter(config);
+      console.log('➕ Agregando nueva impresora:', config.name);
       
-      if (success) {
-        setStatus(prev => ({
-          ...prev,
-          availablePrinters: printService.getAvailablePrinters()
-        }));
+      const response = await authenticatedFetch('/api/admin/impresoras', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: config.name,
+          type: config.type,
+          sucursalId: config.sucursalId,
+          isDefault: config.isDefault,
+          settings: config.settings
+        })
+      });
+
+      if (response.ok) {
+        await refreshPrinters();
+        return true;
       }
       
-      return success;
+      return false;
     } catch (error) {
       console.error('Error agregando impresora:', error);
       return false;
@@ -126,13 +143,42 @@ export function usePrint() {
   // Actualizar lista de impresoras
   const refreshPrinters = useCallback(async () => {
     try {
-      await printService.initialize();
-      setStatus(prev => ({
-        ...prev,
-        availablePrinters: printService.getAvailablePrinters()
-      }));
+      const sucursalId = localStorage.getItem('sucursalId');
+      if (!sucursalId) return;
+
+      const response = await authenticatedFetch(`/api/admin/sucursales/${sucursalId}/impresoras`);
+      
+      if (response.ok) {
+        const printers = await response.json();
+        setStatus(prev => ({
+          ...prev,
+          availablePrinters: printers
+        }));
+        
+        // Actualizar también el servicio
+        await printService.loadPrinterConfigs();
+      }
     } catch (error) {
       console.error('Error actualizando impresoras:', error);
+    }
+  }, []);
+
+  // Detectar impresoras automáticamente
+  const detectPrinters = useCallback(async () => {
+    try {
+      console.log('🔍 Detectando impresoras...');
+      
+      const response = await authenticatedFetch('/api/system/printers');
+      if (response.ok) {
+        const detectedPrinters = await response.json();
+        console.log(`🔍 Detectadas ${detectedPrinters.length} impresoras`);
+        return detectedPrinters;
+      }
+      
+      return [];
+    } catch (error) {
+      console.error('Error detectando impresoras:', error);
+      return [];
     }
   }, []);
 
@@ -144,6 +190,7 @@ export function usePrint() {
     printFactura,
     reprintFactura,
     addPrinter,
-    refreshPrinters
+    refreshPrinters,
+    detectPrinters
   };
 }
