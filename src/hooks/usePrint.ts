@@ -1,4 +1,4 @@
-// src/hooks/usePrint.ts
+// src/hooks/usePrint.ts - VERSIÓN CORREGIDA
 import { useState, useEffect, useCallback } from 'react';
 import { printService, PrinterConfig } from '@/services/print/printService';
 
@@ -137,7 +137,10 @@ export function usePrint() {
   }, []);
 
   return {
+    // Estados
     ...status,
+    
+    // Funciones
     printFactura,
     reprintFactura,
     addPrinter,

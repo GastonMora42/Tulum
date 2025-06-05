@@ -214,6 +214,8 @@ model Ubicacion {
 
   puntoEquilibrioConfigs PuntoEquilibrioConfig[]
 
+  impresoras ConfiguracionImpresora[]
+
   stocksInsumoPdv        StockInsumoPdv[]
   solicitudesInsumoPdv   SolicitudInsumoPdv[]
   enviosInsumoPdvOrigen  EnvioInsumoPdv[]     @relation("EnvioInsumoPdvOrigen")
@@ -647,4 +649,20 @@ model EgresoInsumoPdv {
   usuario       User      @relation(fields: [usuarioId], references: [id])
   fecha         DateTime  @default(now())
   observaciones String?
+}
+
+model ConfiguracionImpresora {
+  id            String   @id @default(uuid())
+  nombre        String
+  tipo          String   // thermal, laser, inkjet
+  sucursalId    String
+  sucursal      Ubicacion @relation(fields: [sucursalId], references: [id])
+  esPorDefecto  Boolean  @default(false)
+  configuracion Json     // { paperWidth, autocut, encoding, etc. }
+  activa        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@unique([sucursalId, nombre])
+  @@map("configuracion_impresora")
 }

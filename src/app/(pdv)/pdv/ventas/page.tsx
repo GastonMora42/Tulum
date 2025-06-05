@@ -252,34 +252,70 @@ export default function HistorialVentasPage() {
     setIsDetalleOpen(true);
   };
   
-  // 🆕 FUNCIÓN PARA REIMPRIMIR FACTURA/TICKET
-  const handleReimprimirFactura = async (venta: Venta) => {
-    setExportingPdf(true);
-    
-    try {
-      if (venta.facturada && venta.numeroFactura) {
-        // Buscar la factura electrónica
-        const facturaResp = await authenticatedFetch(`/api/pdv/facturas?ventaId=${venta.id}`);
-        if (facturaResp.ok) {
-          const facturas = await facturaResp.json();
-          if (facturas && facturas.length > 0) {
-            // Abrir PDF de factura
-            window.open(`/api/pdv/facturas/${facturas[0].id}/pdf`, '_blank');
-            return;
+// 🆕 FUNCIÓN MEJORADA PARA REIMPRIMIR FACTURA/TICKET
+const handleReimprimirFactura = async (venta: Venta) => {
+  setExportingPdf(true);
+  
+  try {
+    if (venta.facturada && venta.numeroFactura) {
+      // Buscar la factura electrónica
+      const facturaResp = await authenticatedFetch(`/api/pdv/facturas?ventaId=${venta.id}`);
+      if (facturaResp.ok) {
+        const facturas = await facturaResp.json();
+        if (facturas && facturas.length > 0) {
+          const facturaId = facturas[0].id;
+          
+          // Intentar imprimir directamente si hay servicio de impresión disponible
+          if (reprintFactura && availablePrinters.length > 0) {
+            console.log('🖨️ Reimprimiendo factura:', facturaId);
+            
+            const printResult = await reprintFactura(facturaId);
+            
+            if (printResult.success) {
+              alert('✅ Factura reimpresa correctamente');
+              return;
+            } else {
+              console.warn('Impresión falló, abriendo PDF:', printResult.message);
+            }
           }
+          
+          // Fallback: abrir PDF
+          window.open(`/api/pdv/facturas/${facturaId}/pdf`, '_blank');
+          return;
         }
       }
-      
-      // Si no hay factura, generar ticket de venta
-      alert('Función de ticket de venta disponible próximamente');
-      
-    } catch (error) {
-      console.error('Error al reimprimir:', error);
-      alert('Error al generar el comprobante');
-    } finally {
-      setExportingPdf(false);
     }
-  };
+    
+    // Si no hay factura, generar ticket de venta usando el servicio de impresión
+    if (reprintFactura && availablePrinters.length > 0) {
+      try {
+        // Crear ticket temporal para la venta
+        const ticketResp = await authenticatedFetch('/api/pdv/tickets/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ventaId: venta.id })
+        });
+        
+        if (ticketResp.ok) {
+          const ticket = await ticketResp.json();
+          alert('✅ Ticket de venta impreso');
+          return;
+        }
+      } catch (ticketError) {
+        console.warn('Error generando ticket:', ticketError);
+      }
+    }
+    
+    // Fallback final: mostrar información de la venta
+    alert(`Venta #${venta.id.slice(-6)}\nTotal: $${venta.total.toFixed(2)}\nFecha: ${new Date(venta.fecha).toLocaleString()}`);
+    
+  } catch (error) {
+    console.error('Error al reimprimir:', error);
+    alert('Error al generar el comprobante');
+  } finally {
+    setExportingPdf(false);
+  }
+};
   
   // Paginación
   const indexOfLastItem = currentPage * itemsPerPage;

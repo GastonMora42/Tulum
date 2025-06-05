@@ -13,6 +13,8 @@ import {
   MapPin, Building2, ChevronDown
 } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
+import { PrintProvider } from '@/components/providers/PrintProvider';
+import { PrintInitializer } from '@/components/PrintInitializer';
 
 export default function PDVLayout({
   children,
@@ -297,7 +299,9 @@ export default function PDVLayout({
   ];
 
   return (
+    <PrintProvider>
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-50 to-gray-100">
+    <PrintInitializer />
       {/* Header moderno con información de sucursal - MEJORADO PARA TABLETS */}
       <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-30">
         <div className="mx-auto px-4">
@@ -637,5 +641,6 @@ export default function PDVLayout({
         </div>
       </footer>
     </div>
+    </PrintProvider>
   );
 }

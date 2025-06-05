@@ -6,6 +6,7 @@ export interface PrinterConfig {
     sucursalId: string;
     isDefault: boolean;
     settings: {
+      isOnline: boolean;
       paperWidth: number; // 58mm, 80mm, etc.
       autocut: boolean;
       encoding: string;

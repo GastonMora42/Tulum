@@ -13,7 +13,7 @@ export interface PrintTemplate {
 
 export interface PrintJob {
   id: string;
-  type: 'factura' | 'ticket' | 'batch';
+  type: 'factura' | 'ticket' | 'batch' | 'resumen_diario';
   status: 'pending' | 'printing' | 'completed' | 'failed' | 'cancelled';
   priority: 'low' | 'normal' | 'high';
   data: any;
@@ -26,7 +26,6 @@ export interface PrintJob {
   retryCount: number;
   maxRetries: number;
 }
-
 class AdvancedPrintService {
   private printQueue: PrintJob[] = [];
   private isProcessing = false;
@@ -229,6 +228,12 @@ class AdvancedPrintService {
       console.error(`❌ Error en trabajo ${job.id}:`, error);
       throw error;
     }
+  }
+  processFacturaJob(job: PrintJob) {
+    throw new Error('Method not implemented.');
+  }
+  processTicketJob(job: PrintJob) {
+    throw new Error('Method not implemented.');
   }
 
   /**
