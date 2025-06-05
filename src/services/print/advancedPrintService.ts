@@ -39,8 +39,6 @@ class AdvancedPrintService {
     this.startBatchProcessor();
   }
 
-  
-
   /**
    * Inicializar plantillas de impresión
    */
@@ -78,7 +76,23 @@ class AdvancedPrintService {
   }
 
   /**
-   * Imprimir múltiples facturas en lote
+   * Función auxiliar para crear objetos de retorno seguros
+   */
+  private createSafeReturnObject(success: boolean, message: string, additionalData?: any): any {
+    const baseResult = {
+      success: success,
+      message: message
+    };
+    
+    if (additionalData) {
+      return Object.assign(baseResult, additionalData);
+    }
+    
+    return baseResult;
+  }
+
+  /**
+   * Imprimir múltiples facturas en lote - REESCRITO
    */
   async printBatch(facturaIds: string[], options: {
     printerName?: string;
@@ -88,12 +102,15 @@ class AdvancedPrintService {
     
     console.log(`📦 Iniciando impresión en lote de ${facturaIds.length} facturas...`);
 
+    const jobId = `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const jobMessage = `Lote de ${facturaIds.length} facturas agregado a la cola`;
+
     const batchJob: PrintJob = {
-      id: `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      id: jobId,
       type: 'batch',
       status: 'pending',
       priority: options.priority || 'normal',
-      data: { facturaIds, options },
+      data: { facturaIds: facturaIds, options: options },
       printerName: options.printerName,
       copies: options.copies || 1,
       createdAt: new Date(),
@@ -104,15 +121,18 @@ class AdvancedPrintService {
     // Insertar según prioridad
     this.insertByPriority(batchJob);
 
-    return {
+    // Retornar objeto explícito
+    const result = {
       success: true,
-      jobId: batchJob.id,
-      message: `Lote de ${facturaIds.length} facturas agregado a la cola`
+      jobId: jobId,
+      message: jobMessage
     };
+
+    return result;
   }
 
   /**
-   * Imprimir resumen diario de ventas
+   * Imprimir resumen diario de ventas - REESCRITO
    */
   async printDailySummary(fecha: Date, sucursalId: string, options: {
     includeDetails?: boolean;
@@ -126,7 +146,8 @@ class AdvancedPrintService {
       const summaryData = await this.getDailySummaryData(fecha, sucursalId);
       
       if (!summaryData) {
-        throw new Error('No se pudieron obtener los datos del resumen');
+        const errorMessage = 'No se pudieron obtener los datos del resumen';
+        return this.createSafeReturnObject(false, errorMessage);
       }
 
       const job: PrintJob = {
@@ -134,7 +155,7 @@ class AdvancedPrintService {
         type: 'resumen_diario',
         status: 'pending',
         priority: 'normal',
-        data: { summaryData, options },
+        data: { summaryData: summaryData, options: options },
         printerName: options.printerName,
         copies: 1,
         createdAt: new Date(),
@@ -144,17 +165,13 @@ class AdvancedPrintService {
 
       this.printQueue.push(job);
 
-      return {
-        success: true,
-        message: 'Resumen diario agregado a la cola de impresión'
-      };
+      const successMessage = 'Resumen diario agregado a la cola de impresión';
+      return this.createSafeReturnObject(true, successMessage);
 
     } catch (error) {
       console.error('Error generando resumen diario:', error);
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Error desconocido'
-      };
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
+      return this.createSafeReturnObject(false, errorMessage);
     }
   }
 
@@ -427,7 +444,6 @@ class AdvancedPrintService {
       const precio = item.precioUnitario;
       const subtotal = cantidad * precio;
       
-      
       content += `${producto}\n`;
       content += `  ${cantidad} x $${precio.toFixed(2)} = $${subtotal.toFixed(2)}\n`;
     });
@@ -530,23 +546,23 @@ class AdvancedPrintService {
     let html = template.template;
     
     // Variables básicas
-    html = html.replace(/\{\{fecha\}\}/g, data.fecha);
-    html = html.replace(/\{\{sucursal\}\}/g, data.sucursal);
-    html = html.replace(/\{\{totalVentas\}\}/g, data.totalVentas.toFixed(2));
-    html = html.replace(/\{\{cantidadVentas\}\}/g, data.cantidadVentas.toString());
-    html = html.replace(/\{\{totalFacturado\}\}/g, data.totalFacturado.toFixed(2));
+    html = html.replace(/\{\{fecha\}\}/g, data.fecha || '');
+    html = html.replace(/\{\{sucursal\}\}/g, data.sucursal || '');
+    html = html.replace(/\{\{totalVentas\}\}/g, (data.totalVentas || 0).toFixed(2));
+    html = html.replace(/\{\{cantidadVentas\}\}/g, (data.cantidadVentas || 0).toString());
+    html = html.replace(/\{\{totalFacturado\}\}/g, (data.totalFacturado || 0).toFixed(2));
     
     // Desglose por método de pago
     let pagosList = '';
-    if (data.pagosPorMetodo) {
-      for (const pago of data.pagosPorMetodo) {
+    if (data.pagosPorMetodo && Array.isArray(data.pagosPorMetodo)) {
+      data.pagosPorMetodo.forEach((pagoItem: any) => {
         pagosList += `
           <tr>
-            <td>${this.formatMedioPago(pago.medioPago)}</td>
-            <td>$${pago.total.toFixed(2)}</td>
+            <td>${this.formatMedioPago(pagoItem.medioPago || '')}</td>
+            <td>${(pagoItem.total || 0).toFixed(2)}</td>
           </tr>
         `;
-      }
+      });
     }
     html = html.replace(/\{\{pagosPorMetodo\}\}/g, pagosList);
 
@@ -666,7 +682,7 @@ class AdvancedPrintService {
   }
 
   /**
-   * Obtener estadísticas de la cola
+   * Obtener estadísticas de la cola - CORREGIDO
    */
   public getQueueStats(): {
     total: number;
@@ -676,32 +692,38 @@ class AdvancedPrintService {
     failed: number;
     avgProcessingTime: number;
   } {
-    const totalCount = this.printQueue.length;
-    const pendingCount = this.printQueue.filter(j => j.status === 'pending').length;
-    const printingCount = this.printQueue.filter(j => j.status === 'printing').length;
-    const completedCount = this.printQueue.filter(j => j.status === 'completed').length;
-    const failedCount = this.printQueue.filter(j => j.status === 'failed').length;
+    // Calcular contadores
+    const totalJobs = this.printQueue.length;
+    const pendingJobs = this.printQueue.filter(j => j.status === 'pending').length;
+    const printingJobs = this.printQueue.filter(j => j.status === 'printing').length;
+    const completedJobs = this.printQueue.filter(j => j.status === 'completed').length;
+    const failedJobs = this.printQueue.filter(j => j.status === 'failed').length;
     
     // Calcular tiempo promedio de procesamiento
-    const completedJobs = this.printQueue.filter(j => 
+    const jobsWithTiming = this.printQueue.filter(j => 
       j.status === 'completed' && j.startedAt && j.completedAt
     );
     
-    const avgProcessingTime = completedJobs.length > 0
-      ? completedJobs.reduce((acc, job) => {
-          const duration = job.completedAt!.getTime() - job.startedAt!.getTime();
-          return acc + duration;
-        }, 0) / completedJobs.length
-      : 0;
+    let averageTime = 0;
+    if (jobsWithTiming.length > 0) {
+      const totalTime = jobsWithTiming.reduce((acc, job) => {
+        const duration = job.completedAt!.getTime() - job.startedAt!.getTime();
+        return acc + duration;
+      }, 0);
+      averageTime = totalTime / jobsWithTiming.length;
+    }
 
-    return {
-      total: totalCount,
-      pending: pendingCount,
-      printing: printingCount,
-      completed: completedCount,
-      failed: failedCount,
-      avgProcessingTime: avgProcessingTime
+    // Retornar objeto con propiedades explícitas
+    const stats = {
+      total: totalJobs,
+      pending: pendingJobs,
+      printing: printingJobs,
+      completed: completedJobs,
+      failed: failedJobs,
+      avgProcessingTime: averageTime
     };
+
+    return stats;
   }
 
   /**
@@ -719,7 +741,7 @@ class AdvancedPrintService {
   }
 
   /**
-   * Plantillas de impresión
+   * Plantillas de impresión - CORREGIDAS
    */
   private getFacturaTemplate80mm(): string {
     return `
@@ -746,7 +768,7 @@ class AdvancedPrintService {
           {{detalleProductos}}
           <div class="line"></div>
           <table>
-            <tr><td><strong>TOTAL:</strong></td><td style="text-align: right;"><strong>${{total}}</strong></td></tr>
+            <tr><td><strong>TOTAL:</strong></td><td style="text-align: right;"><strong>{{totalMonto}}</strong></td></tr>
           </table>
           <div class="line"></div>
           <div class="center">
@@ -781,7 +803,7 @@ class AdvancedPrintService {
           {{detalleProductos}}
           <div class="line"></div>
           <table>
-            <tr><td><strong>TOTAL:</strong></td><td style="text-align: right;"><strong>${{total}}</strong></td></tr>
+            <tr><td><strong>TOTAL:</strong></td><td style="text-align: right;"><strong>{{totalMonto}}</strong></td></tr>
           </table>
         </body>
       </html>
@@ -811,8 +833,8 @@ class AdvancedPrintService {
           <div class="line"></div>
           <table>
             <tr><td>Ventas:</td><td>{{cantidadVentas}}</td></tr>
-            <tr><td>Total:</td><td>${{totalVentas}}</td></tr>
-            <tr><td>Facturado:</td><td>${{totalFacturado}}</td></tr>
+            html = html.replace(/\{\{totalVentas\}\}/g, (data.totalVentas || 0).toFixed(2));
+html = html.replace(/\{\{totalFacturado\}\}/g, (data.totalFacturado || 0).toFixed(2));
           </table>
           <div class="line"></div>
           <strong>Pagos por método:</strong>
