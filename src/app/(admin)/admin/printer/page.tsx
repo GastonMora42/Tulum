@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState, useEffect } from 'react';
 import { 
   Printer, Monitor, Settings, Zap, BarChart3, AlertTriangle,
