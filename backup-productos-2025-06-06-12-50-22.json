@@ -1,0 +1,5017 @@
+{
+  "timestamp": "2025-06-06T15:50:23.764Z",
+  "productos": [
+    {
+      "id": "db7bc749-750f-4f48-acd5-7dd49bf03b61",
+      "nombre": "Lluvia",
+      "descripcion": "LLUVIA",
+      "precio": 15000,
+      "codigoBarras": "77920241220NaN",
+      "imagen": "/images/categorias/humidificadores-medianos.jpg",
+      "categoriaId": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+        "nombre": "Humidificadores Medianos",
+        "imagen": "/images/categorias/humidificadores-medianos.jpg"
+      }
+    },
+    {
+      "id": "8974c4ba-acd1-447b-87dc-dbfef5eab369",
+      "nombre": "Manchado",
+      "descripcion": "MANCHADO",
+      "precio": 15000,
+      "codigoBarras": "77920241221NaN",
+      "imagen": "/images/categorias/humidificadores-medianos.jpg",
+      "categoriaId": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+        "nombre": "Humidificadores Medianos",
+        "imagen": "/images/categorias/humidificadores-medianos.jpg"
+      }
+    },
+    {
+      "id": "3757f001-13b2-4372-aa7a-8427bfb9e33d",
+      "nombre": "Mini Fuego",
+      "descripcion": "MINI FUEGO",
+      "precio": 15000,
+      "codigoBarras": "77920241222NaN",
+      "imagen": "/images/categorias/humidificadores-medianos.jpg",
+      "categoriaId": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+        "nombre": "Humidificadores Medianos",
+        "imagen": "/images/categorias/humidificadores-medianos.jpg"
+      }
+    },
+    {
+      "id": "5adaa84a-d437-4764-8fb5-22b1f8848554",
+      "nombre": "Minion Blanco",
+      "descripcion": "MINION BLANCO",
+      "precio": 15000,
+      "codigoBarras": "77920241223NaN",
+      "imagen": "/images/categorias/humidificadores-medianos.jpg",
+      "categoriaId": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+        "nombre": "Humidificadores Medianos",
+        "imagen": "/images/categorias/humidificadores-medianos.jpg"
+      }
+    },
+    {
+      "id": "16c3664d-9b29-4e03-9dcb-2b00e6a49a07",
+      "nombre": "Mood",
+      "descripcion": "MOOD",
+      "precio": 15000,
+      "codigoBarras": "77920241224NaN",
+      "imagen": "/images/categorias/humidificadores-medianos.jpg",
+      "categoriaId": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+        "nombre": "Humidificadores Medianos",
+        "imagen": "/images/categorias/humidificadores-medianos.jpg"
+      }
+    },
+    {
+      "id": "4ed36243-50d0-4513-93c1-8a0e831f5ed7",
+      "nombre": "Platito Volador",
+      "descripcion": "PLATITO VOLADOR",
+      "precio": 15000,
+      "codigoBarras": "77920241225NaN",
+      "imagen": "/images/categorias/humidificadores-medianos.jpg",
+      "categoriaId": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+        "nombre": "Humidificadores Medianos",
+        "imagen": "/images/categorias/humidificadores-medianos.jpg"
+      }
+    },
+    {
+      "id": "274b308f-712c-48e1-b300-fff722c511f1",
+      "nombre": "Quimico",
+      "descripcion": "QUIMICO",
+      "precio": 15000,
+      "codigoBarras": "77920241226NaN",
+      "imagen": "/images/categorias/humidificadores-medianos.jpg",
+      "categoriaId": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+        "nombre": "Humidificadores Medianos",
+        "imagen": "/images/categorias/humidificadores-medianos.jpg"
+      }
+    },
+    {
+      "id": "0d113cd3-8e23-4bf1-bbf4-0ff00e3755e5",
+      "nombre": "Redondo Con Abertura 120ml",
+      "descripcion": "REDONDO CON ABERTURA 120ML",
+      "precio": 15000,
+      "codigoBarras": "77920241227NaN",
+      "imagen": "/images/categorias/humidificadores-medianos.jpg",
+      "categoriaId": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+        "nombre": "Humidificadores Medianos",
+        "imagen": "/images/categorias/humidificadores-medianos.jpg"
+      }
+    },
+    {
+      "id": "d7f732a9-a46e-4bbb-83bc-c04bc9f104e7",
+      "nombre": "Redondo Sin Filtro",
+      "descripcion": "REDONDO SIN FILTRO",
+      "precio": 15000,
+      "codigoBarras": "77920241228NaN",
+      "imagen": "/images/categorias/humidificadores-medianos.jpg",
+      "categoriaId": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+        "nombre": "Humidificadores Medianos",
+        "imagen": "/images/categorias/humidificadores-medianos.jpg"
+      }
+    },
+    {
+      "id": "18afc4e2-b918-4b42-932b-4b64d2b2a02d",
+      "nombre": "Sr. Huevo",
+      "descripcion": "SR. HUEVO",
+      "precio": 15000,
+      "codigoBarras": "77920241229NaN",
+      "imagen": "/images/categorias/humidificadores-medianos.jpg",
+      "categoriaId": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+        "nombre": "Humidificadores Medianos",
+        "imagen": "/images/categorias/humidificadores-medianos.jpg"
+      }
+    },
+    {
+      "id": "a6cd5a54-9140-47e5-979e-a68ff7450f71",
+      "nombre": "Transparente Arriba",
+      "descripcion": "TRANSPARENTE ARRIBA",
+      "precio": 15000,
+      "codigoBarras": "77920241230NaN",
+      "imagen": "/images/categorias/humidificadores-medianos.jpg",
+      "categoriaId": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+        "nombre": "Humidificadores Medianos",
+        "imagen": "/images/categorias/humidificadores-medianos.jpg"
+      }
+    },
+    {
+      "id": "b47cb2db-168d-46de-b22b-686ef099f600",
+      "nombre": "Gota Larga",
+      "descripcion": "GOTA LARGA",
+      "precio": 15000,
+      "codigoBarras": "77920241231NaN",
+      "imagen": "/images/categorias/humidificadores-medianos.jpg",
+      "categoriaId": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+        "nombre": "Humidificadores Medianos",
+        "imagen": "/images/categorias/humidificadores-medianos.jpg"
+      }
+    },
+    {
+      "id": "5f1287f2-e764-433f-8c58-e5dd3b433a23",
+      "nombre": "Rejas Chico",
+      "descripcion": "REJAS CHICO",
+      "precio": 15000,
+      "codigoBarras": "77920241232NaN",
+      "imagen": "/images/categorias/humidificadores-medianos.jpg",
+      "categoriaId": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+        "nombre": "Humidificadores Medianos",
+        "imagen": "/images/categorias/humidificadores-medianos.jpg"
+      }
+    },
+    {
+      "id": "6fbc5ad6-273c-40d0-8332-4ebab970d57a",
+      "nombre": "Rejas Mediano",
+      "descripcion": "REJAS MEDIANO",
+      "precio": 15000,
+      "codigoBarras": "77920241233NaN",
+      "imagen": "/images/categorias/humidificadores-medianos.jpg",
+      "categoriaId": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+        "nombre": "Humidificadores Medianos",
+        "imagen": "/images/categorias/humidificadores-medianos.jpg"
+      }
+    },
+    {
+      "id": "6c8ec630-9548-4894-a2a1-63cbe24d70b3",
+      "nombre": "Difusor de Bambú Pequeño",
+      "descripcion": "Difusor aromático de bambú natural, tamaño pequeño",
+      "precio": 450,
+      "codigoBarras": "770986691110",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp",
+      "categoriaId": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+        "nombre": "Difusores",
+        "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp"
+      }
+    },
+    {
+      "id": "1eb14dc3-1394-46b6-8c69-b281c9c02176",
+      "nombre": "Difusor de Bambú Grande",
+      "descripcion": "Difusor aromático de bambú natural, tamaño grande",
+      "precio": 650,
+      "codigoBarras": "770986907494",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp",
+      "categoriaId": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+      "stockMinimo": 3,
+      "activo": false,
+      "categoria": {
+        "id": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+        "nombre": "Difusores",
+        "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp"
+      }
+    },
+    {
+      "id": "523e4c24-d4f4-4c8f-a26d-a1994ef1a911",
+      "nombre": "AGUA  DE  AZAHAR",
+      "descripcion": "Aguas Aromáticas - Código: 2001",
+      "precio": 9500,
+      "codigoBarras": "7791000020015",
+      "imagen": "/images/categorias/aguas.jpg",
+      "categoriaId": "a991301f-d392-45e9-91c1-2f064615e12b",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "a991301f-d392-45e9-91c1-2f064615e12b",
+        "nombre": "Aguas Aromáticas",
+        "imagen": "/images/categorias/aguas.jpg"
+      }
+    },
+    {
+      "id": "235eaa17-d4c7-47fa-92a4-f893bd36d255",
+      "nombre": "AGUA  DE  ROSAS",
+      "descripcion": "Aguas Aromáticas - Código: 2001",
+      "precio": 9500,
+      "codigoBarras": "7791000120012",
+      "imagen": "/images/categorias/aguas.jpg",
+      "categoriaId": "a991301f-d392-45e9-91c1-2f064615e12b",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "a991301f-d392-45e9-91c1-2f064615e12b",
+        "nombre": "Aguas Aromáticas",
+        "imagen": "/images/categorias/aguas.jpg"
+      }
+    },
+    {
+      "id": "914926f3-771e-4ef8-abbd-1f7d6f3e876b",
+      "nombre": "BOMBA  ESF.  ROSA  MOSQUETA",
+      "descripcion": "Bombas de Baño - Código: 3008",
+      "precio": 8500,
+      "codigoBarras": "7791000030083",
+      "imagen": "/images/categorias/bombas-baño.webp",
+      "categoriaId": "67ef504f-b589-4425-9490-7b4e55c24def",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "67ef504f-b589-4425-9490-7b4e55c24def",
+        "nombre": "Bombas de Baño",
+        "imagen": "/images/categorias/bombas-baño.webp"
+      }
+    },
+    {
+      "id": "df5112fa-9a1f-408a-a22d-e4eeff75788b",
+      "nombre": "REC.   DIFU.  AUTO  LIMON Y JENGIBRE",
+      "descripcion": "Difusores para Auto - Código: 4007",
+      "precio": 8900,
+      "codigoBarras": "7791000040075",
+      "imagen": "/images/categorias/difusores-auto.webp",
+      "categoriaId": "e3274745-f673-4ed4-b83b-24a5a6220bcb",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "e3274745-f673-4ed4-b83b-24a5a6220bcb",
+        "nombre": "Difusores para Auto",
+        "imagen": "/images/categorias/difusores-auto.webp"
+      }
+    },
+    {
+      "id": "d54d4fdc-8805-4c7f-9be9-88536cc940a8",
+      "nombre": "REC.   DIFU.  AUTO  SANDALO",
+      "descripcion": "Difusores para Auto - Código: 4014",
+      "precio": 8900,
+      "codigoBarras": "7791000040143",
+      "imagen": "/images/categorias/difusores-auto.webp",
+      "categoriaId": "e3274745-f673-4ed4-b83b-24a5a6220bcb",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "e3274745-f673-4ed4-b83b-24a5a6220bcb",
+        "nombre": "Difusores para Auto",
+        "imagen": "/images/categorias/difusores-auto.webp"
+      }
+    },
+    {
+      "id": "3bad074e-52f1-4d56-98c2-4e3683ab1bf0",
+      "nombre": "DIFUSOR  BAMBU",
+      "descripcion": "Difusores - Código: 5002",
+      "precio": 25900,
+      "codigoBarras": "7791000050029",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp",
+      "categoriaId": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+        "nombre": "Difusores",
+        "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp"
+      }
+    },
+    {
+      "id": "8fec0175-8552-4a34-bcb8-eed249fa41ac",
+      "nombre": "DIFUSOR  CALOR  DE  HOGAR",
+      "descripcion": "Difusores - Código: 5004",
+      "precio": 25900,
+      "codigoBarras": "7791000050043",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp",
+      "categoriaId": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+        "nombre": "Difusores",
+        "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp"
+      }
+    },
+    {
+      "id": "061be47e-6c38-46ee-ac4a-7706a1666dcf",
+      "nombre": "DIFUSOR  GARDENIA",
+      "descripcion": "Difusores - Código: 5008",
+      "precio": 25900,
+      "codigoBarras": "7791000050081",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp",
+      "categoriaId": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+        "nombre": "Difusores",
+        "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp"
+      }
+    },
+    {
+      "id": "9c62af9f-b84f-4609-a601-56a14a304c24",
+      "nombre": "DIFUSOR  JAZMIN",
+      "descripcion": "Difusores - Código: 5009",
+      "precio": 25900,
+      "codigoBarras": "7791000050098",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp",
+      "categoriaId": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+        "nombre": "Difusores",
+        "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp"
+      }
+    },
+    {
+      "id": "93375271-e10c-48b0-a6ae-3b10864d04de",
+      "nombre": "DIFUSOR  LAVANDA  Y  ROMERO",
+      "descripcion": "Difusores - Código: 5010",
+      "precio": 25900,
+      "codigoBarras": "7791000050104",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp",
+      "categoriaId": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+        "nombre": "Difusores",
+        "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp"
+      }
+    },
+    {
+      "id": "8fa1c426-918c-4e98-84b9-a8b19bf287ff",
+      "nombre": "DIFUSOR  MANGO",
+      "descripcion": "Difusores - Código: 5014",
+      "precio": 25900,
+      "codigoBarras": "7791000050142",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp",
+      "categoriaId": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+        "nombre": "Difusores",
+        "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp"
+      }
+    },
+    {
+      "id": "6e48a73e-2058-49e6-9e8c-c13e3ed7b2f6",
+      "nombre": "DIFUSOR  NARANJA  CANELA",
+      "descripcion": "Difusores - Código: 5017",
+      "precio": 25900,
+      "codigoBarras": "7791000050173",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp",
+      "categoriaId": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+        "nombre": "Difusores",
+        "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp"
+      }
+    },
+    {
+      "id": "e0f05c99-74eb-47f3-bafa-4bfbac3b5c36",
+      "nombre": "DIFUSOR  ORANGE",
+      "descripcion": "Difusores - Código: 5020",
+      "precio": 25900,
+      "codigoBarras": "7791000050203",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp",
+      "categoriaId": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+        "nombre": "Difusores",
+        "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp"
+      }
+    },
+    {
+      "id": "561966c2-9767-422f-8f76-ebf0ba2d15bc",
+      "nombre": "DIFUSOR  ROSAS",
+      "descripcion": "Difusores - Código: 5023",
+      "precio": 25900,
+      "codigoBarras": "7791000050234",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp",
+      "categoriaId": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+        "nombre": "Difusores",
+        "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp"
+      }
+    },
+    {
+      "id": "5eb7afde-3c2b-42bd-a874-bbd2b80d67a4",
+      "nombre": "Fragancia textil bambu",
+      "descripcion": "Descripcion de producto",
+      "precio": 250,
+      "codigoBarras": "TULUM-03b3d393",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/228f7043-14be-4de8-b50d-75a000e36c62.webp",
+      "categoriaId": "3ffeee73-7cb2-4f4f-a777-b669d78e8312",
+      "stockMinimo": 50,
+      "activo": false,
+      "categoria": {
+        "id": "3ffeee73-7cb2-4f4f-a777-b669d78e8312",
+        "nombre": "Fragancias",
+        "imagen": null
+      }
+    },
+    {
+      "id": "a02af271-cfdd-4692-94e9-b11f07579697",
+      "nombre": "DIFUSOR  TE  VERDE",
+      "descripcion": "Difusores - Código: 5026",
+      "precio": 25900,
+      "codigoBarras": "7791000050265",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp",
+      "categoriaId": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+        "nombre": "Difusores",
+        "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp"
+      }
+    },
+    {
+      "id": "3dc334f1-49ee-4cff-891a-990ab1f6108c",
+      "nombre": "DIFUSOR  VAINILLA",
+      "descripcion": "Difusores - Código: 5029",
+      "precio": 25900,
+      "codigoBarras": "7791000050296",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp",
+      "categoriaId": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+        "nombre": "Difusores",
+        "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp"
+      }
+    },
+    {
+      "id": "4b5a99aa-a457-4898-a730-442d6a98b201",
+      "nombre": "ES.  HORNI.  BERGAMOTA",
+      "descripcion": "Esencias para Hornillo - Código: 6002",
+      "precio": 9500,
+      "codigoBarras": "7791000060028",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+        "nombre": "Esencias para Hornillo",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "4954830d-c739-4b70-a253-69ad8eee7131",
+      "nombre": "ES.  HORNI.  FRESIAS",
+      "descripcion": "Esencias para Hornillo - Código: 6010",
+      "precio": 9500,
+      "codigoBarras": "7791000060103",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+        "nombre": "Esencias para Hornillo",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "1b020cb9-25ce-4ccd-8eed-24ffa63b92e9",
+      "nombre": "ES.  HORNI.  MIRRA",
+      "descripcion": "Esencias para Hornillo - Código: 6018",
+      "precio": 9500,
+      "codigoBarras": "7791000060189",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+        "nombre": "Esencias para Hornillo",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "0c5c1bdb-11b7-46de-a07d-5a4ce7126771",
+      "nombre": "ES.  HORNI.  ROSAS",
+      "descripcion": "Esencias para Hornillo - Código: 6025",
+      "precio": 9500,
+      "codigoBarras": "7791000060257",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+        "nombre": "Esencias para Hornillo",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "10c23f1f-28b8-4ff7-b57b-324a51251b02",
+      "nombre": "ES.HUMI.AKITA",
+      "descripcion": "Esencias para Humidificador - Código: 7001",
+      "precio": 14500,
+      "codigoBarras": "7791000070010",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "f9e365f6-ecdf-4770-9570-a335effcf286",
+      "nombre": "ES.HUMI.CHANDAL",
+      "descripcion": "Esencias para Humidificador - Código: 7009",
+      "precio": 14500,
+      "codigoBarras": "7791000070096",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "a0def0b6-e436-4cda-a99e-9b49f68d8064",
+      "nombre": "ES.HUMI.LAVANDA",
+      "descripcion": "Esencias para Humidificador - Código: 7017",
+      "precio": 14500,
+      "codigoBarras": "7791000070171",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "0e7490c6-ab83-42bb-828f-13489130e26b",
+      "nombre": "ES.HUMI.NARANJA  Y  PIMIENTA",
+      "descripcion": "Esencias para Humidificador - Código: 7024",
+      "precio": 14500,
+      "codigoBarras": "7791000070249",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "bf6235e6-5f1e-42e5-8870-5d258f5ce11a",
+      "nombre": "ES.HUMI.ORQUIDEA  NEGRA",
+      "descripcion": "Esencias para Humidificador - Código: 7026",
+      "precio": 14500,
+      "codigoBarras": "7791000070263",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "5e5b04d3-0ec3-421d-9f1e-1c855951b4eb",
+      "nombre": "ES.HUMI.UVA Y FRUTOS ROJOS",
+      "descripcion": "Esencias para Humidificador - Código: 7035",
+      "precio": 14500,
+      "codigoBarras": "7791000070355",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "ef7ce81b-ca0e-4570-bafd-021a8cb4127d",
+      "nombre": "ESP.  DE  BAÑO  LAVANDA",
+      "descripcion": "Espumas de Baño - Código: 8006",
+      "precio": 13900,
+      "codigoBarras": "7791000080064",
+      "imagen": "/images/categorias/espuma-baño.webp",
+      "categoriaId": "d3485e1e-1d30-4a8d-968c-60a8d5932fc5",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "d3485e1e-1d30-4a8d-968c-60a8d5932fc5",
+        "nombre": "Espumas de Baño",
+        "imagen": "/images/categorias/espuma-baño.webp"
+      }
+    },
+    {
+      "id": "e45f879a-4342-408c-952d-8456ef4eadc1",
+      "nombre": "F.  TEXTIL  FRESH",
+      "descripcion": "Fragancias Textiles - Código: 9005",
+      "precio": 15900,
+      "codigoBarras": "7791000090056",
+      "imagen": "/images/categorias/fragancia.webp",
+      "categoriaId": "41747273-12e5-44cf-8d68-7e7f4cdfcdca",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "41747273-12e5-44cf-8d68-7e7f4cdfcdca",
+        "nombre": "Fragancias Textiles",
+        "imagen": "/images/categorias/fragancia.webp"
+      }
+    },
+    {
+      "id": "62dba0a6-4154-400f-b2cc-81e448e0d694",
+      "nombre": "HOME  SPRAY  DREAMS",
+      "descripcion": "Home Sprays - Código: 10003",
+      "precio": 16900,
+      "codigoBarras": "7791000100038",
+      "imagen": "/images/categorias/home-spray.webp",
+      "categoriaId": "db8da65c-c93b-42bc-a021-b8b5ceb8a5fe",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "db8da65c-c93b-42bc-a021-b8b5ceb8a5fe",
+        "nombre": "Home Sprays",
+        "imagen": "/images/categorias/home-spray.webp"
+      }
+    },
+    {
+      "id": "53c0bf22-2c36-4be5-9fed-db7beaf75267",
+      "nombre": "HOME  SPRAY  GLAMOUR",
+      "descripcion": "Home Sprays - Código: 10005",
+      "precio": 16900,
+      "codigoBarras": "7791000100052",
+      "imagen": "/images/categorias/home-spray.webp",
+      "categoriaId": "db8da65c-c93b-42bc-a021-b8b5ceb8a5fe",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "db8da65c-c93b-42bc-a021-b8b5ceb8a5fe",
+        "nombre": "Home Sprays",
+        "imagen": "/images/categorias/home-spray.webp"
+      }
+    },
+    {
+      "id": "3bdeec6d-e33a-4d28-8a97-b0289b363b43",
+      "nombre": "HOME  SPRAY  RELAX",
+      "descripcion": "Home Sprays - Código: 10013",
+      "precio": 16900,
+      "codigoBarras": "7791000100137",
+      "imagen": "/images/categorias/home-spray.webp",
+      "categoriaId": "db8da65c-c93b-42bc-a021-b8b5ceb8a5fe",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "db8da65c-c93b-42bc-a021-b8b5ceb8a5fe",
+        "nombre": "Home Sprays",
+        "imagen": "/images/categorias/home-spray.webp"
+      }
+    },
+    {
+      "id": "082f32b0-1490-488b-accc-43adaad4e0d4",
+      "nombre": "JABON  LIQUIDO  PARADISE",
+      "descripcion": "Jabones - Código: 11006",
+      "precio": 14500,
+      "codigoBarras": "7791000110068",
+      "imagen": "/images/categorias/jabones.jpg",
+      "categoriaId": "695a0d79-5f10-4e2c-b1bd-7301d0091f7a",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "695a0d79-5f10-4e2c-b1bd-7301d0091f7a",
+        "nombre": "Jabones",
+        "imagen": "/images/categorias/jabones.jpg"
+      }
+    },
+    {
+      "id": "c955fecc-b188-4a75-b35a-fb6abdf53a56",
+      "nombre": "JABON  SOLIDO  MANZANILLA",
+      "descripcion": "Jabones - Código: 12007",
+      "precio": 4900,
+      "codigoBarras": "7791000120074",
+      "imagen": "/images/categorias/jabones.jpg",
+      "categoriaId": "695a0d79-5f10-4e2c-b1bd-7301d0091f7a",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "695a0d79-5f10-4e2c-b1bd-7301d0091f7a",
+        "nombre": "Jabones",
+        "imagen": "/images/categorias/jabones.jpg"
+      }
+    },
+    {
+      "id": "9187648d-e736-410e-b6ab-1c32fc35068c",
+      "nombre": "SAL  DE  BAÑO  FRUTOS  ROJOS",
+      "descripcion": "Sales de Baño - Código: 13003",
+      "precio": 9500,
+      "codigoBarras": "7791000130035",
+      "imagen": "/images/categorias/sales.webp",
+      "categoriaId": "3a9fd52b-a878-45a6-93c6-581e342204f4",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "3a9fd52b-a878-45a6-93c6-581e342204f4",
+        "nombre": "Sales de Baño",
+        "imagen": "/images/categorias/sales.webp"
+      }
+    },
+    {
+      "id": "ad7edd66-5b41-4fd1-a2b2-5b349ab9aaa4",
+      "nombre": "VELA  DE  SOJA  BOMBE  CON  FRASE",
+      "descripcion": "Velas de Soja - Código: 14001",
+      "precio": 26500,
+      "codigoBarras": "7791000140010",
+      "imagen": "/images/categorias/velas.jpg",
+      "categoriaId": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+        "nombre": "Velas de Soja",
+        "imagen": "/images/categorias/velas.jpg"
+      }
+    },
+    {
+      "id": "390dc302-73a2-4c55-b845-4450fc9f3192",
+      "nombre": "VELA  DE  SOJA  GEOGLIFICA",
+      "descripcion": "Velas de Soja - Código: 14006",
+      "precio": 49000,
+      "codigoBarras": "7791000140065",
+      "imagen": "/images/categorias/velas.jpg",
+      "categoriaId": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+        "nombre": "Velas de Soja",
+        "imagen": "/images/categorias/velas.jpg"
+      }
+    },
+    {
+      "id": "b6067d66-7fb4-4966-9da5-c9cfe8c3f307",
+      "nombre": "Aceite Esencial Limón 10ml",
+      "descripcion": "Aceite esencial puro de limón, frasco de 10ml",
+      "precio": 350,
+      "codigoBarras": "770987324481",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/df761f23-cb5f-4fd4-ae93-dd5de9612ee3.webp",
+      "categoriaId": "787bff99-bf8c-4b1b-8aea-970f9da910a9",
+      "stockMinimo": 8,
+      "activo": false,
+      "categoria": {
+        "id": "787bff99-bf8c-4b1b-8aea-970f9da910a9",
+        "nombre": "Aceites Esenciales",
+        "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/df761f23-cb5f-4fd4-ae93-dd5de9612ee3.webp"
+      }
+    },
+    {
+      "id": "9e062600-c1a6-4dfe-b783-49266deb39dd",
+      "nombre": "Aceite Esencial Menta 10ml",
+      "descripcion": "Aceite esencial puro de menta, frasco de 10ml",
+      "precio": 380,
+      "codigoBarras": "770987465087",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/df761f23-cb5f-4fd4-ae93-dd5de9612ee3.webp",
+      "categoriaId": "787bff99-bf8c-4b1b-8aea-970f9da910a9",
+      "stockMinimo": 8,
+      "activo": false,
+      "categoria": {
+        "id": "787bff99-bf8c-4b1b-8aea-970f9da910a9",
+        "nombre": "Aceites Esenciales",
+        "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/df761f23-cb5f-4fd4-ae93-dd5de9612ee3.webp"
+      }
+    },
+    {
+      "id": "d2242d8d-00f5-449e-81f8-8e53460232d5",
+      "nombre": "ACEITE  DE  ROSA  MOSQUETA",
+      "descripcion": "Aceites Corporales - Código: 1003",
+      "precio": 9500,
+      "codigoBarras": "7791000010030",
+      "imagen": "/images/categorias/aceites.webp",
+      "categoriaId": "2a74f242-d850-451d-bcd9-b46cbe554cb7",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "2a74f242-d850-451d-bcd9-b46cbe554cb7",
+        "nombre": "Aceites Corporales",
+        "imagen": "/images/categorias/aceites.webp"
+      }
+    },
+    {
+      "id": "b827cdc1-0143-49e0-bffb-8510ebba8cb3",
+      "nombre": "ACEITE DE RICINO",
+      "descripcion": "Aceites Corporales - Código: 1004",
+      "precio": 7500,
+      "codigoBarras": "7791000010047",
+      "imagen": "/images/categorias/aceites.webp",
+      "categoriaId": "2a74f242-d850-451d-bcd9-b46cbe554cb7",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "2a74f242-d850-451d-bcd9-b46cbe554cb7",
+        "nombre": "Aceites Corporales",
+        "imagen": "/images/categorias/aceites.webp"
+      }
+    },
+    {
+      "id": "bdffb01b-dfde-4a96-9004-2cdfdde94437",
+      "nombre": "Vela Aromática Lavanda",
+      "descripcion": "Vela de cera de soja con esencia de lavanda",
+      "precio": 280,
+      "codigoBarras": "770987045718",
+      "imagen": null,
+      "categoriaId": "0fa9ef24-6381-4b96-86c1-1104a421b24c",
+      "stockMinimo": 10,
+      "activo": false,
+      "categoria": {
+        "id": "0fa9ef24-6381-4b96-86c1-1104a421b24c",
+        "nombre": "Velas Aromáticas",
+        "imagen": null
+      }
+    },
+    {
+      "id": "ced862d1-029f-4a5e-92f3-7ed15a0920b7",
+      "nombre": "Vela Aromática Eucalipto",
+      "descripcion": "Vela de cera de soja con esencia de eucalipto",
+      "precio": 280,
+      "codigoBarras": "770987185492",
+      "imagen": null,
+      "categoriaId": "0fa9ef24-6381-4b96-86c1-1104a421b24c",
+      "stockMinimo": 10,
+      "activo": false,
+      "categoria": {
+        "id": "0fa9ef24-6381-4b96-86c1-1104a421b24c",
+        "nombre": "Velas Aromáticas",
+        "imagen": null
+      }
+    },
+    {
+      "id": "9b090a01-33ab-45e6-a86c-a5bfbeaa23a4",
+      "nombre": "ACEITE  DE  ALMENDRAS",
+      "descripcion": "Aceites Corporales - Código: 1001",
+      "precio": 8500,
+      "codigoBarras": "7791000010016",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/a235889a-422e-4e8a-afc6-8be1dae3c911.webp",
+      "categoriaId": "2a74f242-d850-451d-bcd9-b46cbe554cb7",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "2a74f242-d850-451d-bcd9-b46cbe554cb7",
+        "nombre": "Aceites Corporales",
+        "imagen": "/images/categorias/aceites.webp"
+      }
+    },
+    {
+      "id": "8aa88af6-4896-4b52-9aac-70df4bf9defd",
+      "nombre": "ACEITE  DE  COCO",
+      "descripcion": "Aceites Corporales - Código: 1002",
+      "precio": 6900,
+      "codigoBarras": "7791000010023",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/483a3928-93d6-4b45-9461-7aeb0773d327.webp",
+      "categoriaId": "2a74f242-d850-451d-bcd9-b46cbe554cb7",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "2a74f242-d850-451d-bcd9-b46cbe554cb7",
+        "nombre": "Aceites Corporales",
+        "imagen": "/images/categorias/aceites.webp"
+      }
+    },
+    {
+      "id": "280b7342-d55d-4394-9fd3-f5a0e533fbba",
+      "nombre": "BOMBA  ESF.  ALMENDRA",
+      "descripcion": "Bombas de Baño - Código: 3001",
+      "precio": 8500,
+      "codigoBarras": "7791000030014",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/5f53dfde-aeea-4186-b360-497f3683f199.webp",
+      "categoriaId": "67ef504f-b589-4425-9490-7b4e55c24def",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "67ef504f-b589-4425-9490-7b4e55c24def",
+        "nombre": "Bombas de Baño",
+        "imagen": "/images/categorias/bombas-baño.webp"
+      }
+    },
+    {
+      "id": "4a988494-fda1-4081-b680-ccacf6e0f743",
+      "nombre": "BOMBA  ESF.  CHICLE",
+      "descripcion": "Bombas de Baño - Código: 3002",
+      "precio": 8500,
+      "codigoBarras": "7791000030021",
+      "imagen": "/images/categorias/bombas-baño.webp",
+      "categoriaId": "67ef504f-b589-4425-9490-7b4e55c24def",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "67ef504f-b589-4425-9490-7b4e55c24def",
+        "nombre": "Bombas de Baño",
+        "imagen": "/images/categorias/bombas-baño.webp"
+      }
+    },
+    {
+      "id": "92f6de62-6116-4bb0-87a2-6322390c8691",
+      "nombre": "BOMBA  ESF.  COCO  VAINILLA",
+      "descripcion": "Bombas de Baño - Código: 3003",
+      "precio": 8500,
+      "codigoBarras": "7791000030038",
+      "imagen": "/images/categorias/bombas-baño.webp",
+      "categoriaId": "67ef504f-b589-4425-9490-7b4e55c24def",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "67ef504f-b589-4425-9490-7b4e55c24def",
+        "nombre": "Bombas de Baño",
+        "imagen": "/images/categorias/bombas-baño.webp"
+      }
+    },
+    {
+      "id": "45f71ace-e9f9-47ef-9572-972379c139ac",
+      "nombre": "BOMBA  ESF.  FLORAL",
+      "descripcion": "Bombas de Baño - Código: 3004",
+      "precio": 8500,
+      "codigoBarras": "7791000030045",
+      "imagen": "/images/categorias/bombas-baño.webp",
+      "categoriaId": "67ef504f-b589-4425-9490-7b4e55c24def",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "67ef504f-b589-4425-9490-7b4e55c24def",
+        "nombre": "Bombas de Baño",
+        "imagen": "/images/categorias/bombas-baño.webp"
+      }
+    },
+    {
+      "id": "e8f53016-7298-4a71-a02b-bb6454ae7c59",
+      "nombre": "BOMBA  ESF.  FRUTOS  ROJOS",
+      "descripcion": "Bombas de Baño - Código: 3005",
+      "precio": 8500,
+      "codigoBarras": "7791000030052",
+      "imagen": "/images/categorias/bombas-baño.webp",
+      "categoriaId": "67ef504f-b589-4425-9490-7b4e55c24def",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "67ef504f-b589-4425-9490-7b4e55c24def",
+        "nombre": "Bombas de Baño",
+        "imagen": "/images/categorias/bombas-baño.webp"
+      }
+    },
+    {
+      "id": "baa5ea54-fb3e-45f8-b546-a931fa7511f6",
+      "nombre": "BOMBA  ESF.  JAZMIN",
+      "descripcion": "Bombas de Baño - Código: 3006",
+      "precio": 8500,
+      "codigoBarras": "7791000030069",
+      "imagen": "/images/categorias/bombas-baño.webp",
+      "categoriaId": "67ef504f-b589-4425-9490-7b4e55c24def",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "67ef504f-b589-4425-9490-7b4e55c24def",
+        "nombre": "Bombas de Baño",
+        "imagen": "/images/categorias/bombas-baño.webp"
+      }
+    },
+    {
+      "id": "51c9214c-8de9-43b5-9139-038f269060c9",
+      "nombre": "BOMBA  ESF.  LAVANDA",
+      "descripcion": "Bombas de Baño - Código: 3007",
+      "precio": 8500,
+      "codigoBarras": "7791000030076",
+      "imagen": "/images/categorias/bombas-baño.webp",
+      "categoriaId": "67ef504f-b589-4425-9490-7b4e55c24def",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "67ef504f-b589-4425-9490-7b4e55c24def",
+        "nombre": "Bombas de Baño",
+        "imagen": "/images/categorias/bombas-baño.webp"
+      }
+    },
+    {
+      "id": "3870cc5b-384d-4756-a23e-dc63f6698243",
+      "nombre": "DIFUSOR  DE  AUTO",
+      "descripcion": "Difusores para Auto - Código: 4001",
+      "precio": 8900,
+      "codigoBarras": "7791000040013",
+      "imagen": "/images/categorias/difusores-auto.webp",
+      "categoriaId": "e3274745-f673-4ed4-b83b-24a5a6220bcb",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "e3274745-f673-4ed4-b83b-24a5a6220bcb",
+        "nombre": "Difusores para Auto",
+        "imagen": "/images/categorias/difusores-auto.webp"
+      }
+    },
+    {
+      "id": "24f5ff30-71ad-435f-9568-0b8879106119",
+      "nombre": "REC.   DIFU.  AUTO  AUTO NUEVO",
+      "descripcion": "Difusores para Auto - Código: 4002",
+      "precio": 8900,
+      "codigoBarras": "7791000040020",
+      "imagen": "/images/categorias/difusores-auto.webp",
+      "categoriaId": "e3274745-f673-4ed4-b83b-24a5a6220bcb",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "e3274745-f673-4ed4-b83b-24a5a6220bcb",
+        "nombre": "Difusores para Auto",
+        "imagen": "/images/categorias/difusores-auto.webp"
+      }
+    },
+    {
+      "id": "6c64eb2c-d8e7-4634-a1b5-e3d549306b02",
+      "nombre": "REC.   DIFU.  AUTO  BAMBU",
+      "descripcion": "Difusores para Auto - Código: 4003",
+      "precio": 8900,
+      "codigoBarras": "7791000040037",
+      "imagen": "/images/categorias/difusores-auto.webp",
+      "categoriaId": "e3274745-f673-4ed4-b83b-24a5a6220bcb",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "e3274745-f673-4ed4-b83b-24a5a6220bcb",
+        "nombre": "Difusores para Auto",
+        "imagen": "/images/categorias/difusores-auto.webp"
+      }
+    },
+    {
+      "id": "2834f222-3db6-4556-b3be-4dc8a624a9db",
+      "nombre": "REC.   DIFU.  AUTO  FLORES BLANCAS",
+      "descripcion": "Difusores para Auto - Código: 4004",
+      "precio": 8900,
+      "codigoBarras": "7791000040044",
+      "imagen": "/images/categorias/difusores-auto.webp",
+      "categoriaId": "e3274745-f673-4ed4-b83b-24a5a6220bcb",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "e3274745-f673-4ed4-b83b-24a5a6220bcb",
+        "nombre": "Difusores para Auto",
+        "imagen": "/images/categorias/difusores-auto.webp"
+      }
+    },
+    {
+      "id": "30250beb-ab05-4be9-8ae3-d5a697cf3c42",
+      "nombre": "REC.   DIFU.  AUTO  FRUTOS ROJOS",
+      "descripcion": "Difusores para Auto - Código: 4005",
+      "precio": 8900,
+      "codigoBarras": "7791000040051",
+      "imagen": "/images/categorias/difusores-auto.webp",
+      "categoriaId": "e3274745-f673-4ed4-b83b-24a5a6220bcb",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "e3274745-f673-4ed4-b83b-24a5a6220bcb",
+        "nombre": "Difusores para Auto",
+        "imagen": "/images/categorias/difusores-auto.webp"
+      }
+    },
+    {
+      "id": "ad0ea5cd-8251-46d0-8580-390fe96a142b",
+      "nombre": "REC.   DIFU.  AUTO  LEMON GRASS",
+      "descripcion": "Difusores para Auto - Código: 4006",
+      "precio": 8900,
+      "codigoBarras": "7791000040068",
+      "imagen": "/images/categorias/difusores-auto.webp",
+      "categoriaId": "e3274745-f673-4ed4-b83b-24a5a6220bcb",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "e3274745-f673-4ed4-b83b-24a5a6220bcb",
+        "nombre": "Difusores para Auto",
+        "imagen": "/images/categorias/difusores-auto.webp"
+      }
+    },
+    {
+      "id": "bc3ae561-30d4-462f-97d9-e7361774ea0c",
+      "nombre": "REC.   DIFU.  AUTO  MANGO",
+      "descripcion": "Difusores para Auto - Código: 4008",
+      "precio": 8900,
+      "codigoBarras": "7791000040082",
+      "imagen": "/images/categorias/difusores-auto.webp",
+      "categoriaId": "e3274745-f673-4ed4-b83b-24a5a6220bcb",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "e3274745-f673-4ed4-b83b-24a5a6220bcb",
+        "nombre": "Difusores para Auto",
+        "imagen": "/images/categorias/difusores-auto.webp"
+      }
+    },
+    {
+      "id": "affe5402-8e08-4898-bc62-5819ce806e7c",
+      "nombre": "REC.   DIFU.  AUTO  NARANJA Y CANELA",
+      "descripcion": "Difusores para Auto - Código: 4009",
+      "precio": 8900,
+      "codigoBarras": "7791000040099",
+      "imagen": "/images/categorias/difusores-auto.webp",
+      "categoriaId": "e3274745-f673-4ed4-b83b-24a5a6220bcb",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "e3274745-f673-4ed4-b83b-24a5a6220bcb",
+        "nombre": "Difusores para Auto",
+        "imagen": "/images/categorias/difusores-auto.webp"
+      }
+    },
+    {
+      "id": "90059274-6276-48ee-8bb6-a2471a281386",
+      "nombre": "REC.   DIFU.  AUTO  NARANJA Y JENGIBRE",
+      "descripcion": "Difusores para Auto - Código: 4010",
+      "precio": 8900,
+      "codigoBarras": "7791000040105",
+      "imagen": "/images/categorias/difusores-auto.webp",
+      "categoriaId": "e3274745-f673-4ed4-b83b-24a5a6220bcb",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "e3274745-f673-4ed4-b83b-24a5a6220bcb",
+        "nombre": "Difusores para Auto",
+        "imagen": "/images/categorias/difusores-auto.webp"
+      }
+    },
+    {
+      "id": "f749b2f1-cdbe-4348-b6c3-8a0390876059",
+      "nombre": "REC.   DIFU.  AUTO  NARANJA Y PIMIENTA",
+      "descripcion": "Difusores para Auto - Código: 4011",
+      "precio": 8900,
+      "codigoBarras": "7791000040112",
+      "imagen": "/images/categorias/difusores-auto.webp",
+      "categoriaId": "e3274745-f673-4ed4-b83b-24a5a6220bcb",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "e3274745-f673-4ed4-b83b-24a5a6220bcb",
+        "nombre": "Difusores para Auto",
+        "imagen": "/images/categorias/difusores-auto.webp"
+      }
+    },
+    {
+      "id": "533417dd-a6bb-411e-875e-13b1d1bbbf64",
+      "nombre": "REC.   DIFU.  AUTO  PERAS Y FLORES",
+      "descripcion": "Difusores para Auto - Código: 4012",
+      "precio": 8900,
+      "codigoBarras": "7791000040129",
+      "imagen": "/images/categorias/difusores-auto.webp",
+      "categoriaId": "e3274745-f673-4ed4-b83b-24a5a6220bcb",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "e3274745-f673-4ed4-b83b-24a5a6220bcb",
+        "nombre": "Difusores para Auto",
+        "imagen": "/images/categorias/difusores-auto.webp"
+      }
+    },
+    {
+      "id": "f3373c8d-2bb9-4eb7-a9ed-e8d2bd02f421",
+      "nombre": "REC.   DIFU.  AUTO  ROSAS",
+      "descripcion": "Difusores para Auto - Código: 4013",
+      "precio": 8900,
+      "codigoBarras": "7791000040136",
+      "imagen": "/images/categorias/difusores-auto.webp",
+      "categoriaId": "e3274745-f673-4ed4-b83b-24a5a6220bcb",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "e3274745-f673-4ed4-b83b-24a5a6220bcb",
+        "nombre": "Difusores para Auto",
+        "imagen": "/images/categorias/difusores-auto.webp"
+      }
+    },
+    {
+      "id": "5b2275f9-db04-4b9d-9423-b7e31c1af86d",
+      "nombre": "REC.   DIFU.  AUTO  TE VERDE",
+      "descripcion": "Difusores para Auto - Código: 4015",
+      "precio": 8900,
+      "codigoBarras": "7791000040150",
+      "imagen": "/images/categorias/difusores-auto.webp",
+      "categoriaId": "e3274745-f673-4ed4-b83b-24a5a6220bcb",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "e3274745-f673-4ed4-b83b-24a5a6220bcb",
+        "nombre": "Difusores para Auto",
+        "imagen": "/images/categorias/difusores-auto.webp"
+      }
+    },
+    {
+      "id": "e0154767-eb97-49c8-9d34-905c4a8e22e5",
+      "nombre": "REC.   DIFU.  AUTO  VAINICOCO",
+      "descripcion": "Difusores para Auto - Código: 4016",
+      "precio": 8900,
+      "codigoBarras": "7791000040167",
+      "imagen": "/images/categorias/difusores-auto.webp",
+      "categoriaId": "e3274745-f673-4ed4-b83b-24a5a6220bcb",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "e3274745-f673-4ed4-b83b-24a5a6220bcb",
+        "nombre": "Difusores para Auto",
+        "imagen": "/images/categorias/difusores-auto.webp"
+      }
+    },
+    {
+      "id": "f33a08bf-103a-4cea-8607-7ee5c98857c6",
+      "nombre": "REC.   DIFU.  AUTO  VAINILLA",
+      "descripcion": "Difusores para Auto - Código: 4017",
+      "precio": 8900,
+      "codigoBarras": "7791000040174",
+      "imagen": "/images/categorias/difusores-auto.webp",
+      "categoriaId": "e3274745-f673-4ed4-b83b-24a5a6220bcb",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "e3274745-f673-4ed4-b83b-24a5a6220bcb",
+        "nombre": "Difusores para Auto",
+        "imagen": "/images/categorias/difusores-auto.webp"
+      }
+    },
+    {
+      "id": "d13e6cbb-e525-4609-acd2-1c9bb0c824de",
+      "nombre": "REC.   DIFU. AUTO LAVANDA",
+      "descripcion": "Difusores para Auto - Código: 4018",
+      "precio": 8900,
+      "codigoBarras": "7791000040181",
+      "imagen": "/images/categorias/difusores-auto.webp",
+      "categoriaId": "e3274745-f673-4ed4-b83b-24a5a6220bcb",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "e3274745-f673-4ed4-b83b-24a5a6220bcb",
+        "nombre": "Difusores para Auto",
+        "imagen": "/images/categorias/difusores-auto.webp"
+      }
+    },
+    {
+      "id": "da1e6410-ba02-4944-8280-55c46f255c3c",
+      "nombre": "DIFUSOR  ALMENDRAS",
+      "descripcion": "Difusores - Código: 5001",
+      "precio": 25900,
+      "codigoBarras": "7791000050012",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp",
+      "categoriaId": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+        "nombre": "Difusores",
+        "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp"
+      }
+    },
+    {
+      "id": "460e6279-e601-4697-8fdb-17d2b51dff5f",
+      "nombre": "DIFUSOR  BERGAMOTA",
+      "descripcion": "Difusores - Código: 5003",
+      "precio": 25900,
+      "codigoBarras": "7791000050036",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp",
+      "categoriaId": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+        "nombre": "Difusores",
+        "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp"
+      }
+    },
+    {
+      "id": "be565ecf-899e-4598-a3e3-f48393eae647",
+      "nombre": "DIFUSOR  CITRONELLA",
+      "descripcion": "Difusores - Código: 5005",
+      "precio": 25900,
+      "codigoBarras": "7791000050050",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp",
+      "categoriaId": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+        "nombre": "Difusores",
+        "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp"
+      }
+    },
+    {
+      "id": "0fa146a6-5501-440f-82cf-f8e794012700",
+      "nombre": "DIFUSOR  FLORES  BLANCAS",
+      "descripcion": "Difusores - Código: 5006",
+      "precio": 25900,
+      "codigoBarras": "7791000050067",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp",
+      "categoriaId": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+        "nombre": "Difusores",
+        "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp"
+      }
+    },
+    {
+      "id": "42400d1c-5b09-41f8-9822-26d5deac4bea",
+      "nombre": "DIFUSOR  FRUTOS  ROJOS",
+      "descripcion": "Difusores - Código: 5007",
+      "precio": 25900,
+      "codigoBarras": "7791000050074",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp",
+      "categoriaId": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+        "nombre": "Difusores",
+        "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp"
+      }
+    },
+    {
+      "id": "5265bba0-aaea-48ad-a3d2-6cba37b648e3",
+      "nombre": "DIFUSOR  LEMONGRASS",
+      "descripcion": "Difusores - Código: 5011",
+      "precio": 25900,
+      "codigoBarras": "7791000050111",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp",
+      "categoriaId": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+        "nombre": "Difusores",
+        "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp"
+      }
+    },
+    {
+      "id": "6ee655c9-d990-47d8-b2cc-fe0ed4e8abeb",
+      "nombre": "DIFUSOR  LIMON  Y  JENGIBRE",
+      "descripcion": "Difusores - Código: 5012",
+      "precio": 25900,
+      "codigoBarras": "7791000050128",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp",
+      "categoriaId": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+        "nombre": "Difusores",
+        "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp"
+      }
+    },
+    {
+      "id": "6411064d-0a58-41ea-9c12-75bda653412c",
+      "nombre": "DIFUSOR  MADERAS  DEL  ORIENTE",
+      "descripcion": "Difusores - Código: 5013",
+      "precio": 25900,
+      "codigoBarras": "7791000050135",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp",
+      "categoriaId": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+        "nombre": "Difusores",
+        "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp"
+      }
+    },
+    {
+      "id": "3455baf3-c655-4288-b3bf-b9cd27837491",
+      "nombre": "DIFUSOR  MANGO  Y  MARACUYA",
+      "descripcion": "Difusores - Código: 5015",
+      "precio": 25900,
+      "codigoBarras": "7791000050159",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp",
+      "categoriaId": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+        "nombre": "Difusores",
+        "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp"
+      }
+    },
+    {
+      "id": "81899360-0d58-4f01-afc9-f4a858fed32a",
+      "nombre": "DIFUSOR  NAGCHAMPA",
+      "descripcion": "Difusores - Código: 5016",
+      "precio": 25900,
+      "codigoBarras": "7791000050166",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp",
+      "categoriaId": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+        "nombre": "Difusores",
+        "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp"
+      }
+    },
+    {
+      "id": "7be9b703-d0f6-4ba0-8224-2eda2803865d",
+      "nombre": "DIFUSOR  NARANJA  Y  JENGIBRE",
+      "descripcion": "Difusores - Código: 5018",
+      "precio": 25900,
+      "codigoBarras": "7791000050180",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp",
+      "categoriaId": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+        "nombre": "Difusores",
+        "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp"
+      }
+    },
+    {
+      "id": "62790e72-200f-4ea2-80df-7c116c1dcc85",
+      "nombre": "DIFUSOR  NARANJA  Y  PIMIENTA",
+      "descripcion": "Difusores - Código: 5019",
+      "precio": 25900,
+      "codigoBarras": "7791000050197",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp",
+      "categoriaId": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+        "nombre": "Difusores",
+        "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp"
+      }
+    },
+    {
+      "id": "195c47c4-b2c2-4143-b2c1-79dc087c6813",
+      "nombre": "DIFUSOR  PALO  SANTO",
+      "descripcion": "Difusores - Código: 5021",
+      "precio": 25900,
+      "codigoBarras": "7791000050210",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp",
+      "categoriaId": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+        "nombre": "Difusores",
+        "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp"
+      }
+    },
+    {
+      "id": "7d9a9816-3f91-4370-a862-5ba982e5108e",
+      "nombre": "DIFUSOR  PERAS  Y  FLORES",
+      "descripcion": "Difusores - Código: 5022",
+      "precio": 25900,
+      "codigoBarras": "7791000050227",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp",
+      "categoriaId": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+        "nombre": "Difusores",
+        "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp"
+      }
+    },
+    {
+      "id": "c2d53d66-c032-4af7-9c78-14c59367f2cc",
+      "nombre": "DIFUSOR  SAI  BABA",
+      "descripcion": "Difusores - Código: 5024",
+      "precio": 25900,
+      "codigoBarras": "7791000050241",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp",
+      "categoriaId": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+        "nombre": "Difusores",
+        "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp"
+      }
+    },
+    {
+      "id": "594d1e4f-e3c5-47c7-9bed-40dca8f3a7ac",
+      "nombre": "DIFUSOR  SANDALO",
+      "descripcion": "Difusores - Código: 5025",
+      "precio": 25900,
+      "codigoBarras": "7791000050258",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp",
+      "categoriaId": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+        "nombre": "Difusores",
+        "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp"
+      }
+    },
+    {
+      "id": "2598915b-37a1-4b49-94df-15e7dd5647be",
+      "nombre": "DIFUSOR  TILO",
+      "descripcion": "Difusores - Código: 5027",
+      "precio": 25900,
+      "codigoBarras": "7791000050272",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp",
+      "categoriaId": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+        "nombre": "Difusores",
+        "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp"
+      }
+    },
+    {
+      "id": "8d906dbf-901f-4f5c-975a-515493f75abe",
+      "nombre": "DIFUSOR  VAINICOCO",
+      "descripcion": "Difusores - Código: 5028",
+      "precio": 25900,
+      "codigoBarras": "7791000050289",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp",
+      "categoriaId": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+        "nombre": "Difusores",
+        "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp"
+      }
+    },
+    {
+      "id": "e92d6df3-fc16-4b95-a69f-56fe2f222f82",
+      "nombre": "DIFUSOR  VERBENA",
+      "descripcion": "Difusores - Código: 5030",
+      "precio": 25900,
+      "codigoBarras": "7791000050302",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp",
+      "categoriaId": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+        "nombre": "Difusores",
+        "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp"
+      }
+    },
+    {
+      "id": "92c0ba86-d207-479f-9f16-2055a71f9422",
+      "nombre": "DIFUSOR  WANAMA",
+      "descripcion": "Difusores - Código: 5031",
+      "precio": 25900,
+      "codigoBarras": "7791000050319",
+      "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp",
+      "categoriaId": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "ab7cd3e2-933f-4463-9d33-b68103468d24",
+        "nombre": "Difusores",
+        "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/4bd19554-7f8f-4d59-9804-76dd0c208f57.webp"
+      }
+    },
+    {
+      "id": "8d10a709-81b6-4f65-ab79-406c52244f4e",
+      "nombre": "ES.  HORNI.  BEBE",
+      "descripcion": "Esencias para Hornillo - Código: 6001",
+      "precio": 9500,
+      "codigoBarras": "7791000060011",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+        "nombre": "Esencias para Hornillo",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "f0a08b23-5e00-4e54-a8b6-7a638a8082bb",
+      "nombre": "ES.  HORNI.  CEREZA",
+      "descripcion": "Esencias para Hornillo - Código: 6003",
+      "precio": 9500,
+      "codigoBarras": "7791000060035",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+        "nombre": "Esencias para Hornillo",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "87b6ab02-cd00-4b38-9883-3a857f4c574d",
+      "nombre": "ES.  HORNI.  CHERRY",
+      "descripcion": "Esencias para Hornillo - Código: 6004",
+      "precio": 9500,
+      "codigoBarras": "7791000060042",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+        "nombre": "Esencias para Hornillo",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "4534c1f4-7ed5-407e-8cc3-37ae007540a1",
+      "nombre": "ES.  HORNI.  CITRONELLA",
+      "descripcion": "Esencias para Hornillo - Código: 6005",
+      "precio": 9500,
+      "codigoBarras": "7791000060059",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+        "nombre": "Esencias para Hornillo",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "13c23d1b-4b10-466b-bc6f-f41d0471a187",
+      "nombre": "ES.  HORNI.  COCO",
+      "descripcion": "Esencias para Hornillo - Código: 6006",
+      "precio": 9500,
+      "codigoBarras": "7791000060066",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+        "nombre": "Esencias para Hornillo",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "e4af0ee5-d771-4881-a6b6-88683156e98b",
+      "nombre": "ES.  HORNI.  EUCALIPTO",
+      "descripcion": "Esencias para Hornillo - Código: 6007",
+      "precio": 9500,
+      "codigoBarras": "7791000060073",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+        "nombre": "Esencias para Hornillo",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "190f799f-3b67-488c-b6cb-03ed5b7908fc",
+      "nombre": "ES.  HORNI.  FLORAL",
+      "descripcion": "Esencias para Hornillo - Código: 6008",
+      "precio": 9500,
+      "codigoBarras": "7791000060080",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+        "nombre": "Esencias para Hornillo",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "89a6dd1c-46c5-4caa-bd7d-411f9249e3f8",
+      "nombre": "ES.  HORNI.  FLORES  BLANCAS",
+      "descripcion": "Esencias para Hornillo - Código: 6009",
+      "precio": 9500,
+      "codigoBarras": "7791000060097",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+        "nombre": "Esencias para Hornillo",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "7122ce50-b192-4a8b-bf7e-ac2e85e17c45",
+      "nombre": "ES.  HORNI.  INCIENSO",
+      "descripcion": "Esencias para Hornillo - Código: 6011",
+      "precio": 9500,
+      "codigoBarras": "7791000060110",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+        "nombre": "Esencias para Hornillo",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "53a73578-01c6-48ea-ad1f-3dddb01335be",
+      "nombre": "ES.  HORNI.  LAVANDA",
+      "descripcion": "Esencias para Hornillo - Código: 6012",
+      "precio": 9500,
+      "codigoBarras": "7791000060127",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+        "nombre": "Esencias para Hornillo",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "e45a528b-3a20-4f44-97cd-7af0c68a9cae",
+      "nombre": "ES.  HORNI.  LEMON  GRASS",
+      "descripcion": "Esencias para Hornillo - Código: 6013",
+      "precio": 9500,
+      "codigoBarras": "7791000060134",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+        "nombre": "Esencias para Hornillo",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "009a1c33-5ef1-4cd8-b992-43a4665ccf41",
+      "nombre": "ES.  HORNI.  MADERAS  DE  ORIENTE",
+      "descripcion": "Esencias para Hornillo - Código: 6014",
+      "precio": 9500,
+      "codigoBarras": "7791000060141",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+        "nombre": "Esencias para Hornillo",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "12189364-d132-4ea0-904a-e3ee75b7fb0a",
+      "nombre": "ES.  HORNI.  MANZANA",
+      "descripcion": "Esencias para Hornillo - Código: 6015",
+      "precio": 9500,
+      "codigoBarras": "7791000060158",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+        "nombre": "Esencias para Hornillo",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "1d349bb4-68b8-463c-9fb6-071c2cf15ce9",
+      "nombre": "ES.  HORNI.  MELON",
+      "descripcion": "Esencias para Hornillo - Código: 6016",
+      "precio": 9500,
+      "codigoBarras": "7791000060165",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+        "nombre": "Esencias para Hornillo",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "ecd49af7-7a26-47f1-a136-a0daf54b9f31",
+      "nombre": "ES.  HORNI.  MIEL",
+      "descripcion": "Esencias para Hornillo - Código: 6017",
+      "precio": 9500,
+      "codigoBarras": "7791000060172",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+        "nombre": "Esencias para Hornillo",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "5a726ec9-70cd-4d16-af83-b525699d63c3",
+      "nombre": "ES.  HORNI.  NAG  CHAMPA",
+      "descripcion": "Esencias para Hornillo - Código: 6019",
+      "precio": 9500,
+      "codigoBarras": "7791000060196",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+        "nombre": "Esencias para Hornillo",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "f5d45339-b10a-484c-b08c-725f3c42984f",
+      "nombre": "ES.  HORNI.  NARANJA  CANELA",
+      "descripcion": "Esencias para Hornillo - Código: 6020",
+      "precio": 9500,
+      "codigoBarras": "7791000060202",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+        "nombre": "Esencias para Hornillo",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "1be75457-c9ab-4b2d-b364-e83ed565afac",
+      "nombre": "ES.  HORNI.  NARANJA  JENGIBRE",
+      "descripcion": "Esencias para Hornillo - Código: 6021",
+      "precio": 9500,
+      "codigoBarras": "7791000060219",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+        "nombre": "Esencias para Hornillo",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "f498e52f-e1df-4ad4-896b-23b81da2eaaa",
+      "nombre": "ES.  HORNI.  NARDO",
+      "descripcion": "Esencias para Hornillo - Código: 6022",
+      "precio": 9500,
+      "codigoBarras": "7791000060226",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+        "nombre": "Esencias para Hornillo",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "b8d8ce54-ccd8-4861-96e0-c3ccb60ff3f5",
+      "nombre": "ES.  HORNI.  PATCHULI",
+      "descripcion": "Esencias para Hornillo - Código: 6023",
+      "precio": 9500,
+      "codigoBarras": "7791000060233",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+        "nombre": "Esencias para Hornillo",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "ddab9bda-bdc6-41f3-b384-956e6ff449c5",
+      "nombre": "ES.  HORNI.  ROMERO",
+      "descripcion": "Esencias para Hornillo - Código: 6024",
+      "precio": 9500,
+      "codigoBarras": "7791000060240",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+        "nombre": "Esencias para Hornillo",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "01d58056-2822-4bf8-88ad-4e52490aade8",
+      "nombre": "ES.  HORNI.  SANDALO",
+      "descripcion": "Esencias para Hornillo - Código: 6026",
+      "precio": 9500,
+      "codigoBarras": "7791000060264",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+        "nombre": "Esencias para Hornillo",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "8f4b2bf1-4421-4c7a-af7b-43e6bfb330af",
+      "nombre": "ES.  HORNI.  SANDALO  HINDU",
+      "descripcion": "Esencias para Hornillo - Código: 6027",
+      "precio": 9500,
+      "codigoBarras": "7791000060271",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+        "nombre": "Esencias para Hornillo",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "359765e2-07e9-4539-ba1b-89d1b7665fea",
+      "nombre": "ES.  HORNI.  TE  VERDE",
+      "descripcion": "Esencias para Hornillo - Código: 6028",
+      "precio": 9500,
+      "codigoBarras": "7791000060288",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+        "nombre": "Esencias para Hornillo",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "707e8dff-e2aa-4c86-a6e5-be63b6632a2a",
+      "nombre": "ES.  HORNI.  TILO",
+      "descripcion": "Esencias para Hornillo - Código: 6029",
+      "precio": 9500,
+      "codigoBarras": "7791000060295",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+        "nombre": "Esencias para Hornillo",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "5279fbf0-ae9a-4e0e-bff3-80e388429024",
+      "nombre": "ES.  HORNI.  VAINICOCO",
+      "descripcion": "Esencias para Hornillo - Código: 6030",
+      "precio": 9500,
+      "codigoBarras": "7791000060301",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+        "nombre": "Esencias para Hornillo",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "5e05e029-a134-4b30-a925-4e707d6aeb48",
+      "nombre": "ES.  HORNI.  VAINILLA",
+      "descripcion": "Esencias para Hornillo - Código: 6031",
+      "precio": 9500,
+      "codigoBarras": "7791000060318",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+        "nombre": "Esencias para Hornillo",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "2d31e2fe-4b4e-49b8-b81b-21a794d38969",
+      "nombre": "ES.  HORNI.  VERBENA",
+      "descripcion": "Esencias para Hornillo - Código: 6032",
+      "precio": 9500,
+      "codigoBarras": "7791000060325",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "36897521-918b-4ad3-8a9f-a5dd2ea294d6",
+        "nombre": "Esencias para Hornillo",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "6d7236bd-2230-4181-bd16-73ae589f6778",
+      "nombre": "ES.HUMI.AMSTERDAM",
+      "descripcion": "Esencias para Humidificador - Código: 7002",
+      "precio": 14500,
+      "codigoBarras": "7791000070027",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "023fd8af-657b-43e1-817a-611898fc3d7a",
+      "nombre": "ES.HUMI.APHRODITA",
+      "descripcion": "Esencias para Humidificador - Código: 7003",
+      "precio": 14500,
+      "codigoBarras": "7791000070034",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "90d421dc-4835-4f2a-9a3e-7772fcaa3625",
+      "nombre": "ES.HUMI.BELICE",
+      "descripcion": "Esencias para Humidificador - Código: 7004",
+      "precio": 14500,
+      "codigoBarras": "7791000070041",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "52400f72-96f5-4450-a9c5-3d8bfb652928",
+      "nombre": "ES.HUMI.BERGAMOTA",
+      "descripcion": "Esencias para Humidificador - Código: 7005",
+      "precio": 14500,
+      "codigoBarras": "7791000070058",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "f5229bcb-adc0-47a4-8ffa-163d7c37ae1c",
+      "nombre": "ES.HUMI.CALIFORNIA",
+      "descripcion": "Esencias para Humidificador - Código: 7006",
+      "precio": 14500,
+      "codigoBarras": "7791000070065",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "cd4df0e9-0117-44ba-985a-e93e3db771cd",
+      "nombre": "ES.HUMI.CANCUN",
+      "descripcion": "Esencias para Humidificador - Código: 7007",
+      "precio": 14500,
+      "codigoBarras": "7791000070072",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "1410653f-5424-4f5a-9f65-0a3b957e9a4e",
+      "nombre": "ES.HUMI.CARIBEAN",
+      "descripcion": "Esencias para Humidificador - Código: 7008",
+      "precio": 14500,
+      "codigoBarras": "7791000070089",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "d982c8ae-98af-4d91-938f-e7066e552a85",
+      "nombre": "ES.HUMI.CHICLE",
+      "descripcion": "Esencias para Humidificador - Código: 7010",
+      "precio": 14500,
+      "codigoBarras": "7791000070102",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "5d0db7b8-ac7e-4f46-976d-b3b82a483d18",
+      "nombre": "ES.HUMI.DELICATEZA",
+      "descripcion": "Esencias para Humidificador - Código: 7011",
+      "precio": 14500,
+      "codigoBarras": "7791000070119",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "13c23648-f762-410a-8add-f862d9c7f9b4",
+      "nombre": "ES.HUMI.EUCALIPTO",
+      "descripcion": "Esencias para Humidificador - Código: 7012",
+      "precio": 14500,
+      "codigoBarras": "7791000070126",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "eb28286a-1c66-4dc3-8c5f-df1c4123a129",
+      "nombre": "ES.HUMI.GINGER",
+      "descripcion": "Esencias para Humidificador - Código: 7013",
+      "precio": 14500,
+      "codigoBarras": "7791000070133",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "7dbc0b9c-5dda-4e1a-bb7b-8f3293781d14",
+      "nombre": "ES.HUMI.GREEN TEA",
+      "descripcion": "Esencias para Humidificador - Código: 7014",
+      "precio": 14500,
+      "codigoBarras": "7791000070140",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "7df1710b-0c78-4b5b-8dfc-60b761d25bfd",
+      "nombre": "ES.HUMI.GROSEILLE",
+      "descripcion": "Esencias para Humidificador - Código: 7015",
+      "precio": 14500,
+      "codigoBarras": "7791000070157",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "3bb33b8a-7dd4-41a9-b195-ca4926dcf69d",
+      "nombre": "ES.HUMI.KANNAUJ",
+      "descripcion": "Esencias para Humidificador - Código: 7016",
+      "precio": 14500,
+      "codigoBarras": "7791000070164",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "a4a4fa8a-442f-4c97-aa48-538314e6f769",
+      "nombre": "ES.HUMI.LEMON",
+      "descripcion": "Esencias para Humidificador - Código: 7018",
+      "precio": 14500,
+      "codigoBarras": "7791000070188",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "c1d20c54-b85d-4c16-8d46-080432c85ef2",
+      "nombre": "ES.HUMI.LOTUS  FRESH",
+      "descripcion": "Esencias para Humidificador - Código: 7019",
+      "precio": 14500,
+      "codigoBarras": "7791000070195",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "6cc6edbd-b7c1-4c93-8ffc-fc9953b6ea09",
+      "nombre": "ES.HUMI.MADRE SELVA",
+      "descripcion": "Esencias para Humidificador - Código: 7020",
+      "precio": 14500,
+      "codigoBarras": "7791000070201",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "0656111b-45a5-40b0-8d75-efbdc746c4d5",
+      "nombre": "ES.HUMI.MALASIA",
+      "descripcion": "Esencias para Humidificador - Código: 7021",
+      "precio": 14500,
+      "codigoBarras": "7791000070218",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "9f84d921-f278-4266-b6c3-f26617879a96",
+      "nombre": "ES.HUMI.MANGO Y MARACUYA",
+      "descripcion": "Esencias para Humidificador - Código: 7022",
+      "precio": 14500,
+      "codigoBarras": "7791000070225",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "576f11ba-cc16-4046-98dd-6173279fba4f",
+      "nombre": "ES.HUMI.MONASTRELL",
+      "descripcion": "Esencias para Humidificador - Código: 7023",
+      "precio": 14500,
+      "codigoBarras": "7791000070232",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "7a34cffe-ed47-4c42-85f4-c83047f10dd1",
+      "nombre": "ES.HUMI.ORANGE",
+      "descripcion": "Esencias para Humidificador - Código: 7025",
+      "precio": 14500,
+      "codigoBarras": "7791000070256",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "3a3b68a7-6ddc-4227-96c2-54a4c7c68429",
+      "nombre": "ES.HUMI.PARADISE",
+      "descripcion": "Esencias para Humidificador - Código: 7027",
+      "precio": 14500,
+      "codigoBarras": "7791000070270",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "72ae2b05-f813-4f77-b27a-218a0864e4d0",
+      "nombre": "ES.HUMI.PITANGA",
+      "descripcion": "Esencias para Humidificador - Código: 7028",
+      "precio": 14500,
+      "codigoBarras": "7791000070287",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "7a7ad98b-c959-47e3-96fc-7d63b3b20281",
+      "nombre": "ES.HUMI.POMELO BLUEBERRY",
+      "descripcion": "Esencias para Humidificador - Código: 7029",
+      "precio": 14500,
+      "codigoBarras": "7791000070294",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "9b0f00b6-ef8e-4604-903e-9bb608400cd6",
+      "nombre": "ES.HUMI.ROMANTIC  WISH",
+      "descripcion": "Esencias para Humidificador - Código: 7030",
+      "precio": 14500,
+      "codigoBarras": "7791000070300",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "265db11f-f552-4848-bf1f-7149ecfb610c",
+      "nombre": "ES.HUMI.SAI  BABA",
+      "descripcion": "Esencias para Humidificador - Código: 7031",
+      "precio": 14500,
+      "codigoBarras": "7791000070317",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "57f5798f-65d5-4da3-8009-60730b3b9b70",
+      "nombre": "ES.HUMI.TAHITI",
+      "descripcion": "Esencias para Humidificador - Código: 7032",
+      "precio": 14500,
+      "codigoBarras": "7791000070324",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "5a672fca-7eda-489b-a051-c2fc06c276c9",
+      "nombre": "ES.HUMI.TE  VERDE  Y  JENGIBRE",
+      "descripcion": "Esencias para Humidificador - Código: 7033",
+      "precio": 14500,
+      "codigoBarras": "7791000070331",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "aeed7ee9-6013-46c6-9b2a-908feadb4089",
+      "nombre": "ES.HUMI.ULTRA VIOLET",
+      "descripcion": "Esencias para Humidificador - Código: 7034",
+      "precio": 14500,
+      "codigoBarras": "7791000070348",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "a2b10796-79d1-4d9a-ad83-0feb11347378",
+      "nombre": "ES.HUMI.VAINILLA CARAMELO",
+      "descripcion": "Esencias para Humidificador - Código: 7036",
+      "precio": 14500,
+      "codigoBarras": "7791000070362",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "da3a9fc7-292a-47ed-8f86-d748446eeeee",
+      "nombre": "ES.HUMI.VAINILLA CEDRO",
+      "descripcion": "Esencias para Humidificador - Código: 7037",
+      "precio": 14500,
+      "codigoBarras": "7791000070379",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "ae0db141-bb52-4eb0-aadd-b765ab872bfe",
+      "nombre": "ES.HUMI.VAINILLA COCO",
+      "descripcion": "Esencias para Humidificador - Código: 7038",
+      "precio": 14500,
+      "codigoBarras": "7791000070386",
+      "imagen": "/images/categorias/esencia-humi.webp",
+      "categoriaId": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "83af8b47-8365-4263-b267-8a3a6c7df9dd",
+        "nombre": "Esencias para Humidificador",
+        "imagen": "/images/categorias/esencia-humi.webp"
+      }
+    },
+    {
+      "id": "2e87f317-0172-490a-a484-7a1db767aa8a",
+      "nombre": "ESP.  DE  BAÑO  ALMENDRAS",
+      "descripcion": "Espumas de Baño - Código: 8001",
+      "precio": 13900,
+      "codigoBarras": "7791000080019",
+      "imagen": "/images/categorias/espuma-baño.webp",
+      "categoriaId": "d3485e1e-1d30-4a8d-968c-60a8d5932fc5",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "d3485e1e-1d30-4a8d-968c-60a8d5932fc5",
+        "nombre": "Espumas de Baño",
+        "imagen": "/images/categorias/espuma-baño.webp"
+      }
+    },
+    {
+      "id": "1b01e671-e3fd-49ca-aee0-990190c43ecc",
+      "nombre": "ESP.  DE  BAÑO  EUCALIPTO",
+      "descripcion": "Espumas de Baño - Código: 8002",
+      "precio": 13900,
+      "codigoBarras": "7791000080026",
+      "imagen": "/images/categorias/espuma-baño.webp",
+      "categoriaId": "d3485e1e-1d30-4a8d-968c-60a8d5932fc5",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "d3485e1e-1d30-4a8d-968c-60a8d5932fc5",
+        "nombre": "Espumas de Baño",
+        "imagen": "/images/categorias/espuma-baño.webp"
+      }
+    },
+    {
+      "id": "b4419b58-9538-4425-ab29-494b9c43acad",
+      "nombre": "ESP.  DE  BAÑO  FLORAL",
+      "descripcion": "Espumas de Baño - Código: 8003",
+      "precio": 13900,
+      "codigoBarras": "7791000080033",
+      "imagen": "/images/categorias/espuma-baño.webp",
+      "categoriaId": "d3485e1e-1d30-4a8d-968c-60a8d5932fc5",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "d3485e1e-1d30-4a8d-968c-60a8d5932fc5",
+        "nombre": "Espumas de Baño",
+        "imagen": "/images/categorias/espuma-baño.webp"
+      }
+    },
+    {
+      "id": "5a4265db-4156-46b5-9d6f-e286f0b8e6b3",
+      "nombre": "ESP.  DE  BAÑO  FRUTAL",
+      "descripcion": "Espumas de Baño - Código: 8004",
+      "precio": 13900,
+      "codigoBarras": "7791000080040",
+      "imagen": "/images/categorias/espuma-baño.webp",
+      "categoriaId": "d3485e1e-1d30-4a8d-968c-60a8d5932fc5",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "d3485e1e-1d30-4a8d-968c-60a8d5932fc5",
+        "nombre": "Espumas de Baño",
+        "imagen": "/images/categorias/espuma-baño.webp"
+      }
+    },
+    {
+      "id": "2c70c8e2-856b-4035-a31f-5e61d1f27d37",
+      "nombre": "ESP.  DE  BAÑO  FRUTOS  ROJOS",
+      "descripcion": "Espumas de Baño - Código: 8005",
+      "precio": 13900,
+      "codigoBarras": "7791000080057",
+      "imagen": "/images/categorias/espuma-baño.webp",
+      "categoriaId": "d3485e1e-1d30-4a8d-968c-60a8d5932fc5",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "d3485e1e-1d30-4a8d-968c-60a8d5932fc5",
+        "nombre": "Espumas de Baño",
+        "imagen": "/images/categorias/espuma-baño.webp"
+      }
+    },
+    {
+      "id": "517f6ead-7b15-4771-9100-df5261d2c873",
+      "nombre": "ESP.  DE  BAÑO  ROSA  MOSQUETA",
+      "descripcion": "Espumas de Baño - Código: 8007",
+      "precio": 13900,
+      "codigoBarras": "7791000080071",
+      "imagen": "/images/categorias/espuma-baño.webp",
+      "categoriaId": "d3485e1e-1d30-4a8d-968c-60a8d5932fc5",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "d3485e1e-1d30-4a8d-968c-60a8d5932fc5",
+        "nombre": "Espumas de Baño",
+        "imagen": "/images/categorias/espuma-baño.webp"
+      }
+    },
+    {
+      "id": "119cb2d1-e780-4cac-b608-18052bb3bf06",
+      "nombre": "ESP.  DE  BAÑO  ROSAS",
+      "descripcion": "Espumas de Baño - Código: 8008",
+      "precio": 13900,
+      "codigoBarras": "7791000080088",
+      "imagen": "/images/categorias/espuma-baño.webp",
+      "categoriaId": "d3485e1e-1d30-4a8d-968c-60a8d5932fc5",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "d3485e1e-1d30-4a8d-968c-60a8d5932fc5",
+        "nombre": "Espumas de Baño",
+        "imagen": "/images/categorias/espuma-baño.webp"
+      }
+    },
+    {
+      "id": "7405cdad-c720-40c6-bc3e-4cffaabe52e6",
+      "nombre": "ESP.  DE  BAÑO  TILO",
+      "descripcion": "Espumas de Baño - Código: 8009",
+      "precio": 13900,
+      "codigoBarras": "7791000080095",
+      "imagen": "/images/categorias/espuma-baño.webp",
+      "categoriaId": "d3485e1e-1d30-4a8d-968c-60a8d5932fc5",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "d3485e1e-1d30-4a8d-968c-60a8d5932fc5",
+        "nombre": "Espumas de Baño",
+        "imagen": "/images/categorias/espuma-baño.webp"
+      }
+    },
+    {
+      "id": "400f55c0-dc33-43ac-9fee-d0323defbee2",
+      "nombre": "ESP.  DE  BAÑO  VAINICOCO",
+      "descripcion": "Espumas de Baño - Código: 8010",
+      "precio": 13900,
+      "codigoBarras": "7791000080101",
+      "imagen": "/images/categorias/espuma-baño.webp",
+      "categoriaId": "d3485e1e-1d30-4a8d-968c-60a8d5932fc5",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "d3485e1e-1d30-4a8d-968c-60a8d5932fc5",
+        "nombre": "Espumas de Baño",
+        "imagen": "/images/categorias/espuma-baño.webp"
+      }
+    },
+    {
+      "id": "b3e6842a-851b-481e-b43c-9bdc2c71c01e",
+      "nombre": "F.  TEXTIL  AKIA",
+      "descripcion": "Fragancias Textiles - Código: 9001",
+      "precio": 15900,
+      "codigoBarras": "7791000090018",
+      "imagen": "/images/categorias/fragancia.webp",
+      "categoriaId": "41747273-12e5-44cf-8d68-7e7f4cdfcdca",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "41747273-12e5-44cf-8d68-7e7f4cdfcdca",
+        "nombre": "Fragancias Textiles",
+        "imagen": "/images/categorias/fragancia.webp"
+      }
+    },
+    {
+      "id": "25ac243f-b6f9-4846-b515-df2aeeb82536",
+      "nombre": "F.  TEXTIL  CHER",
+      "descripcion": "Fragancias Textiles - Código: 9002",
+      "precio": 15900,
+      "codigoBarras": "7791000090025",
+      "imagen": "/images/categorias/fragancia.webp",
+      "categoriaId": "41747273-12e5-44cf-8d68-7e7f4cdfcdca",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "41747273-12e5-44cf-8d68-7e7f4cdfcdca",
+        "nombre": "Fragancias Textiles",
+        "imagen": "/images/categorias/fragancia.webp"
+      }
+    },
+    {
+      "id": "98dbf0cc-c579-4cef-9abc-97485ce9b67e",
+      "nombre": "F.  TEXTIL  CONI",
+      "descripcion": "Fragancias Textiles - Código: 9003",
+      "precio": 15900,
+      "codigoBarras": "7791000090032",
+      "imagen": "/images/categorias/fragancia.webp",
+      "categoriaId": "41747273-12e5-44cf-8d68-7e7f4cdfcdca",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "41747273-12e5-44cf-8d68-7e7f4cdfcdca",
+        "nombre": "Fragancias Textiles",
+        "imagen": "/images/categorias/fragancia.webp"
+      }
+    },
+    {
+      "id": "da5fab35-1c00-4d61-aa90-7e327281a2ba",
+      "nombre": "F.  TEXTIL  CROMBIE",
+      "descripcion": "Fragancias Textiles - Código: 9004",
+      "precio": 15900,
+      "codigoBarras": "7791000090049",
+      "imagen": "/images/categorias/fragancia.webp",
+      "categoriaId": "41747273-12e5-44cf-8d68-7e7f4cdfcdca",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "41747273-12e5-44cf-8d68-7e7f4cdfcdca",
+        "nombre": "Fragancias Textiles",
+        "imagen": "/images/categorias/fragancia.webp"
+      }
+    },
+    {
+      "id": "bbcb32e7-4696-4fbb-bd43-4e28ccf0488f",
+      "nombre": "F.  TEXTIL  KOSIUK",
+      "descripcion": "Fragancias Textiles - Código: 9006",
+      "precio": 15900,
+      "codigoBarras": "7791000090063",
+      "imagen": "/images/categorias/fragancia.webp",
+      "categoriaId": "41747273-12e5-44cf-8d68-7e7f4cdfcdca",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "41747273-12e5-44cf-8d68-7e7f4cdfcdca",
+        "nombre": "Fragancias Textiles",
+        "imagen": "/images/categorias/fragancia.webp"
+      }
+    },
+    {
+      "id": "c5fe92e8-a7f6-4e3a-9572-8cebc1a417b5",
+      "nombre": "F.  TEXTIL  MILLON",
+      "descripcion": "Fragancias Textiles - Código: 9007",
+      "precio": 15900,
+      "codigoBarras": "7791000090070",
+      "imagen": "/images/categorias/fragancia.webp",
+      "categoriaId": "41747273-12e5-44cf-8d68-7e7f4cdfcdca",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "41747273-12e5-44cf-8d68-7e7f4cdfcdca",
+        "nombre": "Fragancias Textiles",
+        "imagen": "/images/categorias/fragancia.webp"
+      }
+    },
+    {
+      "id": "e550542e-7e6f-4243-b761-889636dfdb6e",
+      "nombre": "F.  TEXTIL  TOMY",
+      "descripcion": "Fragancias Textiles - Código: 9008",
+      "precio": 15900,
+      "codigoBarras": "7791000090087",
+      "imagen": "/images/categorias/fragancia.webp",
+      "categoriaId": "41747273-12e5-44cf-8d68-7e7f4cdfcdca",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "41747273-12e5-44cf-8d68-7e7f4cdfcdca",
+        "nombre": "Fragancias Textiles",
+        "imagen": "/images/categorias/fragancia.webp"
+      }
+    },
+    {
+      "id": "2c330601-2501-4a56-ac30-4a8f993aad45",
+      "nombre": "F.  TEXTIL  WANA",
+      "descripcion": "Fragancias Textiles - Código: 9009",
+      "precio": 15900,
+      "codigoBarras": "7791000090094",
+      "imagen": "/images/categorias/fragancia.webp",
+      "categoriaId": "41747273-12e5-44cf-8d68-7e7f4cdfcdca",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "41747273-12e5-44cf-8d68-7e7f4cdfcdca",
+        "nombre": "Fragancias Textiles",
+        "imagen": "/images/categorias/fragancia.webp"
+      }
+    },
+    {
+      "id": "817bb8ea-c9f5-4fbe-8cfb-99e5500b17e0",
+      "nombre": "F.  TEXTIL  YAPA",
+      "descripcion": "Fragancias Textiles - Código: 9010",
+      "precio": 15900,
+      "codigoBarras": "7791000090100",
+      "imagen": "/images/categorias/fragancia.webp",
+      "categoriaId": "41747273-12e5-44cf-8d68-7e7f4cdfcdca",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "41747273-12e5-44cf-8d68-7e7f4cdfcdca",
+        "nombre": "Fragancias Textiles",
+        "imagen": "/images/categorias/fragancia.webp"
+      }
+    },
+    {
+      "id": "34f4969f-ae8a-4299-bee3-ed51fd7316cb",
+      "nombre": "HOME  SPRAY  CALM",
+      "descripcion": "Home Sprays - Código: 10001",
+      "precio": 16900,
+      "codigoBarras": "7791000100014",
+      "imagen": "/images/categorias/home-spray.webp",
+      "categoriaId": "db8da65c-c93b-42bc-a021-b8b5ceb8a5fe",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "db8da65c-c93b-42bc-a021-b8b5ceb8a5fe",
+        "nombre": "Home Sprays",
+        "imagen": "/images/categorias/home-spray.webp"
+      }
+    },
+    {
+      "id": "869fe7ea-54cd-484f-aa52-44f2d71ed92d",
+      "nombre": "HOME  SPRAY  CARIBEAN",
+      "descripcion": "Home Sprays - Código: 10002",
+      "precio": 16900,
+      "codigoBarras": "7791000100021",
+      "imagen": "/images/categorias/home-spray.webp",
+      "categoriaId": "db8da65c-c93b-42bc-a021-b8b5ceb8a5fe",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "db8da65c-c93b-42bc-a021-b8b5ceb8a5fe",
+        "nombre": "Home Sprays",
+        "imagen": "/images/categorias/home-spray.webp"
+      }
+    },
+    {
+      "id": "fdc924f6-48ec-4c83-8904-b50e0d73598d",
+      "nombre": "HOME  SPRAY  FLOWERS",
+      "descripcion": "Home Sprays - Código: 10004",
+      "precio": 16900,
+      "codigoBarras": "7791000100045",
+      "imagen": "/images/categorias/home-spray.webp",
+      "categoriaId": "db8da65c-c93b-42bc-a021-b8b5ceb8a5fe",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "db8da65c-c93b-42bc-a021-b8b5ceb8a5fe",
+        "nombre": "Home Sprays",
+        "imagen": "/images/categorias/home-spray.webp"
+      }
+    },
+    {
+      "id": "ba1cd796-4c55-4a83-b685-88b334609b70",
+      "nombre": "HOME  SPRAY  HARMONY",
+      "descripcion": "Home Sprays - Código: 10006",
+      "precio": 16900,
+      "codigoBarras": "7791000100069",
+      "imagen": "/images/categorias/home-spray.webp",
+      "categoriaId": "db8da65c-c93b-42bc-a021-b8b5ceb8a5fe",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "db8da65c-c93b-42bc-a021-b8b5ceb8a5fe",
+        "nombre": "Home Sprays",
+        "imagen": "/images/categorias/home-spray.webp"
+      }
+    },
+    {
+      "id": "806d9b5c-561e-44d8-bde0-ff9c553ed3c9",
+      "nombre": "HOME  SPRAY  INTENSE",
+      "descripcion": "Home Sprays - Código: 10007",
+      "precio": 16900,
+      "codigoBarras": "7791000100076",
+      "imagen": "/images/categorias/home-spray.webp",
+      "categoriaId": "db8da65c-c93b-42bc-a021-b8b5ceb8a5fe",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "db8da65c-c93b-42bc-a021-b8b5ceb8a5fe",
+        "nombre": "Home Sprays",
+        "imagen": "/images/categorias/home-spray.webp"
+      }
+    },
+    {
+      "id": "dc863a3d-a322-44ad-9cc3-488aa34de850",
+      "nombre": "HOME  SPRAY  LIVE",
+      "descripcion": "Home Sprays - Código: 10008",
+      "precio": 16900,
+      "codigoBarras": "7791000100083",
+      "imagen": "/images/categorias/home-spray.webp",
+      "categoriaId": "db8da65c-c93b-42bc-a021-b8b5ceb8a5fe",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "db8da65c-c93b-42bc-a021-b8b5ceb8a5fe",
+        "nombre": "Home Sprays",
+        "imagen": "/images/categorias/home-spray.webp"
+      }
+    },
+    {
+      "id": "063d86a8-fa87-43a2-9edb-d0e4972fafb5",
+      "nombre": "HOME  SPRAY  LOVE",
+      "descripcion": "Home Sprays - Código: 10009",
+      "precio": 16900,
+      "codigoBarras": "7791000100090",
+      "imagen": "/images/categorias/home-spray.webp",
+      "categoriaId": "db8da65c-c93b-42bc-a021-b8b5ceb8a5fe",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "db8da65c-c93b-42bc-a021-b8b5ceb8a5fe",
+        "nombre": "Home Sprays",
+        "imagen": "/images/categorias/home-spray.webp"
+      }
+    },
+    {
+      "id": "1e1826c4-8bda-4776-bd6b-68fcb1d36f09",
+      "nombre": "HOME  SPRAY  PEACE",
+      "descripcion": "Home Sprays - Código: 10010",
+      "precio": 16900,
+      "codigoBarras": "7791000100106",
+      "imagen": "/images/categorias/home-spray.webp",
+      "categoriaId": "db8da65c-c93b-42bc-a021-b8b5ceb8a5fe",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "db8da65c-c93b-42bc-a021-b8b5ceb8a5fe",
+        "nombre": "Home Sprays",
+        "imagen": "/images/categorias/home-spray.webp"
+      }
+    },
+    {
+      "id": "cb3d5a42-0022-45d4-9a18-b9f9bef3657f",
+      "nombre": "HOME  SPRAY  PURO",
+      "descripcion": "Home Sprays - Código: 10011",
+      "precio": 16900,
+      "codigoBarras": "7791000100113",
+      "imagen": "/images/categorias/home-spray.webp",
+      "categoriaId": "db8da65c-c93b-42bc-a021-b8b5ceb8a5fe",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "db8da65c-c93b-42bc-a021-b8b5ceb8a5fe",
+        "nombre": "Home Sprays",
+        "imagen": "/images/categorias/home-spray.webp"
+      }
+    },
+    {
+      "id": "20fb721a-1114-4d1e-a32d-46892677d633",
+      "nombre": "HOME  SPRAY  QUINTANA  ROO",
+      "descripcion": "Home Sprays - Código: 10012",
+      "precio": 16900,
+      "codigoBarras": "7791000100120",
+      "imagen": "/images/categorias/home-spray.webp",
+      "categoriaId": "db8da65c-c93b-42bc-a021-b8b5ceb8a5fe",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "db8da65c-c93b-42bc-a021-b8b5ceb8a5fe",
+        "nombre": "Home Sprays",
+        "imagen": "/images/categorias/home-spray.webp"
+      }
+    },
+    {
+      "id": "5961ea39-1305-4c51-aa93-5920f4e5ac77",
+      "nombre": "HOME  SPRAY  SER",
+      "descripcion": "Home Sprays - Código: 10014",
+      "precio": 16900,
+      "codigoBarras": "7791000100144",
+      "imagen": "/images/categorias/home-spray.webp",
+      "categoriaId": "db8da65c-c93b-42bc-a021-b8b5ceb8a5fe",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "db8da65c-c93b-42bc-a021-b8b5ceb8a5fe",
+        "nombre": "Home Sprays",
+        "imagen": "/images/categorias/home-spray.webp"
+      }
+    },
+    {
+      "id": "2646d92a-6808-4475-8be1-6516e3268a83",
+      "nombre": "HOME  SPRAY  SWEET",
+      "descripcion": "Home Sprays - Código: 10015",
+      "precio": 16900,
+      "codigoBarras": "7791000100151",
+      "imagen": "/images/categorias/home-spray.webp",
+      "categoriaId": "db8da65c-c93b-42bc-a021-b8b5ceb8a5fe",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "db8da65c-c93b-42bc-a021-b8b5ceb8a5fe",
+        "nombre": "Home Sprays",
+        "imagen": "/images/categorias/home-spray.webp"
+      }
+    },
+    {
+      "id": "a30b47b9-11dc-4af8-82a7-b50e79f69ad5",
+      "nombre": "JABON  LIQUIDO  ALOE",
+      "descripcion": "Jabones - Código: 11001",
+      "precio": 14500,
+      "codigoBarras": "7791000110013",
+      "imagen": "/images/categorias/jabones.jpg",
+      "categoriaId": "695a0d79-5f10-4e2c-b1bd-7301d0091f7a",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "695a0d79-5f10-4e2c-b1bd-7301d0091f7a",
+        "nombre": "Jabones",
+        "imagen": "/images/categorias/jabones.jpg"
+      }
+    },
+    {
+      "id": "1f666e02-3a20-4ae5-baf4-c6239e527a5a",
+      "nombre": "JABON  LIQUIDO  CANCUN",
+      "descripcion": "Jabones - Código: 11002",
+      "precio": 14500,
+      "codigoBarras": "7791000110020",
+      "imagen": "/images/categorias/jabones.jpg",
+      "categoriaId": "695a0d79-5f10-4e2c-b1bd-7301d0091f7a",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "695a0d79-5f10-4e2c-b1bd-7301d0091f7a",
+        "nombre": "Jabones",
+        "imagen": "/images/categorias/jabones.jpg"
+      }
+    },
+    {
+      "id": "c9a9b22c-ae5d-478b-b935-2eb0eb8bd8ab",
+      "nombre": "JABON  LIQUIDO  CHANDAL",
+      "descripcion": "Jabones - Código: 11003",
+      "precio": 14500,
+      "codigoBarras": "7791000110037",
+      "imagen": "/images/categorias/jabones.jpg",
+      "categoriaId": "695a0d79-5f10-4e2c-b1bd-7301d0091f7a",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "695a0d79-5f10-4e2c-b1bd-7301d0091f7a",
+        "nombre": "Jabones",
+        "imagen": "/images/categorias/jabones.jpg"
+      }
+    },
+    {
+      "id": "915c2000-23fa-4db9-86bc-0e49126b1f2d",
+      "nombre": "JABON  LIQUIDO  HIBISCUS",
+      "descripcion": "Jabones - Código: 11004",
+      "precio": 14500,
+      "codigoBarras": "7791000110044",
+      "imagen": "/images/categorias/jabones.jpg",
+      "categoriaId": "695a0d79-5f10-4e2c-b1bd-7301d0091f7a",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "695a0d79-5f10-4e2c-b1bd-7301d0091f7a",
+        "nombre": "Jabones",
+        "imagen": "/images/categorias/jabones.jpg"
+      }
+    },
+    {
+      "id": "3339cff0-af8e-4a17-9b48-43f110f117dd",
+      "nombre": "JABON  LIQUIDO  MANGO Y MARACUYA",
+      "descripcion": "Jabones - Código: 11005",
+      "precio": 14500,
+      "codigoBarras": "7791000110051",
+      "imagen": "/images/categorias/jabones.jpg",
+      "categoriaId": "695a0d79-5f10-4e2c-b1bd-7301d0091f7a",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "695a0d79-5f10-4e2c-b1bd-7301d0091f7a",
+        "nombre": "Jabones",
+        "imagen": "/images/categorias/jabones.jpg"
+      }
+    },
+    {
+      "id": "fde6fd5b-b441-4d7f-acc9-af11b3f59fb5",
+      "nombre": "JABON  LIQUIDO  VAINILLA COCO",
+      "descripcion": "Jabones - Código: 11007",
+      "precio": 14500,
+      "codigoBarras": "7791000110075",
+      "imagen": "/images/categorias/jabones.jpg",
+      "categoriaId": "695a0d79-5f10-4e2c-b1bd-7301d0091f7a",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "695a0d79-5f10-4e2c-b1bd-7301d0091f7a",
+        "nombre": "Jabones",
+        "imagen": "/images/categorias/jabones.jpg"
+      }
+    },
+    {
+      "id": "589d72eb-ed9f-49dd-a89f-67fcd0b3728b",
+      "nombre": "JABON  SOLIDO  AVENA Y COCO",
+      "descripcion": "Jabones - Código: 12001",
+      "precio": 4900,
+      "codigoBarras": "7791000220019",
+      "imagen": "/images/categorias/jabones.jpg",
+      "categoriaId": "695a0d79-5f10-4e2c-b1bd-7301d0091f7a",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "695a0d79-5f10-4e2c-b1bd-7301d0091f7a",
+        "nombre": "Jabones",
+        "imagen": "/images/categorias/jabones.jpg"
+      }
+    },
+    {
+      "id": "dacfd3e3-9b26-4585-bee3-a4d5918e8d7b",
+      "nombre": "JABON  SOLIDO  CACAO",
+      "descripcion": "Jabones - Código: 12002",
+      "precio": 4900,
+      "codigoBarras": "7791000120029",
+      "imagen": "/images/categorias/jabones.jpg",
+      "categoriaId": "695a0d79-5f10-4e2c-b1bd-7301d0091f7a",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "695a0d79-5f10-4e2c-b1bd-7301d0091f7a",
+        "nombre": "Jabones",
+        "imagen": "/images/categorias/jabones.jpg"
+      }
+    },
+    {
+      "id": "5a47013e-3468-41ef-8c3b-ad34c2c9aaf9",
+      "nombre": "JABON  SOLIDO  CALENDULA",
+      "descripcion": "Jabones - Código: 12003",
+      "precio": 4900,
+      "codigoBarras": "7791000120036",
+      "imagen": "/images/categorias/jabones.jpg",
+      "categoriaId": "695a0d79-5f10-4e2c-b1bd-7301d0091f7a",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "695a0d79-5f10-4e2c-b1bd-7301d0091f7a",
+        "nombre": "Jabones",
+        "imagen": "/images/categorias/jabones.jpg"
+      }
+    },
+    {
+      "id": "cfeabc43-6e6c-4efc-89a1-93f8baf282fc",
+      "nombre": "JABON  SOLIDO  CARBON ACTIVADO",
+      "descripcion": "Jabones - Código: 12004",
+      "precio": 4900,
+      "codigoBarras": "7791000120043",
+      "imagen": "/images/categorias/jabones.jpg",
+      "categoriaId": "695a0d79-5f10-4e2c-b1bd-7301d0091f7a",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "695a0d79-5f10-4e2c-b1bd-7301d0091f7a",
+        "nombre": "Jabones",
+        "imagen": "/images/categorias/jabones.jpg"
+      }
+    },
+    {
+      "id": "e2b4cde6-0e79-45ed-87dc-933c9402f8f4",
+      "nombre": "JABON  SOLIDO  LAVANDA",
+      "descripcion": "Jabones - Código: 12005",
+      "precio": 4900,
+      "codigoBarras": "7791000120050",
+      "imagen": "/images/categorias/jabones.jpg",
+      "categoriaId": "695a0d79-5f10-4e2c-b1bd-7301d0091f7a",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "695a0d79-5f10-4e2c-b1bd-7301d0091f7a",
+        "nombre": "Jabones",
+        "imagen": "/images/categorias/jabones.jpg"
+      }
+    },
+    {
+      "id": "90a40ea1-cb3f-437e-b4bb-8b63513be1bf",
+      "nombre": "JABON  SOLIDO  MALBEC",
+      "descripcion": "Jabones - Código: 12006",
+      "precio": 4900,
+      "codigoBarras": "7791000120067",
+      "imagen": "/images/categorias/jabones.jpg",
+      "categoriaId": "695a0d79-5f10-4e2c-b1bd-7301d0091f7a",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "695a0d79-5f10-4e2c-b1bd-7301d0091f7a",
+        "nombre": "Jabones",
+        "imagen": "/images/categorias/jabones.jpg"
+      }
+    },
+    {
+      "id": "ab9a4cc7-6c5c-4736-a772-e05974e6f00a",
+      "nombre": "JABON  SOLIDO  OLIVA",
+      "descripcion": "Jabones - Código: 12008",
+      "precio": 4900,
+      "codigoBarras": "7791000120081",
+      "imagen": "/images/categorias/jabones.jpg",
+      "categoriaId": "695a0d79-5f10-4e2c-b1bd-7301d0091f7a",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "695a0d79-5f10-4e2c-b1bd-7301d0091f7a",
+        "nombre": "Jabones",
+        "imagen": "/images/categorias/jabones.jpg"
+      }
+    },
+    {
+      "id": "0e5937ff-f363-43e6-b7a9-37a6f50a5e2f",
+      "nombre": "JABON  SOLIDO  ROSA MOSQUETA",
+      "descripcion": "Jabones - Código: 12009",
+      "precio": 4900,
+      "codigoBarras": "7791000120098",
+      "imagen": "/images/categorias/jabones.jpg",
+      "categoriaId": "695a0d79-5f10-4e2c-b1bd-7301d0091f7a",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "695a0d79-5f10-4e2c-b1bd-7301d0091f7a",
+        "nombre": "Jabones",
+        "imagen": "/images/categorias/jabones.jpg"
+      }
+    },
+    {
+      "id": "ebea53e5-6665-4e86-ad52-e56046721bc0",
+      "nombre": "JABON SOLIDO CAFE",
+      "descripcion": "Jabones - Código: 12010",
+      "precio": 4900,
+      "codigoBarras": "7791000120104",
+      "imagen": "/images/categorias/jabones.jpg",
+      "categoriaId": "695a0d79-5f10-4e2c-b1bd-7301d0091f7a",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "695a0d79-5f10-4e2c-b1bd-7301d0091f7a",
+        "nombre": "Jabones",
+        "imagen": "/images/categorias/jabones.jpg"
+      }
+    },
+    {
+      "id": "d3a56db3-1a15-4a6c-8c7f-e0bb7c7467f2",
+      "nombre": "JABON SOLIDO CENTELLA ASIATICA",
+      "descripcion": "Jabones - Código: 12011",
+      "precio": 4900,
+      "codigoBarras": "7791000120111",
+      "imagen": "/images/categorias/jabones.jpg",
+      "categoriaId": "695a0d79-5f10-4e2c-b1bd-7301d0091f7a",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "695a0d79-5f10-4e2c-b1bd-7301d0091f7a",
+        "nombre": "Jabones",
+        "imagen": "/images/categorias/jabones.jpg"
+      }
+    },
+    {
+      "id": "bbd166d7-f50d-4e2e-96ef-b23805c6a799",
+      "nombre": "SAL  DE  BAÑO  COCO  VAINILLA",
+      "descripcion": "Sales de Baño - Código: 13001",
+      "precio": 9500,
+      "codigoBarras": "7791000130011",
+      "imagen": "/images/categorias/sales.webp",
+      "categoriaId": "3a9fd52b-a878-45a6-93c6-581e342204f4",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "3a9fd52b-a878-45a6-93c6-581e342204f4",
+        "nombre": "Sales de Baño",
+        "imagen": "/images/categorias/sales.webp"
+      }
+    },
+    {
+      "id": "bcc7e671-b432-46a0-a8ba-43ff47548fa4",
+      "nombre": "SAL  DE  BAÑO  EUCALIPTO",
+      "descripcion": "Sales de Baño - Código: 13002",
+      "precio": 9500,
+      "codigoBarras": "7791000130028",
+      "imagen": "/images/categorias/sales.webp",
+      "categoriaId": "3a9fd52b-a878-45a6-93c6-581e342204f4",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "3a9fd52b-a878-45a6-93c6-581e342204f4",
+        "nombre": "Sales de Baño",
+        "imagen": "/images/categorias/sales.webp"
+      }
+    },
+    {
+      "id": "efe238a5-460b-41ec-a959-5ccd673bff4e",
+      "nombre": "SAL  DE  BAÑO  LAVANDA",
+      "descripcion": "Sales de Baño - Código: 13004",
+      "precio": 9500,
+      "codigoBarras": "7791000130042",
+      "imagen": "/images/categorias/sales.webp",
+      "categoriaId": "3a9fd52b-a878-45a6-93c6-581e342204f4",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "3a9fd52b-a878-45a6-93c6-581e342204f4",
+        "nombre": "Sales de Baño",
+        "imagen": "/images/categorias/sales.webp"
+      }
+    },
+    {
+      "id": "530e7a0a-fbd0-4b6f-9fa5-6cb01159e70a",
+      "nombre": "SAL  DE  BAÑO  MARINA",
+      "descripcion": "Sales de Baño - Código: 13005",
+      "precio": 9500,
+      "codigoBarras": "7791000130059",
+      "imagen": "/images/categorias/sales.webp",
+      "categoriaId": "3a9fd52b-a878-45a6-93c6-581e342204f4",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "3a9fd52b-a878-45a6-93c6-581e342204f4",
+        "nombre": "Sales de Baño",
+        "imagen": "/images/categorias/sales.webp"
+      }
+    },
+    {
+      "id": "3e645d17-e531-4fb4-97bd-6ae6dcfa4e36",
+      "nombre": "SAL  DE  BAÑO  ROSAS",
+      "descripcion": "Sales de Baño - Código: 13006",
+      "precio": 9500,
+      "codigoBarras": "7791000130066",
+      "imagen": "/images/categorias/sales.webp",
+      "categoriaId": "3a9fd52b-a878-45a6-93c6-581e342204f4",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "3a9fd52b-a878-45a6-93c6-581e342204f4",
+        "nombre": "Sales de Baño",
+        "imagen": "/images/categorias/sales.webp"
+      }
+    },
+    {
+      "id": "27d82c0a-4c01-4f8c-bcd6-98af5d10de06",
+      "nombre": "SAL  DE  BAÑO  TILO",
+      "descripcion": "Sales de Baño - Código: 13007",
+      "precio": 9500,
+      "codigoBarras": "7791000130073",
+      "imagen": "/images/categorias/sales.webp",
+      "categoriaId": "3a9fd52b-a878-45a6-93c6-581e342204f4",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "3a9fd52b-a878-45a6-93c6-581e342204f4",
+        "nombre": "Sales de Baño",
+        "imagen": "/images/categorias/sales.webp"
+      }
+    },
+    {
+      "id": "07409223-5ef4-4661-9814-bd4b661b671e",
+      "nombre": "SAL  DE  BAÑO  VAINILLA",
+      "descripcion": "Sales de Baño - Código: 13008",
+      "precio": 9500,
+      "codigoBarras": "7791000130080",
+      "imagen": "/images/categorias/sales.webp",
+      "categoriaId": "3a9fd52b-a878-45a6-93c6-581e342204f4",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "3a9fd52b-a878-45a6-93c6-581e342204f4",
+        "nombre": "Sales de Baño",
+        "imagen": "/images/categorias/sales.webp"
+      }
+    },
+    {
+      "id": "6a49effa-28a1-42b1-a4c1-0854385d3bf1",
+      "nombre": "ADAPTADOR  PARA  HUMI",
+      "descripcion": "Accesorios - Código: 15001",
+      "precio": 8500,
+      "codigoBarras": "7791000150019",
+      "imagen": "/images/categorias/accesorios.jpg",
+      "categoriaId": "e84d08cb-579c-4054-836b-522e8da5cd9b",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "e84d08cb-579c-4054-836b-522e8da5cd9b",
+        "nombre": "Accesorios",
+        "imagen": "/images/categorias/accesorios.jpg"
+      }
+    },
+    {
+      "id": "f0aaa67f-c11e-4465-979e-5d1012c1f9b9",
+      "nombre": "APAGA  VELAS",
+      "descripcion": "Accesorios - Código: 15002",
+      "precio": 4500,
+      "codigoBarras": "7791000150026",
+      "imagen": "/images/categorias/accesorios.jpg",
+      "categoriaId": "e84d08cb-579c-4054-836b-522e8da5cd9b",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "e84d08cb-579c-4054-836b-522e8da5cd9b",
+        "nombre": "Accesorios",
+        "imagen": "/images/categorias/accesorios.jpg"
+      }
+    },
+    {
+      "id": "a170d4aa-0092-427a-acc5-c4072ee6036f",
+      "nombre": "FILTRO  HUMIDIFICADOR",
+      "descripcion": "Accesorios - Código: 15003",
+      "precio": 2500,
+      "codigoBarras": "7791000150033",
+      "imagen": "/images/categorias/accesorios.jpg",
+      "categoriaId": "e84d08cb-579c-4054-836b-522e8da5cd9b",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "e84d08cb-579c-4054-836b-522e8da5cd9b",
+        "nombre": "Accesorios",
+        "imagen": "/images/categorias/accesorios.jpg"
+      }
+    },
+    {
+      "id": "fe987be3-958c-40ae-ae23-8092d380d1b3",
+      "nombre": "Almendras Difusor",
+      "descripcion": "Difusor con aroma a Almendras",
+      "precio": 15000,
+      "codigoBarras": "77920241033NaN",
+      "imagen": "/images/categorias/difusores.webp",
+      "categoriaId": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+        "nombre": "Difusores de Hogar",
+        "imagen": "/images/categorias/difusores.webp"
+      }
+    },
+    {
+      "id": "242bcf95-a2fa-45e5-9b34-67c79d73c98f",
+      "nombre": "Bambu Difusor",
+      "descripcion": "Difusor con aroma a Bambu",
+      "precio": 15000,
+      "codigoBarras": "77920241034NaN",
+      "imagen": "/images/categorias/difusores.webp",
+      "categoriaId": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+        "nombre": "Difusores de Hogar",
+        "imagen": "/images/categorias/difusores.webp"
+      }
+    },
+    {
+      "id": "0ee8761e-74a9-4d71-9f02-211772c12ee6",
+      "nombre": "Bergamota Difusor",
+      "descripcion": "Difusor con aroma a Bergamota",
+      "precio": 15000,
+      "codigoBarras": "77920241035NaN",
+      "imagen": "/images/categorias/difusores.webp",
+      "categoriaId": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+        "nombre": "Difusores de Hogar",
+        "imagen": "/images/categorias/difusores.webp"
+      }
+    },
+    {
+      "id": "aafbc266-83ba-44b6-b3bd-1d13d6500fa5",
+      "nombre": "Calor De Hogar Difusor",
+      "descripcion": "Difusor con aroma a Calor De Hogar",
+      "precio": 15000,
+      "codigoBarras": "77920241036NaN",
+      "imagen": "/images/categorias/difusores.webp",
+      "categoriaId": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+        "nombre": "Difusores de Hogar",
+        "imagen": "/images/categorias/difusores.webp"
+      }
+    },
+    {
+      "id": "9d6588c3-7bd7-4c10-9526-8013adbe515f",
+      "nombre": "Citronella Difusor",
+      "descripcion": "Difusor con aroma a Citronella",
+      "precio": 15000,
+      "codigoBarras": "77920241037NaN",
+      "imagen": "/images/categorias/difusores.webp",
+      "categoriaId": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+        "nombre": "Difusores de Hogar",
+        "imagen": "/images/categorias/difusores.webp"
+      }
+    },
+    {
+      "id": "27acd22b-3a1e-4149-af9d-79c90b3bea73",
+      "nombre": "Flores Blancas Difusor",
+      "descripcion": "Difusor con aroma a Flores Blancas",
+      "precio": 15000,
+      "codigoBarras": "77920241038NaN",
+      "imagen": "/images/categorias/difusores.webp",
+      "categoriaId": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+        "nombre": "Difusores de Hogar",
+        "imagen": "/images/categorias/difusores.webp"
+      }
+    },
+    {
+      "id": "2506f739-98ee-4d6d-b1c5-4f038782d112",
+      "nombre": "Frutos Rojos Difusor",
+      "descripcion": "Difusor con aroma a Frutos Rojos",
+      "precio": 15000,
+      "codigoBarras": "77920241039NaN",
+      "imagen": "/images/categorias/difusores.webp",
+      "categoriaId": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+        "nombre": "Difusores de Hogar",
+        "imagen": "/images/categorias/difusores.webp"
+      }
+    },
+    {
+      "id": "2a35ffa6-33bd-4bd7-990f-941af9714646",
+      "nombre": "Gardenia Difusor",
+      "descripcion": "Difusor con aroma a Gardenia",
+      "precio": 15000,
+      "codigoBarras": "77920241040NaN",
+      "imagen": "/images/categorias/difusores.webp",
+      "categoriaId": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+        "nombre": "Difusores de Hogar",
+        "imagen": "/images/categorias/difusores.webp"
+      }
+    },
+    {
+      "id": "19173488-6e21-4638-aa17-c4843d8db8a9",
+      "nombre": "Jazmin Difusor",
+      "descripcion": "Difusor con aroma a Jazmin",
+      "precio": 15000,
+      "codigoBarras": "77920241041NaN",
+      "imagen": "/images/categorias/difusores.webp",
+      "categoriaId": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+        "nombre": "Difusores de Hogar",
+        "imagen": "/images/categorias/difusores.webp"
+      }
+    },
+    {
+      "id": "80b297fd-2132-4d6f-989a-f4af7a22b6e6",
+      "nombre": "Lavanda Y Romero Difusor",
+      "descripcion": "Difusor con aroma a Lavanda Y Romero",
+      "precio": 15000,
+      "codigoBarras": "77920241042NaN",
+      "imagen": "/images/categorias/difusores.webp",
+      "categoriaId": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+        "nombre": "Difusores de Hogar",
+        "imagen": "/images/categorias/difusores.webp"
+      }
+    },
+    {
+      "id": "3cb56512-660d-48a3-bdcc-c6a9a6af5e1d",
+      "nombre": "Lemongrass Difusor",
+      "descripcion": "Difusor con aroma a Lemongrass",
+      "precio": 15000,
+      "codigoBarras": "77920241043NaN",
+      "imagen": "/images/categorias/difusores.webp",
+      "categoriaId": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+        "nombre": "Difusores de Hogar",
+        "imagen": "/images/categorias/difusores.webp"
+      }
+    },
+    {
+      "id": "ec166934-8abf-4b84-ae66-c0c2f844a71c",
+      "nombre": "Limon Y Jengibre Difusor",
+      "descripcion": "Difusor con aroma a Limon Y Jengibre",
+      "precio": 15000,
+      "codigoBarras": "77920241044NaN",
+      "imagen": "/images/categorias/difusores.webp",
+      "categoriaId": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+        "nombre": "Difusores de Hogar",
+        "imagen": "/images/categorias/difusores.webp"
+      }
+    },
+    {
+      "id": "23448241-bfdd-45c8-8adf-178616ad0c06",
+      "nombre": "Maderas Del Oriente Difusor",
+      "descripcion": "Difusor con aroma a Maderas Del Oriente",
+      "precio": 15000,
+      "codigoBarras": "77920241045NaN",
+      "imagen": "/images/categorias/difusores.webp",
+      "categoriaId": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+        "nombre": "Difusores de Hogar",
+        "imagen": "/images/categorias/difusores.webp"
+      }
+    },
+    {
+      "id": "6eb5694b-a219-49db-97ad-9dfb76deb270",
+      "nombre": "Mango Difusor",
+      "descripcion": "Difusor con aroma a Mango",
+      "precio": 15000,
+      "codigoBarras": "77920241046NaN",
+      "imagen": "/images/categorias/difusores.webp",
+      "categoriaId": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+        "nombre": "Difusores de Hogar",
+        "imagen": "/images/categorias/difusores.webp"
+      }
+    },
+    {
+      "id": "7568a900-667e-4c39-86da-7fcdc85c2554",
+      "nombre": "Mango Y Maracuya Difusor",
+      "descripcion": "Difusor con aroma a Mango Y Maracuya",
+      "precio": 15000,
+      "codigoBarras": "77920241047NaN",
+      "imagen": "/images/categorias/difusores.webp",
+      "categoriaId": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+        "nombre": "Difusores de Hogar",
+        "imagen": "/images/categorias/difusores.webp"
+      }
+    },
+    {
+      "id": "874f8873-8bfe-4e59-b34e-75f039579c2a",
+      "nombre": "Nagchampa Difusor",
+      "descripcion": "Difusor con aroma a Nagchampa",
+      "precio": 15000,
+      "codigoBarras": "77920241048NaN",
+      "imagen": "/images/categorias/difusores.webp",
+      "categoriaId": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+        "nombre": "Difusores de Hogar",
+        "imagen": "/images/categorias/difusores.webp"
+      }
+    },
+    {
+      "id": "de0a083b-a35a-4412-8840-710508a5d149",
+      "nombre": "Naranja Canela Difusor",
+      "descripcion": "Difusor con aroma a Naranja Canela",
+      "precio": 15000,
+      "codigoBarras": "77920241049NaN",
+      "imagen": "/images/categorias/difusores.webp",
+      "categoriaId": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+        "nombre": "Difusores de Hogar",
+        "imagen": "/images/categorias/difusores.webp"
+      }
+    },
+    {
+      "id": "5c500066-121a-46a3-93c1-bb77f6ebf5ce",
+      "nombre": "Naranja Y Jengibre Difusor",
+      "descripcion": "Difusor con aroma a Naranja Y Jengibre",
+      "precio": 15000,
+      "codigoBarras": "77920241050NaN",
+      "imagen": "/images/categorias/difusores.webp",
+      "categoriaId": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+        "nombre": "Difusores de Hogar",
+        "imagen": "/images/categorias/difusores.webp"
+      }
+    },
+    {
+      "id": "c4769fd8-0a0d-40da-bce4-a08c5b41c2ba",
+      "nombre": "Naranja Y Pimienta Difusor",
+      "descripcion": "Difusor con aroma a Naranja Y Pimienta",
+      "precio": 15000,
+      "codigoBarras": "77920241051NaN",
+      "imagen": "/images/categorias/difusores.webp",
+      "categoriaId": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+        "nombre": "Difusores de Hogar",
+        "imagen": "/images/categorias/difusores.webp"
+      }
+    },
+    {
+      "id": "07ebbd8e-d0e2-48b2-b16a-44da9b69c76a",
+      "nombre": "Orange Difusor",
+      "descripcion": "Difusor con aroma a Orange",
+      "precio": 15000,
+      "codigoBarras": "77920241052NaN",
+      "imagen": "/images/categorias/difusores.webp",
+      "categoriaId": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+        "nombre": "Difusores de Hogar",
+        "imagen": "/images/categorias/difusores.webp"
+      }
+    },
+    {
+      "id": "64f5611a-55fa-445f-bfd9-2d6cbdef2742",
+      "nombre": "Palo Santo Difusor",
+      "descripcion": "Difusor con aroma a Palo Santo",
+      "precio": 15000,
+      "codigoBarras": "77920241053NaN",
+      "imagen": "/images/categorias/difusores.webp",
+      "categoriaId": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+        "nombre": "Difusores de Hogar",
+        "imagen": "/images/categorias/difusores.webp"
+      }
+    },
+    {
+      "id": "b17e84f1-739d-4c19-8bd5-c1765271a1af",
+      "nombre": "Peras Y Flores Difusor",
+      "descripcion": "Difusor con aroma a Peras Y Flores",
+      "precio": 15000,
+      "codigoBarras": "77920241054NaN",
+      "imagen": "/images/categorias/difusores.webp",
+      "categoriaId": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+        "nombre": "Difusores de Hogar",
+        "imagen": "/images/categorias/difusores.webp"
+      }
+    },
+    {
+      "id": "31c180b8-7c23-4bee-9e94-f8b53061e271",
+      "nombre": "VELA  DE  SOJA  CARAMELERA",
+      "descripcion": "Velas de Soja - Código: 14002",
+      "precio": 45000,
+      "codigoBarras": "7791000140027",
+      "imagen": "/images/categorias/velas.jpg",
+      "categoriaId": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+        "nombre": "Velas de Soja",
+        "imagen": "/images/categorias/velas.jpg"
+      }
+    },
+    {
+      "id": "25312bbf-2a8f-411d-8a72-c98bc522fb43",
+      "nombre": "VELA  DE  SOJA  CATEDRAL  GRANDE",
+      "descripcion": "Velas de Soja - Código: 14003",
+      "precio": 39000,
+      "codigoBarras": "7791000140034",
+      "imagen": "/images/categorias/velas.jpg",
+      "categoriaId": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+        "nombre": "Velas de Soja",
+        "imagen": "/images/categorias/velas.jpg"
+      }
+    },
+    {
+      "id": "c2d74bf0-e885-4add-8278-570df56b96a0",
+      "nombre": "VELA  DE  SOJA  ECO  CON  TAPA",
+      "descripcion": "Velas de Soja - Código: 14004",
+      "precio": 23500,
+      "codigoBarras": "7791000140041",
+      "imagen": "/images/categorias/velas.jpg",
+      "categoriaId": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+        "nombre": "Velas de Soja",
+        "imagen": "/images/categorias/velas.jpg"
+      }
+    },
+    {
+      "id": "c5dd9dce-8691-4396-b6c4-47c2fcebe8e2",
+      "nombre": "VELA  DE  SOJA  ECO  SIN  TAPA",
+      "descripcion": "Velas de Soja - Código: 14005",
+      "precio": 20500,
+      "codigoBarras": "7791000140058",
+      "imagen": "/images/categorias/velas.jpg",
+      "categoriaId": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+        "nombre": "Velas de Soja",
+        "imagen": "/images/categorias/velas.jpg"
+      }
+    },
+    {
+      "id": "99b61660-202b-4ee8-842a-edcbb951a33b",
+      "nombre": "VELA  DE  SOJA  URSULA  COLOR  CON  TAPA",
+      "descripcion": "Velas de Soja - Código: 14007",
+      "precio": 39000,
+      "codigoBarras": "7791000140072",
+      "imagen": "/images/categorias/velas.jpg",
+      "categoriaId": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+        "nombre": "Velas de Soja",
+        "imagen": "/images/categorias/velas.jpg"
+      }
+    },
+    {
+      "id": "af2e260e-896c-4101-a8c9-48116146b0b7",
+      "nombre": "VELA  DE  SOJA  URSULA  SIN  TAPA",
+      "descripcion": "Velas de Soja - Código: 14008",
+      "precio": 23500,
+      "codigoBarras": "7791000140089",
+      "imagen": "/images/categorias/velas.jpg",
+      "categoriaId": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+        "nombre": "Velas de Soja",
+        "imagen": "/images/categorias/velas.jpg"
+      }
+    },
+    {
+      "id": "7426360d-5e63-42b3-9a56-e81813fb727e",
+      "nombre": "VELA  DE  SOJA  URSULA  VIDRIO  CON  TAPA",
+      "descripcion": "Velas de Soja - Código: 14009",
+      "precio": 25500,
+      "codigoBarras": "7791000140096",
+      "imagen": "/images/categorias/velas.jpg",
+      "categoriaId": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+        "nombre": "Velas de Soja",
+        "imagen": "/images/categorias/velas.jpg"
+      }
+    },
+    {
+      "id": "73537b47-411f-4747-9e25-6cfc37ba4d81",
+      "nombre": "VELA DE SOJA ACANALADA",
+      "descripcion": "Velas de Soja - Código: 14010",
+      "precio": 49000,
+      "codigoBarras": "7791000140102",
+      "imagen": "/images/categorias/velas.jpg",
+      "categoriaId": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+        "nombre": "Velas de Soja",
+        "imagen": "/images/categorias/velas.jpg"
+      }
+    },
+    {
+      "id": "8bfe4680-efe7-4c31-8283-732e520a2795",
+      "nombre": "VELA DE SOJA CERAMICA",
+      "descripcion": "Velas de Soja - Código: 14011",
+      "precio": 29500,
+      "codigoBarras": "7791000140119",
+      "imagen": "/images/categorias/velas.jpg",
+      "categoriaId": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+        "nombre": "Velas de Soja",
+        "imagen": "/images/categorias/velas.jpg"
+      }
+    },
+    {
+      "id": "e1da3d9e-ca87-41df-b14d-96c8423af633",
+      "nombre": "VELA DE SOJA REDONDA GRANDE",
+      "descripcion": "Velas de Soja - Código: 14012",
+      "precio": 39000,
+      "codigoBarras": "7791000140126",
+      "imagen": "/images/categorias/velas.jpg",
+      "categoriaId": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+        "nombre": "Velas de Soja",
+        "imagen": "/images/categorias/velas.jpg"
+      }
+    },
+    {
+      "id": "0011b34e-0c77-4815-b9d0-9517a8526ad9",
+      "nombre": "VELA DE SOJA RELIEVE",
+      "descripcion": "Velas de Soja - Código: 14013",
+      "precio": 39000,
+      "codigoBarras": "7791000140133",
+      "imagen": "/images/categorias/velas.jpg",
+      "categoriaId": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+        "nombre": "Velas de Soja",
+        "imagen": "/images/categorias/velas.jpg"
+      }
+    },
+    {
+      "id": "a5593c95-ad74-411d-810c-7d92d019b216",
+      "nombre": "VELA DE SOJA ROMBOS",
+      "descripcion": "Velas de Soja - Código: 14014",
+      "precio": 39000,
+      "codigoBarras": "7791000140140",
+      "imagen": "/images/categorias/velas.jpg",
+      "categoriaId": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+        "nombre": "Velas de Soja",
+        "imagen": "/images/categorias/velas.jpg"
+      }
+    },
+    {
+      "id": "d06d21f3-7a4d-4e42-ae1b-3f00033c6300",
+      "nombre": "VELA DE SOJA TRIANGULO GRANDE",
+      "descripcion": "Velas de Soja - Código: 14015",
+      "precio": 79000,
+      "codigoBarras": "7791000140157",
+      "imagen": "/images/categorias/velas.jpg",
+      "categoriaId": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+      "stockMinimo": 5,
+      "activo": false,
+      "categoria": {
+        "id": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+        "nombre": "Velas de Soja",
+        "imagen": "/images/categorias/velas.jpg"
+      }
+    },
+    {
+      "id": "d0580372-95ae-4b35-bfc9-0d11b9988967",
+      "nombre": "Rosas Difusor",
+      "descripcion": "Difusor con aroma a Rosas",
+      "precio": 15000,
+      "codigoBarras": "77920241055NaN",
+      "imagen": "/images/categorias/difusores.webp",
+      "categoriaId": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+        "nombre": "Difusores de Hogar",
+        "imagen": "/images/categorias/difusores.webp"
+      }
+    },
+    {
+      "id": "d7e3f510-55e5-4477-bdf9-dc9dd7236c5c",
+      "nombre": "Sai Baba Difusor",
+      "descripcion": "Difusor con aroma a Sai Baba",
+      "precio": 15000,
+      "codigoBarras": "77920241056NaN",
+      "imagen": "/images/categorias/difusores.webp",
+      "categoriaId": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+        "nombre": "Difusores de Hogar",
+        "imagen": "/images/categorias/difusores.webp"
+      }
+    },
+    {
+      "id": "ced0b3e7-ae05-42bf-b108-e76835874e40",
+      "nombre": "Sandalo Difusor",
+      "descripcion": "Difusor con aroma a Sandalo",
+      "precio": 15000,
+      "codigoBarras": "77920241057NaN",
+      "imagen": "/images/categorias/difusores.webp",
+      "categoriaId": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+        "nombre": "Difusores de Hogar",
+        "imagen": "/images/categorias/difusores.webp"
+      }
+    },
+    {
+      "id": "05c61257-477d-41c1-bdea-695026f1788c",
+      "nombre": "Te Verde Difusor",
+      "descripcion": "Difusor con aroma a Te Verde",
+      "precio": 15000,
+      "codigoBarras": "77920241058NaN",
+      "imagen": "/images/categorias/difusores.webp",
+      "categoriaId": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+        "nombre": "Difusores de Hogar",
+        "imagen": "/images/categorias/difusores.webp"
+      }
+    },
+    {
+      "id": "edf61ef5-be15-4a2e-9efc-56bb46afd573",
+      "nombre": "Tilo Difusor",
+      "descripcion": "Difusor con aroma a Tilo",
+      "precio": 15000,
+      "codigoBarras": "77920241059NaN",
+      "imagen": "/images/categorias/difusores.webp",
+      "categoriaId": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+        "nombre": "Difusores de Hogar",
+        "imagen": "/images/categorias/difusores.webp"
+      }
+    },
+    {
+      "id": "c1dcd57b-ddeb-4c88-b5cc-20596bb3c6cd",
+      "nombre": "Vainicoco Difusor",
+      "descripcion": "Difusor con aroma a Vainicoco",
+      "precio": 15000,
+      "codigoBarras": "77920241060NaN",
+      "imagen": "/images/categorias/difusores.webp",
+      "categoriaId": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+        "nombre": "Difusores de Hogar",
+        "imagen": "/images/categorias/difusores.webp"
+      }
+    },
+    {
+      "id": "b71d73ce-bcd9-46bb-88be-7ecb003ea40a",
+      "nombre": "Vainilla Difusor",
+      "descripcion": "Difusor con aroma a Vainilla",
+      "precio": 15000,
+      "codigoBarras": "77920241061NaN",
+      "imagen": "/images/categorias/difusores.webp",
+      "categoriaId": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+        "nombre": "Difusores de Hogar",
+        "imagen": "/images/categorias/difusores.webp"
+      }
+    },
+    {
+      "id": "e9a2a619-6f73-45f7-9258-821f38fa3d6f",
+      "nombre": "Verbena Difusor",
+      "descripcion": "Difusor con aroma a Verbena",
+      "precio": 15000,
+      "codigoBarras": "77920241062NaN",
+      "imagen": "/images/categorias/difusores.webp",
+      "categoriaId": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+        "nombre": "Difusores de Hogar",
+        "imagen": "/images/categorias/difusores.webp"
+      }
+    },
+    {
+      "id": "565eb2d2-7c84-4dc4-b985-c8d2108feb49",
+      "nombre": "Wanama Difusor",
+      "descripcion": "Difusor con aroma a Wanama",
+      "precio": 15000,
+      "codigoBarras": "77920241063NaN",
+      "imagen": "/images/categorias/difusores.webp",
+      "categoriaId": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "984cf595-1b8a-4242-9ee1-41873aecd7ac",
+        "nombre": "Difusores de Hogar",
+        "imagen": "/images/categorias/difusores.webp"
+      }
+    },
+    {
+      "id": "52cc06b9-3502-4e37-be50-f8256d28b45d",
+      "nombre": "Basico",
+      "descripcion": "BASICO",
+      "precio": 15000,
+      "codigoBarras": "77920241171NaN",
+      "imagen": "/images/categorias/humidificadores.jpg",
+      "categoriaId": "7fefc1aa-2f92-4737-b435-985bdfcf8939",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "7fefc1aa-2f92-4737-b435-985bdfcf8939",
+        "nombre": "Humidificadores con Filtro",
+        "imagen": "/images/categorias/humidificadores.webp"
+      }
+    },
+    {
+      "id": "f2946823-3f35-4809-83c4-557d441cdfa1",
+      "nombre": "Florero Chico Con Filtro",
+      "descripcion": "FLORERO CHICO CON FILTRO",
+      "precio": 15000,
+      "codigoBarras": "77920241172NaN",
+      "imagen": "/images/categorias/humidificadores.jpg",
+      "categoriaId": "7fefc1aa-2f92-4737-b435-985bdfcf8939",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "7fefc1aa-2f92-4737-b435-985bdfcf8939",
+        "nombre": "Humidificadores con Filtro",
+        "imagen": "/images/categorias/humidificadores.webp"
+      }
+    },
+    {
+      "id": "4de6ab16-1cdb-4e55-9d9b-53d4aedd6dc4",
+      "nombre": "Florero Con Filtro",
+      "descripcion": "FLORERO CON FILTRO",
+      "precio": 15000,
+      "codigoBarras": "77920241173NaN",
+      "imagen": "/images/categorias/humidificadores.jpg",
+      "categoriaId": "7fefc1aa-2f92-4737-b435-985bdfcf8939",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "7fefc1aa-2f92-4737-b435-985bdfcf8939",
+        "nombre": "Humidificadores con Filtro",
+        "imagen": "/images/categorias/humidificadores.webp"
+      }
+    },
+    {
+      "id": "95286932-2af2-475c-86e1-3cf46f5cbb7e",
+      "nombre": "Humidifier",
+      "descripcion": "HUMIDIFIER",
+      "precio": 15000,
+      "codigoBarras": "77920241174NaN",
+      "imagen": "/images/categorias/humidificadores.jpg",
+      "categoriaId": "7fefc1aa-2f92-4737-b435-985bdfcf8939",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "7fefc1aa-2f92-4737-b435-985bdfcf8939",
+        "nombre": "Humidificadores con Filtro",
+        "imagen": "/images/categorias/humidificadores.webp"
+      }
+    },
+    {
+      "id": "238e69b2-3ed7-44b7-bbb3-00a40326cd25",
+      "nombre": "Humidifier Pro",
+      "descripcion": "HUMIDIFIER PRO",
+      "precio": 15000,
+      "codigoBarras": "77920241175NaN",
+      "imagen": "/images/categorias/humidificadores.jpg",
+      "categoriaId": "7fefc1aa-2f92-4737-b435-985bdfcf8939",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "7fefc1aa-2f92-4737-b435-985bdfcf8939",
+        "nombre": "Humidificadores con Filtro",
+        "imagen": "/images/categorias/humidificadores.webp"
+      }
+    },
+    {
+      "id": "f9b7a70e-1318-4c2f-9d34-813f9474663c",
+      "nombre": "Redondo Con Filtro",
+      "descripcion": "REDONDO CON FILTRO",
+      "precio": 15000,
+      "codigoBarras": "77920241176NaN",
+      "imagen": "/images/categorias/humidificadores.jpg",
+      "categoriaId": "7fefc1aa-2f92-4737-b435-985bdfcf8939",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "7fefc1aa-2f92-4737-b435-985bdfcf8939",
+        "nombre": "Humidificadores con Filtro",
+        "imagen": "/images/categorias/humidificadores.webp"
+      }
+    },
+    {
+      "id": "544743fb-45f5-4789-9379-62b7efedd737",
+      "nombre": "Velador Luna",
+      "descripcion": "VELADOR LUNA",
+      "precio": 15000,
+      "codigoBarras": "77920241177NaN",
+      "imagen": "/images/categorias/humidificadores.jpg",
+      "categoriaId": "7fefc1aa-2f92-4737-b435-985bdfcf8939",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "7fefc1aa-2f92-4737-b435-985bdfcf8939",
+        "nombre": "Humidificadores con Filtro",
+        "imagen": "/images/categorias/humidificadores.webp"
+      }
+    },
+    {
+      "id": "d6c6d8c9-3287-4aaa-9493-6a2dd4435349",
+      "nombre": "Planeta",
+      "descripcion": "PLANETA",
+      "precio": 15000,
+      "codigoBarras": "77920241178NaN",
+      "imagen": "/images/categorias/humidificadores.jpg",
+      "categoriaId": "7fefc1aa-2f92-4737-b435-985bdfcf8939",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "7fefc1aa-2f92-4737-b435-985bdfcf8939",
+        "nombre": "Humidificadores con Filtro",
+        "imagen": "/images/categorias/humidificadores.webp"
+      }
+    },
+    {
+      "id": "06280df8-c487-4489-ad5b-453db2e8a6a5",
+      "nombre": "Volcan Con Filtro",
+      "descripcion": "VOLCAN CON FILTRO",
+      "precio": 15000,
+      "codigoBarras": "77920241179NaN",
+      "imagen": "/images/categorias/humidificadores.jpg",
+      "categoriaId": "7fefc1aa-2f92-4737-b435-985bdfcf8939",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "7fefc1aa-2f92-4737-b435-985bdfcf8939",
+        "nombre": "Humidificadores con Filtro",
+        "imagen": "/images/categorias/humidificadores.webp"
+      }
+    },
+    {
+      "id": "3b8a173f-e322-48b8-959b-4312a77edd04",
+      "nombre": "Base Madera Punta Blanca Grande",
+      "descripcion": "BASE MADERA PUNTA BLANCA GRANDE",
+      "precio": 15000,
+      "codigoBarras": "77920241180NaN",
+      "imagen": "/images/categorias/humidificadores-grandes.jpg",
+      "categoriaId": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+        "nombre": "Humidificadores Grandes",
+        "imagen": "/images/categorias/humidificadores-grandes.jpg"
+      }
+    },
+    {
+      "id": "c48a5e98-60b8-4212-9b16-84ec408c77f2",
+      "nombre": "Base Madera Redondo Grande 500",
+      "descripcion": "BASE MADERA REDONDO GRANDE 500",
+      "precio": 15000,
+      "codigoBarras": "77920241181NaN",
+      "imagen": "/images/categorias/humidificadores-grandes.jpg",
+      "categoriaId": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+        "nombre": "Humidificadores Grandes",
+        "imagen": "/images/categorias/humidificadores-grandes.jpg"
+      }
+    },
+    {
+      "id": "9bae45da-d2b9-4a43-94c6-5b0e87ed58fa",
+      "nombre": "Blanco Grande Punta Media",
+      "descripcion": "BLANCO GRANDE PUNTA MEDIA",
+      "precio": 15000,
+      "codigoBarras": "77920241182NaN",
+      "imagen": "/images/categorias/humidificadores-grandes.jpg",
+      "categoriaId": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+        "nombre": "Humidificadores Grandes",
+        "imagen": "/images/categorias/humidificadores-grandes.jpg"
+      }
+    },
+    {
+      "id": "0e6713d9-81b4-4716-b046-abb04a56b90f",
+      "nombre": "Con Bluetooth",
+      "descripcion": "CON BLUETOOTH",
+      "precio": 15000,
+      "codigoBarras": "77920241183NaN",
+      "imagen": "/images/categorias/humidificadores-grandes.jpg",
+      "categoriaId": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+        "nombre": "Humidificadores Grandes",
+        "imagen": "/images/categorias/humidificadores-grandes.jpg"
+      }
+    },
+    {
+      "id": "bfe873a1-6828-4062-a95d-82d9684660b5",
+      "nombre": "Florero Grande 500ml Blanco",
+      "descripcion": "FLORERO GRANDE 500ML BLANCO",
+      "precio": 15000,
+      "codigoBarras": "77920241184NaN",
+      "imagen": "/images/categorias/humidificadores-grandes.jpg",
+      "categoriaId": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+        "nombre": "Humidificadores Grandes",
+        "imagen": "/images/categorias/humidificadores-grandes.jpg"
+      }
+    },
+    {
+      "id": "ca8fa348-24bf-4fd2-b16f-a3ebefbb7668",
+      "nombre": "Florero Grande 500ml Madera",
+      "descripcion": "FLORERO GRANDE 500ML MADERA",
+      "precio": 15000,
+      "codigoBarras": "77920241185NaN",
+      "imagen": "/images/categorias/humidificadores-grandes.jpg",
+      "categoriaId": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+        "nombre": "Humidificadores Grandes",
+        "imagen": "/images/categorias/humidificadores-grandes.jpg"
+      }
+    },
+    {
+      "id": "b4496611-504a-4175-ab9c-7fc963a0187e",
+      "nombre": "Florero Grande 500ml Oscuro",
+      "descripcion": "FLORERO GRANDE 500ML OSCURO",
+      "precio": 15000,
+      "codigoBarras": "77920241186NaN",
+      "imagen": "/images/categorias/humidificadores-grandes.jpg",
+      "categoriaId": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+        "nombre": "Humidificadores Grandes",
+        "imagen": "/images/categorias/humidificadores-grandes.jpg"
+      }
+    },
+    {
+      "id": "72cd940d-d8c2-447a-b937-e86e68ec952b",
+      "nombre": "Florista Madera Clara",
+      "descripcion": "FLORISTA MADERA CLARA",
+      "precio": 15000,
+      "codigoBarras": "77920241187NaN",
+      "imagen": "/images/categorias/humidificadores-grandes.jpg",
+      "categoriaId": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+        "nombre": "Humidificadores Grandes",
+        "imagen": "/images/categorias/humidificadores-grandes.jpg"
+      }
+    },
+    {
+      "id": "ed6cc427-9763-49a9-b5d3-9c18e4a2e71e",
+      "nombre": "Florista Madera Oscura",
+      "descripcion": "FLORISTA MADERA OSCURA",
+      "precio": 15000,
+      "codigoBarras": "77920241188NaN",
+      "imagen": "/images/categorias/humidificadores-grandes.jpg",
+      "categoriaId": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+        "nombre": "Humidificadores Grandes",
+        "imagen": "/images/categorias/humidificadores-grandes.jpg"
+      }
+    },
+    {
+      "id": "7ab7b77c-9a12-48a0-8708-dde4c5210399",
+      "nombre": "Fogata Grande",
+      "descripcion": "FOGATA GRANDE",
+      "precio": 15000,
+      "codigoBarras": "77920241189NaN",
+      "imagen": "/images/categorias/humidificadores-grandes.jpg",
+      "categoriaId": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+        "nombre": "Humidificadores Grandes",
+        "imagen": "/images/categorias/humidificadores-grandes.jpg"
+      }
+    },
+    {
+      "id": "757ef11c-312c-4bfc-bceb-696ef2fe5761",
+      "nombre": "Fuego",
+      "descripcion": "FUEGO",
+      "precio": 15000,
+      "codigoBarras": "77920241190NaN",
+      "imagen": "/images/categorias/humidificadores-grandes.jpg",
+      "categoriaId": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+        "nombre": "Humidificadores Grandes",
+        "imagen": "/images/categorias/humidificadores-grandes.jpg"
+      }
+    },
+    {
+      "id": "729aa976-15b4-4137-8965-ef926bc807ea",
+      "nombre": "Grande Laurel Claro",
+      "descripcion": "GRANDE LAUREL CLARO",
+      "precio": 15000,
+      "codigoBarras": "77920241191NaN",
+      "imagen": "/images/categorias/humidificadores-grandes.jpg",
+      "categoriaId": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+        "nombre": "Humidificadores Grandes",
+        "imagen": "/images/categorias/humidificadores-grandes.jpg"
+      }
+    },
+    {
+      "id": "3450612d-1f73-488a-a561-5454a5cd007f",
+      "nombre": "Grande Laurel Oscuro",
+      "descripcion": "GRANDE LAUREL OSCURO",
+      "precio": 15000,
+      "codigoBarras": "77920241192NaN",
+      "imagen": "/images/categorias/humidificadores-grandes.jpg",
+      "categoriaId": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+        "nombre": "Humidificadores Grandes",
+        "imagen": "/images/categorias/humidificadores-grandes.jpg"
+      }
+    },
+    {
+      "id": "37e45cab-caa7-43cd-99cd-1847b6189a89",
+      "nombre": "Madera Blanca Punta Blanca 500",
+      "descripcion": "MADERA BLANCA PUNTA BLANCA 500",
+      "precio": 15000,
+      "codigoBarras": "77920241193NaN",
+      "imagen": "/images/categorias/humidificadores-grandes.jpg",
+      "categoriaId": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+        "nombre": "Humidificadores Grandes",
+        "imagen": "/images/categorias/humidificadores-grandes.jpg"
+      }
+    },
+    {
+      "id": "14d29a10-4f40-49bd-aabe-cf6968181531",
+      "nombre": "Madera Grande Punta Media",
+      "descripcion": "MADERA GRANDE PUNTA MEDIA",
+      "precio": 15000,
+      "codigoBarras": "77920241194NaN",
+      "imagen": "/images/categorias/humidificadores-grandes.jpg",
+      "categoriaId": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+        "nombre": "Humidificadores Grandes",
+        "imagen": "/images/categorias/humidificadores-grandes.jpg"
+      }
+    },
+    {
+      "id": "e8772cd1-d770-4e43-9412-d9d69bb0c044",
+      "nombre": "Madera Oscura Punta Blanca",
+      "descripcion": "MADERA OSCURA PUNTA BLANCA",
+      "precio": 15000,
+      "codigoBarras": "77920241195NaN",
+      "imagen": "/images/categorias/humidificadores-grandes.jpg",
+      "categoriaId": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+        "nombre": "Humidificadores Grandes",
+        "imagen": "/images/categorias/humidificadores-grandes.jpg"
+      }
+    },
+    {
+      "id": "036189a3-db62-4611-b282-54eea8d57873",
+      "nombre": "Notas Musicales Claro",
+      "descripcion": "NOTAS MUSICALES CLARO",
+      "precio": 15000,
+      "codigoBarras": "77920241196NaN",
+      "imagen": "/images/categorias/humidificadores-grandes.jpg",
+      "categoriaId": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+        "nombre": "Humidificadores Grandes",
+        "imagen": "/images/categorias/humidificadores-grandes.jpg"
+      }
+    },
+    {
+      "id": "7e424016-67ab-4332-9d49-4b843cdc2123",
+      "nombre": "Notas Musicales Oscuro",
+      "descripcion": "NOTAS MUSICALES OSCURO",
+      "precio": 15000,
+      "codigoBarras": "77920241197NaN",
+      "imagen": "/images/categorias/humidificadores-grandes.jpg",
+      "categoriaId": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+        "nombre": "Humidificadores Grandes",
+        "imagen": "/images/categorias/humidificadores-grandes.jpg"
+      }
+    },
+    {
+      "id": "ab328c57-5f5f-40f8-991b-b8056d650a94",
+      "nombre": "Oscuro Grande Punta Media",
+      "descripcion": "OSCURO GRANDE PUNTA MEDIA",
+      "precio": 15000,
+      "codigoBarras": "77920241198NaN",
+      "imagen": "/images/categorias/humidificadores-grandes.jpg",
+      "categoriaId": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+        "nombre": "Humidificadores Grandes",
+        "imagen": "/images/categorias/humidificadores-grandes.jpg"
+      }
+    },
+    {
+      "id": "481b9734-3479-423d-aeef-114844a92ad7",
+      "nombre": "Pico Largo",
+      "descripcion": "PICO LARGO",
+      "precio": 15000,
+      "codigoBarras": "77920241199NaN",
+      "imagen": "/images/categorias/humidificadores-grandes.jpg",
+      "categoriaId": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+        "nombre": "Humidificadores Grandes",
+        "imagen": "/images/categorias/humidificadores-grandes.jpg"
+      }
+    },
+    {
+      "id": "995f6385-5a68-4a87-9b1a-0c367d608917",
+      "nombre": "Redondo Calado",
+      "descripcion": "REDONDO CALADO",
+      "precio": 15000,
+      "codigoBarras": "77920241200NaN",
+      "imagen": "/images/categorias/humidificadores-grandes.jpg",
+      "categoriaId": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+        "nombre": "Humidificadores Grandes",
+        "imagen": "/images/categorias/humidificadores-grandes.jpg"
+      }
+    },
+    {
+      "id": "6209b358-552d-4f6b-908c-bd16fb79dc02",
+      "nombre": "Redondo Sin Bluethoo",
+      "descripcion": "REDONDO SIN BLUETHOO",
+      "precio": 15000,
+      "codigoBarras": "77920241201NaN",
+      "imagen": "/images/categorias/humidificadores-grandes.jpg",
+      "categoriaId": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+        "nombre": "Humidificadores Grandes",
+        "imagen": "/images/categorias/humidificadores-grandes.jpg"
+      }
+    },
+    {
+      "id": "7b19b70c-4b09-469d-b34a-10ee16f9e9a1",
+      "nombre": "Rejas Grande Claro",
+      "descripcion": "REJAS GRANDE CLARO",
+      "precio": 15000,
+      "codigoBarras": "77920241202NaN",
+      "imagen": "/images/categorias/humidificadores-grandes.jpg",
+      "categoriaId": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+        "nombre": "Humidificadores Grandes",
+        "imagen": "/images/categorias/humidificadores-grandes.jpg"
+      }
+    },
+    {
+      "id": "e25feacd-21cc-4d7d-b34a-42022060befe",
+      "nombre": "Rejas Grande Oscuro",
+      "descripcion": "REJAS GRANDE OSCURO",
+      "precio": 15000,
+      "codigoBarras": "77920241203NaN",
+      "imagen": "/images/categorias/humidificadores-grandes.jpg",
+      "categoriaId": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+        "nombre": "Humidificadores Grandes",
+        "imagen": "/images/categorias/humidificadores-grandes.jpg"
+      }
+    },
+    {
+      "id": "85b60caf-ae36-41ce-9504-83475d7b6506",
+      "nombre": "Simil Madera Grande",
+      "descripcion": "SIMIL MADERA GRANDE",
+      "precio": 15000,
+      "codigoBarras": "77920241204NaN",
+      "imagen": "/images/categorias/humidificadores-grandes.jpg",
+      "categoriaId": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+        "nombre": "Humidificadores Grandes",
+        "imagen": "/images/categorias/humidificadores-grandes.jpg"
+      }
+    },
+    {
+      "id": "e330855b-7b7a-4cf8-a800-151db36501ae",
+      "nombre": "Reloj/alarma",
+      "descripcion": "RELOJ/ALARMA",
+      "precio": 15000,
+      "codigoBarras": "77920241205NaN",
+      "imagen": "/images/categorias/humidificadores-grandes.jpg",
+      "categoriaId": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+        "nombre": "Humidificadores Grandes",
+        "imagen": "/images/categorias/humidificadores-grandes.jpg"
+      }
+    },
+    {
+      "id": "c1e1e228-9d6d-4e39-bc8e-90e7659e7b9f",
+      "nombre": "Volcan",
+      "descripcion": "VOLCAN",
+      "precio": 15000,
+      "codigoBarras": "77920241206NaN",
+      "imagen": "/images/categorias/humidificadores-grandes.jpg",
+      "categoriaId": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+        "nombre": "Humidificadores Grandes",
+        "imagen": "/images/categorias/humidificadores-grandes.jpg"
+      }
+    },
+    {
+      "id": "abd64d79-f9a5-4d2b-8565-1e28ac2b9be5",
+      "nombre": "Y Lampara De Sal",
+      "descripcion": "y LAMPARA DE SAL",
+      "precio": 15000,
+      "codigoBarras": "77920241207NaN",
+      "imagen": "/images/categorias/humidificadores-grandes.jpg",
+      "categoriaId": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "d5fa0523-b40d-4599-bce6-3f89b6910f2f",
+        "nombre": "Humidificadores Grandes",
+        "imagen": "/images/categorias/humidificadores-grandes.jpg"
+      }
+    },
+    {
+      "id": "f2540131-a7c6-4c95-be1a-2f390bdf57fd",
+      "nombre": "125ml",
+      "descripcion": "125ML",
+      "precio": 15000,
+      "codigoBarras": "77920241208NaN",
+      "imagen": "/images/categorias/humidificadores-medianos.jpg",
+      "categoriaId": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+        "nombre": "Humidificadores Medianos",
+        "imagen": "/images/categorias/humidificadores-medianos.jpg"
+      }
+    },
+    {
+      "id": "1cd01e51-47f7-4067-896f-7aff7ac74096",
+      "nombre": "300ml Pro",
+      "descripcion": "300ML PRO",
+      "precio": 15000,
+      "codigoBarras": "77920241209NaN",
+      "imagen": "/images/categorias/humidificadores-medianos.jpg",
+      "categoriaId": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+        "nombre": "Humidificadores Medianos",
+        "imagen": "/images/categorias/humidificadores-medianos.jpg"
+      }
+    },
+    {
+      "id": "ce628221-3065-4923-8321-e51a215a98ef",
+      "nombre": "Ajo Base Madera",
+      "descripcion": "AJO BASE MADERA",
+      "precio": 15000,
+      "codigoBarras": "77920241210NaN",
+      "imagen": "/images/categorias/humidificadores-medianos.jpg",
+      "categoriaId": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+        "nombre": "Humidificadores Medianos",
+        "imagen": "/images/categorias/humidificadores-medianos.jpg"
+      }
+    },
+    {
+      "id": "6c62e16e-1912-402b-8cfa-49c29cb17fa1",
+      "nombre": "Alargado Tipo Florero",
+      "descripcion": "ALARGADO TIPO FLORERO",
+      "precio": 15000,
+      "codigoBarras": "77920241211NaN",
+      "imagen": "/images/categorias/humidificadores-medianos.jpg",
+      "categoriaId": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+        "nombre": "Humidificadores Medianos",
+        "imagen": "/images/categorias/humidificadores-medianos.jpg"
+      }
+    },
+    {
+      "id": "c0622298-c0e4-4819-969e-723d46a2b2a1",
+      "nombre": "Aroma Difuser",
+      "descripcion": "AROMA DIFUSER",
+      "precio": 15000,
+      "codigoBarras": "77920241212NaN",
+      "imagen": "/images/categorias/humidificadores-medianos.jpg",
+      "categoriaId": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+        "nombre": "Humidificadores Medianos",
+        "imagen": "/images/categorias/humidificadores-medianos.jpg"
+      }
+    },
+    {
+      "id": "9017f800-326c-41a0-8994-56f507a49803",
+      "nombre": "Base Madera Blanco 300ml",
+      "descripcion": "BASE MADERA BLANCO 300ML",
+      "precio": 15000,
+      "codigoBarras": "77920241213NaN",
+      "imagen": "/images/categorias/humidificadores-medianos.jpg",
+      "categoriaId": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+        "nombre": "Humidificadores Medianos",
+        "imagen": "/images/categorias/humidificadores-medianos.jpg"
+      }
+    },
+    {
+      "id": "8ae79a4e-4b61-40ff-a5db-fabedf6b4df5",
+      "nombre": "Florero Sin Filtro",
+      "descripcion": "FLORERO SIN FILTRO",
+      "precio": 15000,
+      "codigoBarras": "77920241214NaN",
+      "imagen": "/images/categorias/humidificadores-medianos.jpg",
+      "categoriaId": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+        "nombre": "Humidificadores Medianos",
+        "imagen": "/images/categorias/humidificadores-medianos.jpg"
+      }
+    },
+    {
+      "id": "7637dae4-1092-4004-b041-ef256c06c87c",
+      "nombre": "Florero Usb Grande",
+      "descripcion": "FLORERO USB grande",
+      "precio": 15000,
+      "codigoBarras": "77920241215NaN",
+      "imagen": "/images/categorias/humidificadores-medianos.jpg",
+      "categoriaId": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+        "nombre": "Humidificadores Medianos",
+        "imagen": "/images/categorias/humidificadores-medianos.jpg"
+      }
+    },
+    {
+      "id": "c4836280-ce85-4c42-ace2-77bb98673c4f",
+      "nombre": "Gota Grande",
+      "descripcion": "GOTA GRANDE",
+      "precio": 15000,
+      "codigoBarras": "77920241216NaN",
+      "imagen": "/images/categorias/humidificadores-medianos.jpg",
+      "categoriaId": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+        "nombre": "Humidificadores Medianos",
+        "imagen": "/images/categorias/humidificadores-medianos.jpg"
+      }
+    },
+    {
+      "id": "698b9358-fe13-4df8-bb95-4c186a17b397",
+      "nombre": "Gota Pequea",
+      "descripcion": "GOTA PEQUEA",
+      "precio": 15000,
+      "codigoBarras": "77920241217NaN",
+      "imagen": "/images/categorias/humidificadores-medianos.jpg",
+      "categoriaId": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+        "nombre": "Humidificadores Medianos",
+        "imagen": "/images/categorias/humidificadores-medianos.jpg"
+      }
+    },
+    {
+      "id": "020b0564-4715-434b-b833-3554e1ed37dc",
+      "nombre": "Huevito Base Madera",
+      "descripcion": "HUEVITO BASE MADERA",
+      "precio": 15000,
+      "codigoBarras": "77920241218NaN",
+      "imagen": "/images/categorias/humidificadores-medianos.jpg",
+      "categoriaId": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+        "nombre": "Humidificadores Medianos",
+        "imagen": "/images/categorias/humidificadores-medianos.jpg"
+      }
+    },
+    {
+      "id": "f526fde4-7e59-4a7b-87ff-87a145287c1b",
+      "nombre": "Huevo Grande",
+      "descripcion": "HUEVO GRANDE",
+      "precio": 15000,
+      "codigoBarras": "77920241219NaN",
+      "imagen": "/images/categorias/humidificadores-medianos.jpg",
+      "categoriaId": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+      "stockMinimo": 5,
+      "activo": true,
+      "categoria": {
+        "id": "adae9c6f-6e85-4e78-a00d-d1003bd880fa",
+        "nombre": "Humidificadores Medianos",
+        "imagen": "/images/categorias/humidificadores-medianos.jpg"
+      }
+    }
+  ],
+  "stats": {
+    "totalProductos": 313,
+    "productosActivos": 94
+  }
+}
