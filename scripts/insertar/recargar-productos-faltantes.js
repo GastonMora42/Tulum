@@ -1,8 +1,9 @@
-// scripts/insertar/insertar-productos-finales.js - PRODUCTOS DEFINITIVOS
+// scripts/insertar/recargar-productos-faltantes.js
 const { PrismaClient } = require('@prisma/client');
+const { capitalizarTexto } = require('./insertar-productos-finales');
 const prisma = new PrismaClient();
 
-// Mapeo de categorías con sus nombres limpios e imágenes
+// Misma configuración de categorías
 const categoriasConfig = {
   'ACEITES': {
     nombre: 'Aceites Corporales',
@@ -91,7 +92,140 @@ const categoriasConfig = {
   }
 };
 
-// Función para limpiar y parsear el archivo de productos
+// Función para procesar nombres y extraer aroma + formato
+function procesarNombreProducto(nombreOriginal, categoria) {
+  const config = categoriasConfig[categoria];
+  if (!config) return null;
+
+  let aroma = '';
+  let formato = config.prefijo;
+  
+  // Limpiar el nombre original
+  let nombreLimpio = nombreOriginal
+    .replace(/^(ACEITE DE|AGUA DE|BOMBA ESF\.|ES\. HORNI\.|ES\.HUMI\.|ESP\. DE BAÑO|F\. TEXTIL|HOME SPRAY|HUMIDIF\.|JABON LIQUIDO|JABON SOLIDO|SAL DE BAÑO|VELA DE SOJA|DIFUSOR|REC\. DIFU\. AUTO|REC\.DIFU\. AUTO)/i, '')
+    .trim();
+
+  // Casos especiales por categoría (mismo código que antes)
+  switch (categoria) {
+    case 'ACEITES':
+      aroma = nombreLimpio.replace(/^DE\s+/, '');
+      formato = 'Aceite Corporal';
+      break;
+      
+    case 'AGUAS DE AZAHAR':
+      aroma = nombreLimpio.replace(/^DE\s+/, '');
+      formato = 'Agua Aromática';
+      break;
+      
+    case 'BOMBAS ESFERVESCENTES':
+      aroma = nombreLimpio;
+      formato = 'Bomba de Baño';
+      break;
+      
+    case 'DIFUSORES DE AUTO':
+      if (nombreOriginal.includes('REC.')) {
+        aroma = nombreLimpio;
+        formato = 'Recambio Difusor Auto';
+      } else {
+        aroma = 'Auto Nuevo';
+        formato = 'Difusor Auto';
+      }
+      break;
+      
+    case 'DIFUSORES DE HOGAR':
+      aroma = nombreLimpio;
+      formato = 'Difusor';
+      break;
+      
+    case 'ESENCIAS DE HORNILLO':
+      aroma = nombreLimpio;
+      formato = 'Esencia Hornillo';
+      break;
+      
+    case 'ESENCIAS HUMIDIFICADORES':
+      aroma = nombreLimpio;
+      formato = 'Esencia Humidificador';
+      break;
+      
+    case 'ESPUMAS DE BAÑO':
+      aroma = nombreLimpio;
+      formato = 'Espuma de Baño';
+      break;
+      
+    case 'FRAGANCIAS TEXTILES':
+      aroma = nombreLimpio;
+      formato = 'Fragancia Textil';
+      break;
+      
+    case 'HOME SPRAY':
+      aroma = nombreLimpio;
+      formato = 'Home Spray';
+      break;
+      
+    case 'SALES DE BAÑO':
+      aroma = nombreLimpio;
+      formato = 'Sales de Baño';
+      break;
+      
+    case 'JABONES LIQUIDOS Y SOLIDOS':
+      aroma = nombreLimpio;
+      formato = nombreOriginal.includes('LIQUIDO') ? 'Jabón Líquido' : 'Jabón Sólido';
+      break;
+      
+    case 'VELAS DE SOJA':
+      aroma = '';
+      formato = nombreLimpio.replace(/^DE SOJA\s+/, '');
+      break;
+      
+    case 'HUMIDIFICADOR CON FILTRO':
+    case 'HUMIDIFICADORES GRANDES':
+    case 'HUMIDIFICADORES MEDIANOS':
+      aroma = '';
+      formato = nombreLimpio;
+      break;
+      
+    case 'VARIOS':
+      aroma = '';
+      formato = nombreLimpio;
+      break;
+      
+    default:
+      aroma = nombreLimpio;
+      formato = config.prefijo;
+  }
+
+  const nombreFinal = aroma ? 
+    `${capitalizarTexto(aroma)} ${formato}` : 
+    capitalizarTexto(formato);
+
+  return {
+    nombre: nombreFinal,
+    nombreOriginal: nombreOriginal,
+    aroma: aroma ? capitalizarTexto(aroma) : null,
+    formato: formato,
+    categoria: config.nombre,
+    imagen: config.imagen
+  };
+}
+
+// Función para generar código de barras EAN-13
+function generarCodigoBarras(codigo) {
+  const paisArg = '779';
+  const empresa = '2024';
+  const producto = codigo.toString().padStart(4, '0');
+  const base = paisArg + empresa + producto;
+  
+  let suma = 0;
+  for (let i = 0; i < 12; i++) {
+    const digito = parseInt(base[i]);
+    suma += (i % 2 === 0) ? digito : digito * 3;
+  }
+  
+  const digitoVerificador = (10 - (suma % 10)) % 10;
+  return base + digitoVerificador;
+}
+
+// Función para procesar los datos (copia de insertar-productos-finales.js)
 function procesarProductosDefinitivos() {
   const productosRaw = `ACEITES	ACEITES
 ACEITE DE ALMENDRAS   	ACEITES
@@ -397,7 +531,6 @@ VELA DE SOJA TRIANGULO GRANDE 	VELAS DE SOJA`;
       const nombreOriginal = partes[0];
       const categoria = partes[1];
       
-      // Solo procesar productos, no headers de categorías
       if (nombreOriginal !== categoria) {
         const productoData = procesarNombreProducto(nombreOriginal, categoria);
         if (productoData) {
@@ -414,253 +547,83 @@ VELA DE SOJA TRIANGULO GRANDE 	VELAS DE SOJA`;
   return productos;
 }
 
-// Función para procesar nombres y extraer aroma + formato
-function procesarNombreProducto(nombreOriginal, categoria) {
-  const config = categoriasConfig[categoria];
-  if (!config) return null;
-
-  let aroma = '';
-  let formato = config.prefijo;
-  
-  // Limpiar el nombre original
-  let nombreLimpio = nombreOriginal
-    .replace(/^(ACEITE DE|AGUA DE|BOMBA ESF\.|ES\. HORNI\.|ES\.HUMI\.|ESP\. DE BAÑO|F\. TEXTIL|HOME SPRAY|HUMIDIF\.|JABON LIQUIDO|JABON SOLIDO|SAL DE BAÑO|VELA DE SOJA|DIFUSOR|REC\. DIFU\. AUTO|REC\.DIFU\. AUTO)/i, '')
-    .trim();
-
-  // Casos especiales por categoría
-  switch (categoria) {
-    case 'ACEITES':
-      aroma = nombreLimpio.replace(/^DE\s+/, '');
-      formato = 'Aceite Corporal';
-      break;
-      
-    case 'AGUAS DE AZAHAR':
-      aroma = nombreLimpio.replace(/^DE\s+/, '');
-      formato = 'Agua Aromática';
-      break;
-      
-    case 'BOMBAS ESFERVESCENTES':
-      aroma = nombreLimpio;
-      formato = 'Bomba de Baño';
-      break;
-      
-    case 'DIFUSORES DE AUTO':
-      // Para recambios de difusor auto
-      if (nombreOriginal.includes('REC.')) {
-        aroma = nombreLimpio;
-        formato = 'Recambio Difusor Auto';
-      } else {
-        aroma = 'Auto Nuevo';
-        formato = 'Difusor Auto';
-      }
-      break;
-      
-    case 'DIFUSORES DE HOGAR':
-      aroma = nombreLimpio;
-      formato = 'Difusor';
-      break;
-      
-    case 'ESENCIAS DE HORNILLO':
-      aroma = nombreLimpio;
-      formato = 'Esencia Hornillo';
-      break;
-      
-    case 'ESENCIAS HUMIDIFICADORES':
-      aroma = nombreLimpio;
-      formato = 'Esencia Humidificador';
-      break;
-      
-    case 'ESPUMAS DE BAÑO':
-      aroma = nombreLimpio;
-      formato = 'Espuma de Baño';
-      break;
-      
-    case 'FRAGANCIAS TEXTILES':
-      aroma = nombreLimpio;
-      formato = 'Fragancia Textil';
-      break;
-      
-    case 'HOME SPRAY':
-      aroma = nombreLimpio;
-      formato = 'Home Spray';
-      break;
-      
-    case 'SALES DE BAÑO':
-      aroma = nombreLimpio;
-      formato = 'Sales de Baño';
-      break;
-      
-    case 'JABONES LIQUIDOS Y SOLIDOS':
-      aroma = nombreLimpio;
-      formato = nombreOriginal.includes('LIQUIDO') ? 'Jabón Líquido' : 'Jabón Sólido';
-      break;
-      
-    case 'VELAS DE SOJA':
-      // Para velas, el estilo es parte del nombre
-      aroma = '';
-      formato = nombreLimpio.replace(/^DE SOJA\s+/, '');
-      break;
-      
-    case 'HUMIDIFICADOR CON FILTRO':
-    case 'HUMIDIFICADORES GRANDES':
-    case 'HUMIDIFICADORES MEDIANOS':
-      aroma = '';
-      formato = nombreLimpio;
-      break;
-      
-    case 'VARIOS':
-      aroma = '';
-      formato = nombreLimpio;
-      break;
-      
-    default:
-      aroma = nombreLimpio;
-      formato = config.prefijo;
-  }
-
-  // Construir nombre final: "Aroma Formato" o solo "Formato" si no hay aroma
-  const nombreFinal = aroma ? 
-    `${capitalizarTexto(aroma)} ${formato}` : 
-    capitalizarTexto(formato);
-
-  return {
-    nombre: nombreFinal,
-    nombreOriginal: nombreOriginal,
-    aroma: aroma ? capitalizarTexto(aroma) : null,
-    formato: formato,
-    categoria: config.nombre,
-    imagen: config.imagen
-  };
-}
-
-// Función para capitalizar texto correctamente
-function capitalizarTexto(texto) {
-  return texto
-    .toLowerCase()
-    .split(' ')
-    .map(palabra => palabra.charAt(0).toUpperCase() + palabra.slice(1))
-    .join(' ');
-}
-
-// Generar código de barras EAN-13
-function generarCodigoBarras(codigo) {
-  const paisArg = '779';
-  const empresa = '2024';
-  const producto = codigo.toString().padStart(4, '0');
-  const base = paisArg + empresa + producto;
-  
-  let suma = 0;
-  for (let i = 0; i < 12; i++) {
-    const digito = parseInt(base[i]);
-    suma += (i % 2 === 0) ? digito : digito * 3;
-  }
-  
-  const digitoVerificador = (10 - (suma % 10)) % 10;
-  return base + digitoVerificador;
-}
-
-// Función para limpiar datos existentes
-async function limpiarDatosExistentes() {
-  console.log('🧹 Limpiando datos existentes...');
-  
-  try {
-    // Verificar dependencias
-    const ventas = await prisma.itemVenta.count();
-    const recetas = await prisma.productoReceta.count();
-    const stock = await prisma.stock.count({ where: { productoId: { not: null } } });
-    
-    if (ventas > 0 || recetas > 0 || stock > 0) {
-      console.log('⚠️ Se encontraron dependencias:');
-      console.log(`   - Ventas: ${ventas}`);
-      console.log(`   - Recetas: ${recetas}`);
-      console.log(`   - Stock: ${stock}`);
-      
-      // Solo desactivar productos y categorías
-      const productosDesactivados = await prisma.producto.updateMany({
-        data: { activo: false }
-      });
-      
-      console.log(`   🔄 ${productosDesactivados.count} productos desactivados`);
-      return { productosEliminados: 0, categoriasEliminadas: 0, productosDesactivados: productosDesactivados.count };
-    }
-    
-    // Si no hay dependencias, eliminar todo
-    await prisma.productoReceta.deleteMany({});
-    await prisma.movimientoStock.deleteMany({ where: { stock: { productoId: { not: null } } } });
-    await prisma.stock.deleteMany({ where: { productoId: { not: null } } });
-    
-    const productosEliminados = await prisma.producto.deleteMany({});
-    const categoriasEliminadas = await prisma.categoria.deleteMany({});
-    
-    console.log(`   ✅ ${productosEliminados.count} productos eliminados`);
-    console.log(`   ✅ ${categoriasEliminadas.count} categorías eliminadas`);
-    
-    return { 
-      productosEliminados: productosEliminados.count, 
-      categoriasEliminadas: categoriasEliminadas.count,
-      productosDesactivados: 0 
-    };
-  } catch (error) {
-    console.error('❌ Error al limpiar datos:', error);
-    throw error;
-  }
-}
-
-// Versión alternativa usando upsert (crear o actualizar)
-async function crearCategorias() {
-  console.log('📂 Creando/actualizando categorías con imágenes...');
-  
+// Función para obtener categorías existentes
+async function obtenerCategorias() {
+  const categorias = await prisma.categoria.findMany();
   const categoriaMap = new Map();
   
-  for (const [key, config] of Object.entries(categoriasConfig)) {
-    try {
-      // 🔧 USAR UPSERT: Crear si no existe, actualizar si existe
-      const categoria = await prisma.categoria.upsert({
-        where: { nombre: config.nombre },
-        update: { 
-          imagen: config.imagen // Actualizar imagen si cambió
-        },
-        create: {
-          nombre: config.nombre,
-          imagen: config.imagen
-        }
-      });
-      
-      categoriaMap.set(config.nombre, categoria.id);
-      console.log(`   ✅ ${config.nombre} (${categoria.createdAt === categoria.updatedAt ? 'creada' : 'actualizada'})`);
-      
-    } catch (error) {
-      console.error(`   ❌ Error con categoría ${config.nombre}:`, error.message);
-    }
-  }
+  categorias.forEach(categoria => {
+    categoriaMap.set(categoria.nombre, categoria.id);
+  });
   
-  console.log(`\n📊 Procesadas ${categoriaMap.size} categorías correctamente`);
   return categoriaMap;
 }
 
-// Función principal para insertar productos
-async function insertarProductosFinales() {
-  console.log('📦 === INSERCIÓN DE PRODUCTOS DEFINITIVOS ===\n');
+// Función para identificar productos faltantes
+async function identificarProductosFaltantes() {
+  console.log('🔍 Identificando productos faltantes...\n');
+  
+  // Obtener productos esperados
+  const productosEsperados = procesarProductosDefinitivos();
+  console.log(`📋 Total productos esperados: ${productosEsperados.length}`);
+  
+  // Obtener productos existentes
+  const productosExistentes = await prisma.producto.findMany({
+    select: { nombre: true, codigoBarras: true }
+  });
+  console.log(`📦 Productos existentes en BD: ${productosExistentes.length}`);
+  
+  // Crear sets para comparación rápida
+  const nombresExistentes = new Set(productosExistentes.map(p => p.nombre));
+  const codigosExistentes = new Set(productosExistentes.map(p => p.codigoBarras).filter(Boolean));
+  
+  // Identificar faltantes
+  const productosFaltantes = productosEsperados.filter(producto => {
+    const codigoBarras = generarCodigoBarras(producto.codigo);
+    return !nombresExistentes.has(producto.nombre) && !codigosExistentes.has(codigoBarras);
+  });
+  
+  console.log(`❌ Productos faltantes: ${productosFaltantes.length}`);
+  
+  if (productosFaltantes.length > 0) {
+    console.log('\n📝 Algunos productos faltantes:');
+    productosFaltantes.slice(0, 10).forEach(p => {
+      console.log(`   - ${p.nombre} (${p.categoria})`);
+    });
+    if (productosFaltantes.length > 10) {
+      console.log(`   ... y ${productosFaltantes.length - 10} más`);
+    }
+  }
+  
+  return productosFaltantes;
+}
+
+// Función principal para recargar productos faltantes
+async function recargarProductosFaltantes() {
+  console.log('🔄 === RECARGA DE PRODUCTOS FALTANTES ===\n');
   
   try {
-    // 1. Procesar productos del archivo
-    console.log('📋 Procesando productos...');
-    const productos = procesarProductosDefinitivos();
-    console.log(`   Procesados ${productos.length} productos`);
+    // 1. Obtener categorías
+    const categoriaMap = await obtenerCategorias();
+    console.log(`📂 Categorías disponibles: ${categoriaMap.size}`);
     
-    // 2. Limpiar datos existentes
-    const limpieza = await limpiarDatosExistentes();
+    // 2. Identificar productos faltantes
+    const productosFaltantes = await identificarProductosFaltantes();
     
-    // 3. Crear categorías
-    const categoriaMap = await crearCategorias();
+    if (productosFaltantes.length === 0) {
+      console.log('\n✅ No hay productos faltantes. Todos están cargados.');
+      return { success: true, message: 'Todos los productos están cargados' };
+    }
     
-    // 4. Insertar productos
-    console.log('\n📦 Insertando productos...');
+    console.log(`\n🚀 Insertando ${productosFaltantes.length} productos faltantes...\n`);
     
     let insertados = 0;
+    let actualizados = 0;
     let errores = 0;
+    const erroresDetalle = [];
     
-    for (const producto of productos) {
+    // 3. Procesar cada producto faltante con UPSERT
+    for (const producto of productosFaltantes) {
       try {
         const categoriaId = categoriaMap.get(producto.categoria);
         
@@ -668,69 +631,70 @@ async function insertarProductosFinales() {
           throw new Error(`Categoría no encontrada: ${producto.categoria}`);
         }
         
-        const nuevoProducto = await prisma.producto.create({
-          data: {
+        const codigoBarras = generarCodigoBarras(producto.codigo);
+        
+        // 🔧 USAR UPSERT para manejar duplicados
+        const resultado = await prisma.producto.upsert({
+          where: { codigoBarras: codigoBarras },
+          update: {
+            // Si existe, solo actualizar campos no críticos
+            descripcion: `${producto.formato}${producto.aroma ? ` con aroma a ${producto.aroma}` : ''}`,
+            activo: true
+          },
+          create: {
+            // Si no existe, crear completo
             nombre: producto.nombre,
             descripcion: `${producto.formato}${producto.aroma ? ` con aroma a ${producto.aroma}` : ''}`,
-            precio: 15000, // Precio base, se puede ajustar después
-            codigoBarras: generarCodigoBarras(producto.codigo),
-            imagen: producto.imagen, // Heredar imagen de la categoría
+            precio: 15000,
+            codigoBarras: codigoBarras,
+            imagen: producto.imagen,
             categoriaId: categoriaId,
             stockMinimo: 5,
             activo: true
           }
         });
         
-        console.log(`   ✅ ${nuevoProducto.nombre}`);
-        insertados++;
+        // Determinar si fue creado o actualizado comparando timestamps
+        if (resultado.createdAt.getTime() === resultado.updatedAt.getTime()) {
+          console.log(`   ✅ ${resultado.nombre} (creado)`);
+          insertados++;
+        } else {
+          console.log(`   🔄 ${resultado.nombre} (actualizado)`);
+          actualizados++;
+        }
         
       } catch (error) {
         console.error(`   ❌ Error con ${producto.nombre}: ${error.message}`);
         errores++;
+        erroresDetalle.push(`${producto.nombre}: ${error.message}`);
       }
     }
     
-    // 5. Mostrar resumen
-    console.log('\n📊 === RESUMEN FINAL ===');
+    // 4. Mostrar resumen
+    console.log('\n📊 === RESUMEN DE RECARGA ===');
     console.log(`✅ Productos insertados: ${insertados}`);
+    console.log(`🔄 Productos actualizados: ${actualizados}`);
     console.log(`❌ Errores: ${errores}`);
-    console.log(`📂 Categorías creadas: ${categoriaMap.size}`);
-    console.log(`🔄 Productos eliminados: ${limpieza.productosEliminados}`);
-    console.log(`🔄 Productos desactivados: ${limpieza.productosDesactivados}`);
+    console.log(`📋 Total procesados: ${productosFaltantes.length}`);
     
-    // 6. Mostrar muestra por categoría
-    console.log('\n🔍 Muestra de productos por categoría:');
-    const muestra = await prisma.producto.findMany({
-      take: 20,
-      include: { categoria: true },
-      orderBy: [
-        { categoria: { nombre: 'asc' } },
-        { nombre: 'asc' }
-      ]
-    });
-    
-    const productosPorCategoria = muestra.reduce((acc, producto) => {
-      const categoria = producto.categoria.nombre;
-      if (!acc[categoria]) acc[categoria] = [];
-      acc[categoria].push(producto.nombre);
-      return acc;
-    }, {});
-    
-    Object.entries(productosPorCategoria).forEach(([categoria, productos]) => {
-      console.log(`   📂 ${categoria}:`);
-      productos.slice(0, 3).forEach(nombre => {
-        console.log(`      - ${nombre}`);
-      });
-      if (productos.length > 3) {
-        console.log(`      ... y ${productos.length - 3} más`);
+    if (errores > 0) {
+      console.log('\n❌ Errores detallados:');
+      erroresDetalle.slice(0, 10).forEach(error => console.log(`   - ${error}`));
+      if (erroresDetalle.length > 10) {
+        console.log(`   ... y ${erroresDetalle.length - 10} errores más`);
       }
-    });
+    }
+    
+    // 5. Verificación final
+    const totalProductosFinales = await prisma.producto.count({ where: { activo: true } });
+    console.log(`\n📦 Total productos activos finales: ${totalProductosFinales}`);
     
     return {
+      success: true,
       insertados,
+      actualizados,
       errores,
-      categorias: categoriaMap.size,
-      limpieza
+      totalFinal: totalProductosFinales
     };
     
   } catch (error) {
@@ -743,22 +707,24 @@ async function insertarProductosFinales() {
 
 // Ejecutar si es llamado directamente
 if (require.main === module) {
-  insertarProductosFinales()
+  recargarProductosFaltantes()
     .then((resultado) => {
-      console.log('\n🎉 === INSERCIÓN COMPLETADA ===');
-      console.log(`📦 ${resultado.insertados} productos insertados`);
-      console.log(`📂 ${resultado.categorias} categorías creadas`);
+      console.log('\n🎉 === RECARGA COMPLETADA ===');
+      if (resultado.success) {
+        console.log(`✅ ${resultado.insertados} productos insertados`);
+        console.log(`🔄 ${resultado.actualizados} productos actualizados`);
+        console.log(`📦 Total productos finales: ${resultado.totalFinal}`);
+      }
       process.exit(0);
     })
     .catch((error) => {
-      console.error('\n💥 === ERROR EN LA INSERCIÓN ===');
+      console.error('\n💥 === ERROR EN LA RECARGA ===');
       console.error(error);
       process.exit(1);
     });
 }
 
 module.exports = { 
-  insertarProductosFinales,
-  procesarProductosDefinitivos,
-  capitalizarTexto
+  recargarProductosFaltantes,
+  identificarProductosFaltantes
 };
