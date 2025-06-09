@@ -1,4 +1,4 @@
-// src/components/pdv/CierreCajaUXMejorado.tsx
+// src/components/pdv/CierreCaja.tsx - CORRECCIÓN DEL ERROR DE RENDERIZADO
 'use client';
 
 import { useState, useEffect, useCallback, JSX } from 'react';
@@ -26,12 +26,16 @@ interface ConfiguracionCierre {
   sucursalId: string;
 }
 
+// 🔧 CORRECCIÓN: Actualizar interface para reflejar la estructura real de la API
 interface EgresoInfo {
   id: string;
   monto: number;
   motivo: string;
   fecha: string;
-  usuario: string;
+  usuario: {
+    id: string;
+    name: string;
+  } | string; // Puede ser objeto o string dependiendo de la API
   detalles?: string;
 }
 
@@ -60,6 +64,17 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
   const [efectivoConteoCompleto, setEfectivoConteoCompleto] = useState(false);
   
   const router = useRouter();
+  
+  // 🔧 FUNCIÓN HELPER PARA OBTENER NOMBRE DE USUARIO
+  const getUserName = (usuario: EgresoInfo['usuario']): string => {
+    if (typeof usuario === 'string') {
+      return usuario;
+    }
+    if (typeof usuario === 'object' && usuario?.name) {
+      return usuario.name;
+    }
+    return 'Usuario desconocido';
+  };
   
   // CARGAR CONFIGURACIÓN Y DATOS DE CIERRE
   const loadCierreCaja = useCallback(async () => {
@@ -394,7 +409,10 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
               <div>
                 <h1 className="text-lg md:text-xl font-bold text-gray-900">Cierre de Caja</h1>
                 <p className="text-xs md:text-sm text-gray-600">
-                  {format(new Date(cierreCaja?.fechaApertura), 'dd/MM/yyyy HH:mm')} • Monto Fijo: ${configuracionCierre?.montoFijo?.toFixed(2)}
+                  {cierreCaja?.fechaApertura 
+                    ? format(new Date(cierreCaja.fechaApertura), 'dd/MM/yyyy HH:mm') 
+                    : 'Fecha no disponible'
+                  } • Monto Fijo: ${configuracionCierre?.montoFijo?.toFixed(2) || '0.00'}
                 </p>
               </div>
             </div>
@@ -498,7 +516,7 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
               </div>
             </div>
 
-            {/* 🆕 EGRESOS A SIMPLE VISTA */}
+            {/* 🔧 EGRESOS CORREGIDOS - RENDERIZAR NOMBRE DE USUARIO CORRECTAMENTE */}
             <div className="bg-white rounded-xl md:rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6 mb-4">
               <h3 className="text-lg font-bold text-gray-900 flex items-center mb-4">
                 <ArrowDownLeft className="w-5 h-5 text-red-600 mr-2" />
@@ -517,7 +535,7 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-gray-900 truncate">{egreso.motivo}</p>
                         <p className="text-xs text-gray-600">
-                          {new Date(egreso.fecha).toLocaleTimeString()} - {egreso.usuario}
+                          {new Date(egreso.fecha).toLocaleTimeString()} - {getUserName(egreso.usuario)}
                         </p>
                         {egreso.detalles && <p className="text-xs text-gray-500 truncate">{egreso.detalles}</p>}
                       </div>
