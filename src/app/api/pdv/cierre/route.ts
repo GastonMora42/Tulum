@@ -1,4 +1,4 @@
-// src/app/api/pdv/cierre/route.ts - VERSIÓN ACTUALIZADA CON NUEVA LÓGICA
+// src/app/api/pdv/cierre/route.ts - VERSIÓN ACTUALIZADA CON NUEVA LÓGICA COMPLETA
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/server/db/client';
 import { authMiddleware } from '@/server/api/middlewares/auth';
@@ -46,6 +46,22 @@ export async function GET(req: NextRequest) {
       );
     }
     
+    // 🆕 OBTENER CONFIGURACIÓN DE MONTO FIJO
+    let configuracionCierre = await prisma.configuracionCierre.findUnique({
+      where: { sucursalId }
+    });
+    
+    if (!configuracionCierre) {
+      const user = (req as any).user;
+      configuracionCierre = await prisma.configuracionCierre.create({
+        data: {
+          sucursalId,
+          montoFijo: 10000,
+          creadoPor: user.id
+        }
+      });
+    }
+    
     // OBTENER VENTAS Y CALCULAR TOTALES POR MEDIO DE PAGO
     const ventas = await prisma.venta.findMany({
       where: {
@@ -79,12 +95,18 @@ export async function GET(req: NextRequest) {
     // CALCULAR EGRESOS TOTALES
     const totalEgresos = cierreCaja.egresos.reduce((sum, egreso) => sum + egreso.monto, 0);
     
-    // CALCULAR EFECTIVO ESPERADO
+    // CALCULAR EFECTIVO ESPERADO (SIN RECUPERO AÚN)
     const ventasEfectivo = totalesPorMedioPago['efectivo']?.monto || 0;
-    const efectivoEsperado = cierreCaja.montoInicial + ventasEfectivo - totalEgresos;
+    const efectivoEsperadoBase = cierreCaja.montoInicial + ventasEfectivo - totalEgresos;
+    
+    // 🆕 NUEVA LÓGICA: INFORMACIÓN SOBRE RECUPERO BASADA EN MONTO FIJO
+    const montoFijo = configuracionCierre.montoFijo;
+    const puedeAplicarRecupero = cierreCaja.montoInicial < montoFijo && ventasEfectivo > 0;
+    const recuperoMaximoPosible = puedeAplicarRecupero ? 
+      Math.min(montoFijo - cierreCaja.montoInicial, ventasEfectivo) : 0;
     
     // VERIFICAR SI HAY SALDO PENDIENTE DE TURNO ANTERIOR
-    const ultimoCierre = await prisma.cierreCaja.findFirst({
+    const ultimoCierreAnterior = await prisma.cierreCaja.findFirst({
       where: {
         sucursalId,
         fechaCierre: { not: null },
@@ -96,14 +118,28 @@ export async function GET(req: NextRequest) {
     });
     
     return NextResponse.json({
-      cierreCaja,
+      cierreCaja: {
+        ...cierreCaja,
+        montoFijoReferencia: montoFijo // Agregar monto fijo actual
+      },
       ventasResumen: {
         total: totalVentas,
         cantidadVentas: ventas.length,
         totalesPorMedioPago,
         totalEgresos,
-        efectivoEsperado,
-        saldoPendienteAnterior: ultimoCierre?.saldoPendienteActual || 0
+        efectivoEsperado: efectivoEsperadoBase,
+        saldoPendienteAnterior: ultimoCierreAnterior?.saldoPendienteActual || 0,
+        // 🆕 NUEVOS CAMPOS PARA RECUPERO
+        montoFijo,
+        puedeAplicarRecupero,
+        recuperoMaximoPosible,
+        ventasEfectivo,
+        infoRecupero: puedeAplicarRecupero ? {
+          razon: 'Abrió con menos del monto fijo y hubo ventas en efectivo',
+          montoInicialVsMontoFijo: `$${cierreCaja.montoInicial.toFixed(2)} vs $${montoFijo.toFixed(2)}`,
+          ventasEfectivoDisponibles: `$${ventasEfectivo.toFixed(2)}`,
+          recuperoMaximo: `$${recuperoMaximoPosible.toFixed(2)}`
+        } : null
       },
       egresos: cierreCaja.egresos,
       abierto: true
@@ -135,10 +171,11 @@ export async function PATCH(req: NextRequest) {
       conteoTarjetaDebito,
       conteoQR,
       conteoOtros,
-      // RECUPERO DE FONDO
+      // 🆕 RECUPERO DE FONDO CON NUEVA LÓGICA
       recuperoFondo = 0,
-      // NUEVO: Indicador de si se está forzando algún método
-      forzarContingencia = false
+      // 🆕 INDICADORES DE RESOLUCIÓN DE DIFERENCIAS
+      forzarContingencia = false,
+      resolverDiferenciasAutomaticamente = false
     } = body;
     
     if (!id) {
@@ -156,6 +193,8 @@ export async function PATCH(req: NextRequest) {
     }
     
     const conteoEfectivoNum = parseFloat(conteoEfectivo);
+    const recuperoFondoNum = parseFloat(recuperoFondo) || 0;
+    
     if (isNaN(conteoEfectivoNum) || conteoEfectivoNum < 0) {
       return NextResponse.json(
         { error: 'El conteo de efectivo debe ser un número válido mayor o igual a cero' },
@@ -184,6 +223,24 @@ export async function PATCH(req: NextRequest) {
         { status: 400 }
       );
     }
+    
+    // 🆕 OBTENER CONFIGURACIÓN DE MONTO FIJO
+    let configuracionCierre = await prisma.configuracionCierre.findUnique({
+      where: { sucursalId: cierreCaja.sucursalId }
+    });
+    
+    if (!configuracionCierre) {
+      const user = (req as any).user;
+      configuracionCierre = await prisma.configuracionCierre.create({
+        data: {
+          sucursalId: cierreCaja.sucursalId,
+          montoFijo: 10000,
+          creadoPor: user.id
+        }
+      });
+    }
+    
+    const montoFijo = configuracionCierre.montoFijo;
     
     // RECALCULAR TODOS LOS TOTALES
     const ventas = await prisma.venta.findMany({
@@ -238,82 +295,114 @@ export async function PATCH(req: NextRequest) {
     
     // CALCULAR EGRESOS Y EFECTIVO ESPERADO
     const totalEgresos = cierreCaja.egresos.reduce((sum, egreso) => sum + egreso.monto, 0);
-    const efectivoEsperado = cierreCaja.montoInicial + ventasEfectivo - totalEgresos - recuperoFondo;
-    const diferenciaEfectivo = conteoEfectivoNum - efectivoEsperado;
+    const efectivoEsperadoSinRecupero = cierreCaja.montoInicial + ventasEfectivo - totalEgresos;
+    const efectivoEsperadoConRecupero = efectivoEsperadoSinRecupero - recuperoFondoNum;
+    const diferenciaEfectivo = conteoEfectivoNum - efectivoEsperadoConRecupero;
     
-    // 🆕 NUEVA LÓGICA: VERIFICAR DIFERENCIAS EN TODOS LOS MEDIOS DE PAGO
+    // 🆕 NUEVA LÓGICA: VALIDAR RECUPERO SEGÚN LAS REGLAS DEL CLIENTE
+    let recuperoValidado = 0;
+    let errorRecupero = '';
+    
+    if (recuperoFondoNum > 0) {
+      // Regla 1: Solo se puede aplicar recupero si se abrió con menos del monto fijo
+      if (cierreCaja.montoInicial >= montoFijo) {
+        errorRecupero = 'No se puede aplicar recupero porque se abrió con el monto fijo completo o más';
+      }
+      // Regla 2: Solo se puede aplicar recupero si hubo ventas en efectivo
+      else if (ventasEfectivo <= 0) {
+        errorRecupero = 'No se puede aplicar recupero porque no hubo ventas en efectivo en el turno';
+      }
+      // Regla 3: El recupero no puede ser mayor a las ventas en efectivo
+      else if (recuperoFondoNum > ventasEfectivo) {
+        errorRecupero = `El recupero no puede ser mayor a las ventas en efectivo ($${ventasEfectivo.toFixed(2)})`;
+      }
+      // Regla 4: El recupero no debería superar la diferencia del monto fijo
+      else if (recuperoFondoNum > (montoFijo - cierreCaja.montoInicial)) {
+        errorRecupero = `El recupero no debería superar la diferencia del monto fijo ($${(montoFijo - cierreCaja.montoInicial).toFixed(2)})`;
+      }
+      else {
+        recuperoValidado = recuperoFondoNum;
+      }
+    }
+    
+    if (errorRecupero) {
+      return NextResponse.json(
+        { error: errorRecupero },
+        { status: 400 }
+      );
+    }
+    
+    // VERIFICAR DIFERENCIAS EN TODOS LOS MEDIOS DE PAGO
     const diferencias: Array<{
       medioPago: string;
       esperado: number;
       contado: number;
       diferencia: number;
-      significativa: boolean; // Nueva propiedad para identificar diferencias > $200
+      significativa: boolean;
     }> = [];
     
-    // Verificar efectivo
+    // Verificar efectivo (con recupero aplicado)
     if (Math.abs(diferenciaEfectivo) > 0.01) {
       diferencias.push({
         medioPago: 'Efectivo',
-        esperado: efectivoEsperado,
+        esperado: efectivoEsperadoConRecupero,
         contado: conteoEfectivoNum,
         diferencia: diferenciaEfectivo,
         significativa: Math.abs(diferenciaEfectivo) >= 200
       });
     }
     
-    // Verificar tarjetas de crédito
-    if (conteoTarjetaCredito !== undefined && Math.abs(conteoTarjetaCredito - ventasTarjetaCredito) > 0.01) {
-      const diff = conteoTarjetaCredito - ventasTarjetaCredito;
-      diferencias.push({
-        medioPago: 'Tarjeta de Crédito',
-        esperado: ventasTarjetaCredito,
-        contado: conteoTarjetaCredito,
-        diferencia: diff,
-        significativa: Math.abs(diff) >= 200
-      });
-    }
+    // Verificar otros medios de pago
+    const otrosMedios = [
+      { nombre: 'Tarjeta de Crédito', esperado: ventasTarjetaCredito, contado: conteoTarjetaCredito },
+      { nombre: 'Tarjeta de Débito', esperado: ventasTarjetaDebito, contado: conteoTarjetaDebito },
+      { nombre: 'QR / Digital', esperado: ventasQR, contado: conteoQR }
+    ];
     
-    // Verificar tarjetas de débito
-    if (conteoTarjetaDebito !== undefined && Math.abs(conteoTarjetaDebito - ventasTarjetaDebito) > 0.01) {
-      const diff = conteoTarjetaDebito - ventasTarjetaDebito;
-      diferencias.push({
-        medioPago: 'Tarjeta de Débito',
-        esperado: ventasTarjetaDebito,
-        contado: conteoTarjetaDebito,
-        diferencia: diff,
-        significativa: Math.abs(diff) >= 200
-      });
-    }
+    otrosMedios.forEach(medio => {
+      if (medio.contado !== undefined && Math.abs(medio.contado - medio.esperado) > 0.01) {
+        const diff = medio.contado - medio.esperado;
+        diferencias.push({
+          medioPago: medio.nombre,
+          esperado: medio.esperado,
+          contado: medio.contado,
+          diferencia: diff,
+          significativa: Math.abs(diff) >= 200
+        });
+      }
+    });
     
-    // Verificar QR
-    if (conteoQR !== undefined && Math.abs(conteoQR - ventasQR) > 0.01) {
-      const diff = conteoQR - ventasQR;
-      diferencias.push({
-        medioPago: 'QR / Digital',
-        esperado: ventasQR,
-        contado: conteoQR,
-        diferencia: diff,
-        significativa: Math.abs(diff) >= 200
-      });
-    }
-    
-    // 🆕 NUEVA LÓGICA: Solo generar contingencia si hay diferencias >= $200 O si se fuerza
+    // 🆕 NUEVA LÓGICA: DETERMINACIÓN DE ESTADO DEL CIERRE
     const diferenciasMayores = diferencias.filter(d => d.significativa);
-    const shouldGenerateContingency = diferenciasMayores.length > 0 || forzarContingencia;
+    const shouldGenerateContingency = diferenciasMayores.length > 0 || forzarContingencia || resolverDiferenciasAutomaticamente;
     
-    // CALCULAR SALDO PARA PRÓXIMO TURNO
-    let saldoPendienteActual = 0;
-    let sugerenciaProximaApertura = 5000; 
-    let requiereRecupero = false;
+    // Si hay diferencias mayores y no se está forzando, requerir confirmación
+    if (diferenciasMayores.length > 0 && !forzarContingencia && !resolverDiferenciasAutomaticamente) {
+      return NextResponse.json(
+        { 
+          error: 'Hay diferencias significativas sin resolver',
+          diferencias: diferenciasMayores,
+          requiereConfirmacion: true,
+          mensaje: 'Use el botón "Resolver Diferencias" para forzar el cierre y generar contingencias automáticamente.'
+        },
+        { status: 400 }
+      );
+    }
     
-    if (efectivoEsperado < 0) {
-      saldoPendienteActual = Math.abs(efectivoEsperado);
-      requiereRecupero = true;
-      sugerenciaProximaApertura = 5000 + saldoPendienteActual;
-    } else if (efectivoEsperado < 2000) {
-      sugerenciaProximaApertura = 5000;
-    } else {
-      sugerenciaProximaApertura = Math.max(3000, efectivoEsperado * 0.6);
+    // 🆕 NUEVA LÓGICA: CÁLCULO DE ALERTAS Y PRÓXIMO TURNO SEGÚN MONTO FIJO
+    const efectivoFinalReal = conteoEfectivoNum; // Efectivo físico contado
+    const efectivoParaProximoTurno = efectivoFinalReal; // Lo que queda para el próximo turno
+    
+    let alertaMontoInsuficiente = '';
+    let requiereRecuperoProximo = false;
+    let sugerenciaProximaApertura = montoFijo;
+    
+    // Si el efectivo final es menor al monto fijo, generar alerta
+    if (efectivoParaProximoTurno < montoFijo) {
+      const diferencia = montoFijo - efectivoParaProximoTurno;
+      requiereRecuperoProximo = true;
+      alertaMontoInsuficiente = `El próximo turno deberá hacer un recupero de fondo. Está dejando como monto inicial para apertura de caja $${efectivoParaProximoTurno.toFixed(2)} (faltan $${diferencia.toFixed(2)} para llegar al monto fijo de $${montoFijo.toFixed(2)})`;
+      sugerenciaProximaApertura = efectivoParaProximoTurno;
     }
     
     const user = (req as any).user;
@@ -333,15 +422,21 @@ export async function PATCH(req: NextRequest) {
           
           // Cálculos de efectivo
           totalEgresos,
-          efectivoEsperado,
+          efectivoEsperado: efectivoEsperadoConRecupero,
           efectivoReal: conteoEfectivoNum,
           diferenciaEfectivo,
           
+          // 🆕 NUEVOS CAMPOS SEGÚN ESPECIFICACIONES
+          montoFijoReferencia: montoFijo,
+          requiereRecuperoProximo,
+          alertaMontoInsuficiente: alertaMontoInsuficiente || null,
+          esCierreConDiferencias: shouldGenerateContingency,
+          razonCierreForzado: (forzarContingencia || resolverDiferenciasAutomaticamente) ? 
+            `Diferencias resueltas automáticamente: ${diferencias.map(d => `${d.medioPago} $${Math.abs(d.diferencia).toFixed(2)}`).join(', ')}` : 
+            null,
+          
           // Recupero de fondo
-          recuperoFondo,
-          saldoPendienteActual,
-          sugerenciaProximaApertura,
-          requiereRecupero,
+          recuperoFondo: recuperoValidado,
           
           // Estado y cierre
           montoFinal: conteoEfectivoNum,
@@ -353,7 +448,7 @@ export async function PATCH(req: NextRequest) {
         }
       });
       
-      // 🆕 GENERAR CONTINGENCIA SOLO SI HAY DIFERENCIAS SIGNIFICATIVAS O SE FUERZA
+      // 🆕 GENERAR CONTINGENCIA SI ES NECESARIO
       if (shouldGenerateContingency) {
         const detallesDiferencia: string[] = [];
         
@@ -372,7 +467,6 @@ export async function PATCH(req: NextRequest) {
           minute: '2-digit' 
         });
         
-        // Determinar urgencia basada en diferencias significativas
         const esUrgente = diferenciasMayores.length > 0 || Math.abs(diferenciaEfectivo) > 500;
         
         await tx.contingencia.create({
@@ -387,10 +481,12 @@ export async function PATCH(req: NextRequest) {
 
 💰 RESUMEN DEL TURNO:
 - Monto inicial: $${cierreCaja.montoInicial.toFixed(2)}
+- Monto fijo configurado: $${montoFijo.toFixed(2)}
 - Ventas en efectivo: $${ventasEfectivo.toFixed(2)}
 - Total egresos: $${totalEgresos.toFixed(2)}
-- Recupero de fondo: $${recuperoFondo.toFixed(2)}
-- Efectivo esperado: $${efectivoEsperado.toFixed(2)}
+- Recupero aplicado: $${recuperoValidado.toFixed(2)}
+- Efectivo esperado (con recupero): $${efectivoEsperadoConRecupero.toFixed(2)}
+- Efectivo contado: $${conteoEfectivoNum.toFixed(2)}
 
 🔍 DIFERENCIAS ENCONTRADAS:
 ${detallesDiferencia.join('\n')}
@@ -407,6 +503,10 @@ ${cierreCaja.egresos.map(egreso =>
   `• ${egreso.motivo}: $${egreso.monto.toFixed(2)} - ${new Date(egreso.fecha).toLocaleTimeString()}`
 ).join('\n') || 'Sin egresos registrados'}
 
+${recuperoValidado > 0 ? `\n💰 RECUPERO DE FONDO APLICADO: $${recuperoValidado.toFixed(2)}\n- Se aplicó recupero porque se abrió con menos del monto fijo y hubo ventas en efectivo` : ''}
+
+${alertaMontoInsuficiente ? `\n⚠️ ALERTA PARA PRÓXIMO TURNO:\n${alertaMontoInsuficiente}` : ''}
+
 ${observaciones ? `\n📝 OBSERVACIONES DEL VENDEDOR:\n${observaciones}` : ''}
 
 🔧 ACCIONES REQUERIDAS:
@@ -415,8 +515,6 @@ ${observaciones ? `\n📝 OBSERVACIONES DEL VENDEDOR:\n${observaciones}` : ''}
 - Investigar posibles errores en el registro de ventas o egresos
 - Documentar las correcciones realizadas
 - Ajustar el sistema si corresponde
-
-${requiereRecupero ? `\n⚠️ IMPORTANTE: Este turno generó un saldo negativo de $${saldoPendienteActual.toFixed(2)} que debe ser recuperado en el próximo turno.` : ''}
             `.trim(),
             origen: 'sucursal',
             creadoPor: user.id,
@@ -428,72 +526,48 @@ ${requiereRecupero ? `\n⚠️ IMPORTANTE: Este turno generó un saldo negativo 
         });
       }
       
-      // REGISTRAR RECUPERO DE FONDO SI APLICA
-      if (recuperoFondo > 0) {
-        const cierreCajaAnterior = await tx.cierreCaja.findFirst({
-          where: {
-            sucursalId: cierreCaja.sucursalId,
-            saldoPendienteActual: { gt: 0 },
-            fechaCierre: { not: null }
-          },
-          orderBy: {
-            fechaCierre: 'desc'
-          }
-        });
-        
-        if (cierreCajaAnterior) {
-          await tx.recuperoFondo.create({
-            data: {
-              cierreCajaId: cierreCaja.id,
-              cierreCajaOrigenId: cierreCajaAnterior.id,
-              monto: recuperoFondo,
-              usuarioId: user.id,
-              observaciones: `Recupero de fondo del turno ${new Date(cierreCajaAnterior.fechaApertura).toLocaleDateString()}`
-            }
-          });
-          
-          await tx.cierreCaja.update({
-            where: { id: cierreCajaAnterior.id },
-            data: {
-              saldoPendienteActual: Math.max(0, cierreCajaAnterior.saldoPendienteActual - recuperoFondo)
-            }
-          });
-        }
-      }
-      
       return cierreCajaUpdated;
     });
     
     // PREPARAR RESPUESTA COMPLETA
     const mensajeBase = shouldGenerateContingency 
       ? diferenciasMayores.length > 0 
-        ? `Caja cerrada con diferencias significativas (≥$200). Se ha generado una contingencia para revisión.`
-        : `Caja cerrada con cierre forzado. Se ha generado una contingencia para revisión.`
+        ? `Caja cerrada con diferencias significativas (≥$200). Se generó una contingencia para revisión.`
+        : `Caja cerrada con cierre forzado. Se generó una contingencia para revisión.`
       : diferencias.length > 0
         ? `Caja cerrada correctamente. Las diferencias menores a $200 son aceptables.`
         : `Caja cerrada correctamente sin diferencias.`;
     
-    const recuperoInfo = requiereRecupero 
-      ? ` IMPORTANTE: Se requiere recupero de $${saldoPendienteActual.toFixed(2)} en el próximo turno.` 
+    const recuperoInfo = recuperoValidado > 0 
+      ? ` Se aplicó recupero de $${recuperoValidado.toFixed(2)}.` 
+      : '';
+    
+    const alertaInfo = alertaMontoInsuficiente 
+      ? ` ${alertaMontoInsuficiente}` 
       : '';
     
     return NextResponse.json({
       success: true,
-      message: mensajeBase + recuperoInfo,
+      message: mensajeBase + recuperoInfo + alertaInfo,
       cierreCaja: result,
       contingenciaGenerada: shouldGenerateContingency,
       diferencias: {
         efectivo: {
-          esperado: efectivoEsperado,
+          esperado: efectivoEsperadoConRecupero,
           contado: conteoEfectivoNum,
           diferencia: diferenciaEfectivo
         },
         otrosMedios: diferencias.filter(d => d.medioPago !== 'Efectivo')
       },
       recuperoInfo: {
-        requiereRecupero,
-        saldoPendiente: saldoPendienteActual,
-        sugerenciaProximaApertura
+        aplicado: recuperoValidado,
+        razon: recuperoValidado > 0 ? 'Monto inicial menor al monto fijo con ventas en efectivo' : null
+      },
+      alertaProximoTurno: {
+        requiereRecupero: requiereRecuperoProximo,
+        alertaMontoInsuficiente,
+        sugerenciaApertura: sugerenciaProximaApertura,
+        montoFijoReferencia: montoFijo
       },
       resumen: {
         totalVentas: ventas.reduce((sum, v) => sum + v.total, 0),
@@ -505,9 +579,10 @@ ${requiereRecupero ? `\n⚠️ IMPORTANTE: Este turno generó un saldo negativo 
           monto: datos.monto,
           cantidad: datos.cantidad
         })),
-        // 🆕 NUEVA INFO: Clasificación de diferencias
         diferenciasSignificativas: diferenciasMayores.length,
-        diferenciasMenores: diferencias.length - diferenciasMayores.length
+        diferenciasMenores: diferencias.length - diferenciasMayores.length,
+        montoFijo,
+        cumpleMontoFijo: efectivoParaProximoTurno >= montoFijo
       }
     });
   } catch (error: any) {

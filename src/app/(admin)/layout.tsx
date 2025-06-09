@@ -29,7 +29,8 @@ import {
   MapPin,
   TrendingUp,
   CheckSquare,
-  Printer
+  Printer,
+  PiggyBank
 } from 'lucide-react';
 
 export default function AdminLayout({
@@ -239,6 +240,7 @@ export default function AdminLayout({
     { href: '/admin/usuarios', label: 'Usuarios', icon: <Users className="w-5 h-5" /> },
     { href: '/admin/ubicaciones', label: 'Ubicaciones', icon: <MapPin className="w-5 h-5" /> },
     { href: '/admin/contingencias', label: 'Contingencias', icon: <AlertTriangle className="w-5 h-5" /> },
+    { href: '/admin/cierres', label: 'Cierres', icon: <PiggyBank className="w-5 h-5" /> },
     { href: '/admin/conciliaciones', label: 'Conciliaciones', icon: <CheckSquare className="w-5 h-5" /> },
     { href: '/admin/punto-equilibrio', label: 'Punto de Equilibrio', icon: <TrendingUp className="w-5 h-5" /> },
     { href: '/admin/facturas', label: 'Facturas', icon: <FileText className="h-5 w-5" /> },

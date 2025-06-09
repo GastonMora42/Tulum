@@ -30,6 +30,7 @@ model User {
   cajaEgresos            CajaEgreso[]
   reintentos             FacturaReintento[]
   puntoEquilibrioConfigs PuntoEquilibrioConfig[]
+  configuracionesCierre ConfiguracionCierre[]
 
   movimientosStockInsumoPdv MovimientoStockInsumoPdv[]
   solicitudesInsumoPdv      SolicitudInsumoPdv[]
@@ -214,6 +215,8 @@ model Ubicacion {
 
   puntoEquilibrioConfigs PuntoEquilibrioConfig[]
 
+  configuracionCierre ConfiguracionCierre?
+
   impresoras ConfiguracionImpresora[]
 
   stocksInsumoPdv        StockInsumoPdv[]
@@ -327,6 +330,12 @@ model CierreCaja {
   conteoTransferencia  Float? // Transferencias
   conteoQR            Float? // Pagos QR
   conteoOtros         Float? // Otros medios de pago
+
+  montoFijoReferencia    Float   @default(10000) // Referencia del monto fijo al momento del cierre
+  requiereRecuperoProximo Boolean @default(false) // Si el próximo turno requiere recupero
+  alertaMontoInsuficiente String? // Mensaje de alerta si hay monto insuficiente
+  esCierreConDiferencias  Boolean @default(false) // Si se cerró con el botón "resolver diferencias"
+  razonCierreForzado     String? // Razón del cierre forzado si aplica
 
   // 🆕 CAMPOS PARA CONTROL DE EFECTIVO
   totalEgresos        Float  @default(0) // Total de egresos del turno
@@ -665,4 +674,18 @@ model ConfiguracionImpresora {
   
   @@unique([sucursalId, nombre])
   @@map("configuracion_impresora")
+}
+
+model ConfiguracionCierre {
+  id          String    @id @default(uuid())
+  sucursalId  String    @unique
+  sucursal    Ubicacion @relation(fields: [sucursalId], references: [id])
+  montoFijo   Float     @default(10000) // Monto fijo por defecto $10,000
+  activo      Boolean   @default(true)
+  creadoPor   String
+  usuario     User      @relation(fields: [creadoPor], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@map("configuracion_cierre")
 }

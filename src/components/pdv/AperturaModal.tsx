@@ -1,31 +1,34 @@
-// src/components/pdv/AperturaModal.tsx - VERSIÓN CORREGIDA
+// src/components/pdv/AperturaModalMejorado.tsx - VERSIÓN ACTUALIZADA CON MONTO FIJO
 'use client';
 
 import { useState, useEffect } from 'react';
 import { 
   X, DollarSign, AlertTriangle, CheckCircle, Calculator, 
-  Clock, PiggyBank, Coins, TrendingUp, Info, Zap, AlertCircle 
+  Clock, PiggyBank, Coins, TrendingUp, Info, Zap, AlertCircle,
+  Shield, Settings
 } from 'lucide-react';
 
-interface AperturaModalProps {
+interface AperturaModalMejoradoProps {
   isOpen: boolean;
   onClose: () => void;
-  onComplete: (data: { montoInicial: number; recuperarSaldo: boolean }) => Promise<void>;
+  onComplete: (data: { montoInicial: number; aplicarRecupero: boolean; observaciones?: string }) => Promise<void>;
   aperturaInfo: {
     sugerenciaApertura: number;
     requiereRecupero: boolean;
     saldoPendiente: number;
+    montoFijo: number;
+    alertaMontoInsuficiente?: string;
     ultimoCierre?: any;
   } | null;
 }
 
-export function AperturaModal({ isOpen, onClose, onComplete, aperturaInfo }: AperturaModalProps) {
+export function AperturaModal({ isOpen, onClose, onComplete, aperturaInfo }: AperturaModalMejoradoProps) {
   const [montoInicial, setMontoInicial] = useState<string>('');
-  const [recuperarSaldo, setRecuperarSaldo] = useState(false);
+  const [aplicarRecupero, setAplicarRecupero] = useState(false);
+  const [observaciones, setObservaciones] = useState<string>('');
   const [showCalculator, setShowCalculator] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   
-  // 🆕 AGREGAR ESTADO PARA ERRORES
   const [error, setError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
@@ -33,17 +36,17 @@ export function AperturaModal({ isOpen, onClose, onComplete, aperturaInfo }: Ape
   useEffect(() => {
     if (isOpen && aperturaInfo) {
       setMontoInicial(aperturaInfo.sugerenciaApertura.toFixed(2));
-      setRecuperarSaldo(aperturaInfo.requiereRecupero);
-      setError(null); // 🆕 Limpiar errores al abrir
+      setAplicarRecupero(aperturaInfo.requiereRecupero);
+      setError(null);
       setValidationErrors([]);
+      setObservaciones('');
     }
   }, [isOpen, aperturaInfo]);
 
-  // 🆕 FUNCIÓN DE VALIDACIÓN MEJORADA
+  // Función de validación mejorada
   const validateForm = (): boolean => {
     const errors: string[] = [];
     
-    // Validar monto
     const monto = parseFloat(montoInicial);
     if (isNaN(monto)) {
       errors.push('Debe ingresar un monto válido');
@@ -53,58 +56,70 @@ export function AperturaModal({ isOpen, onClose, onComplete, aperturaInfo }: Ape
       errors.push('El monto es excesivamente alto');
     }
 
-    // Validar recupero si es necesario
-    if (aperturaInfo?.requiereRecupero && recuperarSaldo && monto < aperturaInfo.saldoPendiente) {
-      errors.push(`Monto insuficiente para recupero completo (faltarían $${(aperturaInfo.saldoPendiente - monto).toFixed(2)})`);
+    // 🆕 VALIDACIONES ESPECÍFICAS SEGÚN MONTO FIJO
+    if (aperturaInfo) {
+      const montoFijo = aperturaInfo.montoFijo;
+      
+      // Si el monto es menor al monto fijo, verificar que sea una situación válida
+      if (monto < montoFijo) {
+        // Solo es válido si viene de un turno anterior con recupero pendiente
+        if (!aperturaInfo.requiereRecupero && !aperturaInfo.alertaMontoInsuficiente) {
+          errors.push(`El monto inicial debería ser al menos ${montoFijo.toFixed(2)} (monto fijo configurado). Si es intencional, agregue observaciones explicando el motivo.`);
+        }
+      }
     }
 
     setValidationErrors(errors);
     return errors.length === 0;
   };
 
-// src/components/pdv/AperturaModal.tsx - SIMPLIFICAR DEBUGGING
-// En la función handleSubmit, simplifica los console.log:
-
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  
-  console.log('🚀 Enviando datos de apertura:', { montoInicial, recuperarSaldo });
-  
-  // Limpiar errores previos
-  setError(null);
-  setValidationErrors([]);
-  
-  // Validar formulario
-  if (!validateForm()) {
-    return;
-  }
-  
-  const monto = parseFloat(montoInicial);
-  
-  setIsProcessing(true);
-  
-  try {
-    await onComplete({
-      montoInicial: monto,
-      recuperarSaldo
-    });
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     
-    console.log('✅ Apertura completada exitosamente');
+    console.log('🚀 Enviando datos de apertura:', { montoInicial, aplicarRecupero, observaciones });
     
-  } catch (error) {
-    console.error('❌ Error en apertura:', error);
+    setError(null);
+    setValidationErrors([]);
     
-    if (error instanceof Error) {
-      setError(error.message);
-    } else {
-      setError('Error desconocido al abrir la caja');
+    if (!validateForm()) {
+      return;
     }
-  } finally {
-    setIsProcessing(false);
-  }
-};
+    
+    const monto = parseFloat(montoInicial);
+    
+    // 🆕 CONFIRMACIÓN ESPECIAL SI ABRE CON MENOS DEL MONTO FIJO
+    if (aperturaInfo && monto < aperturaInfo.montoFijo && !aperturaInfo.requiereRecupero) {
+      const confirmacion = confirm(
+        `Está abriendo con ${monto.toFixed(2)}, que es menor al monto fijo de ${aperturaInfo.montoFijo.toFixed(2)}. Si hay ventas en efectivo durante el turno, se habilitará la función de recupero de fondo. ¿Desea continuar?`
+      );
+      if (!confirmacion) return;
+    }
+    
+    setIsProcessing(true);
+    
+    try {
+      await onComplete({
+        montoInicial: monto,
+        aplicarRecupero,
+        observaciones: observaciones.trim() || undefined
+      });
+      
+      console.log('✅ Apertura completada exitosamente');
+      
+    } catch (error) {
+      console.error('❌ Error en apertura:', error);
+      
+      if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError('Error desconocido al abrir la caja');
+      }
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
-  // Resto del código de calculadora...
+  // Calculadora (mantener la funcionalidad existente)
   const calculatorButtons = [
     '7', '8', '9', 'C',
     '4', '5', '6', '⌫',
@@ -150,13 +165,11 @@ const handleSubmit = async (e: React.FormEvent) => {
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-        {/* Overlay */}
         <div 
           className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" 
           onClick={onClose}
         />
 
-        {/* Modal */}
         <div className="inline-block align-bottom bg-white rounded-3xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
           
           {/* Header */}
@@ -190,7 +203,27 @@ const handleSubmit = async (e: React.FormEvent) => {
 
           <form onSubmit={handleSubmit} className="p-8">
             
-            {/* 🆕 MOSTRAR ERRORES */}
+            {/* 🆕 MOSTRAR INFORMACIÓN DEL MONTO FIJO */}
+            {aperturaInfo && (
+              <div className="mb-6 bg-blue-50 border border-blue-200 rounded-xl p-4">
+                <div className="flex items-center mb-3">
+                  <Settings className="w-5 h-5 text-blue-600 mr-2" />
+                  <h4 className="font-semibold text-blue-800">Configuración de Sucursal</h4>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div className="bg-white rounded-lg p-3">
+                    <p className="text-gray-600 mb-1">Monto Fijo Configurado:</p>
+                    <p className="text-xl font-bold text-blue-700">${aperturaInfo.montoFijo.toFixed(2)}</p>
+                  </div>
+                  <div className="bg-white rounded-lg p-3">
+                    <p className="text-gray-600 mb-1">Monto Sugerido:</p>
+                    <p className="text-xl font-bold text-green-700">${aperturaInfo.sugerenciaApertura.toFixed(2)}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* MOSTRAR ERRORES */}
             {error && (
               <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
                 <div className="flex items-center">
@@ -205,7 +238,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                 <div className="flex items-start">
                   <AlertTriangle className="w-5 h-5 text-yellow-600 mr-2 mt-0.5" />
                   <div>
-                    <p className="text-yellow-800 font-medium mb-2">Errores de validación:</p>
+                    <p className="text-yellow-800 font-medium mb-2">Validaciones:</p>
                     <ul className="text-yellow-700 text-sm space-y-1">
                       {validationErrors.map((err, idx) => (
                         <li key={idx}>• {err}</li>
@@ -216,25 +249,25 @@ const handleSubmit = async (e: React.FormEvent) => {
               </div>
             )}
             
-            {/* Información de recupero si es necesario */}
-            {aperturaInfo?.requiereRecupero && (
+            {/* 🆕 INFORMACIÓN DE RECUPERO MEJORADA */}
+            {aperturaInfo?.alertaMontoInsuficiente && (
               <div className="mb-8 bg-yellow-50 border border-yellow-200 rounded-2xl p-6">
                 <div className="flex items-center mb-4">
-                  <AlertTriangle className="w-6 h-6 text-yellow-600 mr-3" />
-                  <h4 className="text-lg font-semibold text-yellow-800">Recupero de Saldo Pendiente</h4>
+                  <Shield className="w-6 h-6 text-yellow-600 mr-3" />
+                  <h4 className="text-lg font-semibold text-yellow-800">Situación del Turno Anterior</h4>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  <div className="bg-white rounded-xl p-4">
-                    <p className="text-xs text-gray-500 mb-1">Saldo del turno anterior</p>
-                    <p className="text-2xl font-bold text-yellow-700">
-                      ${aperturaInfo.saldoPendiente.toFixed(2)}
-                    </p>
-                  </div>
-                  
-                  {aperturaInfo.ultimoCierre && (
+                <div className="bg-white rounded-xl p-4 mb-4">
+                  <p className="text-sm text-yellow-800 mb-2">
+                    <strong>Alerta del sistema:</strong>
+                  </p>
+                  <p className="text-yellow-700">{aperturaInfo.alertaMontoInsuficiente}</p>
+                </div>
+                
+                {aperturaInfo.ultimoCierre && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div className="bg-white rounded-xl p-4">
-                      <p className="text-xs text-gray-500 mb-1">Cierre anterior</p>
+                      <p className="text-xs text-gray-500 mb-1">Fecha del último cierre</p>
                       <p className="text-lg font-semibold text-gray-900">
                         {new Date(aperturaInfo.ultimoCierre.fechaCierre).toLocaleDateString()}
                       </p>
@@ -242,26 +275,33 @@ const handleSubmit = async (e: React.FormEvent) => {
                         {new Date(aperturaInfo.ultimoCierre.fechaCierre).toLocaleTimeString()}
                       </p>
                     </div>
-                  )}
-                </div>
+                    
+                    <div className="bg-white rounded-xl p-4">
+                      <p className="text-xs text-gray-500 mb-1">Efectivo que quedó</p>
+                      <p className="text-lg font-semibold text-gray-900">
+                        ${(aperturaInfo.ultimoCierre.montoFinal - (aperturaInfo.ultimoCierre.recuperoFondo || 0)).toFixed(2)}
+                      </p>
+                    </div>
+                  </div>
+                )}
                 
                 <label className="flex items-center space-x-3 cursor-pointer">
                   <input
                     type="checkbox"
-                    checked={recuperarSaldo}
-                    onChange={(e) => setRecuperarSaldo(e.target.checked)}
+                    checked={aplicarRecupero}
+                    onChange={(e) => setAplicarRecupero(e.target.checked)}
                     className="w-5 h-5 text-yellow-600 rounded focus:ring-yellow-500 border-gray-300"
                     disabled={isProcessing}
                   />
                   <span className="text-yellow-800 font-medium">
-                    Aplicar recupero de ${aperturaInfo.saldoPendiente.toFixed(2)} en este turno
+                    Marcar como que se aplicará recupero durante este turno
                   </span>
                 </label>
                 
                 <p className="text-yellow-700 text-sm mt-2">
-                  {recuperarSaldo 
-                    ? 'Se descontará del efectivo al momento del cierre'
-                    : 'El saldo permanecerá pendiente para turnos posteriores'
+                  {aplicarRecupero 
+                    ? 'Durante el cierre de este turno, si hay ventas en efectivo, podrá aplicar recupero de fondo'
+                    : 'La situación permanecerá pendiente para turnos posteriores'
                   }
                 </p>
               </div>
@@ -281,7 +321,7 @@ const handleSubmit = async (e: React.FormEvent) => {
                   value={montoInicial}
                   onChange={(e) => {
                     setMontoInicial(e.target.value);
-                    setError(null); // Limpiar error al cambiar
+                    setError(null);
                     setValidationErrors([]);
                   }}
                   className="w-full pl-14 pr-6 py-4 text-2xl font-bold border-2 border-gray-300 rounded-2xl focus:ring-2 focus:ring-[#311716] focus:border-[#311716] text-center bg-gray-50"
@@ -291,36 +331,46 @@ const handleSubmit = async (e: React.FormEvent) => {
                 />
               </div>
 
-              {/* Sugerencia */}
+              {/* Botones de monto rápido */}
               {aperturaInfo && (
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                  <div className="flex items-center mb-2">
-                    <Info className="w-5 h-5 text-blue-600 mr-2" />
-                    <span className="font-medium text-blue-800">Monto Sugerido</span>
-                  </div>
-                  <p className="text-blue-700">
-                    ${aperturaInfo.sugerenciaApertura.toFixed(2)}
-                  </p>
-                  <p className="text-blue-600 text-sm mt-1">
-                    {aperturaInfo.requiereRecupero 
-                      ? `Incluye $${aperturaInfo.saldoPendiente.toFixed(2)} de recupero + cambio suficiente`
-                      : 'Monto recomendado para tener cambio suficiente durante el día'
-                    }
-                  </p>
+                <div className="grid grid-cols-2 gap-3 mb-4">
+                  <button
+                    type="button"
+                    onClick={() => setMontoInicial(aperturaInfo.montoFijo.toFixed(2))}
+                    className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium"
+                    disabled={isProcessing}
+                  >
+                    Usar Monto Fijo (${aperturaInfo.montoFijo.toFixed(2)})
+                  </button>
                   
                   <button
                     type="button"
                     onClick={() => setMontoInicial(aperturaInfo.sugerenciaApertura.toFixed(2))}
-                    className="mt-3 px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium"
+                    className="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors text-sm font-medium"
                     disabled={isProcessing}
                   >
-                    Usar monto sugerido
+                    Usar Sugerido (${aperturaInfo.sugerenciaApertura.toFixed(2)})
                   </button>
                 </div>
               )}
             </div>
 
-            {/* Calculadora */}
+            {/* Observaciones */}
+            <div className="mb-8">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Observaciones (opcional):
+              </label>
+              <textarea
+                rows={3}
+                value={observaciones}
+                onChange={(e) => setObservaciones(e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#311716] focus:border-[#311716] text-sm"
+                placeholder="Cualquier observación sobre la apertura, situaciones especiales, etc..."
+                disabled={isProcessing}
+              />
+            </div>
+
+            {/* Calculadora (mantener existente) */}
             <div className="mb-8">
               <div className="flex items-center justify-between mb-4">
                 <h4 className="text-lg font-semibold text-gray-900">Herramientas</h4>
@@ -370,20 +420,35 @@ const handleSubmit = async (e: React.FormEvent) => {
                   <span className="font-bold text-lg">${parseFloat(montoInicial || '0').toFixed(2)}</span>
                 </div>
                 
-                {aperturaInfo?.requiereRecupero && recuperarSaldo && (
-                  <div className="flex justify-between items-center text-yellow-700">
-                    <span>Recupero a aplicar:</span>
-                    <span className="font-bold">-${aperturaInfo.saldoPendiente.toFixed(2)}</span>
-                  </div>
+                {aperturaInfo && (
+                  <>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Monto fijo configurado:</span>
+                      <span className="font-bold text-blue-600">${aperturaInfo.montoFijo.toFixed(2)}</span>
+                    </div>
+                    
+                    {parseFloat(montoInicial || '0') < aperturaInfo.montoFijo && (
+                      <div className="flex justify-between items-center text-yellow-700">
+                        <span>Diferencia del monto fijo:</span>
+                        <span className="font-bold">-${(aperturaInfo.montoFijo - parseFloat(montoInicial || '0')).toFixed(2)}</span>
+                      </div>
+                    )}
+                  </>
                 )}
                 
                 <hr className="border-gray-200" />
                 
-                <div className="flex justify-between items-center">
-                  <span className="font-medium text-gray-900">Efectivo disponible al inicio:</span>
-                  <span className="font-bold text-xl text-[#311716]">
-                    ${(parseFloat(montoInicial || '0') - (aperturaInfo?.requiereRecupero && recuperarSaldo ? aperturaInfo.saldoPendiente : 0)).toFixed(2)}
-                  </span>
+                <div className="bg-white rounded-lg p-3">
+                  <p className="text-sm text-gray-600 mb-1">Estado de la apertura:</p>
+                  {aperturaInfo && parseFloat(montoInicial || '0') < aperturaInfo.montoFijo ? (
+                    <p className="text-yellow-700 font-medium">
+                      ⚠️ Menor al monto fijo - Se habilitará recupero si hay ventas en efectivo
+                    </p>
+                  ) : (
+                    <p className="text-green-700 font-medium">
+                      ✅ Cumple con el monto fijo configurado
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
