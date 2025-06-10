@@ -1,4 +1,4 @@
-// src/components/pdv/CierreCaja.tsx - CORRECCIÓN DEL ERROR DE RENDERIZADO
+// src/components/pdv/CierreCaja.tsx - VERSIÓN COMPLETA CORREGIDA
 'use client';
 
 import { useState, useEffect, useCallback, JSX } from 'react';
@@ -26,7 +26,6 @@ interface ConfiguracionCierre {
   sucursalId: string;
 }
 
-// 🔧 CORRECCIÓN: Actualizar interface para reflejar la estructura real de la API
 interface EgresoInfo {
   id: string;
   monto: number;
@@ -35,8 +34,14 @@ interface EgresoInfo {
   usuario: {
     id: string;
     name: string;
-  } | string; // Puede ser objeto o string dependiendo de la API
+  } | string;
   detalles?: string;
+}
+
+interface MedioPagoValidation {
+  isValid: boolean;
+  difference: number;
+  status: 'empty' | 'correct' | 'incorrect' | 'forced';
 }
 
 export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
@@ -46,12 +51,19 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
   const [egresos, setEgresos] = useState<EgresoInfo[]>([]);
   const [configuracionCierre, setConfiguracionCierre] = useState<ConfiguracionCierre | null>(null);
   
-  // Estados de conteos manuales - SOLO CAMPOS VACÍOS PARA OTROS MEDIOS
+  // Estados de conteos manuales
   const [efectivoContado, setEfectivoContado] = useState<number>(0);
   const [conteoTarjetaCredito, setConteoTarjetaCredito] = useState<string>('');
   const [conteoTarjetaDebito, setConteoTarjetaDebito] = useState<string>('');
   const [conteoQR, setConteoQR] = useState<string>('');
   const [recuperoFondo, setRecuperoFondo] = useState<string>('');
+  
+  // Estados de validación (separados del recupero)
+  const [efectivoValidation, setEfectivoValidation] = useState<MedioPagoValidation>({
+    isValid: false,
+    difference: 0,
+    status: 'empty'
+  });
   
   // Estados para diferencias y resolución
   const [forcedMethods, setForcedMethods] = useState<Set<string>>(new Set());
@@ -65,7 +77,7 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
   
   const router = useRouter();
   
-  // 🔧 FUNCIÓN HELPER PARA OBTENER NOMBRE DE USUARIO
+  // Función helper para obtener nombre de usuario
   const getUserName = (usuario: EgresoInfo['usuario']): string => {
     if (typeof usuario === 'string') {
       return usuario;
@@ -75,6 +87,76 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
     }
     return 'Usuario desconocido';
   };
+  
+  // 🎯 FUNCIÓN DE VALIDACIÓN DEL EFECTIVO - TOTALMENTE INDEPENDIENTE DEL RECUPERO
+  const calcularValidacionEfectivo = useCallback(() => {
+    if (!ventasResumen || !cierreCaja || efectivoContado <= 0) {
+      return {
+        isValid: false,
+        difference: 0,
+        status: 'empty' as const
+      };
+    }
+    
+    const totalEgresos = ventasResumen.totalEgresos || 0;
+    const ventasEfectivo = ventasResumen.totalesPorMedioPago?.efectivo?.monto || 0;
+    const montoInicial = cierreCaja.montoInicial || 0;
+    
+    // 🔑 CLAVE: El efectivo esperado NUNCA incluye recupero
+    const efectivoEsperado = montoInicial + ventasEfectivo - totalEgresos;
+    const diferencia = efectivoContado - efectivoEsperado;
+    
+    // Margen de tolerancia: $200
+    const MARGEN_TOLERANCIA = 200;
+    const isValid = Math.abs(diferencia) <= MARGEN_TOLERANCIA;
+    
+    return {
+      isValid,
+      difference: diferencia,
+      status: isValid ? 'correct' as const : 'incorrect' as const
+    };
+  }, [ventasResumen, cierreCaja, efectivoContado]);
+  
+  // 🎯 EFECTO PARA VALIDAR EFECTIVO - SOLO CUANDO CAMBIAN LOS DATOS RELEVANTES
+  useEffect(() => {
+    const validacion = calcularValidacionEfectivo();
+    setEfectivoValidation(validacion);
+  }, [calcularValidacionEfectivo]);
+  
+  // Función para validar medios electrónicos
+  const validateMedioElectronico = useCallback((tipo: string, contado: string): MedioPagoValidation => {
+    if (!ventasResumen || !contado.trim()) {
+      return {
+        isValid: false,
+        difference: 0,
+        status: 'empty'
+      };
+    }
+    
+    const contadoNum = parseFloat(contado) || 0;
+    let esperado = 0;
+    
+    switch (tipo) {
+      case 'tarjeta_credito':
+        esperado = ventasResumen.totalesPorMedioPago?.tarjeta_credito?.monto || 0;
+        break;
+      case 'tarjeta_debito':
+        esperado = ventasResumen.totalesPorMedioPago?.tarjeta_debito?.monto || 0;
+        break;
+      case 'qr':
+        esperado = ventasResumen.totalesPorMedioPago?.qr?.monto || 0;
+        break;
+    }
+    
+    const diferencia = contadoNum - esperado;
+    const isValid = Math.abs(diferencia) < 0.01;
+    
+    return {
+      isValid,
+      difference: diferencia,
+      status: isValid ? 'correct' : 'incorrect'
+    };
+  }, [ventasResumen]);
   
   // CARGAR CONFIGURACIÓN Y DATOS DE CIERRE
   const loadCierreCaja = useCallback(async () => {
@@ -87,7 +169,6 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
         throw new Error('No se ha definido una sucursal para este punto de venta');
       }
       
-      // Cargar datos del cierre
       const [responseCierre, responseConfig] = await Promise.all([
         authenticatedFetch(`/api/pdv/cierre?sucursalId=${encodeURIComponent(sucursalId)}`),
         authenticatedFetch(`/api/admin/configuracion-cierres?sucursalId=${encodeURIComponent(sucursalId)}`)
@@ -111,7 +192,7 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
       setEgresos(dataCierre.egresos || []);
       setConfiguracionCierre(dataConfig);
       
-      // 🆕 NO PRE-LLENAR NADA - Empezar desde cero
+      // Reiniciar estados
       setEfectivoContado(0);
       setConteoTarjetaCredito('');
       setConteoTarjetaDebito('');
@@ -136,28 +217,23 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
     }
   }, [id, loadCierreCaja]);
   
-  // 🆕 CALCULAR RECUPERO RECOMENDADO
+  // Calcular recupero recomendado
   const calcularRecuperoRecomendado = useCallback(() => {
     if (!ventasResumen || !configuracionCierre || !cierreCaja) return 0;
     
     const montoFijo = configuracionCierre.montoFijo;
     const montoInicial = cierreCaja.montoInicial;
     const ventasEfectivo = ventasResumen.totalesPorMedioPago?.efectivo?.monto || 0;
-    const totalEgresos = ventasResumen.totalEgresos || 0;
     
-    // Solo recomendar recupero si:
-    // 1. Abrió con menos del monto fijo
-    // 2. Hubo ventas en efectivo
     if (montoInicial < montoFijo && ventasEfectivo > 0) {
       const diferenciaMonto = montoFijo - montoInicial;
       const recuperoMaximo = Math.min(diferenciaMonto, ventasEfectivo);
       
-      // Simular qué pasaría si aplicamos el recupero
+      const totalEgresos = ventasResumen.totalEgresos || 0;
       const efectivoSimulado = montoInicial + ventasEfectivo - totalEgresos;
       const efectivoConRecupero = efectivoSimulado - recuperoMaximo;
       
-      // Si con el recupero quedamos más cerca del monto fijo, recomendarlo
-      if (efectivoConRecupero >= montoFijo * 0.8) { // Al menos 80% del monto fijo
+      if (efectivoConRecupero >= montoFijo * 0.8) {
         return recuperoMaximo;
       }
     }
@@ -165,13 +241,14 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
     return 0;
   }, [ventasResumen, configuracionCierre, cierreCaja]);
   
-  // 🆕 CALCULAR CUENTAS AUTOMÁTICAS UNA VEZ CONTADO EL EFECTIVO
+  // 🎯 CALCULAR CUENTAS AUTOMÁTICAS - EL RECUPERO SOLO AFECTA AL SOBRE
   const calcularCuentasAutomaticas = useCallback(() => {
     if (efectivoContado <= 0) return null;
     
     const totalEgresos = ventasResumen?.totalEgresos || 0;
     const recuperoNum = parseFloat(recuperoFondo) || 0;
     
+    // El recupero se descuenta del efectivo para sobre, NO de la validación
     const efectivoParaSobre = efectivoContado - totalEgresos - recuperoNum;
     
     return {
@@ -183,100 +260,108 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
     };
   }, [efectivoContado, ventasResumen, recuperoFondo]);
   
-  // 🆕 VERIFICAR DIFERENCIAS EN OTROS MEDIOS DE PAGO
-  const verificarDiferenciasOtrosMedios = useCallback(() => {
-    if (!ventasResumen) return [];
-    
-    const totales = ventasResumen.totalesPorMedioPago || {};
-    const diferencias: Array<{
-      medioPago: string;
-      esperado: number;
-      contado: number;
-      diferencia: number;
-      significativa: boolean;
-    }> = [];
-    
-    // Verificar tarjetas de crédito
-    const ventasTarjetaCredito = totales.tarjeta_credito?.monto || 0;
-    const conteoTarjetaCreditoNum = parseFloat(conteoTarjetaCredito) || 0;
-    if (ventasTarjetaCredito > 0 || conteoTarjetaCreditoNum > 0) {
-      const diff = conteoTarjetaCreditoNum - ventasTarjetaCredito;
-      if (Math.abs(diff) > 0.01) {
-        diferencias.push({
-          medioPago: 'Tarjeta de Crédito',
-          esperado: ventasTarjetaCredito,
-          contado: conteoTarjetaCreditoNum,
-          diferencia: diff,
-          significativa: Math.abs(diff) >= 200
-        });
-      }
-    }
-    
-    // Verificar tarjetas de débito
-    const ventasTarjetaDebito = totales.tarjeta_debito?.monto || 0;
-    const conteoTarjetaDebitoNum = parseFloat(conteoTarjetaDebito) || 0;
-    if (ventasTarjetaDebito > 0 || conteoTarjetaDebitoNum > 0) {
-      const diff = conteoTarjetaDebitoNum - ventasTarjetaDebito;
-      if (Math.abs(diff) > 0.01) {
-        diferencias.push({
-          medioPago: 'Tarjeta de Débito',
-          esperado: ventasTarjetaDebito,
-          contado: conteoTarjetaDebitoNum,
-          diferencia: diff,
-          significativa: Math.abs(diff) >= 200
-        });
-      }
-    }
-    
-    // Verificar QR
-    const ventasQR = totales.qr?.monto || 0;
-    const conteoQRNum = parseFloat(conteoQR) || 0;
-    if (ventasQR > 0 || conteoQRNum > 0) {
-      const diff = conteoQRNum - ventasQR;
-      if (Math.abs(diff) > 0.01) {
-        diferencias.push({
-          medioPago: 'QR / Digital',
-          esperado: ventasQR,
-          contado: conteoQRNum,
-          diferencia: diff,
-          significativa: Math.abs(diff) >= 200
-        });
-      }
-    }
-    
-    return diferencias.map(d => ({
-      ...d,
-      isCorrect: Math.abs(d.diferencia) < 200 || forcedMethods.has(d.medioPago)
-    }));
-  }, [ventasResumen, conteoTarjetaCredito, conteoTarjetaDebito, conteoQR, forcedMethods]);
-  
-  // Función para resolver todas las diferencias automáticamente
-  const resolverTodasLasDiferencias = () => {
-    const diferenciasOtrosMedios = verificarDiferenciasOtrosMedios();
-    const nuevosMetodosForzados = new Set(forcedMethods);
-    
-    diferenciasOtrosMedios.forEach(medio => {
-      if (!medio.isCorrect && medio.significativa) {
-        nuevosMetodosForzados.add(medio.medioPago);
-      }
-    });
-    
-    setForcedMethods(nuevosMetodosForzados);
-    
-    setNotification({
-      type: 'info',
-      message: '🔧 Diferencias resueltas automáticamente',
-      details: 'Se habilitó el cierre forzado. Esto generará contingencias para revisión administrativa.'
-    });
-  };
-  
   // Función para manejar cambio del contador de billetes
   const handleBillCounterChange = (total: number) => {
     setEfectivoContado(total);
     setEfectivoConteoCompleto(total > 0);
   };
   
-  // CERRAR CAJA CON NUEVA LÓGICA
+  // Componente para medios electrónicos con indicadores visuales
+  const MedioElectronicoInput = ({ 
+    tipo, 
+    nombre, 
+    icono, 
+    valor, 
+    onChange, 
+    colorScheme 
+  }: {
+    tipo: string;
+    nombre: string;
+    icono: JSX.Element;
+    valor: string;
+    onChange: (value: string) => void;
+    colorScheme: string;
+  }) => {
+    const validation = validateMedioElectronico(tipo, valor);
+    const isForcedCorrect = forcedMethods.has(nombre);
+    
+    return (
+      <div className={`bg-${colorScheme}-50 rounded-xl p-4 border-2 ${
+        validation.status === 'empty' ? `border-${colorScheme}-200` :
+        validation.isValid || isForcedCorrect ? 'border-green-500 bg-green-50' :
+        'border-red-500 bg-red-50'
+      } transition-all duration-200`}>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center">
+            <div className={`w-6 h-6 text-${colorScheme}-600 mr-2`}>
+              {icono}
+            </div>
+            <span className={`font-semibold text-${colorScheme}-800`}>{nombre}</span>
+          </div>
+          
+          {/* Indicador visual */}
+          <div className="flex items-center space-x-2">
+            {validation.status === 'empty' && (
+              <div className="w-4 h-4 bg-gray-300 rounded-full"></div>
+            )}
+            {validation.status === 'correct' && (
+              <div className="flex items-center text-green-600">
+                <CheckCircle className="w-5 h-5 mr-1" />
+                <span className="text-sm font-medium">Correcto</span>
+              </div>
+            )}
+            {validation.status === 'incorrect' && !isForcedCorrect && (
+              <div className="flex items-center text-red-600">
+                <XCircle className="w-5 h-5 mr-1" />
+                <span className="text-sm font-medium">Diferencia</span>
+              </div>
+            )}
+            {isForcedCorrect && (
+              <div className="flex items-center text-amber-600">
+                <Wrench className="w-5 h-5 mr-1" />
+                <span className="text-sm font-medium">Forzado</span>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        <div className="relative">
+          <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+          <input
+            type="number"
+            step="0.01"
+            value={valor}
+            onChange={(e) => onChange(e.target.value)}
+            className={`w-full pl-10 pr-4 py-3 text-lg font-bold border-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+              validation.status === 'empty' ? 'border-gray-300' :
+              validation.isValid || isForcedCorrect ? 'border-green-300 bg-white' :
+              'border-red-300 bg-white'
+            }`}
+            placeholder="Ingrese monto contado..."
+          />
+        </div>
+        
+        {/* Botón para forzar corrección */}
+        {validation.status === 'incorrect' && !isForcedCorrect && Math.abs(validation.difference) >= 200 && (
+          <button
+            onClick={() => {
+              setForcedMethods(prev => new Set([...prev, nombre]));
+              setNotification({
+                type: 'info',
+                message: `${nombre} marcado como forzado`,
+                details: 'Esto generará una contingencia para revisión'
+              });
+            }}
+            className="mt-2 px-3 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-lg text-sm font-medium transition-colors"
+          >
+            Forzar Corrección
+          </button>
+        )}
+      </div>
+    );
+  };
+  
+  // Cerrar caja con nueva lógica
   const handleCerrarCaja = async () => {
     try {
       setIsSaving(true);
@@ -289,40 +374,28 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
         throw new Error('Debe contar el efectivo antes de cerrar la caja');
       }
       
-      const diferenciasOtrosMedios = verificarDiferenciasOtrosMedios();
-      const mediosIncorrectos = diferenciasOtrosMedios.filter(medio => !medio.isCorrect);
-      const mediosForzados = mediosIncorrectos.filter(medio => forcedMethods.has(medio.medioPago));
-      const mediosSinResolver = mediosIncorrectos.filter(medio => !forcedMethods.has(medio.medioPago));
+      // Validar medios electrónicos
+      const mediosConVentas = [
+        { tipo: 'tarjeta_credito', nombre: 'Tarjeta de Crédito', valor: conteoTarjetaCredito },
+        { tipo: 'tarjeta_debito', nombre: 'Tarjeta de Débito', valor: conteoTarjetaDebito },
+        { tipo: 'qr', nombre: 'QR / Digital', valor: conteoQR }
+      ].filter(medio => {
+        const ventas = ventasResumen.totalesPorMedioPago?.[medio.tipo]?.monto || 0;
+        return ventas > 0 || medio.valor.trim();
+      });
       
-      // Si hay medios sin resolver, mostrar error
-      if (mediosSinResolver.length > 0) {
+      const mediosIncorrectos = mediosConVentas.filter(medio => {
+        const validation = validateMedioElectronico(medio.tipo, medio.valor);
+        return !validation.isValid && !forcedMethods.has(medio.nombre);
+      });
+      
+      if (mediosIncorrectos.length > 0) {
         setNotification({
           type: 'error',
-          message: 'Hay diferencias sin resolver',
-          details: `Los siguientes medios tienen diferencias: ${mediosSinResolver.map(m => m.medioPago).join(', ')}. Usa "Resolver Diferencias" para forzar el cierre.`
+          message: 'Hay diferencias sin resolver en medios electrónicos',
+          details: `Verifique: ${mediosIncorrectos.map(m => m.nombre).join(', ')}`
         });
         return;
-      }
-      
-      const cuentas = calcularCuentasAutomaticas();
-      if (!cuentas) {
-        throw new Error('Error al calcular las cuentas automáticas');
-      }
-      
-      // Verificar si hay diferencias mayores
-      const diferenciasMayores = diferenciasOtrosMedios.filter(medio => medio.significativa && !forcedMethods.has(medio.medioPago));
-      const hayDiferenciasForzadas = mediosForzados.length > 0;
-      const generarContingencia = diferenciasMayores.length > 0 || hayDiferenciasForzadas;
-      
-      if (generarContingencia) {
-        const tipoProblema = diferenciasMayores.length > 0 ? 'diferencias mayores a $200' : 'cierre forzado';
-        const confirmacion = confirm(
-          `Se detectaron ${tipoProblema}. Esto generará una contingencia para revisión administrativa. ¿Deseas continuar?`
-        );
-        if (!confirmacion) {
-          setIsSaving(false);
-          return;
-        }
       }
       
       const response = await authenticatedFetch('/api/pdv/cierre', {
@@ -332,15 +405,15 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
         },
         body: JSON.stringify({
           id: cierreCaja.id,
-          observaciones: observaciones + (hayDiferenciasForzadas ? `\n\nMedios forzados: ${mediosForzados.map(m => m.medioPago).join(', ')}` : ''),
+          observaciones: observaciones + (forcedMethods.size > 0 ? `\n\nMedios forzados: ${Array.from(forcedMethods).join(', ')}` : ''),
           conteoEfectivo: efectivoContado,
           conteoTarjetaCredito: parseFloat(conteoTarjetaCredito) || 0,
           conteoTarjetaDebito: parseFloat(conteoTarjetaDebito) || 0,
           conteoQR: parseFloat(conteoQR) || 0,
           conteoOtros: 0,
           recuperoFondo: parseFloat(recuperoFondo) || 0,
-          forzarContingencia: hayDiferenciasForzadas,
-          resolverDiferenciasAutomaticamente: hayDiferenciasForzadas
+          forzarContingencia: forcedMethods.size > 0,
+          resolverDiferenciasAutomaticamente: forcedMethods.size > 0
         })
       });
       
@@ -350,11 +423,12 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
       }
       
       const data = await response.json();
+      const cuentas = calcularCuentasAutomaticas();
       
       setNotification({
         type: 'success',
         message: '🎉 Caja cerrada correctamente',
-        details: `Efectivo para sobre: $${cuentas.efectivoParaSobre.toFixed(2)}`,
+        details: `Efectivo para sobre: $${cuentas?.efectivoParaSobre.toFixed(2) || '0.00'}`,
         data: data
       });
       
@@ -373,7 +447,7 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
     }
   };
   
-  // RENDERIZADO
+  // Renderizado principal
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-blue-50">
@@ -391,24 +465,21 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
   
   const recuperoRecomendado = calcularRecuperoRecomendado();
   const cuentasAutomaticas = calcularCuentasAutomaticas();
-  const diferenciasOtrosMedios = verificarDiferenciasOtrosMedios();
-  const hasIncorrectOtherMethods = diferenciasOtrosMedios.some(medio => !medio.isCorrect);
-  const canClose = !hasIncorrectOtherMethods || diferenciasOtrosMedios.filter(m => !m.isCorrect).every(m => forcedMethods.has(m.medioPago));
-  const diferenciasMayores = diferenciasOtrosMedios.filter(medio => medio.significativa && !forcedMethods.has(medio.medioPago));
+  const canClose = efectivoConteoCompleto && efectivoValidation.isValid;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-2 md:p-4">
       <div className="max-w-7xl mx-auto">
-        {/* HEADER */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 md:p-4 mb-4">
+        {/* Header reducido */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-2 md:p-3 mb-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 md:w-10 md:h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-                <PiggyBank className="w-4 h-4 md:w-5 md:h-5 text-white" />
+            <div className="flex items-center space-x-2">
+              <div className="w-6 h-6 md:w-8 md:h-8 bg-blue-600 rounded-lg flex items-center justify-center">
+                <PiggyBank className="w-3 h-3 md:w-4 md:h-4 text-white" />
               </div>
               <div>
-                <h1 className="text-lg md:text-xl font-bold text-gray-900">Cierre de Caja</h1>
-                <p className="text-xs md:text-sm text-gray-600">
+                <h1 className="text-base md:text-lg font-bold text-gray-900">Cierre de Caja</h1>
+                <p className="text-xs text-gray-600">
                   {cierreCaja?.fechaApertura 
                     ? format(new Date(cierreCaja.fechaApertura), 'dd/MM/yyyy HH:mm') 
                     : 'Fecha no disponible'
@@ -419,24 +490,24 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
           </div>
         </div>
 
-        {/* NOTIFICACIONES */}
+        {/* Notificaciones */}
         {notification && (
-          <div className={`mb-4 md:mb-6 p-4 md:p-6 rounded-2xl border transition-all ${
+          <div className={`mb-4 p-4 rounded-2xl border transition-all ${
             notification.type === 'success' ? 'bg-green-50 border-green-200' :
             notification.type === 'info' ? 'bg-blue-50 border-blue-200' :
             'bg-red-50 border-red-200'
           }`}>
             <div className="flex items-start">
-              <div className="flex-shrink-0 mr-3 md:mr-4">
+              <div className="flex-shrink-0 mr-3">
                 {notification.type === 'success' ? 
-                  <CheckCircle className="w-5 h-5 md:w-6 md:h-6 text-green-600" /> :
+                  <CheckCircle className="w-5 h-5 text-green-600" /> :
                   notification.type === 'info' ?
-                  <Info className="w-5 h-5 md:w-6 md:h-6 text-blue-600" /> :
-                  <AlertCircle className="w-5 h-5 md:w-6 md:h-6 text-red-600" />
+                  <Info className="w-5 h-5 text-blue-600" /> :
+                  <AlertCircle className="w-5 h-5 text-red-600" />
                 }
               </div>
               <div className="flex-1">
-                <h3 className={`font-bold text-sm md:text-base mb-1 ${
+                <h3 className={`font-bold text-sm mb-1 ${
                   notification.type === 'success' ? 'text-green-800' : 
                   notification.type === 'info' ? 'text-blue-800' :
                   'text-red-800'
@@ -444,7 +515,7 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
                   {notification.message}
                 </h3>
                 {notification.details && (
-                  <p className={`text-xs md:text-sm ${
+                  <p className={`text-xs ${
                     notification.type === 'success' ? 'text-green-700' : 
                     notification.type === 'info' ? 'text-blue-700' :
                     'text-red-700'
@@ -455,28 +526,28 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
               </div>
               <button
                 onClick={() => setNotification(null)}
-                className="ml-2 md:ml-4 p-1 rounded-full hover:bg-black hover:bg-opacity-10 transition-colors"
+                className="ml-2 p-1 rounded-full hover:bg-black hover:bg-opacity-10 transition-colors"
               >
-                <X className="w-4 h-4 md:w-5 md:h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
           </div>
         )}
 
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 md:gap-6">
-          {/* PANEL IZQUIERDO - INFORMACIÓN DEL TURNO */}
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+          {/* Panel izquierdo - Información del turno */}
           <div className="xl:col-span-1">
             {/* Resumen del turno */}
-            <div className="bg-white rounded-xl md:rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6 mb-4 md:mb-6">
-              <h3 className="text-lg md:text-xl font-bold text-gray-900 flex items-center mb-4 md:mb-6">
-                <Clock className="w-5 h-5 md:w-6 md:h-6 text-blue-600 mr-2" />
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-4">
+              <h3 className="text-lg font-bold text-gray-900 flex items-center mb-4">
+                <Clock className="w-5 h-5 text-blue-600 mr-2" />
                 Resumen del Turno
               </h3>
               
-              <div className="space-y-3 md:space-y-4">
-                <div className="bg-blue-50 rounded-lg md:rounded-xl p-3 md:p-4 text-center">
+              <div className="space-y-3">
+                <div className="bg-blue-50 rounded-lg p-3 text-center">
                   <p className="text-sm text-blue-600 mb-1">Monto Inicial</p>
-                  <p className="text-xl md:text-2xl font-bold text-blue-700">
+                  <p className="text-xl font-bold text-blue-700">
                     ${cierreCaja?.montoInicial?.toFixed(2)}
                   </p>
                   {configuracionCierre && cierreCaja?.montoInicial < configuracionCierre.montoFijo && (
@@ -486,24 +557,19 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
                   )}
                 </div>
                 
-                {/* 🆕 MOSTRAR TOTAL DE VENTAS */}
-                <div className="bg-green-50 rounded-lg md:rounded-xl p-3 md:p-4 text-center">
+                <div className="bg-green-50 rounded-lg p-3 text-center">
                   <p className="text-sm text-green-600 mb-1">Total de Ventas</p>
-                  <p className="text-xl md:text-2xl font-bold text-green-700">
+                  <p className="text-xl font-bold text-green-700">
                     ${ventasResumen?.total?.toFixed(2)}
                   </p>
                   <p className="text-xs text-gray-500">{ventasResumen?.cantidadVentas} operaciones</p>
                 </div>
                 
-                {/* 🆕 RECUPERO RECOMENDADO */}
                 {recuperoRecomendado > 0 && (
-                  <div className="bg-yellow-50 rounded-lg md:rounded-xl p-3 md:p-4 text-center border border-yellow-200">
+                  <div className="bg-yellow-50 rounded-lg p-3 text-center border border-yellow-200">
                     <p className="text-sm text-yellow-600 mb-1">Recupero Recomendado</p>
-                    <p className="text-xl md:text-2xl font-bold text-yellow-700">
+                    <p className="text-xl font-bold text-yellow-700">
                       ${recuperoRecomendado.toFixed(2)}
-                    </p>
-                    <p className="text-xs text-yellow-600 mt-1">
-                      Para acercarse al monto fijo
                     </p>
                     <button
                       onClick={() => setRecuperoFondo(recuperoRecomendado.toFixed(2))}
@@ -516,8 +582,8 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
               </div>
             </div>
 
-            {/* 🔧 EGRESOS CORREGIDOS - RENDERIZAR NOMBRE DE USUARIO CORRECTAMENTE */}
-            <div className="bg-white rounded-xl md:rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6 mb-4">
+            {/* Egresos */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-4">
               <h3 className="text-lg font-bold text-gray-900 flex items-center mb-4">
                 <ArrowDownLeft className="w-5 h-5 text-red-600 mr-2" />
                 Egresos del Turno
@@ -545,7 +611,6 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
                     </div>
                   ))}
                   
-                  {/* Total de egresos */}
                   <div className="flex justify-between items-center p-3 bg-red-100 rounded-lg border-2 border-red-200 mt-3">
                     <span className="font-semibold text-red-800">Total Egresos:</span>
                     <span className="text-xl font-bold text-red-800">
@@ -557,25 +622,47 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
             </div>
           </div>
           
-          {/* PANEL PRINCIPAL */}
-          <div className="xl:col-span-2 space-y-4 md:space-y-6">
-            {/* 🆕 CONTADOR DE BILLETES SIN VALORES PRECARGADOS */}
-            <BillCounter
-              onTotalChange={handleBillCounterChange}
-              className="shadow-sm md:shadow-lg"
-            />
+          {/* Panel principal */}
+          <div className="xl:col-span-2 space-y-4">
+            {/* Contador de billetes con indicadores visuales */}
+            <div className="relative">
+              <BillCounter
+                onTotalChange={handleBillCounterChange}
+                className="shadow-sm"
+              />
+              
+              {/* Indicador visual para efectivo */}
+              {efectivoConteoCompleto && (
+                <div className={`absolute top-4 right-4 flex items-center px-3 py-2 rounded-lg font-medium ${
+                  efectivoValidation.isValid 
+                    ? 'bg-green-100 text-green-800 border border-green-300'
+                    : 'bg-red-100 text-red-800 border border-red-300'
+                }`}>
+                  {efectivoValidation.isValid ? (
+                    <>
+                      <CheckCircle className="w-5 h-5 mr-2" />
+                      <span>Efectivo Correcto</span>
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="w-5 h-5 mr-2" />
+                      <span>Hay Diferencia</span>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
             
-            {/* 🆕 CUENTAS AUTOMÁTICAS - SOLO CUANDO HAY EFECTIVO CONTADO */}
+            {/* Cuentas automáticas */}
             {efectivoConteoCompleto && cuentasAutomaticas && (
-              <div className="bg-white rounded-xl md:rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6">
-                <h3 className="text-lg md:text-xl font-bold text-gray-900 flex items-center mb-4">
-                  <Calculator className="w-5 h-5 md:w-6 md:h-6 text-green-600 mr-2" />
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+                <h3 className="text-lg font-bold text-gray-900 flex items-center mb-4">
+                  <Calculator className="w-5 h-5 text-green-600 mr-2" />
                   Cuentas Automáticas
                 </h3>
                 
-                <div className="bg-gray-50 rounded-xl p-4 md:p-6">
+                <div className="bg-gray-50 rounded-xl p-4">
                   <div className="space-y-4">
-                    {/* Efectivo contado */}
                     <div className="flex justify-between items-center py-2">
                       <span className="text-gray-700 font-medium">Efectivo total contado:</span>
                       <span className="text-xl font-bold text-green-600">
@@ -583,7 +670,6 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
                       </span>
                     </div>
                     
-                    {/* Egresos */}
                     {cuentasAutomaticas.menosEgresos > 0 && (
                       <div className="flex justify-between items-center py-2">
                         <span className="text-gray-700 font-medium">Menos egresos:</span>
@@ -593,7 +679,6 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
                       </div>
                     )}
                     
-                    {/* Recupero */}
                     {cuentasAutomaticas.menosRecupero > 0 && (
                       <div className="flex justify-between items-center py-2">
                         <span className="text-gray-700 font-medium">Menos recupero de fondo:</span>
@@ -605,7 +690,6 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
                     
                     <hr className="border-gray-300" />
                     
-                    {/* Resultado final */}
                     <div className={`flex justify-between items-center py-3 px-4 rounded-lg ${
                       cuentasAutomaticas.esNegativo ? 'bg-red-100 border border-red-300' : 'bg-green-100 border border-green-300'
                     }`}>
@@ -616,14 +700,6 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
                         ${cuentasAutomaticas.efectivoParaSobre.toFixed(2)}
                       </span>
                     </div>
-                    
-                    {cuentasAutomaticas.esNegativo && (
-                      <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                        <p className="text-red-800 text-sm">
-                          ⚠️ <strong>Atención:</strong> El resultado es negativo. Verifica el conteo de efectivo, egresos y recupero.
-                        </p>
-                      </div>
-                    )}
                   </div>
                 </div>
                 
@@ -632,6 +708,9 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Recupero de Fondo (opcional):
                   </label>
+                  <p className="text-xs text-gray-500 mb-2">
+                    💡 El recupero se descuenta del efectivo para sobre, no afecta la validación del conteo
+                  </p>
                   <div className="relative">
                     <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
                     <input
@@ -645,131 +724,65 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
                   </div>
                   {recuperoRecomendado > 0 && parseFloat(recuperoFondo) !== recuperoRecomendado && (
                     <p className="text-sm text-yellow-600 mt-1">
-                      💡 Sugerencia: $${recuperoRecomendado.toFixed(2)}
+                      💡 Sugerencia: ${recuperoRecomendado.toFixed(2)}
                     </p>
                   )}
                 </div>
               </div>
             )}
             
-            {/* 🆕 CONCILIACIÓN MANUAL DE OTROS MEDIOS DE PAGO */}
+            {/* Medios electrónicos con indicadores visuales */}
             {efectivoConteoCompleto && (
-              <div className="bg-white rounded-xl md:rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6">
-                <div className="flex items-center justify-between mb-4 md:mb-6">
-                  <h3 className="text-lg md:text-xl font-bold text-gray-900 flex items-center">
-                    <Target className="w-5 h-5 md:w-6 md:h-6 text-orange-600 mr-2" />
-                    Conciliación Manual - Otros Medios
-                  </h3>
-                  
-                  {/* Botón resolver diferencias */}
-                  {diferenciasMayores.length > 0 && (
-                    <button
-                      onClick={resolverTodasLasDiferencias}
-                      className="px-3 md:px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium text-sm md:text-base flex items-center space-x-2 transition-colors"
-                    >
-                      <Wrench className="w-4 h-4" />
-                      <span>Resolver Diferencias</span>
-                    </button>
-                  )}
-                </div>
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+                <h3 className="text-lg font-bold text-gray-900 flex items-center mb-4">
+                  <Target className="w-5 h-5 text-orange-600 mr-2" />
+                  Conciliación Manual - Medios Electrónicos
+                </h3>
                 
                 <p className="text-sm text-gray-600 mb-4">
-                  Ingresa manualmente los montos de otros medios de pago para conciliar:
+                  Ingresa los montos contados manualmente. El sistema validará si coinciden exactamente:
                 </p>
                 
                 <div className="space-y-4">
-                  {/* Tarjeta de Crédito */}
+                  {/* Solo mostrar medios que tuvieron ventas o fueron ingresados */}
                   {(ventasResumen?.totalesPorMedioPago?.tarjeta_credito?.monto > 0 || conteoTarjetaCredito) && (
-                    <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center">
-                          <CreditCard className="w-5 h-5 text-blue-600 mr-2" />
-                          <span className="font-semibold text-blue-800">Tarjeta de Crédito</span>
-                        </div>
-                        <span className="text-sm text-blue-600">
-                          Sistema: ${(ventasResumen?.totalesPorMedioPago?.tarjeta_credito?.monto || 0).toFixed(2)}
-                        </span>
-                      </div>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={conteoTarjetaCredito}
-                        onChange={(e) => setConteoTarjetaCredito(e.target.value)}
-                        className="w-full p-3 text-lg font-bold border-2 border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="Ingrese monto manual..."
-                      />
-                    </div>
+                    <MedioElectronicoInput
+                      tipo="tarjeta_credito"
+                      nombre="Tarjeta de Crédito"
+                      icono={<CreditCard />}
+                      valor={conteoTarjetaCredito}
+                      onChange={setConteoTarjetaCredito}
+                      colorScheme="blue"
+                    />
                   )}
                   
-                  {/* Tarjeta de Débito */}
                   {(ventasResumen?.totalesPorMedioPago?.tarjeta_debito?.monto > 0 || conteoTarjetaDebito) && (
-                    <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center">
-                          <CreditCard className="w-5 h-5 text-purple-600 mr-2" />
-                          <span className="font-semibold text-purple-800">Tarjeta de Débito</span>
-                        </div>
-                        <span className="text-sm text-purple-600">
-                          Sistema: ${(ventasResumen?.totalesPorMedioPago?.tarjeta_debito?.monto || 0).toFixed(2)}
-                        </span>
-                      </div>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={conteoTarjetaDebito}
-                        onChange={(e) => setConteoTarjetaDebito(e.target.value)}
-                        className="w-full p-3 text-lg font-bold border-2 border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                        placeholder="Ingrese monto manual..."
-                      />
-                    </div>
+                    <MedioElectronicoInput
+                      tipo="tarjeta_debito"
+                      nombre="Tarjeta de Débito"
+                      icono={<CreditCard />}
+                      valor={conteoTarjetaDebito}
+                      onChange={setConteoTarjetaDebito}
+                      colorScheme="purple"
+                    />
                   )}
                   
-                  {/* QR / Digital */}
                   {(ventasResumen?.totalesPorMedioPago?.qr?.monto > 0 || conteoQR) && (
-                    <div className="bg-orange-50 rounded-lg p-4 border border-orange-200">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center">
-                          <Smartphone className="w-5 h-5 text-orange-600 mr-2" />
-                          <span className="font-semibold text-orange-800">QR / Digital</span>
-                        </div>
-                        <span className="text-sm text-orange-600">
-                          Sistema: ${(ventasResumen?.totalesPorMedioPago?.qr?.monto || 0).toFixed(2)}
-                        </span>
-                      </div>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={conteoQR}
-                        onChange={(e) => setConteoQR(e.target.value)}
-                        className="w-full p-3 text-lg font-bold border-2 border-orange-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                        placeholder="Ingrese monto manual..."
-                      />
-                    </div>
+                    <MedioElectronicoInput
+                      tipo="qr"
+                      nombre="QR / Digital"
+                      icono={<Smartphone />}
+                      valor={conteoQR}
+                      onChange={setConteoQR}
+                      colorScheme="orange"
+                    />
                   )}
                 </div>
-                
-                {/* Mostrar diferencias si las hay */}
-                {diferenciasOtrosMedios.length > 0 && (
-                  <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <h4 className="font-semibold text-yellow-800 mb-2">Diferencias Detectadas:</h4>
-                    <div className="space-y-2 text-sm">
-                      {diferenciasOtrosMedios.map((diff, idx) => (
-                        <div key={idx} className={`flex justify-between ${diff.significativa ? 'text-red-700' : 'text-yellow-700'}`}>
-                          <span>{diff.medioPago}:</span>
-                          <span className="font-bold">
-                            {diff.diferencia > 0 ? '+' : ''}${diff.diferencia.toFixed(2)}
-                            {diff.significativa && ' 🚨'}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
             {/* Footer con observaciones y finalizar */}
-            <div className="bg-white rounded-xl md:rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -779,8 +792,8 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
                     rows={3}
                     value={observaciones}
                     onChange={(e) => setObservaciones(e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm md:text-base"
-                    placeholder="Cualquier observación sobre el cierre, diferencias encontradas, o situaciones especiales..."
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                    placeholder="Cualquier observación sobre el cierre..."
                   />
                 </div>
                 
@@ -788,63 +801,54 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
                   <button
                     onClick={() => router.push('/pdv')}
                     disabled={isSaving}
-                    className="w-full md:w-auto px-4 md:px-6 py-2 md:py-3 border-2 border-gray-300 text-gray-700 rounded-lg md:rounded-xl hover:bg-gray-50 disabled:opacity-50 transition-colors font-medium"
+                    className="w-full md:w-auto px-4 py-2 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors font-medium"
                   >
                     Cancelar
                   </button>
                   
                   <button
                     onClick={handleCerrarCaja}
-                    disabled={isSaving || !canClose || !efectivoConteoCompleto}
-                    className={`w-full md:w-auto px-6 md:px-8 py-2 md:py-3 rounded-lg md:rounded-xl text-white font-bold text-base md:text-lg shadow-lg hover:shadow-xl transition-all flex items-center justify-center space-x-2 ${
-                      canClose && efectivoConteoCompleto
-                        ? hasIncorrectOtherMethods
-                          ? 'bg-amber-600 hover:bg-amber-700'
-                          : 'bg-green-600 hover:bg-green-700'
+                    disabled={isSaving || !canClose}
+                    className={`w-full md:w-auto px-6 py-2 rounded-lg text-white font-bold text-base shadow-lg hover:shadow-xl transition-all flex items-center justify-center space-x-2 ${
+                      canClose
+                        ? 'bg-green-600 hover:bg-green-700'
                         : 'bg-gray-400 cursor-not-allowed'
                     }`}
                   >
                     {isSaving ? (
                       <>
-                        <Loader className="animate-spin h-4 md:h-5 md:w-5" />
+                        <Loader className="animate-spin h-4 w-4" />
                         <span>Procesando...</span>
                       </>
                     ) : !efectivoConteoCompleto ? (
                       <>
-                        <Calculator className="h-4 md:h-5 md:w-5" />
+                        <Calculator className="h-4 w-4" />
                         <span>Contar Efectivo Primero</span>
+                      </>
+                    ) : !efectivoValidation.isValid ? (
+                      <>
+                        <AlertTriangle className="h-4 w-4" />
+                        <span>Revisar Efectivo</span>
                       </>
                     ) : (
                       <>
-                        <Zap className="h-4 md:h-5 md:w-5" />
-                        <span>
-                          {hasIncorrectOtherMethods && canClose ? 'Cerrar con Diferencias' : 'Cerrar Caja'}
-                        </span>
+                        <Zap className="h-4 w-4" />
+                        <span>Cerrar Caja</span>
                       </>
                     )}
                   </button>
                 </div>
                 
                 {/* Estado del cierre */}
-                {hasIncorrectOtherMethods && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg md:rounded-xl p-4">
+                {!canClose && efectivoConteoCompleto && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
                     <div className="flex items-center mb-2">
-                      <AlertTriangle className="w-4 h-4 md:w-5 md:h-5 text-amber-600 mr-2" />
-                      <p className="font-medium text-amber-800 text-sm md:text-base">Estado del cierre</p>
+                      <AlertTriangle className="w-5 h-5 text-amber-600 mr-2" />
+                      <p className="font-medium text-amber-800">Estado del cierre</p>
                     </div>
-                    <div className="text-xs md:text-sm text-amber-700 space-y-1">
-                      {canClose ? (
-                        <>
-                          <p>✅ Puedes cerrar la caja.</p>
-                          {diferenciasMayores.length > 0 && (
-                            <p>⚠️ Las diferencias ≥ $200 generarán contingencias automáticamente.</p>
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          <p>⚠️ Hay {diferenciasMayores.length} diferencia(s) mayor(es) a $200 sin resolver.</p>
-                          <p>💡 Usa el botón "Resolver Diferencias" para forzar el cierre y generar contingencias.</p>
-                        </>
+                    <div className="text-sm text-amber-700">
+                      {!efectivoValidation.isValid && (
+                        <p>⚠️ Hay una diferencia en el conteo de efectivo. Margen tolerado: $200.</p>
                       )}
                     </div>
                   </div>

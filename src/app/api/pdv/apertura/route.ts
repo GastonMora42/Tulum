@@ -7,7 +7,11 @@ import { checkPermission } from '@/server/api/middlewares/authorization';
 export async function GET(req: NextRequest) {
   const authError = await authMiddleware(req);
   if (authError) return authError;
-  
+
+    // CAMBIO: Solo requerir caja:crear, no admin
+    const permError = await checkPermission('caja:crear')(req);
+    if (permError) return permError;
+    
   try {
     const { searchParams } = new URL(req.url);
     const sucursalId = searchParams.get('sucursalId');
@@ -105,8 +109,10 @@ export async function POST(req: NextRequest) {
   const authError = await authMiddleware(req);
   if (authError) return authError;
   
-  const permError = await checkPermission(['caja:crear', 'admin'])(req);
+  // CAMBIO: Solo requerir caja:crear, no admin
+  const permError = await checkPermission('caja:crear')(req);
   if (permError) return permError;
+  
   
   try {
     const body = await req.json();

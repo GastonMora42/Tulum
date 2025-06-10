@@ -8,7 +8,8 @@ export async function GET(req: NextRequest) {
   const authError = await authMiddleware(req);
   if (authError) return authError;
   
-  const permError = await checkPermission(['caja:ver', 'admin'])(req);
+  // CAMBIO: Solo requerir caja:ver, no admin
+  const permError = await checkPermission('caja:ver')(req);
   if (permError) return permError;
   
   try {
@@ -157,7 +158,8 @@ export async function PATCH(req: NextRequest) {
   const authError = await authMiddleware(req);
   if (authError) return authError;
   
-  const permError = await checkPermission(['caja:crear', 'admin'])(req);
+  // CAMBIO: Solo requerir caja:crear, no admin  
+  const permError = await checkPermission('caja:crear')(req);
   if (permError) return permError;
   
   try {

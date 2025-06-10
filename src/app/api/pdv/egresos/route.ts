@@ -9,9 +9,11 @@ export async function GET(req: NextRequest) {
   const authError = await authMiddleware(req);
   if (authError) return authError;
   
-  const permissionError = await checkPermission(['venta:crear', 'admin'])(req);
+  // CAMBIO: Solo requerir venta:crear en lugar de array
+  const permissionError = await checkPermission('venta:crear')(req);
   if (permissionError) return permissionError;
   
+
   try {
     const { searchParams } = new URL(req.url);
     const cierreCajaId = searchParams.get('cierreCajaId');
@@ -69,8 +71,9 @@ export async function POST(req: NextRequest) {
 const authError = await authMiddleware(req);
 if (authError) return authError;
 
-const permissionError = await checkPermission(['venta:crear', 'admin'])(req);
-if (permissionError) return permissionError;
+  // CAMBIO: Solo requerir venta:crear en lugar de array
+  const permissionError = await checkPermission('venta:crear')(req);
+  if (permissionError) return permissionError;
 
 try {
   const body = await req.json();
