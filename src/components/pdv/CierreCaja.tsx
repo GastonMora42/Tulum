@@ -1,4 +1,4 @@
-// src/components/pdv/CierreCaja.tsx - VERSIÓN COMPLETA CORREGIDA
+// src/components/pdv/CierreCaja.tsx - VERSIÓN MEJORADA CON CÁLCULO CORRECTO DEL SOBRE
 'use client';
 
 import { useState, useEffect, useCallback, JSX } from 'react';
@@ -88,7 +88,7 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
     return 'Usuario desconocido';
   };
   
-  // 🎯 FUNCIÓN DE VALIDACIÓN DEL EFECTIVO - TOTALMENTE INDEPENDIENTE DEL RECUPERO
+  // 🎯 FUNCIÓN DE VALIDACIÓN DEL EFECTIVO - MEJORADA PARA PERMITIR NEGATIVO SIN VENTAS
   const calcularValidacionEfectivo = useCallback(() => {
     if (!ventasResumen || !cierreCaja || efectivoContado <= 0) {
       return {
@@ -102,12 +102,12 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
     const ventasEfectivo = ventasResumen.totalesPorMedioPago?.efectivo?.monto || 0;
     const montoInicial = cierreCaja.montoInicial || 0;
     
-    // 🔑 CLAVE: El efectivo esperado NUNCA incluye recupero
+    // El efectivo esperado NUNCA incluye recupero
     const efectivoEsperado = montoInicial + ventasEfectivo - totalEgresos;
     const diferencia = efectivoContado - efectivoEsperado;
     
-    // Margen de tolerancia: $200
-    const MARGEN_TOLERANCIA = 200;
+    // 🆕 NUEVA LÓGICA: Si no hay ventas en efectivo, permitir diferencias mayores
+    const MARGEN_TOLERANCIA = ventasEfectivo > 0 ? 200 : 1000; // Mayor tolerancia sin ventas en efectivo
     const isValid = Math.abs(diferencia) <= MARGEN_TOLERANCIA;
     
     return {
@@ -117,7 +117,7 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
     };
   }, [ventasResumen, cierreCaja, efectivoContado]);
   
-  // 🎯 EFECTO PARA VALIDAR EFECTIVO - SOLO CUANDO CAMBIAN LOS DATOS RELEVANTES
+  // Efecto para validar efectivo
   useEffect(() => {
     const validacion = calcularValidacionEfectivo();
     setEfectivoValidation(validacion);
@@ -241,24 +241,27 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
     return 0;
   }, [ventasResumen, configuracionCierre, cierreCaja]);
   
-  // 🎯 CALCULAR CUENTAS AUTOMÁTICAS - EL RECUPERO SOLO AFECTA AL SOBRE
+  // 🆕 CALCULAR CUENTAS AUTOMÁTICAS MEJORADAS - RESTAR MONTO FIJO PARA PRÓXIMO TURNO
   const calcularCuentasAutomaticas = useCallback(() => {
     if (efectivoContado <= 0) return null;
     
     const totalEgresos = ventasResumen?.totalEgresos || 0;
     const recuperoNum = parseFloat(recuperoFondo) || 0;
+    const montoFijo = configuracionCierre?.montoFijo || 0;
     
-    // El recupero se descuenta del efectivo para sobre, NO de la validación
-    const efectivoParaSobre = efectivoContado - totalEgresos - recuperoNum;
+    // 🔧 NUEVO CÁLCULO: Restar también el monto fijo que debe quedar para el próximo turno
+    const efectivoParaSobre = efectivoContado - totalEgresos - recuperoNum - montoFijo;
     
     return {
       efectivoContado,
       menosEgresos: totalEgresos,
       menosRecupero: recuperoNum,
+      menosMontoFijo: montoFijo, // 🆕 Nuevo campo
       efectivoParaSobre,
+      efectivoProximoTurno: montoFijo, // 🆕 Lo que queda para próximo turno
       esNegativo: efectivoParaSobre < 0
     };
-  }, [efectivoContado, ventasResumen, recuperoFondo]);
+  }, [efectivoContado, ventasResumen, recuperoFondo, configuracionCierre]);
   
   // Función para manejar cambio del contador de billetes
   const handleBillCounterChange = (total: number) => {
@@ -361,7 +364,7 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
     );
   };
   
-  // Cerrar caja con nueva lógica
+  // 🆕 NUEVA LÓGICA DE CIERRE MEJORADA
   const handleCerrarCaja = async () => {
     try {
       setIsSaving(true);
@@ -373,6 +376,10 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
       if (efectivoContado <= 0) {
         throw new Error('Debe contar el efectivo antes de cerrar la caja');
       }
+      
+      // 🆕 VALIDACIÓN MEJORADA: Permitir cerrar con negativo si no hay ventas en efectivo
+      const ventasEfectivo = ventasResumen.totalesPorMedioPago?.efectivo?.monto || 0;
+      const puedeUsarLogicaFlexible = ventasEfectivo === 0;
       
       // Validar medios electrónicos
       const mediosConVentas = [
@@ -398,6 +405,17 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
         return;
       }
       
+      // 🆕 VALIDACIÓN DE EFECTIVO MEJORADA
+      if (!efectivoValidation.isValid && !puedeUsarLogicaFlexible) {
+        const confirmacion = confirm(
+          `Hay una diferencia significativa en el efectivo (${efectivoValidation.difference > 0 ? '+' : ''}$${efectivoValidation.difference.toFixed(2)}). ¿Desea forzar el cierre y generar una contingencia?`
+        );
+        if (!confirmacion) return;
+        
+        // Agregar a métodos forzados
+        setForcedMethods(prev => new Set([...prev, 'Efectivo']));
+      }
+      
       const response = await authenticatedFetch('/api/pdv/cierre', {
         method: 'PATCH',
         headers: {
@@ -405,15 +423,15 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
         },
         body: JSON.stringify({
           id: cierreCaja.id,
-          observaciones: observaciones + (forcedMethods.size > 0 ? `\n\nMedios forzados: ${Array.from(forcedMethods).join(', ')}` : ''),
+          observaciones: observaciones + (forcedMethods.size > 0 ? `\n\nMedios forzados: ${Array.from(forcedMethods).join(', ')}` : '') + (puedeUsarLogicaFlexible ? '\n\nCierre con lógica flexible (sin ventas en efectivo)' : ''),
           conteoEfectivo: efectivoContado,
           conteoTarjetaCredito: parseFloat(conteoTarjetaCredito) || 0,
           conteoTarjetaDebito: parseFloat(conteoTarjetaDebito) || 0,
           conteoQR: parseFloat(conteoQR) || 0,
           conteoOtros: 0,
           recuperoFondo: parseFloat(recuperoFondo) || 0,
-          forzarContingencia: forcedMethods.size > 0,
-          resolverDiferenciasAutomaticamente: forcedMethods.size > 0
+          forzarContingencia: forcedMethods.size > 0 || (!efectivoValidation.isValid && !puedeUsarLogicaFlexible),
+          resolverDiferenciasAutomaticamente: forcedMethods.size > 0 || puedeUsarLogicaFlexible
         })
       });
       
@@ -428,7 +446,7 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
       setNotification({
         type: 'success',
         message: '🎉 Caja cerrada correctamente',
-        details: `Efectivo para sobre: $${cuentas?.efectivoParaSobre.toFixed(2) || '0.00'}`,
+        details: `Efectivo para sobre: $${cuentas?.efectivoParaSobre.toFixed(2) || '0.00'}. Próximo turno: $${configuracionCierre.montoFijo.toFixed(2)}`,
         data: data
       });
       
@@ -465,7 +483,9 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
   
   const recuperoRecomendado = calcularRecuperoRecomendado();
   const cuentasAutomaticas = calcularCuentasAutomaticas();
-  const canClose = efectivoConteoCompleto && efectivoValidation.isValid;
+  const ventasEfectivo = ventasResumen?.totalesPorMedioPago?.efectivo?.monto || 0;
+  const puedeUsarLogicaFlexible = ventasEfectivo === 0;
+  const canClose = efectivoConteoCompleto && (efectivoValidation.isValid || puedeUsarLogicaFlexible);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-2 md:p-4">
@@ -564,6 +584,16 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
                   </p>
                   <p className="text-xs text-gray-500">{ventasResumen?.cantidadVentas} operaciones</p>
                 </div>
+
+                {/* 🆕 INDICADOR ESPECIAL PARA SIN VENTAS EN EFECTIVO */}
+                {puedeUsarLogicaFlexible && (
+                  <div className="bg-yellow-50 rounded-lg p-3 text-center border border-yellow-200">
+                    <p className="text-sm text-yellow-600 mb-1">⚠️ Sin Ventas en Efectivo</p>
+                    <p className="text-xs text-yellow-700">
+                      Se permite mayor flexibilidad en el cierre
+                    </p>
+                  </div>
+                )}
                 
                 {recuperoRecomendado > 0 && (
                   <div className="bg-yellow-50 rounded-lg p-3 text-center border border-yellow-200">
@@ -634,14 +664,14 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
               {/* Indicador visual para efectivo */}
               {efectivoConteoCompleto && (
                 <div className={`absolute top-4 right-4 flex items-center px-3 py-2 rounded-lg font-medium ${
-                  efectivoValidation.isValid 
+                  efectivoValidation.isValid || puedeUsarLogicaFlexible
                     ? 'bg-green-100 text-green-800 border border-green-300'
                     : 'bg-red-100 text-red-800 border border-red-300'
                 }`}>
-                  {efectivoValidation.isValid ? (
+                  {efectivoValidation.isValid || puedeUsarLogicaFlexible ? (
                     <>
                       <CheckCircle className="w-5 h-5 mr-2" />
-                      <span>Efectivo Correcto</span>
+                      <span>{puedeUsarLogicaFlexible ? 'Flexible' : 'Correcto'}</span>
                     </>
                   ) : (
                     <>
@@ -653,7 +683,7 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
               )}
             </div>
             
-            {/* Cuentas automáticas */}
+            {/* 🆕 CUENTAS AUTOMÁTICAS MEJORADAS */}
             {efectivoConteoCompleto && cuentasAutomaticas && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
                 <h3 className="text-lg font-bold text-gray-900 flex items-center mb-4">
@@ -688,8 +718,17 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
                       </div>
                     )}
                     
+                    {/* 🆕 NUEVA LÍNEA: MONTO FIJO PARA PRÓXIMO TURNO */}
+                    <div className="flex justify-between items-center py-2">
+                      <span className="text-gray-700 font-medium">Menos monto fijo (próximo turno):</span>
+                      <span className="text-xl font-bold text-blue-600">
+                        -${cuentasAutomaticas.menosMontoFijo.toFixed(2)}
+                      </span>
+                    </div>
+                    
                     <hr className="border-gray-300" />
                     
+                    {/* Efectivo para sobre */}
                     <div className={`flex justify-between items-center py-3 px-4 rounded-lg ${
                       cuentasAutomaticas.esNegativo ? 'bg-red-100 border border-red-300' : 'bg-green-100 border border-green-300'
                     }`}>
@@ -699,6 +738,21 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
                       <span className={`text-2xl font-black ${cuentasAutomaticas.esNegativo ? 'text-red-800' : 'text-green-800'}`}>
                         ${cuentasAutomaticas.efectivoParaSobre.toFixed(2)}
                       </span>
+                    </div>
+                    
+                    {/* 🆕 NUEVA LÍNEA: EFECTIVO PARA PRÓXIMO TURNO */}
+                    <div className="bg-blue-100 border border-blue-300 rounded-lg py-3 px-4">
+                      <div className="flex justify-between items-center">
+                        <span className="font-bold text-lg text-blue-800">
+                          🏪 Efectivo próximo turno:
+                        </span>
+                        <span className="text-2xl font-black text-blue-800">
+                          ${cuentasAutomaticas.efectivoProximoTurno.toFixed(2)}
+                        </span>
+                      </div>
+                      <p className="text-xs text-blue-700 mt-1">
+                        Este monto debe quedar en caja para el próximo turno
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -825,10 +879,10 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
                         <Calculator className="h-4 w-4" />
                         <span>Contar Efectivo Primero</span>
                       </>
-                    ) : !efectivoValidation.isValid ? (
+                    ) : !canClose ? (
                       <>
                         <AlertTriangle className="h-4 w-4" />
-                        <span>Revisar Efectivo</span>
+                        <span>Revisar Diferencias</span>
                       </>
                     ) : (
                       <>
@@ -847,8 +901,8 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
                       <p className="font-medium text-amber-800">Estado del cierre</p>
                     </div>
                     <div className="text-sm text-amber-700">
-                      {!efectivoValidation.isValid && (
-                        <p>⚠️ Hay una diferencia en el conteo de efectivo. Margen tolerado: $200.</p>
+                      {!efectivoValidation.isValid && !puedeUsarLogicaFlexible && (
+                        <p>⚠️ Hay una diferencia en el conteo de efectivo. {puedeUsarLogicaFlexible ? 'Puede usar lógica flexible (sin ventas en efectivo)' : 'Margen tolerado: $200.'}</p>
                       )}
                     </div>
                   </div>

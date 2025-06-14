@@ -1,8 +1,10 @@
+// src/components/admin/BulkStockUpload.tsx - VERSIÓN CORREGIDA
 import React, { useState, useRef } from 'react';
-import { Upload, FileSpreadsheet, Download, AlertTriangle, CheckCircle, Info, X } from 'lucide-react';
+import { Upload, FileSpreadsheet, Download, AlertTriangle, CheckCircle, Info, X, Loader } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { authenticatedFetch } from '@/hooks/useAuth';
-// ✅ INTERFACES CORREGIDAS
+
+// ✅ INTERFACES CORREGIDAS Y COMPLETAS
 interface Sucursal {
   id: string;
   nombre: string;
@@ -10,8 +12,8 @@ interface Sucursal {
 }
 
 interface BulkItem {
-  codigoBarras: string;
-  nombreProducto: string;
+  codigoBarras?: string;
+  nombreProducto?: string;
   cantidad: number;
   fila: number;
 }
@@ -22,19 +24,43 @@ interface BulkStockUploadProps {
   onSuccess: (result: any) => void;
 }
 
+interface BulkUploadData {
+  sucursalId: string;
+  nombre: string;
+  descripcion: string;
+  modo: 'incrementar' | 'establecer' | 'decrementar';
+  items: Array<{
+    codigoBarras?: string;
+    nombreProducto?: string;
+    cantidad: number;
+  }>;
+}
+
+interface BulkResult {
+  carga: any;
+  resumen: {
+    totalItems: number;
+    itemsProcesados: number;
+    itemsErrores: number;
+    porcentajeExito: number;
+  };
+  resultados: any[];
+}
+
 const BulkStockUpload: React.FC<BulkStockUploadProps> = ({ sucursales, onClose, onSuccess }) => {
   const [file, setFile] = useState<File | null>(null);
-  const [parsing, setParsing] = useState<boolean>(false);
-  const [parsedData, setParsedData] = useState<Array<any>>([]);
-  const [uploadData, setUploadData] = useState({
+  const [parsing, setParsing] = useState(false);
+  const [parsedData, setParsedData] = useState<BulkItem[]>([]);
+  const [uploadData, setUploadData] = useState<BulkUploadData>({
     sucursalId: '',
     nombre: '',
     descripcion: '',
-    modo: 'incrementar'
+    modo: 'incrementar',
+    items: [] // Añadido el campo items requerido
   });
-  const [errors, setErrors] = useState([]);
+  const [errors, setErrors] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Template de ejemplo para descargar
   const downloadTemplate = () => {
@@ -70,15 +96,15 @@ const BulkStockUpload: React.FC<BulkStockUploadProps> = ({ sucursales, onClose, 
     XLSX.writeFile(wb, 'template_carga_stock.xlsx');
   };
 
-  const handleFileChange = (event: { target: { files: any[]; }; }) => {
-    const selectedFile = event.target.files[0];
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = event.target.files?.[0];
     if (selectedFile) {
       setFile(selectedFile);
       parseFile(selectedFile);
     }
   };
 
-  const parseFile = async (file: { arrayBuffer: () => any; }) => {
+  const parseFile = async (file: File) => {
     setParsing(true);
     setErrors([]);
     setParsedData([]);
@@ -88,30 +114,38 @@ const BulkStockUpload: React.FC<BulkStockUploadProps> = ({ sucursales, onClose, 
       const workbook = XLSX.read(arrayBuffer, { type: 'array' });
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+      const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
 
       // Validar y normalizar datos
-      const normalizedData: React.SetStateAction<any[]> = [];
-      const validationErrors: ((prevState: never[]) => never[]) | string[] = [];
+      const normalizedData: BulkItem[] = [];
+      const validationErrors: string[] = [];
 
-      jsonData.forEach((row, index) => {
+      jsonData.forEach((row: any, index: number) => {
         const rowNum = index + 2; // +2 porque Excel empieza en 1 y tenemos header
         
         // Detectar posibles nombres de columnas
-        const codigoBarras = (row as Record<string, any>)['Código de Barras'] || 
-                           (row as Record<string, any>)['Codigo de Barras'] || 
-                           (row as Record<string, any>)['CodigoBarras'] || 
-                           (row as Record<string, any>)['Barcode'] || '';
+        const codigoBarras = (
+          row['Código de Barras'] || 
+          row['Codigo de Barras'] || 
+          row['CodigoBarras'] || 
+          row['Barcode'] || 
+          ''
+        )?.toString().trim();
                            
-        const nombreProducto = (row as Record<string, any>)['Nombre del Producto'] || 
-                             (row as Record<string, any>)['Nombre'] || 
-                             (row as Record<string, any>)['Producto'] || 
-                             (row as Record<string, any>)['Product'] || '';
+        const nombreProducto = (
+          row['Nombre del Producto'] || 
+          row['Nombre'] || 
+          row['Producto'] || 
+          row['Product'] || 
+          ''
+        )?.toString().trim();
                              
-        const cantidad = parseFloat((row as Record<string, any>)['Cantidad'] || 
-                                  (row as Record<string, any>)['Qty'] || 
-                                  (row as Record<string, any>)['Stock'] || 
-                                  0);
+        const cantidad = parseFloat(
+          row['Cantidad'] || 
+          row['Qty'] || 
+          row['Stock'] || 
+          0
+        );
 
         // Validaciones
         if (!codigoBarras && !nombreProducto) {
@@ -125,14 +159,15 @@ const BulkStockUpload: React.FC<BulkStockUploadProps> = ({ sucursales, onClose, 
         }
 
         normalizedData.push({
-          codigoBarras: codigoBarras.toString().trim(),
-          nombreProducto: nombreProducto.toString().trim(),
+          codigoBarras: codigoBarras || undefined,
+          nombreProducto: nombreProducto || undefined,
           cantidad,
           fila: rowNum
         });
       });
+
       if (validationErrors.length > 0) {
-        setErrors(validationErrors as string[]);
+        setErrors(validationErrors);
       }
 
       setParsedData(normalizedData);
@@ -152,20 +187,27 @@ const BulkStockUpload: React.FC<BulkStockUploadProps> = ({ sucursales, onClose, 
     setUploading(true);
 
     try {
-      const requestData = {
+      const requestData: BulkUploadData = {
         ...uploadData,
-        items: parsedData
+        items: parsedData.map(item => ({
+          codigoBarras: item.codigoBarras,
+          nombreProducto: item.nombreProducto,
+          cantidad: item.cantidad
+        }))
       };
 
       const response = await authenticatedFetch('/api/admin/stock-config/bulk-load', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify(requestData)
       });
 
       if (response.ok) {
-        const result = await response.json();
-        onSuccess && onSuccess(result);
-        onClose && onClose();
+        const result: BulkResult = await response.json();
+        onSuccess(result);
+        onClose();
       } else {
         const errorData = await response.json();
         setErrors([errorData.error || 'Error al procesar la carga masiva']);
@@ -178,6 +220,22 @@ const BulkStockUpload: React.FC<BulkStockUploadProps> = ({ sucursales, onClose, 
     }
   };
 
+  const resetFile = () => {
+    setFile(null);
+    setParsedData([]);
+    setErrors([]);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const updateUploadData = <K extends keyof BulkUploadData>(
+    key: K, 
+    value: BulkUploadData[K]
+  ) => {
+    setUploadData(prev => ({ ...prev, [key]: value }));
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -186,6 +244,7 @@ const BulkStockUpload: React.FC<BulkStockUploadProps> = ({ sucursales, onClose, 
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600"
+            disabled={uploading}
           >
             <X className="w-6 h-6" />
           </button>
@@ -194,7 +253,7 @@ const BulkStockUpload: React.FC<BulkStockUploadProps> = ({ sucursales, onClose, 
         {/* Instrucciones y template */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
           <div className="flex items-start">
-            <Info className="w-5 h-5 text-blue-600 mr-2 mt-0.5" />
+            <Info className="w-5 h-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0" />
             <div className="flex-1">
               <h3 className="text-sm font-medium text-blue-800 mb-2">Instrucciones para la carga</h3>
               <ul className="text-sm text-blue-700 space-y-1">
@@ -205,7 +264,8 @@ const BulkStockUpload: React.FC<BulkStockUploadProps> = ({ sucursales, onClose, 
               </ul>
               <button
                 onClick={downloadTemplate}
-                className="mt-3 inline-flex items-center px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+                className="mt-3 inline-flex items-center px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition-colors"
+                type="button"
               >
                 <Download className="w-4 h-4 mr-2" />
                 Descargar Template
@@ -220,9 +280,10 @@ const BulkStockUpload: React.FC<BulkStockUploadProps> = ({ sucursales, onClose, 
             <label className="block text-sm font-medium text-gray-700 mb-1">Sucursal *</label>
             <select
               value={uploadData.sucursalId}
-              onChange={(e) => setUploadData({...uploadData, sucursalId: e.target.value})}
-              className="w-full border border-gray-300 rounded-md px-3 py-2"
+              onChange={(e) => updateUploadData('sucursalId', e.target.value)}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white text-gray-900"
               required
+              disabled={uploading}
             >
               <option value="">Seleccionar sucursal</option>
               {sucursales.map(s => (
@@ -235,8 +296,9 @@ const BulkStockUpload: React.FC<BulkStockUploadProps> = ({ sucursales, onClose, 
             <label className="block text-sm font-medium text-gray-700 mb-1">Modo de Carga *</label>
             <select
               value={uploadData.modo}
-              onChange={(e) => setUploadData({...uploadData, modo: e.target.value})}
-              className="w-full border border-gray-300 rounded-md px-3 py-2"
+              onChange={(e) => updateUploadData('modo', e.target.value as BulkUploadData['modo'])}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white text-gray-900"
+              disabled={uploading}
             >
               <option value="incrementar">Incrementar stock existente</option>
               <option value="establecer">Establecer stock exacto</option>
@@ -249,9 +311,10 @@ const BulkStockUpload: React.FC<BulkStockUploadProps> = ({ sucursales, onClose, 
             <input
               type="text"
               value={uploadData.nombre}
-              onChange={(e) => setUploadData({...uploadData, nombre: e.target.value})}
-              className="w-full border border-gray-300 rounded-md px-3 py-2"
+              onChange={(e) => updateUploadData('nombre', e.target.value)}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white text-gray-900"
               placeholder="Ej: Reposición enero 2025"
+              disabled={uploading}
             />
           </div>
         </div>
@@ -266,6 +329,7 @@ const BulkStockUpload: React.FC<BulkStockUploadProps> = ({ sucursales, onClose, 
               onChange={handleFileChange}
               accept=".xlsx,.xls,.csv"
               className="hidden"
+              disabled={uploading}
             />
             
             {!file ? (
@@ -274,7 +338,9 @@ const BulkStockUpload: React.FC<BulkStockUploadProps> = ({ sucursales, onClose, 
                 <p className="text-gray-600 mb-2">Seleccione un archivo Excel o CSV</p>
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                  type="button"
+                  disabled={uploading}
                 >
                   <Upload className="w-4 h-4 mr-2 inline" />
                   Seleccionar Archivo
@@ -288,13 +354,10 @@ const BulkStockUpload: React.FC<BulkStockUploadProps> = ({ sucursales, onClose, 
                   {(file.size / 1024).toFixed(1)} KB
                 </p>
                 <button
-                  onClick={() => {
-                    setFile(null);
-                    setParsedData([]);
-                    setErrors([]);
-                    fileInputRef.current.value = '';
-                  }}
+                  onClick={resetFile}
                   className="mt-2 text-blue-600 hover:text-blue-800 text-sm"
+                  type="button"
+                  disabled={uploading}
                 >
                   Cambiar archivo
                 </button>
@@ -307,10 +370,10 @@ const BulkStockUpload: React.FC<BulkStockUploadProps> = ({ sucursales, onClose, 
         {errors.length > 0 && (
           <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
             <div className="flex items-center mb-2">
-              <AlertTriangle className="w-5 h-5 text-red-600 mr-2" />
+              <AlertTriangle className="w-5 h-5 text-red-600 mr-2 flex-shrink-0" />
               <h3 className="text-sm font-medium text-red-800">Errores encontrados</h3>
             </div>
-            <ul className="text-sm text-red-700 space-y-1">
+            <ul className="text-sm text-red-700 space-y-1 max-h-32 overflow-y-auto">
               {errors.map((error, index) => (
                 <li key={index}>• {error}</li>
               ))}
@@ -361,10 +424,11 @@ const BulkStockUpload: React.FC<BulkStockUploadProps> = ({ sucursales, onClose, 
           <label className="block text-sm font-medium text-gray-700 mb-1">Descripción (opcional)</label>
           <textarea
             value={uploadData.descripcion}
-            onChange={(e) => setUploadData({...uploadData, descripcion: e.target.value})}
-            className="w-full border border-gray-300 rounded-md px-3 py-2"
+            onChange={(e) => updateUploadData('descripcion', e.target.value)}
+            className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white text-gray-900"
             rows={2}
             placeholder="Descripción adicional sobre esta carga..."
+            disabled={uploading}
           />
         </div>
 
@@ -372,8 +436,9 @@ const BulkStockUpload: React.FC<BulkStockUploadProps> = ({ sucursales, onClose, 
         <div className="flex justify-end space-x-3">
           <button
             onClick={onClose}
-            className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+            className="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
             disabled={uploading}
+            type="button"
           >
             Cancelar
           </button>
@@ -381,11 +446,12 @@ const BulkStockUpload: React.FC<BulkStockUploadProps> = ({ sucursales, onClose, 
           <button
             onClick={handleUpload}
             disabled={uploading || !uploadData.sucursalId || parsedData.length === 0 || errors.length > 0}
-            className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center"
+            className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center transition-colors"
+            type="button"
           >
             {uploading ? (
               <>
-                <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2"></div>
+                <Loader className="animate-spin h-4 w-4 mr-2" />
                 Procesando...
               </>
             ) : (
@@ -400,7 +466,7 @@ const BulkStockUpload: React.FC<BulkStockUploadProps> = ({ sucursales, onClose, 
         {/* Estado de procesamiento */}
         {parsing && (
           <div className="mt-4 flex items-center justify-center text-blue-600">
-            <div className="animate-spin rounded-full h-5 w-5 border-2 border-blue-600 border-t-transparent mr-2"></div>
+            <Loader className="animate-spin h-5 w-5 mr-2" />
             Procesando archivo...
           </div>
         )}

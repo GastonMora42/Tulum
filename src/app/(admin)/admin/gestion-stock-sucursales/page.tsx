@@ -1,14 +1,16 @@
-// src/app/(admin)/admin/gestion-stock-sucursales/page.tsx - CORREGIDA
-import React, { useState, useEffect } from 'react';
+// src/app/(admin)/admin/gestion-stock-sucursales/page.tsx
+'use client';
+
+import { useState, useEffect } from 'react';
 import { 
-  TrendingUp, TrendingDown, AlertTriangle, CheckCircle, 
-  Settings, Upload, Download, RefreshCw, Plus, Search,
-  BarChart3, Package, Store, Filter, Eye, Edit, Trash2,
-  FileSpreadsheet, Info, Target, Minus
+  Settings, Plus, Edit, Trash2, Save, X, Filter, Search,
+  AlertTriangle, CheckCircle, Info, Package, Store, Target,
+  TrendingUp, BarChart3, Activity, Loader
 } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
+import { ContrastEnhancer } from '@/components/ui/ContrastEnhancer';
 
-// ✅ INTERFACES CORREGIDAS
+// Interfaces
 interface Sucursal {
   id: string;
   nombre: string;
@@ -21,42 +23,31 @@ interface Producto {
   codigoBarras?: string;
 }
 
-interface DashboardData {
-  estadisticas: {
-    total: number;
-    criticos: number;
-    bajos: number;
-    normales: number;
-    excesos: number;
+interface StockConfig {
+  id: string;
+  productoId: string;
+  sucursalId: string;
+  stockMaximo: number;
+  stockMinimo: number;
+  puntoReposicion: number;
+  activo: boolean;
+  producto: Producto;
+  sucursal: Sucursal;
+  usuario: {
+    name: string;
+    email: string;
   };
-  analisisCompleto: Array<{
-    producto: {
-      id: string;
-      nombre: string;
-      codigoBarras?: string;
-    };
-    sucursal: {
-      id: string;
-      nombre: string;
-      tipo: string;
-    };
-    stockActual: number;
-    configuracion: {
-      stockMaximo: number;
-      stockMinimo: number;
-      puntoReposicion: number;
-    };
-    diferencia: number;
+  createdAt: string;
+  updatedAt: string;
+  stockActual?: {
+    cantidad: number;
     estado: string;
     porcentajeUso: number;
-    acciones: {
-      necesitaReposicion: boolean;
-      cantidadSugerida: number;
-    };
-  }>;
+    necesitaReposicion: boolean;
+  };
 }
 
-interface ConfigData {
+interface ConfigFormData {
   productoId: string;
   sucursalId: string;
   stockMaximo: number;
@@ -64,66 +55,39 @@ interface ConfigData {
   puntoReposicion: number;
 }
 
-interface BulkData {
-  sucursalId: string;
-  nombre: string;
-  descripcion: string;
-  modo: string;
-  items: Array<{
-    nombreProducto: string;
-    cantidad: number;
-  }>;
-}
-
-interface BulkResult {
-  resumen: {
-    itemsProcesados: number;
-    itemsErrores: number;
-  };
-}
-
-const StockDashboard: React.FC = () => {
+export default function GestionStockSucursalesPage() {
   const [loading, setLoading] = useState(true);
-  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [configs, setConfigs] = useState<StockConfig[]>([]);
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
   const [productos, setProductos] = useState<Producto[]>([]);
+  
+  // Estados de filtrado
   const [selectedSucursal, setSelectedSucursal] = useState('');
-  const [view, setView] = useState('dashboard');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('todos');
-
-  // Estados para configuración
-  const [configModal, setConfigModal] = useState(false);
-  const [configData, setConfigData] = useState<ConfigData>({
+  
+  // Estados del modal
+  const [showModal, setShowModal] = useState(false);
+  const [editingConfig, setEditingConfig] = useState<StockConfig | null>(null);
+  const [formData, setFormData] = useState<ConfigFormData>({
     productoId: '',
     sucursalId: '',
     stockMaximo: 0,
     stockMinimo: 0,
     puntoReposicion: 0
   });
-
-  // Estados para carga masiva
-  const [bulkModal, setBulkModal] = useState(false);
-  const [bulkData, setBulkData] = useState<BulkData>({
-    sucursalId: '',
-    nombre: '',
-    descripcion: '',
-    modo: 'incrementar',
-    items: []
-  });
+  
+  // Estados de UI
+  const [notification, setNotification] = useState<any>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     loadInitialData();
   }, []);
 
-  useEffect(() => {
-    if (view === 'dashboard') {
-      loadDashboardData();
-    }
-  }, [selectedSucursal, view]);
-
   const loadInitialData = async () => {
     try {
+      setLoading(true);
       const [sucursalesRes, productosRes] = await Promise.all([
         authenticatedFetch('/api/admin/ubicaciones'),
         authenticatedFetch('/api/productos?limit=1000')
@@ -135,600 +99,491 @@ const StockDashboard: React.FC = () => {
         
         setSucursales(sucursalesData.filter((s: Sucursal) => s.tipo === 'sucursal'));
         setProductos(productosData.data || productosData);
+        
+        await loadConfigs();
       }
     } catch (error) {
       console.error('Error cargando datos:', error);
-    }
-  };
-
-  const loadDashboardData = async () => {
-    try {
-      setLoading(true);
-      const params = new URLSearchParams();
-      if (selectedSucursal) params.append('sucursalId', selectedSucursal);
-
-      const response = await authenticatedFetch(`/api/admin/stock-config/dashboard?${params}`);
-      if (response.ok) {
-        const data = await response.json();
-        setDashboardData(data);
-      }
-    } catch (error) {
-      console.error('Error cargando dashboard:', error);
+      showNotification('error', 'Error al cargar datos iniciales');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleConfigSave = async () => {
+  const loadConfigs = async (includeStats = true) => {
     try {
+      const params = new URLSearchParams();
+      if (selectedSucursal) params.append('sucursalId', selectedSucursal);
+      if (includeStats) params.append('includeStats', 'true');
+
+      const response = await authenticatedFetch(`/api/admin/stock-config?${params}`);
+      if (response.ok) {
+        const data = await response.json();
+        setConfigs(data);
+      }
+    } catch (error) {
+      console.error('Error cargando configuraciones:', error);
+      showNotification('error', 'Error al cargar configuraciones');
+    }
+  };
+
+  const showNotification = (type: 'success' | 'error' | 'info', message: string, details?: string) => {
+    setNotification({ type, message, details });
+    setTimeout(() => setNotification(null), 5000);
+  };
+
+  const openModal = (config?: StockConfig) => {
+    if (config) {
+      setEditingConfig(config);
+      setFormData({
+        productoId: config.productoId,
+        sucursalId: config.sucursalId,
+        stockMaximo: config.stockMaximo,
+        stockMinimo: config.stockMinimo,
+        puntoReposicion: config.puntoReposicion
+      });
+    } else {
+      setEditingConfig(null);
+      setFormData({
+        productoId: '',
+        sucursalId: selectedSucursal || '',
+        stockMaximo: 0,
+        stockMinimo: 0,
+        puntoReposicion: 0
+      });
+    }
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setEditingConfig(null);
+    setFormData({
+      productoId: '',
+      sucursalId: '',
+      stockMaximo: 0,
+      stockMinimo: 0,
+      puntoReposicion: 0
+    });
+  };
+
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      
+      // Validaciones
+      if (!formData.productoId || !formData.sucursalId) {
+        showNotification('error', 'Debe seleccionar producto y sucursal');
+        return;
+      }
+
+      if (formData.stockMinimo > formData.stockMaximo) {
+        showNotification('error', 'El stock mínimo no puede ser mayor al máximo');
+        return;
+      }
+
+      if (formData.puntoReposicion > formData.stockMaximo) {
+        showNotification('error', 'El punto de reposición no puede ser mayor al stock máximo');
+        return;
+      }
+
       const response = await authenticatedFetch('/api/admin/stock-config', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(configData)
+        body: JSON.stringify(formData)
       });
 
       if (response.ok) {
-        setConfigModal(false);
-        setConfigData({
-          productoId: '',
-          sucursalId: '',
-          stockMaximo: 0,
-          stockMinimo: 0,
-          puntoReposicion: 0
-        });
-        loadDashboardData();
+        showNotification('success', 
+          editingConfig ? 'Configuración actualizada exitosamente' : 'Configuración creada exitosamente'
+        );
+        closeModal();
+        await loadConfigs();
+      } else {
+        const errorData = await response.json();
+        showNotification('error', errorData.error || 'Error al guardar configuración');
       }
     } catch (error) {
       console.error('Error guardando configuración:', error);
+      showNotification('error', 'Error al guardar la configuración');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleBulkLoad = async () => {
+  const handleDelete = async (config: StockConfig) => {
+    if (!confirm(`¿Está seguro de eliminar la configuración de "${config.producto.nombre}" para "${config.sucursal.nombre}"?`)) {
+      return;
+    }
+
     try {
-      const response = await authenticatedFetch('/api/admin/stock-config/bulk-load', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(bulkData)
+      const response = await authenticatedFetch(`/api/admin/stock-config/${config.id}`, {
+        method: 'DELETE'
       });
 
       if (response.ok) {
-        const result: BulkResult = await response.json();
-        setBulkModal(false);
-        setBulkData({
-          sucursalId: '',
-          nombre: '',
-          descripcion: '',
-          modo: 'incrementar',
-          items: []
-        });
-        alert(`Carga completada: ${result.resumen.itemsProcesados} procesados, ${result.resumen.itemsErrores} errores`);
-        loadDashboardData();
+        showNotification('success', 'Configuración eliminada exitosamente');
+        await loadConfigs();
+      } else {
+        showNotification('error', 'Error al eliminar configuración');
       }
     } catch (error) {
-      console.error('Error en carga masiva:', error);
+      console.error('Error eliminando configuración:', error);
+      showNotification('error', 'Error al eliminar la configuración');
     }
   };
 
-  const getStatusColor = (estado: string) => {
+  // Filtrar configuraciones
+  const filteredConfigs = configs.filter(config => {
+    if (selectedSucursal && config.sucursalId !== selectedSucursal) return false;
+    if (searchTerm && !config.producto.nombre.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+    if (statusFilter !== 'todos' && config.stockActual?.estado !== statusFilter) return false;
+    return true;
+  });
+
+  const getStatusColor = (estado?: string) => {
     switch (estado) {
-      case 'critico': return 'text-red-600 bg-red-100';
-      case 'bajo': return 'text-orange-600 bg-orange-100';
-      case 'exceso': return 'text-purple-600 bg-purple-100';
-      default: return 'text-green-600 bg-green-100';
+      case 'critico': return 'text-red-600 bg-red-100 border-red-200';
+      case 'bajo': return 'text-orange-600 bg-orange-100 border-orange-200';
+      case 'exceso': return 'text-purple-600 bg-purple-100 border-purple-200';
+      default: return 'text-green-600 bg-green-100 border-green-200';
     }
   };
 
-  const getStatusIcon = (estado: string) => {
+  const getStatusIcon = (estado?: string) => {
     switch (estado) {
       case 'critico': return <AlertTriangle className="w-4 h-4" />;
-      case 'bajo': return <TrendingDown className="w-4 h-4" />;
-      case 'exceso': return <TrendingUp className="w-4 h-4" />;
+      case 'bajo': return <TrendingUp className="w-4 h-4" />;
+      case 'exceso': return <Package className="w-4 h-4" />;
       default: return <CheckCircle className="w-4 h-4" />;
     }
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
+      <ContrastEnhancer>
+        <div className="flex items-center justify-center h-64">
+          <Loader className="h-12 w-12 animate-spin text-blue-600" />
+          <span className="ml-3 text-lg">Cargando configuraciones...</span>
+        </div>
+      </ContrastEnhancer>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Gestión de Stock por Sucursales</h1>
-          <p className="text-gray-600">Configuración de stocks máximos y gestión por ubicación</p>
-        </div>
-        
-        <div className="flex gap-3">
-          <button
-            onClick={() => setView('dashboard')}
-            className={`px-4 py-2 rounded-lg ${view === 'dashboard' ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}
-          >
-            <BarChart3 className="w-4 h-4 mr-2 inline" />
-            Dashboard
-          </button>
-          <button
-            onClick={() => setConfigModal(true)}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-          >
-            <Settings className="w-4 h-4 mr-2 inline" />
-            Configurar Stock
-          </button>
-          <button
-            onClick={() => setBulkModal(true)}
-            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-          >
-            <Upload className="w-4 h-4 mr-2 inline" />
-            Carga Masiva
-          </button>
-        </div>
-      </div>
-
-      {/* Filtros */}
-      <div className="bg-white p-4 rounded-lg shadow-sm border">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <ContrastEnhancer>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex flex-col lg:flex-row lg:justify-between lg:items-center space-y-4 lg:space-y-0">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Sucursal</label>
-            <select
-              value={selectedSucursal}
-              onChange={(e) => setSelectedSucursal(e.target.value)}
-              className="w-full border border-gray-300 rounded-md px-3 py-2"
-            >
-              <option value="">Todas las sucursales</option>
-              {sucursales.map(s => (
-                <option key={s.id} value={s.id}>{s.nombre}</option>
-              ))}
-            </select>
+            <h1 className="text-3xl font-bold text-black">Gestión de Configuraciones de Stock</h1>
+            <p className="text-black/80 mt-1">Administrar límites de stock por producto y sucursal</p>
           </div>
           
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full border border-gray-300 rounded-md px-3 py-2"
-            >
-              <option value="todos">Todos los estados</option>
-              <option value="critico">Críticos</option>
-              <option value="bajo">Bajos</option>
-              <option value="normal">Normales</option>
-              <option value="exceso">Con exceso</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Buscar productos..."
-                className="w-full pl-10 border border-gray-300 rounded-md px-3 py-2"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-end">
-            <button
-              onClick={loadDashboardData}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-            >
-              <RefreshCw className="w-4 h-4 mr-2 inline" />
-              Actualizar
-            </button>
-          </div>
+          <button
+            onClick={() => openModal()}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Nueva Configuración
+          </button>
         </div>
-      </div>
 
-      {/* Estadísticas */}
-      {dashboardData && (
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-          <div className="bg-white p-6 rounded-lg shadow-sm border">
-            <div className="flex items-center justify-between">
+        {/* Notificaciones */}
+        {notification && (
+          <div className={`p-4 rounded-lg border ${
+            notification.type === 'success' ? 'bg-green-50 border-green-200 text-green-800' :
+            notification.type === 'error' ? 'bg-red-50 border-red-200 text-red-800' :
+            'bg-blue-50 border-blue-200 text-blue-800'
+          }`}>
+            <div className="flex items-center">
+              {notification.type === 'success' ? <CheckCircle className="w-5 h-5 mr-2" /> :
+               notification.type === 'error' ? <AlertTriangle className="w-5 h-5 mr-2" /> :
+               <Info className="w-5 h-5 mr-2" />}
               <div>
-                <p className="text-sm text-gray-600">Total Configurados</p>
-                <p className="text-2xl font-bold text-gray-900">{dashboardData.estadisticas.total}</p>
+                <p className="font-medium">{notification.message}</p>
+                {notification.details && <p className="text-sm mt-1">{notification.details}</p>}
               </div>
-              <Package className="w-8 h-8 text-blue-600" />
+              <button onClick={() => setNotification(null)} className="ml-auto">
+                <X className="w-4 h-4" />
+              </button>
             </div>
           </div>
+        )}
 
-          <div className="bg-white p-6 rounded-lg shadow-sm border">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-red-600">Críticos</p>
-                <p className="text-2xl font-bold text-red-600">{dashboardData.estadisticas.criticos}</p>
-              </div>
-              <AlertTriangle className="w-8 h-8 text-red-600" />
+        {/* Filtros */}
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-black mb-1">Sucursal</label>
+              <select
+                value={selectedSucursal}
+                onChange={(e) => {
+                  setSelectedSucursal(e.target.value);
+                  loadConfigs();
+                }}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white text-black"
+              >
+                <option value="">Todas las sucursales</option>
+                {sucursales.map(s => (
+                  <option key={s.id} value={s.id}>{s.nombre}</option>
+                ))}
+              </select>
             </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-lg shadow-sm border">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-orange-600">Bajos</p>
-                <p className="text-2xl font-bold text-orange-600">{dashboardData.estadisticas.bajos}</p>
-              </div>
-              <TrendingDown className="w-8 h-8 text-orange-600" />
+            
+            <div>
+              <label className="block text-sm font-medium text-black mb-1">Estado</label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white text-black"
+              >
+                <option value="todos">Todos los estados</option>
+                <option value="critico">Críticos</option>
+                <option value="bajo">Bajos</option>
+                <option value="normal">Normales</option>
+                <option value="exceso">Con exceso</option>
+              </select>
             </div>
-          </div>
 
-          <div className="bg-white p-6 rounded-lg shadow-sm border">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-green-600">Normales</p>
-                <p className="text-2xl font-bold text-green-600">{dashboardData.estadisticas.normales}</p>
+            <div>
+              <label className="block text-sm font-medium text-black mb-1">Buscar</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Buscar productos..."
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md bg-white text-black"
+                />
               </div>
-              <CheckCircle className="w-8 h-8 text-green-600" />
             </div>
-          </div>
 
-          <div className="bg-white p-6 rounded-lg shadow-sm border">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-purple-600">Con Exceso</p>
-                <p className="text-2xl font-bold text-purple-600">{dashboardData.estadisticas.excesos}</p>
+            <div className="flex items-end">
+              <div className="text-sm text-gray-600">
+                <p className="font-medium">{filteredConfigs.length} configuraciones</p>
+                <p>{configs.filter(c => c.stockActual?.estado === 'critico').length} críticas</p>
               </div>
-              <TrendingUp className="w-8 h-8 text-purple-600" />
             </div>
           </div>
         </div>
-      )}
 
-      {/* Tabla de análisis de stock */}
-      {dashboardData && (
-        <div className="bg-white rounded-lg shadow-sm border">
+        {/* Tabla de configuraciones */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
           <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-medium text-gray-900">Análisis Detallado de Stock</h3>
+            <h3 className="text-lg font-medium text-black">
+              Configuraciones de Stock ({filteredConfigs.length})
+            </h3>
           </div>
           
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sucursal</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock Actual</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock Máximo</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Diferencia</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">% Uso</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                    Producto
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                    Sucursal
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                    Stock Actual
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                    Límites
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                    Estado
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                    Acciones
+                  </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
-                {dashboardData.analisisCompleto
-                  .filter(item => {
-                    if (statusFilter !== 'todos' && item.estado !== statusFilter) return false;
-                    if (searchTerm && !item.producto.nombre.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-                    return true;
-                  })
-                  .slice(0, 50)
-                  .map((item, index) => (
-                    <tr key={index} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredConfigs.map((config) => (
+                  <tr key={config.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div>
+                        <div className="font-medium text-black">{config.producto.nombre}</div>
+                        {config.producto.codigoBarras && (
+                          <div className="text-sm text-black/60">{config.producto.codigoBarras}</div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <Store className="w-4 h-4 mr-2 text-black/60" />
+                        <span className="text-sm text-black">{config.sucursal.nombre}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {config.stockActual ? (
                         <div>
-                          <div className="font-medium text-gray-900">{item.producto.nombre}</div>
-                          {item.producto.codigoBarras && (
-                            <div className="text-sm text-gray-500">{item.producto.codigoBarras}</div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <Store className="w-4 h-4 mr-2 text-gray-400" />
-                          <span className="text-sm text-gray-900">{item.sucursal.nombre}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-lg font-bold text-gray-900">{item.stockActual}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-sm text-gray-600">{item.configuracion.stockMaximo}</span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          {item.diferencia > 0 ? (
-                            <Minus className="w-4 h-4 text-red-500 mr-1" />
-                          ) : (
-                            <Plus className="w-4 h-4 text-green-500 mr-1" />
-                          )}
-                          <span className={`font-medium ${item.diferencia > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                            {Math.abs(item.diferencia)}
+                          <span className="text-lg font-bold text-black">
+                            {config.stockActual.cantidad}
                           </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(item.estado)}`}>
-                          {getStatusIcon(item.estado)}
-                          <span className="ml-1">{item.estado}</span>
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
+                          <div className="w-16 bg-gray-200 rounded-full h-2 mt-1">
                             <div 
                               className={`h-2 rounded-full ${
-                                item.porcentajeUso <= 30 ? 'bg-red-500' :
-                                item.porcentajeUso <= 70 ? 'bg-yellow-500' :
-                                item.porcentajeUso <= 100 ? 'bg-green-500' : 'bg-purple-500'
+                                config.stockActual.porcentajeUso <= 30 ? 'bg-red-500' :
+                                config.stockActual.porcentajeUso <= 70 ? 'bg-yellow-500' :
+                                config.stockActual.porcentajeUso <= 100 ? 'bg-green-500' : 'bg-purple-500'
                               }`}
-                              style={{ width: `${Math.min(100, item.porcentajeUso)}%` }}
+                              style={{ width: `${Math.min(100, config.stockActual.porcentajeUso)}%` }}
                             ></div>
                           </div>
-                          <span className="text-sm text-gray-600">{item.porcentajeUso}%</span>
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex space-x-2">
-                          {item.acciones.necesitaReposicion && (
-                            <button
-                              className="text-orange-600 hover:text-orange-800"
-                              title={`Reponer ${item.acciones.cantidadSugerida} unidades`}
-                            >
-                              <Target className="w-4 h-4" />
-                            </button>
-                          )}
-                          <button
-                            onClick={() => {
-                              setConfigData({
-                                productoId: item.producto.id,
-                                sucursalId: item.sucursal.id,
-                                stockMaximo: item.configuracion.stockMaximo,
-                                stockMinimo: item.configuracion.stockMinimo,
-                                puntoReposicion: item.configuracion.puntoReposicion
-                              });
-                              setConfigModal(true);
-                            }}
-                            className="text-blue-600 hover:text-blue-800"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <div className="space-y-1">
+                        <div>Máx: <span className="font-medium">{config.stockMaximo}</span></div>
+                        <div>Mín: <span className="font-medium">{config.stockMinimo}</span></div>
+                        <div>Repo: <span className="font-medium">{config.puntoReposicion}</span></div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {config.stockActual ? (
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(config.stockActual.estado)}`}>
+                          {getStatusIcon(config.stockActual.estado)}
+                          <span className="ml-1 capitalize">{config.stockActual.estado}</span>
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => openModal(config)}
+                          className="text-blue-600 hover:text-blue-900"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(config)}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
         </div>
-      )}
 
-      {/* Modal de Configuración */}
-      {configModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-medium mb-4">Configurar Stock</h3>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Producto</label>
-                <select
-                  value={configData.productoId}
-                  onChange={(e) => setConfigData({...configData, productoId: e.target.value})}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2"
-                  disabled={!!configData.productoId}
-                >
-                  <option value="">Seleccionar producto</option>
-                  {productos.map(p => (
-                    <option key={p.id} value={p.id}>{p.nombre}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Sucursal</label>
-                <select
-                  value={configData.sucursalId}
-                  onChange={(e) => setConfigData({...configData, sucursalId: e.target.value})}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2"
-                  disabled={!!configData.sucursalId}
-                >
-                  <option value="">Seleccionar sucursal</option>
-                  {sucursales.map(s => (
-                    <option key={s.id} value={s.id}>{s.nombre}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Stock Máximo</label>
-                <input
-                  type="number"
-                  value={configData.stockMaximo}
-                  onChange={(e) => setConfigData({...configData, stockMaximo: parseFloat(e.target.value) || 0})}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2"
-                  min="0"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Stock Mínimo</label>
-                <input
-                  type="number"
-                  value={configData.stockMinimo}
-                  onChange={(e) => setConfigData({...configData, stockMinimo: parseFloat(e.target.value) || 0})}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2"
-                  min="0"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Punto de Reposición</label>
-                <input
-                  type="number"
-                  value={configData.puntoReposicion}
-                  onChange={(e) => setConfigData({...configData, puntoReposicion: parseFloat(e.target.value) || 0})}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2"
-                  min="0"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end space-x-3 mt-6">
-              <button
-                onClick={() => setConfigModal(false)}
-                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleConfigSave}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-                disabled={!configData.productoId || !configData.sucursalId}
-              >
-                Guardar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de Carga Masiva */}
-      {bulkModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-medium mb-4">Carga Masiva de Stock</h3>
-            
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+        {/* Modal */}
+        {showModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+              <h3 className="text-lg font-medium mb-4 text-black">
+                {editingConfig ? 'Editar Configuración' : 'Nueva Configuración'}
+              </h3>
+              
+              <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Sucursal</label>
+                  <label className="block text-sm font-medium text-black mb-1">Producto</label>
                   <select
-                    value={bulkData.sucursalId}
-                    onChange={(e) => setBulkData({...bulkData, sucursalId: e.target.value})}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2"
+                    value={formData.productoId}
+                    onChange={(e) => setFormData({...formData, productoId: e.target.value})}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white text-black"
+                    disabled={!!editingConfig}
+                  >
+                    <option value="">Seleccionar producto</option>
+                    {productos.map((p) => (
+                      <option key={p.id} value={p.id}>{p.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-black mb-1">Sucursal</label>
+                  <select
+                    value={formData.sucursalId}
+                    onChange={(e) => setFormData({...formData, sucursalId: e.target.value})}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white text-black"
+                    disabled={!!editingConfig}
                   >
                     <option value="">Seleccionar sucursal</option>
-                    {sucursales.map(s => (
+                    {sucursales.map((s) => (
                       <option key={s.id} value={s.id}>{s.nombre}</option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Modo de Carga</label>
-                  <select
-                    value={bulkData.modo}
-                    onChange={(e) => setBulkData({...bulkData, modo: e.target.value})}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2"
-                  >
-                    <option value="incrementar">Incrementar stock existente</option>
-                    <option value="establecer">Establecer stock exacto</option>
-                    <option value="decrementar">Decrementar stock</option>
-                  </select>
+                  <label className="block text-sm font-medium text-black mb-1">Stock Máximo</label>
+                  <input
+                    type="number"
+                    value={formData.stockMaximo}
+                    onChange={(e) => setFormData({...formData, stockMaximo: parseFloat(e.target.value) || 0})}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white text-black"
+                    min="0"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-black mb-1">Stock Mínimo</label>
+                  <input
+                    type="number"
+                    value={formData.stockMinimo}
+                    onChange={(e) => setFormData({...formData, stockMinimo: parseFloat(e.target.value) || 0})}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white text-black"
+                    min="0"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-black mb-1">Punto de Reposición</label>
+                  <input
+                    type="number"
+                    value={formData.puntoReposicion}
+                    onChange={(e) => setFormData({...formData, puntoReposicion: parseFloat(e.target.value) || 0})}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white text-black"
+                    min="0"
+                  />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre de la carga</label>
-                <input
-                  type="text"
-                  value={bulkData.nombre}
-                  onChange={(e) => setBulkData({...bulkData, nombre: e.target.value})}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2"
-                  placeholder="Ej: Reposición mensual enero 2025"
-                />
+              <div className="flex justify-end space-x-3 mt-6">
+                <button
+                  onClick={closeModal}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-black hover:bg-gray-50"
+                  disabled={saving}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSave}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center"
+                  disabled={saving || !formData.productoId || !formData.sucursalId}
+                >
+                  {saving ? (
+                    <>
+                      <Loader className="w-4 h-4 mr-2 animate-spin" />
+                      Guardando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      Guardar
+                    </>
+                  )}
+                </button>
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
-                <textarea
-                  value={bulkData.descripcion}
-                  onChange={(e) => setBulkData({...bulkData, descripcion: e.target.value})}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2"
-                  rows={2}
-                  placeholder="Descripción opcional de la carga..."
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Items a cargar</label>
-                <div className="border border-gray-300 rounded-md p-3 space-y-2 max-h-40 overflow-y-auto">
-                  {bulkData.items.map((item, index) => (
-                    <div key={index} className="flex items-center space-x-2 bg-gray-50 p-2 rounded">
-                      <input
-                        type="text"
-                        value={item.nombreProducto || ''}
-                        onChange={(e) => {
-                          const newItems = [...bulkData.items];
-                          newItems[index] = {...newItems[index], nombreProducto: e.target.value};
-                          setBulkData({...bulkData, items: newItems});
-                        }}
-                        placeholder="Nombre del producto"
-                        className="flex-1 border border-gray-300 rounded px-2 py-1 text-sm"
-                      />
-                      <input
-                        type="number"
-                        value={item.cantidad || ''}
-                        onChange={(e) => {
-                          const newItems = [...bulkData.items];
-                          newItems[index] = {...newItems[index], cantidad: parseFloat(e.target.value) || 0};
-                          setBulkData({...bulkData, items: newItems});
-                        }}
-                        placeholder="Cantidad"
-                        className="w-20 border border-gray-300 rounded px-2 py-1 text-sm"
-                        min="0"
-                      />
-                      <button
-                        onClick={() => {
-                          const newItems = bulkData.items.filter((_, i) => i !== index);
-                          setBulkData({...bulkData, items: newItems});
-                        }}
-                        className="text-red-600 hover:text-red-800"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                  
-                  <button
-                    onClick={() => {
-                      setBulkData({
-                        ...bulkData, 
-                        items: [...bulkData.items, { nombreProducto: '', cantidad: 0 }]
-                      });
-                    }}
-                    className="w-full border-2 border-dashed border-gray-300 rounded p-2 text-gray-500 hover:border-gray-400 hover:text-gray-600"
-                  >
-                    <Plus className="w-4 h-4 mr-2 inline" />
-                    Agregar item
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-end space-x-3 mt-6">
-              <button
-                onClick={() => setBulkModal(false)}
-                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleBulkLoad}
-                className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
-                disabled={!bulkData.sucursalId || bulkData.items.length === 0}
-              >
-                Cargar Stock
-              </button>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </ContrastEnhancer>
   );
-};
-
-export default StockDashboard;
+}

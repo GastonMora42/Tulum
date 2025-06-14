@@ -1,4 +1,4 @@
-// src/components/pdv/AperturaModalMejorado.tsx - VERSIÓN ACTUALIZADA CON MONTO FIJO
+// src/components/pdv/AperturaModal.tsx - VERSIÓN MEJORADA CON CONSISTENCIA
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -8,7 +8,7 @@ import {
   Shield, Settings
 } from 'lucide-react';
 
-interface AperturaModalMejoradoProps {
+interface AperturaModalProps {
   isOpen: boolean;
   onClose: () => void;
   onComplete: (data: { montoInicial: number; aplicarRecupero: boolean; observaciones?: string }) => Promise<void>;
@@ -22,7 +22,7 @@ interface AperturaModalMejoradoProps {
   } | null;
 }
 
-export function AperturaModal({ isOpen, onClose, onComplete, aperturaInfo }: AperturaModalMejoradoProps) {
+export function AperturaModal({ isOpen, onClose, onComplete, aperturaInfo }: AperturaModalProps) {
   const [montoInicial, setMontoInicial] = useState<string>('');
   const [aplicarRecupero, setAplicarRecupero] = useState(false);
   const [observaciones, setObservaciones] = useState<string>('');
@@ -56,15 +56,15 @@ export function AperturaModal({ isOpen, onClose, onComplete, aperturaInfo }: Ape
       errors.push('El monto es excesivamente alto');
     }
 
-    // 🆕 VALIDACIONES ESPECÍFICAS SEGÚN MONTO FIJO
+    // Validaciones específicas según monto fijo
     if (aperturaInfo) {
       const montoFijo = aperturaInfo.montoFijo;
       
       // Si el monto es menor al monto fijo, verificar que sea una situación válida
       if (monto < montoFijo) {
-        // Solo es válido si viene de un turno anterior con recupero pendiente
-        if (!aperturaInfo.requiereRecupero && !aperturaInfo.alertaMontoInsuficiente) {
-          errors.push(`El monto inicial debería ser al menos ${montoFijo.toFixed(2)} (monto fijo configurado). Si es intencional, agregue observaciones explicando el motivo.`);
+        // Solo es válido si viene de un turno anterior con recupero pendiente o se justifica
+        if (!aperturaInfo.requiereRecupero && !aperturaInfo.alertaMontoInsuficiente && !observaciones.trim()) {
+          errors.push(`El monto inicial debería ser al menos $${montoFijo.toFixed(2)} (monto fijo configurado). Si es intencional, agregue observaciones explicando el motivo.`);
         }
       }
     }
@@ -87,10 +87,17 @@ export function AperturaModal({ isOpen, onClose, onComplete, aperturaInfo }: Ape
     
     const monto = parseFloat(montoInicial);
     
-    // 🆕 CONFIRMACIÓN ESPECIAL SI ABRE CON MENOS DEL MONTO FIJO
+    // Confirmación especial si abre con menos del monto fijo
     if (aperturaInfo && monto < aperturaInfo.montoFijo && !aperturaInfo.requiereRecupero) {
       const confirmacion = confirm(
-        `Está abriendo con ${monto.toFixed(2)}, que es menor al monto fijo de ${aperturaInfo.montoFijo.toFixed(2)}. Si hay ventas en efectivo durante el turno, se habilitará la función de recupero de fondo. ¿Desea continuar?`
+        `Está abriendo con $${monto.toFixed(2)}, que es menor al monto fijo de $${aperturaInfo.montoFijo.toFixed(2)}. 
+
+Durante el turno:
+• Si hay ventas en efectivo, se habilitará recupero de fondo
+• Al cierre, el efectivo para sobre será: Efectivo contado - Egresos - Recupero - $${aperturaInfo.montoFijo.toFixed(2)} (monto fijo)
+• El próximo turno tendrá $${aperturaInfo.montoFijo.toFixed(2)} disponibles
+
+¿Desea continuar?`
       );
       if (!confirmacion) return;
     }
@@ -203,7 +210,7 @@ export function AperturaModal({ isOpen, onClose, onComplete, aperturaInfo }: Ape
 
           <form onSubmit={handleSubmit} className="p-8">
             
-            {/* 🆕 MOSTRAR INFORMACIÓN DEL MONTO FIJO */}
+            {/* MOSTRAR INFORMACIÓN DEL MONTO FIJO */}
             {aperturaInfo && (
               <div className="mb-6 bg-blue-50 border border-blue-200 rounded-xl p-4">
                 <div className="flex items-center mb-3">
@@ -214,6 +221,7 @@ export function AperturaModal({ isOpen, onClose, onComplete, aperturaInfo }: Ape
                   <div className="bg-white rounded-lg p-3">
                     <p className="text-gray-600 mb-1">Monto Fijo Configurado:</p>
                     <p className="text-xl font-bold text-blue-700">${aperturaInfo.montoFijo.toFixed(2)}</p>
+                    <p className="text-xs text-blue-600 mt-1">Se reserva para el próximo turno</p>
                   </div>
                   <div className="bg-white rounded-lg p-3">
                     <p className="text-gray-600 mb-1">Monto Sugerido:</p>
@@ -249,7 +257,7 @@ export function AperturaModal({ isOpen, onClose, onComplete, aperturaInfo }: Ape
               </div>
             )}
             
-            {/* 🆕 INFORMACIÓN DE RECUPERO MEJORADA */}
+            {/* INFORMACIÓN DE RECUPERO MEJORADA */}
             {aperturaInfo?.alertaMontoInsuficiente && (
               <div className="mb-8 bg-yellow-50 border border-yellow-200 rounded-2xl p-6">
                 <div className="flex items-center mb-4">
@@ -407,7 +415,7 @@ export function AperturaModal({ isOpen, onClose, onComplete, aperturaInfo }: Ape
               )}
             </div>
 
-            {/* Resumen */}
+            {/* Resumen mejorado */}
             <div className="mb-8 bg-gray-50 rounded-2xl p-6">
               <h4 className="font-semibold text-gray-900 mb-4 flex items-center">
                 <Coins className="w-5 h-5 mr-2" />
@@ -450,6 +458,19 @@ export function AperturaModal({ isOpen, onClose, onComplete, aperturaInfo }: Ape
                     </p>
                   )}
                 </div>
+
+                {/* 🆕 NUEVA INFORMACIÓN SOBRE CIERRE */}
+                {aperturaInfo && parseFloat(montoInicial || '0') < aperturaInfo.montoFijo && (
+                  <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
+                    <p className="text-sm text-blue-800 font-medium mb-2">💡 Información importante:</p>
+                    <p className="text-xs text-blue-700">
+                      Al cierre, el cálculo será: <strong>Efectivo contado - Egresos - Recupero - ${aperturaInfo.montoFijo.toFixed(2)} (monto fijo) = Efectivo para sobre</strong>
+                    </p>
+                    <p className="text-xs text-blue-700 mt-1">
+                      El próximo turno tendrá ${aperturaInfo.montoFijo.toFixed(2)} disponibles para apertura.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
 

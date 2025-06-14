@@ -1,4 +1,4 @@
-// src/app/(admin)/layout.tsx - VERSIÓN ACTUALIZADA CON IMPRESORAS
+// src/app/(admin)/layout.tsx - VERSIÓN ACTUALIZADA CON STOCK SUCURSALES
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -30,7 +30,9 @@ import {
   TrendingUp,
   CheckSquare,
   Printer,
-  PiggyBank
+  PiggyBank,
+  Target,
+  BarChart3
 } from 'lucide-react';
 
 export default function AdminLayout({
@@ -54,7 +56,6 @@ export default function AdminLayout({
         setIsLoading(true);
         setAuthError(null);
         
-        // Verificar si hay tokens en localStorage
         const accessToken = localStorage.getItem('accessToken');
         const userEmail = localStorage.getItem('userEmail');
         
@@ -65,11 +66,9 @@ export default function AdminLayout({
           return;
         }
 
-        // Si ya tenemos usuario en el store y parece válido, no hacer la llamada
         if (user && user.email && user.roleId) {
           console.log('Usuario ya cargado en store:', user.email);
           
-          // Verificar que sea admin
           if (user.roleId !== 'role-admin') {
             console.log('Usuario no es admin, redirigiendo...');
             router.push('/unauthorized');
@@ -81,11 +80,9 @@ export default function AdminLayout({
         }
 
         try {
-          // Intentar obtener información del usuario del servidor
           const response = await authenticatedFetch('/api/auth/me');
           
           if (!response.ok) {
-            // Si falla, intentar crear usuario desde token local
             if (accessToken && userEmail) {
               console.log('Creando usuario desde token local...');
               
@@ -111,7 +108,6 @@ export default function AdminLayout({
                   
                   setUser(localUser);
                   
-                  // Verificar que sea admin
                   if (localUser.roleId !== 'role-admin') {
                     router.push('/unauthorized');
                     return;
@@ -134,7 +130,6 @@ export default function AdminLayout({
             setUser(data.user);
             console.log('Usuario cargado desde servidor:', data.user.email);
             
-            // Verificar que sea admin
             if (data.user.roleId !== 'role-admin') {
               console.log('Usuario no es admin, redirigiendo...');
               router.push('/unauthorized');
@@ -169,7 +164,6 @@ export default function AdminLayout({
 
     checkAuth();
     
-    // Verificar si es móvil
     const checkMobile = () => {
       setIsMobile(window.innerWidth < 1024);
       if (window.innerWidth < 1024) {
@@ -216,8 +210,17 @@ export default function AdminLayout({
       icon: <Archive className="w-5 h-5" />,
       submenu: [
         { href: '/admin/insumos', label: 'Insumos' },
-        { href: '/admin/stock', label: 'Stock' },
+        { href: '/admin/stock', label: 'Stock General' },
         { href: '/admin/recetas', label: 'Recetas' }
+      ]
+    },
+    // 🆕 NUEVA SECCIÓN: GESTIÓN DE STOCK POR SUCURSALES
+    { 
+      label: 'Stock Sucursales', 
+      icon: <Target className="w-5 h-5" />,
+      submenu: [
+        { href: '/admin/stock-sucursales', label: 'Dashboard Stock' },
+        { href: '/admin/gestion-stock-sucursales', label: 'Configuración Stock' }
       ]
     },
     { 
@@ -244,7 +247,6 @@ export default function AdminLayout({
     { href: '/admin/conciliaciones', label: 'Conciliaciones', icon: <CheckSquare className="w-5 h-5" /> },
     { href: '/admin/punto-equilibrio', label: 'Punto de Equilibrio', icon: <TrendingUp className="w-5 h-5" /> },
     { href: '/admin/facturas', label: 'Facturas', icon: <FileText className="h-5 w-5" /> },
-    // 🆕 NUEVA ENTRADA PARA IMPRESORAS
     { href: '/admin/printer', label: 'Impresoras', icon: <Printer className="w-5 h-5" /> },
     { href: '/admin/descuentos', label: 'Códigos de Descuento', icon: <Tag className="w-5 h-5" /> },
     { href: '/admin/reportes', label: 'Reportes', icon: <BarChart2 className="w-5 h-5" /> },
