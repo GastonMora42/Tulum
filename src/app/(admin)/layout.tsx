@@ -32,7 +32,8 @@ import {
   Printer,
   PiggyBank,
   Target,
-  BarChart3
+  BarChart3,
+  Shield
 } from 'lucide-react';
 
 export default function AdminLayout({
@@ -219,8 +220,7 @@ export default function AdminLayout({
       label: 'Stock Sucursales', 
       icon: <Target className="w-5 h-5" />,
       submenu: [
-        { href: '/admin/stock-sucursales', label: 'Dashboard Stock' },
-        { href: '/admin/gestion-stock-sucursales', label: 'Configuración Stock' }
+        { href: '/admin/stock-sucursales', label: 'Configuracion de Stocks' },
       ]
     },
     { 
@@ -270,10 +270,17 @@ export default function AdminLayout({
   
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#fcf3ea]">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#311716] via-[#462625] to-[#9c7561]">
         <div className="text-center">
-          <div className="w-16 h-16 border-4 border-[#eeb077] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-[#311716] font-medium">Verificando autenticación...</p>
+          <div className="relative">
+            <div className="w-20 h-20 border-4 border-[#eeb077]/20 rounded-full"></div>
+            <div className="absolute top-0 left-0 w-20 h-20 border-4 border-[#eeb077] border-t-transparent rounded-full animate-spin"></div>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Shield className="w-8 h-8 text-white animate-pulse" />
+            </div>
+          </div>
+          <p className="text-white font-semibold mt-6 text-lg">Verificando autenticación...</p>
+          <p className="text-white/70 text-sm mt-1">Preparando tu espacio de trabajo</p>
         </div>
       </div>
     );

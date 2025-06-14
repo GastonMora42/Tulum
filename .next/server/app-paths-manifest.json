@@ -1,12 +1,6 @@
 {
   "/api/admin/dashboard/route": "app/api/admin/dashboard/route.js",
-  "/api/admin/ubicaciones/route": "app/api/admin/ubicaciones/route.js",
-  "/api/productos/route": "app/api/productos/route.js",
-  "/api/admin/stock-config/dashboard/route": "app/api/admin/stock-config/dashboard/route.js",
-  "/api/admin/stock-config/route": "app/api/admin/stock-config/route.js",
-  "/(auth)/login/page": "app/(auth)/login/page.js",
+  "/api/auth/me/route": "app/api/auth/me/route.js",
   "/(admin)/admin/page": "app/(admin)/admin/page.js",
-  "/(admin)/admin/stock-sucursales/page": "app/(admin)/admin/stock-sucursales/page.js",
-  "/(pdv)/pdv/cierre/page": "app/(pdv)/pdv/cierre/page.js",
-  "/(admin)/admin/gestion-stock-sucursales/page": "app/(admin)/admin/gestion-stock-sucursales/page.js"
+  "/(admin)/admin/stock-sucursales/page": "app/(admin)/admin/stock-sucursales/page.js"
 }
