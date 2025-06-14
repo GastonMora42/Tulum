@@ -1,7 +1,7 @@
-// src/app/(admin)/admin/stock-sucursales/page.tsx
+// src/app/(admin)/admin/stock-sucursales/page.tsx - TIPOS CORREGIDOS
 'use client';
 
-import { useState, useEffect, JSXElementConstructor, ReactElement, ReactNode, ReactPortal, JSXElementConstructor, Key, ReactElement, ReactNode, ReactPortal, JSXElementConstructor, Key, ReactElement, ReactNode, ReactPortal, JSXElementConstructor, Key, ReactElement, ReactNode, ReactPortal, Key } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   BarChart3, Settings, Upload, Download, RefreshCw, 
   FileText, TrendingUp, Store, Package2, AlertTriangle,
@@ -11,11 +11,97 @@ import { authenticatedFetch } from '@/hooks/useAuth';
 import { ContrastEnhancer } from '@/components/ui/ContrastEnhancer';
 import BulkStockUpload from '@/components/admin/BulkStockUpload';
 
+// ✅ INTERFACES CORREGIDAS
+interface Sucursal {
+  id: string;
+  nombre: string;
+  tipo: string;
+}
+
+interface Producto {
+  id: string;
+  nombre: string;
+  codigoBarras?: string;
+}
+
+interface DashboardData {
+  estadisticas: {
+    total: number;
+    criticos: number;
+    bajos: number;
+    normales: number;
+    excesos: number;
+    necesitanReposicion: number;
+    conExceso: number;
+  };
+  analisisCompleto: Array<{
+    id: string;
+    producto: {
+      id: string;
+      nombre: string;
+      codigoBarras?: string;
+    };
+    sucursal: {
+      id: string;
+      nombre: string;
+      tipo: string;
+    };
+    configuracion: {
+      stockMaximo: number;
+      stockMinimo: number;
+      puntoReposicion: number;
+    };
+    stockActual: number;
+    diferencia: number;
+    diferenciaPorcentual: number;
+    porcentajeUso: number;
+    estado: string;
+    prioridad: number;
+    acciones: {
+      necesitaReposicion: boolean;
+      puedeCargar: boolean;
+      cantidadSugerida: number;
+      tieneExceso: boolean;
+      excesoActual: number;
+    };
+  }>;
+  resumenSucursales: any[];
+  topDeficit: any[];
+  topExceso: any[];
+  ultimaActualizacion: Date;
+}
+
+interface ConfigData {
+  productoId: string;
+  sucursalId: string;
+  stockMaximo: number;
+  stockMinimo: number;
+  puntoReposicion: number;
+}
+
+interface BulkData {
+  sucursalId: string;
+  nombre: string;
+  descripcion: string;
+  modo: string;
+  items: Array<{
+    nombreProducto: string;
+    cantidad: number;
+  }>;
+}
+
+interface BulkResult {
+  resumen: {
+    itemsProcesados: number;
+    itemsErrores: number;
+  };
+}
+
 export default function StockSucursalesPage() {
   const [loading, setLoading] = useState(true);
-  const [dashboardData, setDashboardData] = useState(null);
-  const [sucursales, setSucursales] = useState([]);
-  const [productos, setProductos] = useState([]);
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [sucursales, setSucursales] = useState<Sucursal[]>([]);
+  const [productos, setProductos] = useState<Producto[]>([]);
   const [selectedSucursal, setSelectedSucursal] = useState('');
   const [view, setView] = useState('dashboard');
   const [searchTerm, setSearchTerm] = useState('');
@@ -27,7 +113,7 @@ export default function StockSucursalesPage() {
   const [showBulkFileModal, setShowBulkFileModal] = useState(false);
 
   // Estados para configuración
-  const [configData, setConfigData] = useState({
+  const [configData, setConfigData] = useState<ConfigData>({
     productoId: '',
     sucursalId: '',
     stockMaximo: 0,
@@ -36,7 +122,7 @@ export default function StockSucursalesPage() {
   });
 
   // Estados para carga masiva manual
-  const [bulkData, setBulkData] = useState({
+  const [bulkData, setBulkData] = useState<BulkData>({
     sucursalId: '',
     nombre: '',
     descripcion: '',
@@ -65,7 +151,7 @@ export default function StockSucursalesPage() {
         const sucursalesData = await sucursalesRes.json();
         const productosData = await productosRes.json();
         
-        setSucursales(sucursalesData.filter((s: { tipo: string; }) => s.tipo === 'sucursal'));
+        setSucursales(sucursalesData.filter((s: Sucursal) => s.tipo === 'sucursal'));
         setProductos(productosData.data || productosData);
       }
     } catch (error) {
@@ -95,6 +181,9 @@ export default function StockSucursalesPage() {
     try {
       const response = await authenticatedFetch('/api/admin/stock-config', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify(configData)
       });
 
@@ -123,11 +212,14 @@ export default function StockSucursalesPage() {
     try {
       const response = await authenticatedFetch('/api/admin/stock-config/bulk-load', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify(bulkData)
       });
 
       if (response.ok) {
-        const result = await response.json();
+        const result: BulkResult = await response.json();
         setShowBulkModal(false);
         setBulkData({
           sucursalId: '',
@@ -148,7 +240,7 @@ export default function StockSucursalesPage() {
     }
   };
 
-  const getStatusColor = (estado: any) => {
+  const getStatusColor = (estado: string) => {
     switch (estado) {
       case 'critico': return 'text-red-600 bg-red-100 border-red-200';
       case 'bajo': return 'text-orange-600 bg-orange-100 border-orange-200';
@@ -157,7 +249,7 @@ export default function StockSucursalesPage() {
     }
   };
 
-  const getStatusIcon = (estado: any) => {
+  const getStatusIcon = (estado: string) => {
     switch (estado) {
       case 'critico': return <AlertTriangle className="w-4 h-4" />;
       case 'bajo': return <TrendingUp className="w-4 h-4" />;
@@ -166,7 +258,7 @@ export default function StockSucursalesPage() {
     }
   };
 
-  const filteredAnalysis = dashboardData?.analisisCompleto?.filter((item: { estado: string; producto: { nombre: string; }; }) => {
+  const filteredAnalysis = dashboardData?.analisisCompleto?.filter((item) => {
     if (statusFilter !== 'todos' && item.estado !== statusFilter) return false;
     if (searchTerm && !item.producto.nombre.toLowerCase().includes(searchTerm.toLowerCase())) return false;
     return true;
@@ -368,7 +460,7 @@ export default function StockSucursalesPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredAnalysis.slice(0, 50).map((item: { producto: { id: any; nombre: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; codigoBarras: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; }; sucursal: { id: any; nombre: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; }; stockActual: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; configuracion: { stockMaximo: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; }; diferencia: number; estado: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; porcentajeUso: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; }) => (
+                  {filteredAnalysis.slice(0, 50).map((item) => (
                     <tr key={`${item.producto.id}-${item.sucursal.id}`} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
@@ -453,12 +545,10 @@ export default function StockSucursalesPage() {
             onClose={() => setShowBulkModal(false)}
           />
         )}
-
         {showBulkFileModal && (
           <BulkStockUpload
             sucursales={sucursales}
-            onSuccess={(result: { resumen: { itemsProcesados: any; itemsErrores: any; }; }) => {
-              alert(`Carga completada: ${result.resumen.itemsProcesados} procesados, ${result.resumen.itemsErrores} errores`);
+            onSuccess={() => {
               loadDashboardData();
             }}
             onClose={() => setShowBulkFileModal(false)}
@@ -469,8 +559,18 @@ export default function StockSucursalesPage() {
   );
 }
 
-// Componente Modal de Configuración
-const ConfigModal = ({ configData, setConfigData, productos, sucursales, onSave, onClose }) => (
+// ✅ COMPONENTES MODALES CON TIPOS CORREGIDOS
+
+interface ConfigModalProps {
+  configData: ConfigData;
+  setConfigData: (data: ConfigData) => void;
+  productos: Producto[];
+  sucursales: Sucursal[];
+  onSave: () => void;
+  onClose: () => void;
+}
+
+const ConfigModal = ({ configData, setConfigData, productos, sucursales, onSave, onClose }: ConfigModalProps) => (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
     <div className="bg-white rounded-lg p-6 w-full max-w-md">
       <h3 className="text-lg font-medium mb-4 text-black">Configurar Stock por Sucursal</h3>
@@ -485,7 +585,7 @@ const ConfigModal = ({ configData, setConfigData, productos, sucursales, onSave,
             disabled={!!configData.productoId}
           >
             <option value="">Seleccionar producto</option>
-            {productos.map((p: { id: Key | readonly string[] | null | undefined; nombre: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; }) => (
+            {productos.map((p) => (
               <option key={p.id} value={p.id}>{p.nombre}</option>
             ))}
           </select>
@@ -500,7 +600,7 @@ const ConfigModal = ({ configData, setConfigData, productos, sucursales, onSave,
             disabled={!!configData.sucursalId}
           >
             <option value="">Seleccionar sucursal</option>
-            {sucursales.map((s: { id: Key | readonly string[] | null | undefined; nombre: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; }) => (
+            {sucursales.map((s) => (
               <option key={s.id} value={s.id}>{s.nombre}</option>
             ))}
           </select>
@@ -559,8 +659,15 @@ const ConfigModal = ({ configData, setConfigData, productos, sucursales, onSave,
   </div>
 );
 
-// Componente Modal de Carga Masiva Manual
-const BulkModal = ({ bulkData, setBulkData, sucursales, onSave, onClose }) => (
+interface BulkModalProps {
+  bulkData: BulkData;
+  setBulkData: (data: BulkData) => void;
+  sucursales: Sucursal[];
+  onSave: () => void;
+  onClose: () => void;
+}
+
+const BulkModal = ({ bulkData, setBulkData, sucursales, onSave, onClose }: BulkModalProps) => (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
     <div className="bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
       <h3 className="text-lg font-medium mb-4 text-black">Carga Masiva Manual</h3>
@@ -575,7 +682,7 @@ const BulkModal = ({ bulkData, setBulkData, sucursales, onSave, onClose }) => (
               className="w-full border border-gray-300 rounded-md px-3 py-2 bg-white text-black"
             >
               <option value="">Seleccionar sucursal</option>
-              {sucursales.map((s: { id: Key | readonly string[] | null | undefined; nombre: string | number | bigint | boolean | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | ReactPortal | Promise<string | number | bigint | boolean | ReactPortal | ReactElement<unknown, string | JSXElementConstructor<any>> | Iterable<ReactNode> | null | undefined> | null | undefined; }) => (
+              {sucursales.map((s) => (
                 <option key={s.id} value={s.id}>{s.nombre}</option>
               ))}
             </select>
@@ -609,7 +716,7 @@ const BulkModal = ({ bulkData, setBulkData, sucursales, onSave, onClose }) => (
         <div>
           <label className="block text-sm font-medium text-black mb-1">Items a cargar</label>
           <div className="border border-gray-300 rounded-md p-3 space-y-2 max-h-40 overflow-y-auto">
-            {bulkData.items.map((item: { nombreProducto: any; cantidad: any; }, index: Key | null | undefined) => (
+            {bulkData.items.map((item, index) => (
               <div key={index} className="flex items-center space-x-2 bg-gray-50 p-2 rounded">
                 <input
                   type="text"
@@ -636,7 +743,7 @@ const BulkModal = ({ bulkData, setBulkData, sucursales, onSave, onClose }) => (
                 />
                 <button
                   onClick={() => {
-                    const newItems = bulkData.items.filter((_: any, i: any) => i !== index);
+                    const newItems = bulkData.items.filter((_, i) => i !== index);
                     setBulkData({...bulkData, items: newItems});
                   }}
                   className="text-red-600 hover:text-red-800"

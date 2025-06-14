@@ -1,7 +1,8 @@
-// src/hooks/useStockSucursales.ts
+// src/hooks/useStockSucursales.ts - HOOK CORREGIDO
 import { useState, useEffect, useCallback } from 'react';
 import { authenticatedFetch } from '@/hooks/useAuth';
 
+// ✅ INTERFACES CORREGIDAS
 export interface StockConfig {
   id: string;
   productoId: string;
@@ -47,15 +48,33 @@ export interface DashboardData {
   };
   analisisCompleto: Array<{
     id: string;
-    producto: any;
-    sucursal: any;
-    configuracion: any;
+    producto: {
+      id: string;
+      nombre: string;
+      codigoBarras?: string;
+    };
+    sucursal: {
+      id: string;
+      nombre: string;
+      tipo: string;
+    };
+    configuracion: {
+      stockMaximo: number;
+      stockMinimo: number;
+      puntoReposicion: number;
+    };
     stockActual: number;
     diferencia: number;
     porcentajeUso: number;
     estado: string;
     prioridad: number;
-    acciones: any;
+    acciones: {
+      necesitaReposicion: boolean;
+      puedeCargar: boolean;
+      cantidadSugerida: number;
+      tieneExceso: boolean;
+      excesoActual: number;
+    };
   }>;
   resumenSucursales: any[];
   topDeficit: any[];
@@ -96,6 +115,18 @@ export interface BulkLoadRequest {
   descripcion?: string;
   modo: 'incrementar' | 'establecer' | 'decrementar';
   items: BulkLoadItem[];
+}
+
+export interface AlertasResponse {
+  alertas: AlertaStock[];
+  estadisticas: {
+    total: number;
+    criticas: number;
+    bajas: number;
+    excesos: number;
+    reposicion: number;
+    noVistas: number;
+  };
 }
 
 export function useStockSucursales() {
@@ -153,6 +184,9 @@ export function useStockSucursales() {
 
       const response = await authenticatedFetch('/api/admin/stock-config', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify(configData)
       });
 
@@ -227,6 +261,9 @@ export function useStockSucursales() {
 
       const response = await authenticatedFetch('/api/admin/stock-config/bulk-load', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify(bulkData)
       });
 
@@ -294,7 +331,7 @@ export function useStockSucursales() {
         throw new Error(errorData.error || 'Error al cargar alertas');
       }
       
-      const data = await response.json();
+      const data: AlertasResponse = await response.json();
       setAlertas(data.alertas);
       return data;
     } catch (err) {
@@ -308,6 +345,9 @@ export function useStockSucursales() {
     try {
       const response = await authenticatedFetch('/api/admin/stock-config/alertas', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({
           accion: 'marcar_vista',
           alertaId
@@ -341,6 +381,9 @@ export function useStockSucursales() {
     try {
       const response = await authenticatedFetch('/api/admin/stock-config/alertas', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({
           accion: type === 'producto' ? 'verificar_producto' : 'verificar_sucursal',
           ...params
@@ -382,7 +425,7 @@ export function useStockSucursales() {
   useEffect(() => {
     loadDashboard();
     loadAlertas({ activa: true });
-  }, []);
+  }, [loadDashboard, loadAlertas]);
 
   return {
     // Estado

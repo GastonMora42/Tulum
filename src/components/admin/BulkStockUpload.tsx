@@ -2,11 +2,30 @@ import React, { useState, useRef } from 'react';
 import { Upload, FileSpreadsheet, Download, AlertTriangle, CheckCircle, Info, X } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { authenticatedFetch } from '@/hooks/useAuth';
+// ✅ INTERFACES CORREGIDAS
+interface Sucursal {
+  id: string;
+  nombre: string;
+  tipo: string;
+}
 
-const BulkStockUpload = ({ sucursales, onClose, onSuccess }) => {
-  const [file, setFile] = useState(null);
-  const [parsing, setParsing] = useState(false);
-  const [parsedData, setParsedData] = useState([]);
+interface BulkItem {
+  codigoBarras: string;
+  nombreProducto: string;
+  cantidad: number;
+  fila: number;
+}
+
+interface BulkStockUploadProps {
+  sucursales: Sucursal[];
+  onClose: () => void;
+  onSuccess: (result: any) => void;
+}
+
+const BulkStockUpload: React.FC<BulkStockUploadProps> = ({ sucursales, onClose, onSuccess }) => {
+  const [file, setFile] = useState<File | null>(null);
+  const [parsing, setParsing] = useState<boolean>(false);
+  const [parsedData, setParsedData] = useState<Array<any>>([]);
   const [uploadData, setUploadData] = useState({
     sucursalId: '',
     nombre: '',
@@ -51,7 +70,7 @@ const BulkStockUpload = ({ sucursales, onClose, onSuccess }) => {
     XLSX.writeFile(wb, 'template_carga_stock.xlsx');
   };
 
-  const handleFileChange = (event) => {
+  const handleFileChange = (event: { target: { files: any[]; }; }) => {
     const selectedFile = event.target.files[0];
     if (selectedFile) {
       setFile(selectedFile);
@@ -59,7 +78,7 @@ const BulkStockUpload = ({ sucursales, onClose, onSuccess }) => {
     }
   };
 
-  const parseFile = async (file) => {
+  const parseFile = async (file: { arrayBuffer: () => any; }) => {
     setParsing(true);
     setErrors([]);
     setParsedData([]);
@@ -72,16 +91,27 @@ const BulkStockUpload = ({ sucursales, onClose, onSuccess }) => {
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
       // Validar y normalizar datos
-      const normalizedData = [];
-      const validationErrors = [];
+      const normalizedData: React.SetStateAction<any[]> = [];
+      const validationErrors: ((prevState: never[]) => never[]) | string[] = [];
 
       jsonData.forEach((row, index) => {
         const rowNum = index + 2; // +2 porque Excel empieza en 1 y tenemos header
         
         // Detectar posibles nombres de columnas
-        const codigoBarras = row['Código de Barras'] || row['Codigo de Barras'] || row['CodigoBarras'] || row['Barcode'] || '';
-        const nombreProducto = row['Nombre del Producto'] || row['Nombre'] || row['Producto'] || row['Product'] || '';
-        const cantidad = parseFloat(row['Cantidad'] || row['Qty'] || row['Stock'] || 0);
+        const codigoBarras = (row as Record<string, any>)['Código de Barras'] || 
+                           (row as Record<string, any>)['Codigo de Barras'] || 
+                           (row as Record<string, any>)['CodigoBarras'] || 
+                           (row as Record<string, any>)['Barcode'] || '';
+                           
+        const nombreProducto = (row as Record<string, any>)['Nombre del Producto'] || 
+                             (row as Record<string, any>)['Nombre'] || 
+                             (row as Record<string, any>)['Producto'] || 
+                             (row as Record<string, any>)['Product'] || '';
+                             
+        const cantidad = parseFloat((row as Record<string, any>)['Cantidad'] || 
+                                  (row as Record<string, any>)['Qty'] || 
+                                  (row as Record<string, any>)['Stock'] || 
+                                  0);
 
         // Validaciones
         if (!codigoBarras && !nombreProducto) {
@@ -101,9 +131,8 @@ const BulkStockUpload = ({ sucursales, onClose, onSuccess }) => {
           fila: rowNum
         });
       });
-
       if (validationErrors.length > 0) {
-        setErrors(validationErrors);
+        setErrors(validationErrors as string[]);
       }
 
       setParsedData(normalizedData);

@@ -1,4 +1,4 @@
-// prisma/schema.prisma
+// prisma/schema.prisma - CORRECCIÓN DE RELACIONES
 generator client {
   provider = "prisma-client-js"
 }
@@ -68,9 +68,10 @@ model Producto {
   itemsVenta      ItemVenta[]
   itemsEnvio      ItemEnvio[]
   
-  // 🆕 NUEVAS RELACIONES
+  // 🆕 NUEVAS RELACIONES - CORREGIDAS
   stockConfigs    StockConfigSucursal[]
   cargasStock     CargaMasivaStockItem[]
+  alertasStock    AlertaStock[] // ✅ RELACIÓN INVERSA AGREGADA
 }
 
 model Insumo {
@@ -232,6 +233,7 @@ model Ubicacion {
   egresosInsumoPdv       EgresoInsumoPdv[]
   stockConfigs StockConfigSucursal[]
   cargasStock  CargaMasivaStock[]
+  alertasStock AlertaStock[] // ✅ RELACIÓN INVERSA AGREGADA
 }
 
 // Distribución
@@ -698,7 +700,7 @@ model ConfiguracionCierre {
   @@map("configuracion_cierre")
 }
 
-// Agregar estos modelos al final de tu schema.prisma
+// ✅ MODELOS NUEVOS CORREGIDOS - Stock por Sucursal
 
 // Configuración de stock por sucursal
 model StockConfigSucursal {
@@ -769,13 +771,13 @@ model CargaMasivaStockItem {
   @@map("carga_masiva_stock_item")
 }
 
-// Alertas automáticas de stock
+// ✅ ALERTAS AUTOMÁTICAS DE STOCK - CORREGIDAS
 model AlertaStock {
   id              String    @id @default(uuid())
   productoId      String
-  producto        Producto  @relation(fields: [productoId], references: [id])
+  producto        Producto  @relation(fields: [productoId], references: [id]) // ✅ YA EXISTE
   sucursalId      String
-  sucursal        Ubicacion @relation(fields: [sucursalId], references: [id])
+  sucursal        Ubicacion @relation(fields: [sucursalId], references: [id]) // ✅ YA EXISTE
   tipoAlerta      String    // critico, bajo, exceso, reposicion
   mensaje         String
   stockActual     Float

@@ -1,3 +1,4 @@
+// src/app/(admin)/admin/gestion-stock-sucursales/page.tsx - CORREGIDA
 import React, { useState, useEffect } from 'react';
 import { 
   TrendingUp, TrendingDown, AlertTriangle, CheckCircle, 
@@ -7,19 +8,93 @@ import {
 } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
 
-const StockDashboard = () => {
+// ✅ INTERFACES CORREGIDAS
+interface Sucursal {
+  id: string;
+  nombre: string;
+  tipo: string;
+}
+
+interface Producto {
+  id: string;
+  nombre: string;
+  codigoBarras?: string;
+}
+
+interface DashboardData {
+  estadisticas: {
+    total: number;
+    criticos: number;
+    bajos: number;
+    normales: number;
+    excesos: number;
+  };
+  analisisCompleto: Array<{
+    producto: {
+      id: string;
+      nombre: string;
+      codigoBarras?: string;
+    };
+    sucursal: {
+      id: string;
+      nombre: string;
+      tipo: string;
+    };
+    stockActual: number;
+    configuracion: {
+      stockMaximo: number;
+      stockMinimo: number;
+      puntoReposicion: number;
+    };
+    diferencia: number;
+    estado: string;
+    porcentajeUso: number;
+    acciones: {
+      necesitaReposicion: boolean;
+      cantidadSugerida: number;
+    };
+  }>;
+}
+
+interface ConfigData {
+  productoId: string;
+  sucursalId: string;
+  stockMaximo: number;
+  stockMinimo: number;
+  puntoReposicion: number;
+}
+
+interface BulkData {
+  sucursalId: string;
+  nombre: string;
+  descripcion: string;
+  modo: string;
+  items: Array<{
+    nombreProducto: string;
+    cantidad: number;
+  }>;
+}
+
+interface BulkResult {
+  resumen: {
+    itemsProcesados: number;
+    itemsErrores: number;
+  };
+}
+
+const StockDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
-  const [dashboardData, setDashboardData] = useState(null);
-  const [sucursales, setSucursales] = useState([]);
-  const [productos, setProductos] = useState([]);
+  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+  const [sucursales, setSucursales] = useState<Sucursal[]>([]);
+  const [productos, setProductos] = useState<Producto[]>([]);
   const [selectedSucursal, setSelectedSucursal] = useState('');
-  const [view, setView] = useState('dashboard'); // dashboard, config, bulk
+  const [view, setView] = useState('dashboard');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('todos');
 
   // Estados para configuración
   const [configModal, setConfigModal] = useState(false);
-  const [configData, setConfigData] = useState({
+  const [configData, setConfigData] = useState<ConfigData>({
     productoId: '',
     sucursalId: '',
     stockMaximo: 0,
@@ -29,7 +104,7 @@ const StockDashboard = () => {
 
   // Estados para carga masiva
   const [bulkModal, setBulkModal] = useState(false);
-  const [bulkData, setBulkData] = useState({
+  const [bulkData, setBulkData] = useState<BulkData>({
     sucursalId: '',
     nombre: '',
     descripcion: '',
@@ -58,7 +133,7 @@ const StockDashboard = () => {
         const sucursalesData = await sucursalesRes.json();
         const productosData = await productosRes.json();
         
-        setSucursales(sucursalesData.filter(s => s.tipo === 'sucursal'));
+        setSucursales(sucursalesData.filter((s: Sucursal) => s.tipo === 'sucursal'));
         setProductos(productosData.data || productosData);
       }
     } catch (error) {
@@ -88,6 +163,9 @@ const StockDashboard = () => {
     try {
       const response = await authenticatedFetch('/api/admin/stock-config', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify(configData)
       });
 
@@ -111,11 +189,14 @@ const StockDashboard = () => {
     try {
       const response = await authenticatedFetch('/api/admin/stock-config/bulk-load', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify(bulkData)
       });
 
       if (response.ok) {
-        const result = await response.json();
+        const result: BulkResult = await response.json();
         setBulkModal(false);
         setBulkData({
           sucursalId: '',
@@ -132,7 +213,7 @@ const StockDashboard = () => {
     }
   };
 
-  const getStatusColor = (estado) => {
+  const getStatusColor = (estado: string) => {
     switch (estado) {
       case 'critico': return 'text-red-600 bg-red-100';
       case 'bajo': return 'text-orange-600 bg-orange-100';
@@ -141,7 +222,7 @@ const StockDashboard = () => {
     }
   };
 
-  const getStatusIcon = (estado) => {
+  const getStatusIcon = (estado: string) => {
     switch (estado) {
       case 'critico': return <AlertTriangle className="w-4 h-4" />;
       case 'bajo': return <TrendingDown className="w-4 h-4" />;
@@ -334,9 +415,9 @@ const StockDashboard = () => {
                     return true;
                   })
                   .slice(0, 50)
-                  .map(item => (
-                    <tr key={`${item.producto.id}-${item.sucursal.id}`} className="hover:bg-gray-50">
-                      <td className="px-6 py-4">
+                  .map((item, index) => (
+                    <tr key={index} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <div>
                           <div className="font-medium text-gray-900">{item.producto.nombre}</div>
                           {item.producto.codigoBarras && (
@@ -344,19 +425,19 @@ const StockDashboard = () => {
                           )}
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <Store className="w-4 h-4 mr-2 text-gray-400" />
                           <span className="text-sm text-gray-900">{item.sucursal.nombre}</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-lg font-bold text-gray-900">{item.stockActual}</span>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-sm text-gray-600">{item.configuracion.stockMaximo}</span>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           {item.diferencia > 0 ? (
                             <Minus className="w-4 h-4 text-red-500 mr-1" />
@@ -368,13 +449,13 @@ const StockDashboard = () => {
                           </span>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(item.estado)}`}>
                           {getStatusIcon(item.estado)}
                           <span className="ml-1">{item.estado}</span>
                         </span>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <div className="w-16 bg-gray-200 rounded-full h-2 mr-2">
                             <div 
@@ -389,7 +470,7 @@ const StockDashboard = () => {
                           <span className="text-sm text-gray-600">{item.porcentajeUso}%</span>
                         </div>
                       </td>
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex space-x-2">
                           {item.acciones.necesitaReposicion && (
                             <button

@@ -1,11 +1,38 @@
+// src/components/admin/AlertasStock.tsx - TIPOS CORREGIDOS
 import React, { useState, useEffect } from 'react';
 import { 
   Bell, AlertTriangle, TrendingDown, Package2, Eye, 
   X, Filter, RefreshCw, CheckCircle, Clock, Store
 } from 'lucide-react';
-import { useStockSucursales } from '@/hooks/useStockSucursales';
+import { useStockSucursales } from '@/hooks/useStockSucursal';
 
-const AlertasStock = ({ className = '', sucursalId = '' }) => {
+// ✅ INTERFACES CORREGIDAS
+interface AlertaStock {
+  id: string;
+  productoId: string;
+  sucursalId: string;
+  tipoAlerta: 'critico' | 'bajo' | 'exceso' | 'reposicion';
+  mensaje: string;
+  stockActual: number;
+  stockReferencia: number;
+  activa: boolean;
+  vistaPor?: string;
+  fechaVista?: Date;
+  createdAt: Date;
+  producto: {
+    nombre: string;
+  };
+  sucursal: {
+    nombre: string;
+  };
+}
+
+interface AlertasStockProps {
+  className?: string;
+  sucursalId?: string;
+}
+
+const AlertasStock: React.FC<AlertasStockProps> = ({ className = '', sucursalId = '' }) => {
   const {
     alertas,
     loading,
@@ -18,16 +45,17 @@ const AlertasStock = ({ className = '', sucursalId = '' }) => {
 
   const [filtroTipo, setFiltroTipo] = useState('todos');
   const [mostrarSoloNoVistas, setMostrarSoloNoVistas] = useState(false);
-  const [alertaSeleccionada, setAlertaSeleccionada] = useState(null);
+  // ✅ TIPO CORREGIDO - AlertaStock | null en lugar de solo null
+  const [alertaSeleccionada, setAlertaSeleccionada] = useState<AlertaStock | null>(null);
 
   useEffect(() => {
     loadAlertas({ 
       sucursalId: sucursalId || undefined,
       activa: true 
     });
-  }, [sucursalId]);
+  }, [sucursalId, loadAlertas]);
 
-  const handleMarcarVista = async (alertaId) => {
+  const handleMarcarVista = async (alertaId: string) => {
     try {
       await marcarAlertaVista(alertaId);
     } catch (error) {
@@ -49,7 +77,7 @@ const AlertasStock = ({ className = '', sucursalId = '' }) => {
     }
   };
 
-  const getIconoAlerta = (tipo) => {
+  const getIconoAlerta = (tipo: string) => {
     switch (tipo) {
       case 'critico':
         return <AlertTriangle className="w-5 h-5 text-red-600" />;
@@ -64,7 +92,7 @@ const AlertasStock = ({ className = '', sucursalId = '' }) => {
     }
   };
 
-  const getColorAlerta = (tipo) => {
+  const getColorAlerta = (tipo: string) => {
     switch (tipo) {
       case 'critico':
         return 'border-red-200 bg-red-50';
@@ -79,7 +107,7 @@ const AlertasStock = ({ className = '', sucursalId = '' }) => {
     }
   };
 
-  const alertasFiltradas = alertas.filter(alerta => {
+  const alertasFiltradas = alertas.filter((alerta: AlertaStock) => {
     if (filtroTipo !== 'todos' && alerta.tipoAlerta !== filtroTipo) {
       return false;
     }
@@ -174,7 +202,7 @@ const AlertasStock = ({ className = '', sucursalId = '' }) => {
           </div>
         ) : (
           <div className="space-y-2 p-3">
-            {alertasFiltradas.map(alerta => (
+            {alertasFiltradas.map((alerta: AlertaStock) => (
               <div
                 key={alerta.id}
                 className={`rounded-lg border-l-4 p-4 cursor-pointer transition-all hover:shadow-md ${getColorAlerta(alerta.tipoAlerta)} ${
@@ -265,8 +293,14 @@ const AlertasStock = ({ className = '', sucursalId = '' }) => {
   );
 };
 
-// Modal de detalle de alerta
-const AlertaDetailModal = ({ alerta, onClose, onMarcarVista }) => (
+// ✅ MODAL CORREGIDO CON TIPOS
+interface AlertaDetailModalProps {
+  alerta: AlertaStock;
+  onClose: () => void;
+  onMarcarVista: (alertaId: string) => void;
+}
+
+const AlertaDetailModal: React.FC<AlertaDetailModalProps> = ({ alerta, onClose, onMarcarVista }) => (
   <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
     <div className="bg-white rounded-lg shadow-lg max-w-md w-full mx-4">
       <div className="px-6 py-4 border-b border-gray-200">
@@ -328,7 +362,7 @@ const AlertaDetailModal = ({ alerta, onClose, onMarcarVista }) => (
             </p>
           </div>
           
-          {alerta.vistaPor && (
+          {alerta.vistaPor && alerta.fechaVista && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Vista por</label>
               <p className="text-sm text-gray-900">
