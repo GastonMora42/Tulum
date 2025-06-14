@@ -20,7 +20,7 @@ model User {
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
 
-  // Relaciones
+  // Relaciones existentes
   producciones           Production[]
   ventas                 Venta[]
   envios                 Envio[]
@@ -31,11 +31,13 @@ model User {
   reintentos             FacturaReintento[]
   puntoEquilibrioConfigs PuntoEquilibrioConfig[]
   configuracionesCierre ConfiguracionCierre[]
-
   movimientosStockInsumoPdv MovimientoStockInsumoPdv[]
   solicitudesInsumoPdv      SolicitudInsumoPdv[]
   egresosInsumoPdv          EgresoInsumoPdv[]
   recuperosFondo RecuperoFondo[]
+  
+  stockConfigs    StockConfigSucursal[]
+  cargasStock     CargaMasivaStock[]
 }
 
 model Role {
@@ -60,11 +62,15 @@ model Producto {
   stockMinimo Int     @default(0)
   activo      Boolean @default(true)
 
-  // Relaciones
+  // Relaciones existentes
   stocks          Stock[]
   productoRecetas ProductoReceta[]
   itemsVenta      ItemVenta[]
   itemsEnvio      ItemEnvio[]
+  
+  // 🆕 NUEVAS RELACIONES
+  stockConfigs    StockConfigSucursal[]
+  cargasStock     CargaMasivaStockItem[]
 }
 
 model Insumo {
@@ -224,6 +230,8 @@ model Ubicacion {
   enviosInsumoPdvOrigen  EnvioInsumoPdv[]     @relation("EnvioInsumoPdvOrigen")
   enviosInsumoPdvDestino EnvioInsumoPdv[]     @relation("EnvioInsumoPdvDestino")
   egresosInsumoPdv       EgresoInsumoPdv[]
+  stockConfigs StockConfigSucursal[]
+  cargasStock  CargaMasivaStock[]
 }
 
 // Distribución
@@ -688,4 +696,97 @@ model ConfiguracionCierre {
   updatedAt   DateTime  @updatedAt
   
   @@map("configuracion_cierre")
+}
+
+// Agregar estos modelos al final de tu schema.prisma
+
+// Configuración de stock por sucursal
+model StockConfigSucursal {
+  id              String    @id @default(uuid())
+  productoId      String
+  producto        Producto  @relation(fields: [productoId], references: [id], onDelete: Cascade)
+  sucursalId      String
+  sucursal        Ubicacion @relation(fields: [sucursalId], references: [id], onDelete: Cascade)
+  stockMaximo     Float     @default(0)
+  stockMinimo     Float     @default(0)
+  puntoReposicion Float     @default(0) // Punto en el que se debe reponer
+  activo          Boolean   @default(true)
+  creadoPor       String
+  usuario         User      @relation(fields: [creadoPor], references: [id])
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@unique([productoId, sucursalId])
+  @@index([sucursalId])
+  @@index([productoId])
+  @@map("stock_config_sucursal")
+}
+
+model CargaMasivaStock {
+  id            String              @id @default(uuid())
+  nombre        String              // Nombre descriptivo de la carga
+  descripcion   String?
+  sucursalId    String
+  sucursal      Ubicacion           @relation(fields: [sucursalId], references: [id])
+  usuarioId     String
+  usuario       User                @relation(fields: [usuarioId], references: [id])
+  estado        String              @default("procesando") // procesando, completado, completado_con_errores, error
+  totalItems    Int                 @default(0)
+  itemsProcesados Int               @default(0)
+  itemsErrores  Int                 @default(0)
+  archivoNombre String?
+  observaciones String?
+  fechaInicio   DateTime            @default(now())
+  fechaFin      DateTime?
+  
+  // Relación con los items de la carga
+  items         CargaMasivaStockItem[]
+  
+  @@index([sucursalId])
+  @@index([usuarioId])
+  @@index([fechaInicio])
+  @@map("carga_masiva_stock")
+}
+
+// Items individuales de una carga masiva
+model CargaMasivaStockItem {
+  id              String            @id @default(uuid())
+  cargaId         String
+  carga           CargaMasivaStock  @relation(fields: [cargaId], references: [id], onDelete: Cascade)
+  productoId      String?
+  producto        Producto?         @relation(fields: [productoId], references: [id])
+  codigoBarras    String?           // Para identificar producto por código
+  nombreProducto  String?           // Para identificar producto por nombre
+  cantidadCargar  Float
+  cantidadAnterior Float?          // Stock anterior a la carga
+  cantidadFinal   Float?           // Stock final después de la carga
+  estado          String           @default("pendiente") // pendiente, procesado, error
+  error           String?          // Mensaje de error si aplica
+  procesadoEn     DateTime?
+  
+  @@index([cargaId])
+  @@index([productoId])
+  @@map("carga_masiva_stock_item")
+}
+
+// Alertas automáticas de stock
+model AlertaStock {
+  id              String    @id @default(uuid())
+  productoId      String
+  producto        Producto  @relation(fields: [productoId], references: [id])
+  sucursalId      String
+  sucursal        Ubicacion @relation(fields: [sucursalId], references: [id])
+  tipoAlerta      String    // critico, bajo, exceso, reposicion
+  mensaje         String
+  stockActual     Float
+  stockReferencia Float     // Puede ser mínimo, máximo o punto de reposición
+  activa          Boolean   @default(true)
+  vistaPor        String?   // Usuario que vio la alerta
+  fechaVista      DateTime?
+  createdAt       DateTime  @default(now())
+  
+  @@index([sucursalId, activa])
+  @@index([productoId])
+  @@index([tipoAlerta])
+  @@map("alerta_stock")
 }
