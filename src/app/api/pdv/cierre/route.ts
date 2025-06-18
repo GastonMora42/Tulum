@@ -1,4 +1,4 @@
-// src/app/api/pdv/cierre/route.ts - VERSIÓN ACTUALIZADA CON NUEVA LÓGICA COMPLETA
+// src/app/api/pdv/cierre/route.ts - VERSIÓN CORREGIDA CON VALIDACIONES OPTIMIZADAS
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/server/db/client';
 import { authMiddleware } from '@/server/api/middlewares/auth';
@@ -8,7 +8,6 @@ export async function GET(req: NextRequest) {
   const authError = await authMiddleware(req);
   if (authError) return authError;
   
-  // CAMBIO: Solo requerir caja:ver, no admin
   const permError = await checkPermission('caja:ver')(req);
   if (permError) return permError;
   
@@ -158,7 +157,6 @@ export async function PATCH(req: NextRequest) {
   const authError = await authMiddleware(req);
   if (authError) return authError;
   
-  // CAMBIO: Solo requerir caja:crear, no admin  
   const permError = await checkPermission('caja:crear')(req);
   if (permError) return permError;
   
@@ -179,6 +177,15 @@ export async function PATCH(req: NextRequest) {
       forzarContingencia = false,
       resolverDiferenciasAutomaticamente = false
     } = body;
+    
+    console.log('🔧 [CIERRE] Iniciando cierre con parámetros:', {
+      id,
+      conteoEfectivo,
+      recuperoFondo,
+      forzarContingencia,
+      resolverDiferenciasAutomaticamente,
+      observaciones: observaciones ? 'presente' : 'no'
+    });
     
     if (!id) {
       return NextResponse.json(
@@ -301,6 +308,16 @@ export async function PATCH(req: NextRequest) {
     const efectivoEsperadoConRecupero = efectivoEsperadoSinRecupero - recuperoFondoNum;
     const diferenciaEfectivo = conteoEfectivoNum - efectivoEsperadoConRecupero;
     
+    console.log('📊 [CIERRE] Cálculos de efectivo:', {
+      montoInicial: cierreCaja.montoInicial,
+      ventasEfectivo,
+      totalEgresos,
+      recuperoFondo: recuperoFondoNum,
+      efectivoEsperado: efectivoEsperadoConRecupero,
+      efectivoContado: conteoEfectivoNum,
+      diferencia: diferenciaEfectivo
+    });
+    
     // 🆕 NUEVA LÓGICA: VALIDAR RECUPERO SEGÚN LAS REGLAS DEL CLIENTE
     let recuperoValidado = 0;
     let errorRecupero = '';
@@ -327,65 +344,116 @@ export async function PATCH(req: NextRequest) {
       }
     }
     
-    if (errorRecupero) {
+    if (errorRecupero && !forzarContingencia) {
       return NextResponse.json(
         { error: errorRecupero },
         { status: 400 }
       );
     }
     
-    // VERIFICAR DIFERENCIAS EN TODOS LOS MEDIOS DE PAGO
-    const diferencias: Array<{
+    // 🔧 VERIFICAR DIFERENCIAS EN MEDIOS DE PAGO - LÓGICA MEJORADA
+    interface DiferenciaDetalle {
       medioPago: string;
       esperado: number;
       contado: number;
       diferencia: number;
       significativa: boolean;
-    }> = [];
+      tienePagosPendientes: boolean;
+    }
+    
+    const diferencias: DiferenciaDetalle[] = [];
     
     // Verificar efectivo (con recupero aplicado)
+    const MARGEN_TOLERANCIA_EFECTIVO = ventasEfectivo > 0 ? 200 : 1000; // Mayor tolerancia sin ventas en efectivo
+    
     if (Math.abs(diferenciaEfectivo) > 0.01) {
       diferencias.push({
         medioPago: 'Efectivo',
         esperado: efectivoEsperadoConRecupero,
         contado: conteoEfectivoNum,
         diferencia: diferenciaEfectivo,
-        significativa: Math.abs(diferenciaEfectivo) >= 200
+        significativa: Math.abs(diferenciaEfectivo) >= MARGEN_TOLERANCIA_EFECTIVO,
+        tienePagosPendientes: false
       });
     }
     
-    // Verificar otros medios de pago
-    const otrosMedios = [
+    // 🔧 VERIFICAR OTROS MEDIOS DE PAGO - NUEVA LÓGICA
+    const mediosElectronicos = [
       { nombre: 'Tarjeta de Crédito', esperado: ventasTarjetaCredito, contado: conteoTarjetaCredito },
       { nombre: 'Tarjeta de Débito', esperado: ventasTarjetaDebito, contado: conteoTarjetaDebito },
       { nombre: 'QR / Digital', esperado: ventasQR, contado: conteoQR }
     ];
     
-    otrosMedios.forEach(medio => {
-      if (medio.contado !== undefined && Math.abs(medio.contado - medio.esperado) > 0.01) {
-        const diff = medio.contado - medio.esperado;
-        diferencias.push({
-          medioPago: medio.nombre,
-          esperado: medio.esperado,
-          contado: medio.contado,
-          diferencia: diff,
-          significativa: Math.abs(diff) >= 200
-        });
+    mediosElectronicos.forEach(medio => {
+      // 🔧 NUEVA LÓGICA: Solo validar si hay ventas esperadas O si se ingresó un conteo
+      const hayVentasEsperadas = medio.esperado > 0;
+      const hayConteoIngresado = medio.contado !== undefined && medio.contado !== null && medio.contado !== '';
+      
+      if (hayVentasEsperadas || hayConteoIngresado) {
+        const contadoNum = parseFloat(String(medio.contado)) || 0;
+        const diff = contadoNum - medio.esperado;
+        
+        // Solo agregar como diferencia si realmente hay una discrepancia
+        if (Math.abs(diff) > 0.01) {
+          diferencias.push({
+            medioPago: medio.nombre,
+            esperado: medio.esperado,
+            contado: contadoNum,
+            diferencia: diff,
+            significativa: Math.abs(diff) >= 200,
+            tienePagosPendientes: hayVentasEsperadas && !hayConteoIngresado
+          });
+        }
       }
     });
     
+    console.log('🔍 [CIERRE] Diferencias detectadas:', diferencias.map(d => ({
+      medio: d.medioPago,
+      diferencia: d.diferencia,
+      significativa: d.significativa,
+      tienePendientes: d.tienePagosPendientes
+    })));
+    
     // 🆕 NUEVA LÓGICA: DETERMINACIÓN DE ESTADO DEL CIERRE
     const diferenciasMayores = diferencias.filter(d => d.significativa);
-    const shouldGenerateContingency = diferenciasMayores.length > 0 || forzarContingencia || resolverDiferenciasAutomaticamente;
+    const diferenciasPendientes = diferencias.filter(d => d.tienePagosPendientes);
     
-    // Si hay diferencias mayores y no se está forzando, requerir confirmación
+    // 🔧 LÓGICA MEJORADA PARA PERMITIR CIERRE
+    const shouldGenerateContingency = forzarContingencia || 
+                                    resolverDiferenciasAutomaticamente || 
+                                    diferenciasMayores.length > 0;
+    
+    // Si hay diferencias pendientes (medios con ventas pero sin conteo) y no se está forzando
+    if (diferenciasPendientes.length > 0 && !forzarContingencia && !resolverDiferenciasAutomaticamente) {
+      return NextResponse.json(
+        { 
+          error: 'Hay medios de pago con ventas pero sin conteo manual',
+          diferencias: diferenciasPendientes.map(d => ({
+            medioPago: d.medioPago,
+            esperado: d.esperado,
+            mensaje: `Se registraron ventas por $${d.esperado.toFixed(2)} pero no se ingresó el conteo manual`
+          })),
+          requiereConteo: true,
+          mensaje: 'Complete el conteo de todos los medios de pago que tuvieron ventas'
+        },
+        { status: 400 }
+      );
+    }
+    
+    // Si hay diferencias significativas sin resolver y no se está forzando
     if (diferenciasMayores.length > 0 && !forzarContingencia && !resolverDiferenciasAutomaticamente) {
       return NextResponse.json(
         { 
           error: 'Hay diferencias significativas sin resolver',
-          diferencias: diferenciasMayores,
+          diferencias: diferenciasMayores.map(d => ({
+            medioPago: d.medioPago,
+            esperado: d.esperado,
+            contado: d.contado,
+            diferencia: d.diferencia,
+            mensaje: `Diferencia de ${d.diferencia > 0 ? '+' : ''}$${Math.abs(d.diferencia).toFixed(2)}`
+          })),
           requiereConfirmacion: true,
-          mensaje: 'Use el botón "Resolver Diferencias" para forzar el cierre y generar contingencias automáticamente.'
+          mensaje: 'Use "Cerrar Forzadamente" para generar contingencias automáticamente.'
         },
         { status: 400 }
       );
@@ -434,7 +502,7 @@ export async function PATCH(req: NextRequest) {
           alertaMontoInsuficiente: alertaMontoInsuficiente || null,
           esCierreConDiferencias: shouldGenerateContingency,
           razonCierreForzado: (forzarContingencia || resolverDiferenciasAutomaticamente) ? 
-            `Diferencias resueltas automáticamente: ${diferencias.map(d => `${d.medioPago} $${Math.abs(d.diferencia).toFixed(2)}`).join(', ')}` : 
+            `Diferencias resueltas automáticamente: ${diferencias.map(d => `${d.medioPago} ${d.diferencia > 0 ? '+' : ''}$${Math.abs(d.diferencia).toFixed(2)}`).join(', ')}` : 
             null,
           
           // Recupero de fondo
@@ -548,6 +616,13 @@ ${observaciones ? `\n📝 OBSERVACIONES DEL VENDEDOR:\n${observaciones}` : ''}
       ? ` ${alertaMontoInsuficiente}` 
       : '';
     
+    console.log('✅ [CIERRE] Cierre completado exitosamente:', {
+      id: result.id,
+      estado: result.estado,
+      contingenciaGenerada: shouldGenerateContingency,
+      diferenciasEncontradas: diferencias.length
+    });
+    
     return NextResponse.json({
       success: true,
       message: mensajeBase + recuperoInfo + alertaInfo,
@@ -588,7 +663,7 @@ ${observaciones ? `\n📝 OBSERVACIONES DEL VENDEDOR:\n${observaciones}` : ''}
       }
     });
   } catch (error: any) {
-    console.error('Error al cerrar caja:', error);
+    console.error('❌ [CIERRE] Error al cerrar caja:', error);
     return NextResponse.json(
       { error: error.message || 'Error al cerrar caja' },
       { status: 500 }

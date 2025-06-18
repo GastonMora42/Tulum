@@ -1,7 +1,8 @@
-// src/components/pdv/CierreCaja.tsx - VERSIÓN MEJORADA CON CÁLCULO CORRECTO DEL SOBRE
+// src/components/pdv/CierreCaja.tsx - VERSIÓN CORREGIDA CON FOCO Y CIERRE FORZADO
+
 'use client';
 
-import { useState, useEffect, useCallback, JSX } from 'react';
+import { useState, useEffect, useCallback, JSX, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { 
@@ -11,7 +12,7 @@ import {
   CreditCard, Banknote, Smartphone, Activity, Coins,
   ArrowDownLeft, ArrowUpRight, Info, ExternalLink, Check,
   XCircle, Settings, Loader, Shield, Wrench, Package,
-  Minus, Plus
+  Minus, Plus, AlertOctagon
 } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
 import { BillCounter } from './BillCounter';
@@ -69,6 +70,10 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
   const [forcedMethods, setForcedMethods] = useState<Set<string>>(new Set());
   const [observaciones, setObservaciones] = useState<string>('');
   
+  // 🆕 NUEVO ESTADO PARA CIERRE FORZADO
+  const [showForceCloseOptions, setShowForceCloseOptions] = useState<boolean>(false);
+  const [forceCloseReason, setForceCloseReason] = useState<string>('');
+  
   // Estados de UI
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -123,9 +128,9 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
     setEfectivoValidation(validacion);
   }, [calcularValidacionEfectivo]);
   
-  // Función para validar medios electrónicos
+  // 🔧 FUNCIÓN MEJORADA PARA VALIDAR MEDIOS ELECTRÓNICOS
   const validateMedioElectronico = useCallback((tipo: string, contado: string): MedioPagoValidation => {
-    if (!ventasResumen || !contado.trim()) {
+    if (!ventasResumen) {
       return {
         isValid: false,
         difference: 0,
@@ -133,6 +138,7 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
       };
     }
     
+    // 🔧 CORRECCIÓN: Si el campo está vacío, verificar si hay ventas
     const contadoNum = parseFloat(contado) || 0;
     let esperado = 0;
     
@@ -146,6 +152,24 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
       case 'qr':
         esperado = ventasResumen.totalesPorMedioPago?.qr?.monto || 0;
         break;
+    }
+    
+    // 🔧 NUEVA LÓGICA: Si no hay ventas esperadas y el campo está vacío, es válido
+    if (esperado === 0 && contadoNum === 0) {
+      return {
+        isValid: true,
+        difference: 0,
+        status: 'correct'
+      };
+    }
+    
+    // Si hay ventas esperadas pero el campo está vacío, es inválido
+    if (esperado > 0 && contado.trim() === '') {
+      return {
+        isValid: false,
+        difference: -esperado,
+        status: 'empty'
+      };
     }
     
     const diferencia = contadoNum - esperado;
@@ -198,6 +222,8 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
       setConteoTarjetaDebito('');
       setConteoQR('');
       setRecuperoFondo('');
+      setForcedMethods(new Set());
+      setShowForceCloseOptions(false);
       
     } catch (error) {
       console.error('Error al cargar cierre de caja:', error);
@@ -269,7 +295,7 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
     setEfectivoConteoCompleto(total > 0);
   };
   
-  // Componente para medios electrónicos con indicadores visuales
+  // 🔧 COMPONENTE OPTIMIZADO PARA MEDIOS ELECTRÓNICOS CON USEREF
   const MedioElectronicoInput = ({ 
     tipo, 
     nombre, 
@@ -285,8 +311,26 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
     onChange: (value: string) => void;
     colorScheme: string;
   }) => {
-    const validation = validateMedioElectronico(tipo, valor);
+    const inputRef = useRef<HTMLInputElement>(null);
+    
+    // Memoizar la validación para evitar recálculos innecesarios
+    const validation = useMemo(() => validateMedioElectronico(tipo, valor), [tipo, valor]);
     const isForcedCorrect = forcedMethods.has(nombre);
+    
+    // Función optimizada para cambios
+    const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+      onChange(e.target.value);
+    }, [onChange]);
+    
+    // Función para forzar corrección
+    const handleForceCorrection = useCallback(() => {
+      setForcedMethods(prev => new Set([...prev, nombre]));
+      setNotification({
+        type: 'info',
+        message: `${nombre} marcado como forzado`,
+        details: 'Esto generará una contingencia para revisión'
+      });
+    }, [nombre]);
     
     return (
       <div className={`bg-${colorScheme}-50 rounded-xl p-4 border-2 ${
@@ -331,10 +375,11 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
         <div className="relative">
           <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
           <input
+            ref={inputRef}
             type="number"
             step="0.01"
             value={valor}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={handleChange}
             className={`w-full pl-10 pr-4 py-3 text-lg font-bold border-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
               validation.status === 'empty' ? 'border-gray-300' :
               validation.isValid || isForcedCorrect ? 'border-green-300 bg-white' :
@@ -344,17 +389,11 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
           />
         </div>
         
+        
         {/* Botón para forzar corrección */}
         {validation.status === 'incorrect' && !isForcedCorrect && Math.abs(validation.difference) >= 200 && (
           <button
-            onClick={() => {
-              setForcedMethods(prev => new Set([...prev, nombre]));
-              setNotification({
-                type: 'info',
-                message: `${nombre} marcado como forzado`,
-                details: 'Esto generará una contingencia para revisión'
-              });
-            }}
+            onClick={handleForceCorrection}
             className="mt-2 px-3 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-lg text-sm font-medium transition-colors"
           >
             Forzar Corrección
@@ -364,8 +403,24 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
     );
   };
   
-  // 🆕 NUEVA LÓGICA DE CIERRE MEJORADA
-  const handleCerrarCaja = async () => {
+  // 🆕 FUNCIÓN PARA OBTENER TODOS LOS MEDIOS CON VALIDACIÓN
+  const getMediosConValidacion = useCallback(() => {
+    const medios = [
+      { tipo: 'tarjeta_credito', nombre: 'Tarjeta de Crédito', valor: conteoTarjetaCredito },
+      { tipo: 'tarjeta_debito', nombre: 'Tarjeta de Débito', valor: conteoTarjetaDebito },
+      { tipo: 'qr', nombre: 'QR / Digital', valor: conteoQR }
+    ];
+    
+    return medios.map(medio => ({
+      ...medio,
+      validation: validateMedioElectronico(medio.tipo, medio.valor),
+      esperado: ventasResumen?.totalesPorMedioPago?.[medio.tipo]?.monto || 0,
+      isForzado: forcedMethods.has(medio.nombre)
+    }));
+  }, [conteoTarjetaCredito, conteoTarjetaDebito, conteoQR, validateMedioElectronico, ventasResumen, forcedMethods]);
+  
+  // 🆕 NUEVA LÓGICA DE CIERRE MEJORADA CON OPCIÓN FORZADA
+  const handleCerrarCaja = async (forzar: boolean = false) => {
     try {
       setIsSaving(true);
       
@@ -381,39 +436,69 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
       const ventasEfectivo = ventasResumen.totalesPorMedioPago?.efectivo?.monto || 0;
       const puedeUsarLogicaFlexible = ventasEfectivo === 0;
       
-      // Validar medios electrónicos
-      const mediosConVentas = [
-        { tipo: 'tarjeta_credito', nombre: 'Tarjeta de Crédito', valor: conteoTarjetaCredito },
-        { tipo: 'tarjeta_debito', nombre: 'Tarjeta de Débito', valor: conteoTarjetaDebito },
-        { tipo: 'qr', nombre: 'QR / Digital', valor: conteoQR }
-      ].filter(medio => {
-        const ventas = ventasResumen.totalesPorMedioPago?.[medio.tipo]?.monto || 0;
-        return ventas > 0 || medio.valor.trim();
-      });
-      
-      const mediosIncorrectos = mediosConVentas.filter(medio => {
-        const validation = validateMedioElectronico(medio.tipo, medio.valor);
-        return !validation.isValid && !forcedMethods.has(medio.nombre);
-      });
-      
-      if (mediosIncorrectos.length > 0) {
-        setNotification({
-          type: 'error',
-          message: 'Hay diferencias sin resolver en medios electrónicos',
-          details: `Verifique: ${mediosIncorrectos.map(m => m.nombre).join(', ')}`
-        });
-        return;
+      if (!forzar) {
+        // Validar medios electrónicos solo si no es forzado
+        const mediosConValidacion = getMediosConValidacion();
+        const mediosIncorrectos = mediosConValidacion.filter(medio => 
+          medio.esperado > 0 && !medio.validation.isValid && !medio.isForzado
+        );
+        
+        if (mediosIncorrectos.length > 0) {
+          setNotification({
+            type: 'error',
+            message: 'Hay diferencias sin resolver en medios electrónicos',
+            details: `Verifique: ${mediosIncorrectos.map(m => `${m.nombre} (esperado: $${m.esperado.toFixed(2)}, diferencia: ${m.validation.difference > 0 ? '+' : ''}$${m.validation.difference.toFixed(2)})`).join(', ')}`,
+            action: 'Puede marcar como "Forzado" los medios con diferencias o usar "Cerrar Forzadamente"'
+          });
+          setShowForceCloseOptions(true);
+          return;
+        }
+        
+        // 🆕 VALIDACIÓN DE EFECTIVO MEJORADA
+        if (!efectivoValidation.isValid && !puedeUsarLogicaFlexible) {
+          setNotification({
+            type: 'error',
+            message: `Hay una diferencia significativa en el efectivo (${efectivoValidation.difference > 0 ? '+' : ''}$${efectivoValidation.difference.toFixed(2)})`,
+            details: 'Puede usar "Cerrar Forzadamente" para generar una contingencia automática',
+            action: 'Verifique el conteo o use cierre forzado'
+          });
+          setShowForceCloseOptions(true);
+          return;
+        }
       }
       
-      // 🆕 VALIDACIÓN DE EFECTIVO MEJORADA
-      if (!efectivoValidation.isValid && !puedeUsarLogicaFlexible) {
-        const confirmacion = confirm(
-          `Hay una diferencia significativa en el efectivo (${efectivoValidation.difference > 0 ? '+' : ''}$${efectivoValidation.difference.toFixed(2)}). ¿Desea forzar el cierre y generar una contingencia?`
-        );
-        if (!confirmacion) return;
+      // Preparar observaciones
+      let observacionesFinal = observaciones;
+      
+      if (forzar) {
+        observacionesFinal += `\n\n🚨 CIERRE FORZADO\n`;
+        if (forceCloseReason) {
+          observacionesFinal += `Motivo: ${forceCloseReason}\n`;
+        }
         
-        // Agregar a métodos forzados
-        setForcedMethods(prev => new Set([...prev, 'Efectivo']));
+        const mediosConValidacion = getMediosConValidacion();
+        const problemasEncontrados = [];
+        
+        // Agregar problemas de efectivo
+        if (!efectivoValidation.isValid && !puedeUsarLogicaFlexible) {
+          problemasEncontrados.push(`Efectivo: diferencia de ${efectivoValidation.difference > 0 ? '+' : ''}$${efectivoValidation.difference.toFixed(2)}`);
+        }
+        
+        // Agregar problemas de medios electrónicos
+        mediosConValidacion.forEach(medio => {
+          if (medio.esperado > 0 && !medio.validation.isValid && !medio.isForzado) {
+            problemasEncontrados.push(`${medio.nombre}: esperado $${medio.esperado.toFixed(2)}, contado $${parseFloat(medio.valor) || 0}, diferencia ${medio.validation.difference > 0 ? '+' : ''}$${medio.validation.difference.toFixed(2)}`);
+          }
+        });
+        
+        if (problemasEncontrados.length > 0) {
+          observacionesFinal += `\nProblemas detectados:\n${problemasEncontrados.map(p => `• ${p}`).join('\n')}`;
+        }
+        
+        // Agregar métodos forzados
+        if (forcedMethods.size > 0) {
+          observacionesFinal += `\nMedios marcados como forzados: ${Array.from(forcedMethods).join(', ')}`;
+        }
       }
       
       const response = await authenticatedFetch('/api/pdv/cierre', {
@@ -423,15 +508,15 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
         },
         body: JSON.stringify({
           id: cierreCaja.id,
-          observaciones: observaciones + (forcedMethods.size > 0 ? `\n\nMedios forzados: ${Array.from(forcedMethods).join(', ')}` : '') + (puedeUsarLogicaFlexible ? '\n\nCierre con lógica flexible (sin ventas en efectivo)' : ''),
+          observaciones: observacionesFinal,
           conteoEfectivo: efectivoContado,
           conteoTarjetaCredito: parseFloat(conteoTarjetaCredito) || 0,
           conteoTarjetaDebito: parseFloat(conteoTarjetaDebito) || 0,
           conteoQR: parseFloat(conteoQR) || 0,
           conteoOtros: 0,
           recuperoFondo: parseFloat(recuperoFondo) || 0,
-          forzarContingencia: forcedMethods.size > 0 || (!efectivoValidation.isValid && !puedeUsarLogicaFlexible),
-          resolverDiferenciasAutomaticamente: forcedMethods.size > 0 || puedeUsarLogicaFlexible
+          forzarContingencia: forzar || forcedMethods.size > 0 || (!efectivoValidation.isValid && !puedeUsarLogicaFlexible),
+          resolverDiferenciasAutomaticamente: forzar || forcedMethods.size > 0 || puedeUsarLogicaFlexible
         })
       });
       
@@ -445,7 +530,7 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
       
       setNotification({
         type: 'success',
-        message: '🎉 Caja cerrada correctamente',
+        message: forzar ? '🎉 Caja cerrada forzadamente con contingencia' : '🎉 Caja cerrada correctamente',
         details: `Efectivo para sobre: $${cuentas?.efectivoParaSobre.toFixed(2) || '0.00'}. Próximo turno: $${configuracionCierre.montoFijo.toFixed(2)}`,
         data: data
       });
@@ -485,7 +570,9 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
   const cuentasAutomaticas = calcularCuentasAutomaticas();
   const ventasEfectivo = ventasResumen?.totalesPorMedioPago?.efectivo?.monto || 0;
   const puedeUsarLogicaFlexible = ventasEfectivo === 0;
+  const mediosConValidacion = getMediosConValidacion();
   const canClose = efectivoConteoCompleto && (efectivoValidation.isValid || puedeUsarLogicaFlexible);
+  const hasUnresolvedIssues = !canClose || mediosConValidacion.some(m => m.esperado > 0 && !m.validation.isValid && !m.isForzado);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 p-2 md:p-4">
@@ -535,12 +622,21 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
                   {notification.message}
                 </h3>
                 {notification.details && (
-                  <p className={`text-xs ${
+                  <p className={`text-xs mb-2 ${
                     notification.type === 'success' ? 'text-green-700' : 
                     notification.type === 'info' ? 'text-blue-700' :
                     'text-red-700'
                   }`}>
                     {notification.details}
+                  </p>
+                )}
+                {notification.action && (
+                  <p className={`text-xs font-medium ${
+                    notification.type === 'success' ? 'text-green-800' : 
+                    notification.type === 'info' ? 'text-blue-800' :
+                    'text-red-800'
+                  }`}>
+                    💡 {notification.action}
                   </p>
                 )}
               </div>
@@ -835,6 +931,60 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
               </div>
             )}
 
+            {/* 🆕 PANEL DE OPCIONES DE CIERRE FORZADO */}
+            {showForceCloseOptions && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+                <div className="flex items-center mb-4">
+                  <AlertOctagon className="w-6 h-6 text-amber-600 mr-3" />
+                  <h3 className="text-lg font-bold text-amber-800">Opciones de Cierre Forzado</h3>
+                </div>
+                
+                <p className="text-sm text-amber-700 mb-4">
+                  Se detectaron diferencias que impiden el cierre normal. Puede cerrar forzadamente para generar una contingencia automática con todos los detalles.
+                </p>
+                
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-amber-800 mb-2">
+                    Motivo del cierre forzado (opcional):
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={forceCloseReason}
+                    onChange={(e) => setForceCloseReason(e.target.value)}
+                    className="w-full p-3 border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-sm"
+                    placeholder="Ej: No se pudieron conciliar las diferencias en el tiempo disponible..."
+                  />
+                </div>
+                
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => setShowForceCloseOptions(false)}
+                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors text-sm"
+                  >
+                    Cancelar
+                  </button>
+                  
+                  <button
+                    onClick={() => handleCerrarCaja(true)}
+                    disabled={isSaving}
+                    className="px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 transition-colors text-sm font-medium flex items-center"
+                  >
+                    {isSaving ? (
+                      <>
+                        <Loader className="animate-spin h-4 w-4 mr-2" />
+                        Cerrando...
+                      </>
+                    ) : (
+                      <>
+                        <AlertOctagon className="h-4 w-4 mr-2" />
+                        Cerrar Forzadamente
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {/* Footer con observaciones y finalizar */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
               <div className="space-y-4">
@@ -860,8 +1010,20 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
                     Cancelar
                   </button>
                   
+                  {/* 🆕 BOTÓN DE CIERRE FORZADO SIEMPRE DISPONIBLE */}
+                  {hasUnresolvedIssues && (
+                    <button
+                      onClick={() => setShowForceCloseOptions(true)}
+                      disabled={isSaving || !efectivoConteoCompleto}
+                      className="w-full md:w-auto px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50 transition-colors font-medium flex items-center justify-center"
+                    >
+                      <AlertOctagon className="h-4 w-4 mr-2" />
+                      Cerrar Forzadamente
+                    </button>
+                  )}
+                  
                   <button
-                    onClick={handleCerrarCaja}
+                    onClick={() => handleCerrarCaja(false)}
                     disabled={isSaving || !canClose}
                     className={`w-full md:w-auto px-6 py-2 rounded-lg text-white font-bold text-base shadow-lg hover:shadow-xl transition-all flex items-center justify-center space-x-2 ${
                       canClose
@@ -893,20 +1055,6 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
                   </button>
                 </div>
                 
-                {/* Estado del cierre */}
-                {!canClose && efectivoConteoCompleto && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                    <div className="flex items-center mb-2">
-                      <AlertTriangle className="w-5 h-5 text-amber-600 mr-2" />
-                      <p className="font-medium text-amber-800">Estado del cierre</p>
-                    </div>
-                    <div className="text-sm text-amber-700">
-                      {!efectivoValidation.isValid && !puedeUsarLogicaFlexible && (
-                        <p>⚠️ Hay una diferencia en el conteo de efectivo. {puedeUsarLogicaFlexible ? 'Puede usar lógica flexible (sin ventas en efectivo)' : 'Margen tolerado: $200.'}</p>
-                      )}
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           </div>
