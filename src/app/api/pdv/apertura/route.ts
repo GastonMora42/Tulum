@@ -1,4 +1,4 @@
-// src/app/api/pdv/apertura/route.ts - VERSIÓN ACTUALIZADA CON MONTO FIJO
+// src/app/api/pdv/apertura/route.ts - VERSIÓN ACTUALIZADA MÁS FLEXIBLE
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/server/db/client';
 import { authMiddleware } from '@/server/api/middlewares/auth';
@@ -8,9 +8,9 @@ export async function GET(req: NextRequest) {
   const authError = await authMiddleware(req);
   if (authError) return authError;
 
-    // CAMBIO: Solo requerir caja:crear, no admin
-    const permError = await checkPermission('caja:crear')(req);
-    if (permError) return permError;
+  // CAMBIO: Solo requerir caja:crear, no admin
+  const permError = await checkPermission('caja:crear')(req);
+  if (permError) return permError;
     
   try {
     const { searchParams } = new URL(req.url);
@@ -113,7 +113,6 @@ export async function POST(req: NextRequest) {
   const permError = await checkPermission('caja:crear')(req);
   if (permError) return permError;
   
-  
   try {
     const body = await req.json();
     const { sucursalId, montoInicial, aplicarRecupero = false, observaciones } = body;
@@ -142,6 +141,30 @@ export async function POST(req: NextRequest) {
       );
     }
     
+    // 🆕 VALIDACIONES BÁSICAS SOLAMENTE (SIN RESTRICCIONES SOBRE MONTO FIJO)
+    const montoInicialNum = parseFloat(montoInicial);
+    
+    if (isNaN(montoInicialNum)) {
+      return NextResponse.json(
+        { error: 'El monto inicial debe ser un número válido' },
+        { status: 400 }
+      );
+    }
+    
+    if (montoInicialNum < 0) {
+      return NextResponse.json(
+        { error: 'El monto inicial no puede ser negativo' },
+        { status: 400 }
+      );
+    }
+    
+    if (montoInicialNum > 1000000) {
+      return NextResponse.json(
+        { error: 'El monto inicial es excesivamente alto. Verifique el valor ingresado.' },
+        { status: 400 }
+      );
+    }
+    
     // 🆕 OBTENER CONFIGURACIÓN DE MONTO FIJO
     let configuracionCierre = await prisma.configuracionCierre.findUnique({
       where: { sucursalId }
@@ -158,16 +181,20 @@ export async function POST(req: NextRequest) {
     }
     
     const montoFijo = configuracionCierre.montoFijo;
-    const montoInicialNum = parseFloat(montoInicial);
     
-    // 🆕 VERIFICAR LÓGICA DE APERTURA CON MONTO FIJO
+    // 🆕 NUEVA LÓGICA MÁS FLEXIBLE - INFORMATIVA EN LUGAR DE RESTRICTIVA
     let alertaApertura = '';
     let requiereRecuperoEsteturno = false;
     
     if (montoInicialNum < montoFijo) {
       const diferencia = montoFijo - montoInicialNum;
       requiereRecuperoEsteturno = true;
-      alertaApertura = `Abriendo con $${montoInicialNum.toFixed(2)}, que es menor al monto fijo de $${montoFijo.toFixed(2)}. Si hay ventas en efectivo durante el turno, se habilitará la función de recupero de fondo hasta $${diferencia.toFixed(2)}.`;
+      alertaApertura = `Apertura con $${montoInicialNum.toFixed(2)} - $${diferencia.toFixed(2)} menos que el monto fijo de $${montoFijo.toFixed(2)}. Durante el turno, si hay ventas en efectivo, se habilitará la función de recupero de fondo.`;
+    } else if (montoInicialNum > montoFijo) {
+      const exceso = montoInicialNum - montoFijo;
+      alertaApertura = `Apertura con $${montoInicialNum.toFixed(2)} - $${exceso.toFixed(2)} por encima del monto fijo. El exceso estará disponible para egresos o quedará para sobre al cierre.`;
+    } else {
+      alertaApertura = `Apertura con el monto fijo configurado de $${montoFijo.toFixed(2)}. Operación normal.`;
     }
     
     // 🗃️ CREAR NUEVA CAJA CON CAMPOS ADICIONALES
@@ -211,8 +238,7 @@ export async function POST(req: NextRequest) {
       }
     }
     
-    const mensajeRespuesta = alertaApertura || 
-      `Caja abierta correctamente con $${montoInicialNum.toFixed(2)}. Monto fijo configurado: $${montoFijo.toFixed(2)}.`;
+    const mensajeRespuesta = alertaApertura;
     
     return NextResponse.json({
       success: true,
@@ -221,7 +247,8 @@ export async function POST(req: NextRequest) {
       configuracion: {
         montoFijo,
         requiereRecuperoEsteturno,
-        diferenciMontoFijo: montoFijo - montoInicialNum
+        diferenciMontoFijo: montoFijo - montoInicialNum,
+        esAperturaFlexible: montoInicialNum !== montoFijo
       }
     }, { status: 201 });
   } catch (error: any) {

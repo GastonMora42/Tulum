@@ -1,11 +1,11 @@
-// src/components/pdv/AperturaModal.tsx - VERSIÓN MEJORADA CON CONSISTENCIA
+// src/components/pdv/AperturaModal.tsx - VERSIÓN MEJORADA MÁS FLEXIBLE
 'use client';
 
 import { useState, useEffect } from 'react';
 import { 
   X, DollarSign, AlertTriangle, CheckCircle, Calculator, 
   Clock, PiggyBank, Coins, TrendingUp, Info, Zap, AlertCircle,
-  Shield, Settings
+  Shield, Settings, Target, Lightbulb, CheckSquare, XSquare
 } from 'lucide-react';
 
 interface AperturaModalProps {
@@ -28,49 +28,100 @@ export function AperturaModal({ isOpen, onClose, onComplete, aperturaInfo }: Ape
   const [observaciones, setObservaciones] = useState<string>('');
   const [showCalculator, setShowCalculator] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showAdvancedMode, setShowAdvancedMode] = useState(false);
   
   const [error, setError] = useState<string | null>(null);
-  const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   // Pre-llenar con la sugerencia al abrir el modal
   useEffect(() => {
     if (isOpen && aperturaInfo) {
-      setMontoInicial(aperturaInfo.sugerenciaApertura.toFixed(2));
+      // Usar el monto fijo como valor por defecto (más conservador)
+      setMontoInicial(aperturaInfo.montoFijo.toFixed(2));
       setAplicarRecupero(aperturaInfo.requiereRecupero);
       setError(null);
-      setValidationErrors([]);
       setObservaciones('');
+      setShowAdvancedMode(false);
     }
   }, [isOpen, aperturaInfo]);
 
-  // Función de validación mejorada
+  // Función de validación básica (solo verificar que sea un número válido)
   const validateForm = (): boolean => {
-    const errors: string[] = [];
-    
     const monto = parseFloat(montoInicial);
+    
     if (isNaN(monto)) {
-      errors.push('Debe ingresar un monto válido');
-    } else if (monto < 0) {
-      errors.push('El monto no puede ser negativo');
-    } else if (monto > 1000000) {
-      errors.push('El monto es excesivamente alto');
+      setError('Debe ingresar un monto válido');
+      return false;
+    }
+    
+    if (monto < 0) {
+      setError('El monto no puede ser negativo');
+      return false;
+    }
+    
+    if (monto > 1000000) {
+      setError('El monto es excesivamente alto. Verifique el valor ingresado.');
+      return false;
     }
 
-    // Validaciones específicas según monto fijo
-    if (aperturaInfo) {
-      const montoFijo = aperturaInfo.montoFijo;
-      
-      // Si el monto es menor al monto fijo, verificar que sea una situación válida
-      if (monto < montoFijo) {
-        // Solo es válido si viene de un turno anterior con recupero pendiente o se justifica
-        if (!aperturaInfo.requiereRecupero && !aperturaInfo.alertaMontoInsuficiente && !observaciones.trim()) {
-          errors.push(`El monto inicial debería ser al menos $${montoFijo.toFixed(2)} (monto fijo configurado). Si es intencional, agregue observaciones explicando el motivo.`);
-        }
-      }
-    }
+    setError(null);
+    return true;
+  };
 
-    setValidationErrors(errors);
-    return errors.length === 0;
+  // Analizar el monto ingresado vs configuración
+  const analyzeAmount = () => {
+    if (!aperturaInfo) return null;
+    
+    const monto = parseFloat(montoInicial || '0');
+    const montoFijo = aperturaInfo.montoFijo;
+    const sugerencia = aperturaInfo.sugerenciaApertura;
+    
+    if (monto === montoFijo) {
+      return {
+        type: 'perfect',
+        message: 'Perfecto! Cumple exactamente con el monto fijo configurado',
+        icon: CheckSquare,
+        color: 'text-green-600',
+        bgColor: 'bg-green-50',
+        borderColor: 'border-green-200'
+      };
+    }
+    
+    if (monto === sugerencia && sugerencia !== montoFijo) {
+      return {
+        type: 'suggested',
+        message: 'Usando el monto sugerido basado en el cierre anterior',
+        icon: Lightbulb,
+        color: 'text-blue-600',
+        bgColor: 'bg-blue-50',
+        borderColor: 'border-blue-200'
+      };
+    }
+    
+    if (monto > montoFijo) {
+      const exceso = monto - montoFijo;
+      return {
+        type: 'above',
+        message: `$${exceso.toFixed(2)} por encima del monto fijo. El exceso quedará disponible para egresos o para sobre al cierre.`,
+        icon: TrendingUp,
+        color: 'text-indigo-600',
+        bgColor: 'bg-indigo-50',
+        borderColor: 'border-indigo-200'
+      };
+    }
+    
+    if (monto < montoFijo) {
+      const deficit = montoFijo - monto;
+      return {
+        type: 'below',
+        message: `$${deficit.toFixed(2)} por debajo del monto fijo. Durante el turno, si hay ventas en efectivo, se habilitará recupero de fondo.`,
+        icon: Target,
+        color: 'text-yellow-600',
+        bgColor: 'bg-yellow-50',
+        borderColor: 'border-yellow-200'
+      };
+    }
+    
+    return null;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -79,28 +130,12 @@ export function AperturaModal({ isOpen, onClose, onComplete, aperturaInfo }: Ape
     console.log('🚀 Enviando datos de apertura:', { montoInicial, aplicarRecupero, observaciones });
     
     setError(null);
-    setValidationErrors([]);
     
     if (!validateForm()) {
       return;
     }
     
     const monto = parseFloat(montoInicial);
-    
-    // Confirmación especial si abre con menos del monto fijo
-    if (aperturaInfo && monto < aperturaInfo.montoFijo && !aperturaInfo.requiereRecupero) {
-      const confirmacion = confirm(
-        `Está abriendo con $${monto.toFixed(2)}, que es menor al monto fijo de $${aperturaInfo.montoFijo.toFixed(2)}. 
-
-Durante el turno:
-• Si hay ventas en efectivo, se habilitará recupero de fondo
-• Al cierre, el efectivo para sobre será: Efectivo contado - Egresos - Recupero - $${aperturaInfo.montoFijo.toFixed(2)} (monto fijo)
-• El próximo turno tendrá $${aperturaInfo.montoFijo.toFixed(2)} disponibles
-
-¿Desea continuar?`
-      );
-      if (!confirmacion) return;
-    }
     
     setIsProcessing(true);
     
@@ -169,6 +204,8 @@ Durante el turno:
 
   if (!isOpen) return null;
 
+  const analysis = analyzeAmount();
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
@@ -210,7 +247,7 @@ Durante el turno:
 
           <form onSubmit={handleSubmit} className="p-8">
             
-            {/* MOSTRAR INFORMACIÓN DEL MONTO FIJO */}
+            {/* CONFIGURACIÓN DE SUCURSAL */}
             {aperturaInfo && (
               <div className="mb-6 bg-blue-50 border border-blue-200 rounded-xl p-4">
                 <div className="flex items-center mb-3">
@@ -221,11 +258,17 @@ Durante el turno:
                   <div className="bg-white rounded-lg p-3">
                     <p className="text-gray-600 mb-1">Monto Fijo Configurado:</p>
                     <p className="text-xl font-bold text-blue-700">${aperturaInfo.montoFijo.toFixed(2)}</p>
-                    <p className="text-xs text-blue-600 mt-1">Se reserva para el próximo turno</p>
+                    <p className="text-xs text-blue-600 mt-1">Recomendado para operación normal</p>
                   </div>
                   <div className="bg-white rounded-lg p-3">
-                    <p className="text-gray-600 mb-1">Monto Sugerido:</p>
+                    <p className="text-gray-600 mb-1">Monto Sugerido Hoy:</p>
                     <p className="text-xl font-bold text-green-700">${aperturaInfo.sugerenciaApertura.toFixed(2)}</p>
+                    <p className="text-xs text-green-600 mt-1">
+                      {aperturaInfo.sugerenciaApertura === aperturaInfo.montoFijo 
+                        ? 'Igual al monto fijo' 
+                        : 'Basado en cierre anterior'
+                      }
+                    </p>
                   </div>
                 </div>
               </div>
@@ -240,22 +283,6 @@ Durante el turno:
                 </div>
               </div>
             )}
-
-            {validationErrors.length > 0 && (
-              <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-xl">
-                <div className="flex items-start">
-                  <AlertTriangle className="w-5 h-5 text-yellow-600 mr-2 mt-0.5" />
-                  <div>
-                    <p className="text-yellow-800 font-medium mb-2">Validaciones:</p>
-                    <ul className="text-yellow-700 text-sm space-y-1">
-                      {validationErrors.map((err, idx) => (
-                        <li key={idx}>• {err}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            )}
             
             {/* INFORMACIÓN DE RECUPERO MEJORADA */}
             {aperturaInfo?.alertaMontoInsuficiente && (
@@ -267,31 +294,10 @@ Durante el turno:
                 
                 <div className="bg-white rounded-xl p-4 mb-4">
                   <p className="text-sm text-yellow-800 mb-2">
-                    <strong>Alerta del sistema:</strong>
+                    <strong>Información del sistema:</strong>
                   </p>
                   <p className="text-yellow-700">{aperturaInfo.alertaMontoInsuficiente}</p>
                 </div>
-                
-                {aperturaInfo.ultimoCierre && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                    <div className="bg-white rounded-xl p-4">
-                      <p className="text-xs text-gray-500 mb-1">Fecha del último cierre</p>
-                      <p className="text-lg font-semibold text-gray-900">
-                        {new Date(aperturaInfo.ultimoCierre.fechaCierre).toLocaleDateString()}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {new Date(aperturaInfo.ultimoCierre.fechaCierre).toLocaleTimeString()}
-                      </p>
-                    </div>
-                    
-                    <div className="bg-white rounded-xl p-4">
-                      <p className="text-xs text-gray-500 mb-1">Efectivo que quedó</p>
-                      <p className="text-lg font-semibold text-gray-900">
-                        ${(aperturaInfo.ultimoCierre.montoFinal - (aperturaInfo.ultimoCierre.recuperoFondo || 0)).toFixed(2)}
-                      </p>
-                    </div>
-                  </div>
-                )}
                 
                 <label className="flex items-center space-x-3 cursor-pointer">
                   <input
@@ -302,16 +308,9 @@ Durante el turno:
                     disabled={isProcessing}
                   />
                   <span className="text-yellow-800 font-medium">
-                    Marcar como que se aplicará recupero durante este turno
+                    Confirmar que se aplicará recupero durante este turno
                   </span>
                 </label>
-                
-                <p className="text-yellow-700 text-sm mt-2">
-                  {aplicarRecupero 
-                    ? 'Durante el cierre de este turno, si hay ventas en efectivo, podrá aplicar recupero de fondo'
-                    : 'La situación permanecerá pendiente para turnos posteriores'
-                  }
-                </p>
               </div>
             )}
 
@@ -330,7 +329,6 @@ Durante el turno:
                   onChange={(e) => {
                     setMontoInicial(e.target.value);
                     setError(null);
-                    setValidationErrors([]);
                   }}
                   className="w-full pl-14 pr-6 py-4 text-2xl font-bold border-2 border-gray-300 rounded-2xl focus:ring-2 focus:ring-[#311716] focus:border-[#311716] text-center bg-gray-50"
                   placeholder="0.00"
@@ -348,74 +346,111 @@ Durante el turno:
                     className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-sm font-medium"
                     disabled={isProcessing}
                   >
-                    Usar Monto Fijo (${aperturaInfo.montoFijo.toFixed(2)})
+                    💡 Monto Fijo (${aperturaInfo.montoFijo.toFixed(2)})
                   </button>
                   
-                  <button
-                    type="button"
-                    onClick={() => setMontoInicial(aperturaInfo.sugerenciaApertura.toFixed(2))}
-                    className="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors text-sm font-medium"
-                    disabled={isProcessing}
-                  >
-                    Usar Sugerido (${aperturaInfo.sugerenciaApertura.toFixed(2)})
-                  </button>
+                  {aperturaInfo.sugerenciaApertura !== aperturaInfo.montoFijo && (
+                    <button
+                      type="button"
+                      onClick={() => setMontoInicial(aperturaInfo.sugerenciaApertura.toFixed(2))}
+                      className="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors text-sm font-medium"
+                      disabled={isProcessing}
+                    >
+                      ⭐ Sugerido (${aperturaInfo.sugerenciaApertura.toFixed(2)})
+                    </button>
+                  )}
                 </div>
               )}
-            </div>
 
-            {/* Observaciones */}
-            <div className="mb-8">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Observaciones (opcional):
-              </label>
-              <textarea
-                rows={3}
-                value={observaciones}
-                onChange={(e) => setObservaciones(e.target.value)}
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#311716] focus:border-[#311716] text-sm"
-                placeholder="Cualquier observación sobre la apertura, situaciones especiales, etc..."
-                disabled={isProcessing}
-              />
-            </div>
-
-            {/* Calculadora (mantener existente) */}
-            <div className="mb-8">
-              <div className="flex items-center justify-between mb-4">
-                <h4 className="text-lg font-semibold text-gray-900">Herramientas</h4>
-                <button
-                  type="button"
-                  onClick={() => setShowCalculator(!showCalculator)}
-                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
-                  disabled={isProcessing}
-                >
-                  {showCalculator ? 'Ocultar' : 'Mostrar'} Calculadora
-                </button>
-              </div>
-
-              {showCalculator && (
-                <div className="bg-gray-50 rounded-2xl p-6">
-                  <div className="grid grid-cols-4 gap-3">
-                    {calculatorButtons.map((btn) => (
-                      <button
-                        key={btn}
-                        type="button"
-                        onClick={() => handleCalculatorInput(btn)}
-                        className={`p-4 rounded-xl font-semibold transition-colors ${
-                          ['C', '⌫', '+', '-', '='].includes(btn)
-                            ? 'bg-[#311716] text-white hover:bg-[#462625]'
-                            : 'bg-white text-gray-900 hover:bg-gray-100 border border-gray-200'
-                        }`}
-                        disabled={isProcessing}
-                      >
-                        {btn}
-                      </button>
-                    ))}
+              {/* Análisis del monto */}
+              {analysis && parseFloat(montoInicial || '0') > 0 && (
+                <div className={`p-4 rounded-xl border ${analysis.borderColor} ${analysis.bgColor} mb-4`}>
+                  <div className="flex items-center mb-2">
+                    <analysis.icon className={`w-5 h-5 ${analysis.color} mr-2`} />
+                    <span className={`font-medium ${analysis.color}`}>
+                      {analysis.type === 'perfect' && '✅ Monto Perfecto'}
+                      {analysis.type === 'suggested' && '💡 Monto Sugerido'}
+                      {analysis.type === 'above' && '📈 Por Encima del Monto Fijo'}
+                      {analysis.type === 'below' && '⚡ Por Debajo del Monto Fijo'}
+                    </span>
                   </div>
+                  <p className={`text-sm ${analysis.color.replace('600', '700')}`}>
+                    {analysis.message}
+                  </p>
                 </div>
               )}
             </div>
 
-            {/* Resumen mejorado */}
+            {/* Modo Avanzado Toggle */}
+            <div className="mb-6">
+              <button
+                type="button"
+                onClick={() => setShowAdvancedMode(!showAdvancedMode)}
+                className="text-sm text-gray-600 hover:text-gray-800 flex items-center"
+              >
+                {showAdvancedMode ? '🔽' : '▶️'} Opciones avanzadas
+              </button>
+            </div>
+
+            {/* Opciones Avanzadas */}
+            {showAdvancedMode && (
+              <div className="mb-8 space-y-6">
+                
+                {/* Observaciones */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Observaciones (opcional):
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={observaciones}
+                    onChange={(e) => setObservaciones(e.target.value)}
+                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#311716] focus:border-[#311716] text-sm"
+                    placeholder="Ej: Apertura con monto diferente debido a situación especial..."
+                    disabled={isProcessing}
+                  />
+                </div>
+
+                {/* Calculadora */}
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-lg font-semibold text-gray-900">Calculadora</h4>
+                    <button
+                      type="button"
+                      onClick={() => setShowCalculator(!showCalculator)}
+                      className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
+                      disabled={isProcessing}
+                    >
+                      {showCalculator ? 'Ocultar' : 'Mostrar'}
+                    </button>
+                  </div>
+
+                  {showCalculator && (
+                    <div className="bg-gray-50 rounded-2xl p-6">
+                      <div className="grid grid-cols-4 gap-3">
+                        {calculatorButtons.map((btn) => (
+                          <button
+                            key={btn}
+                            type="button"
+                            onClick={() => handleCalculatorInput(btn)}
+                            className={`p-4 rounded-xl font-semibold transition-colors ${
+                              ['C', '⌫', '+', '-', '='].includes(btn)
+                                ? 'bg-[#311716] text-white hover:bg-[#462625]'
+                                : 'bg-white text-gray-900 hover:bg-gray-100 border border-gray-200'
+                            }`}
+                            disabled={isProcessing}
+                          >
+                            {btn}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Resumen final */}
             <div className="mb-8 bg-gray-50 rounded-2xl p-6">
               <h4 className="font-semibold text-gray-900 mb-4 flex items-center">
                 <Coins className="w-5 h-5 mr-2" />
@@ -424,7 +459,7 @@ Durante el turno:
               
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Monto inicial:</span>
+                  <span className="text-gray-600">Monto que se abrirá:</span>
                   <span className="font-bold text-lg">${parseFloat(montoInicial || '0').toFixed(2)}</span>
                 </div>
                 
@@ -435,10 +470,13 @@ Durante el turno:
                       <span className="font-bold text-blue-600">${aperturaInfo.montoFijo.toFixed(2)}</span>
                     </div>
                     
-                    {parseFloat(montoInicial || '0') < aperturaInfo.montoFijo && (
+                    {parseFloat(montoInicial || '0') !== aperturaInfo.montoFijo && (
                       <div className="flex justify-between items-center text-yellow-700">
-                        <span>Diferencia del monto fijo:</span>
-                        <span className="font-bold">-${(aperturaInfo.montoFijo - parseFloat(montoInicial || '0')).toFixed(2)}</span>
+                        <span>Diferencia:</span>
+                        <span className="font-bold">
+                          {parseFloat(montoInicial || '0') > aperturaInfo.montoFijo ? '+' : ''}
+                          ${(parseFloat(montoInicial || '0') - aperturaInfo.montoFijo).toFixed(2)}
+                        </span>
                       </div>
                     )}
                   </>
@@ -447,30 +485,17 @@ Durante el turno:
                 <hr className="border-gray-200" />
                 
                 <div className="bg-white rounded-lg p-3">
-                  <p className="text-sm text-gray-600 mb-1">Estado de la apertura:</p>
+                  <p className="text-sm text-gray-600 mb-1">Durante el turno:</p>
                   {aperturaInfo && parseFloat(montoInicial || '0') < aperturaInfo.montoFijo ? (
-                    <p className="text-yellow-700 font-medium">
-                      ⚠️ Menor al monto fijo - Se habilitará recupero si hay ventas en efectivo
+                    <p className="text-yellow-700 font-medium text-sm">
+                      ⚡ Si hay ventas en efectivo, se habilitará recupero de fondo automáticamente
                     </p>
                   ) : (
-                    <p className="text-green-700 font-medium">
-                      ✅ Cumple con el monto fijo configurado
+                    <p className="text-green-700 font-medium text-sm">
+                      ✅ Operación normal - cumple con el monto fijo configurado
                     </p>
                   )}
                 </div>
-
-                {/* 🆕 NUEVA INFORMACIÓN SOBRE CIERRE */}
-                {aperturaInfo && parseFloat(montoInicial || '0') < aperturaInfo.montoFijo && (
-                  <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
-                    <p className="text-sm text-blue-800 font-medium mb-2">💡 Información importante:</p>
-                    <p className="text-xs text-blue-700">
-                      Al cierre, el cálculo será: <strong>Efectivo contado - Egresos - Recupero - ${aperturaInfo.montoFijo.toFixed(2)} (monto fijo) = Efectivo para sobre</strong>
-                    </p>
-                    <p className="text-xs text-blue-700 mt-1">
-                      El próximo turno tendrá ${aperturaInfo.montoFijo.toFixed(2)} disponibles para apertura.
-                    </p>
-                  </div>
-                )}
               </div>
             </div>
 

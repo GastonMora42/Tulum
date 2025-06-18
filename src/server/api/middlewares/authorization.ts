@@ -1,4 +1,4 @@
-// src/server/api/middlewares/authorization.ts - VERSIÓN MEJORADA
+// src/server/api/middlewares/authorization.ts - VERSIÓN MEJORADA CON EDICIÓN DE UBICACIONES
 import { NextRequest, NextResponse } from 'next/server';
 
 export function checkPermission(requiredPermission: string | string[]) {
