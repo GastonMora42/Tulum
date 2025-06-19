@@ -1,4 +1,4 @@
-// src/app/(admin)/admin/stock-sucursales/page.tsx - DISEÑO PROFESIONAL RENOVADO
+// src/app/(admin)/admin/stock-sucursales/page.tsx - VERSIÓN MEJORADA
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -6,23 +6,33 @@ import {
   BarChart3, Settings, Upload, Download, RefreshCw, 
   FileText, TrendingUp, Store, Package2, AlertTriangle,
   CheckCircle, Info, Plus, Filter, Search, ArrowUpRight,
-  Activity, Target, Zap, Eye, Layers, PieChart, Globe
+  Activity, Target, Zap, Eye, Layers, PieChart, Globe,
+  ShoppingCart, Tag
 } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
 import { ContrastEnhancer } from '@/components/ui/ContrastEnhancer';
 import BulkStockUpload from '@/components/admin/BulkStockUpload';
 
-// ✅ INTERFACES CORREGIDAS
+// ✅ INTERFACES MEJORADAS
 interface Sucursal {
   id: string;
   nombre: string;
   tipo: string;
 }
 
+interface Categoria {
+  id: string;
+  nombre: string;
+}
+
 interface Producto {
   id: string;
   nombre: string;
   codigoBarras?: string;
+  categoria?: {
+    id: string;
+    nombre: string;
+  };
 }
 
 interface DashboardData {
@@ -86,9 +96,17 @@ interface BulkData {
   descripcion: string;
   modo: string;
   items: Array<{
+    productoId?: string;
     nombreProducto: string;
     cantidad: number;
   }>;
+}
+
+interface QuickLoadData {
+  productoId: string;
+  sucursalId: string;
+  cantidad: number;
+  modo: 'incrementar' | 'establecer';
 }
 
 interface BulkResult {
@@ -102,8 +120,10 @@ export default function StockSucursalesPage() {
   const [loading, setLoading] = useState(true);
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [productos, setProductos] = useState<Producto[]>([]);
   const [selectedSucursal, setSelectedSucursal] = useState('');
+  const [selectedCategoria, setSelectedCategoria] = useState('');
   const [view, setView] = useState('dashboard');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('todos');
@@ -112,8 +132,9 @@ export default function StockSucursalesPage() {
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
   const [showBulkFileModal, setShowBulkFileModal] = useState(false);
+  const [showQuickLoadModal, setShowQuickLoadModal] = useState(false);
 
-  // Estados para configuración
+  // Estados para datos de modales
   const [configData, setConfigData] = useState<ConfigData>({
     productoId: '',
     sucursalId: '',
@@ -122,13 +143,19 @@ export default function StockSucursalesPage() {
     puntoReposicion: 0
   });
 
-  // Estados para carga masiva manual
   const [bulkData, setBulkData] = useState<BulkData>({
     sucursalId: '',
     nombre: '',
     descripcion: '',
     modo: 'incrementar',
     items: []
+  });
+
+  const [quickLoadData, setQuickLoadData] = useState<QuickLoadData>({
+    productoId: '',
+    sucursalId: '',
+    cantidad: 0,
+    modo: 'incrementar'
   });
 
   useEffect(() => {
@@ -139,21 +166,24 @@ export default function StockSucursalesPage() {
     if (view === 'dashboard') {
       loadDashboardData();
     }
-  }, [selectedSucursal, view]);
+  }, [selectedSucursal, selectedCategoria, view]);
 
   const loadInitialData = async () => {
     try {
-      const [sucursalesRes, productosRes] = await Promise.all([
+      const [sucursalesRes, productosRes, categoriasRes] = await Promise.all([
         authenticatedFetch('/api/admin/ubicaciones'),
-        authenticatedFetch('/api/productos?limit=1000')
+        authenticatedFetch('/api/productos?limit=1000'),
+        authenticatedFetch('/api/admin/categorias')
       ]);
 
-      if (sucursalesRes.ok && productosRes.ok) {
+      if (sucursalesRes.ok && productosRes.ok && categoriasRes.ok) {
         const sucursalesData = await sucursalesRes.json();
         const productosData = await productosRes.json();
+        const categoriasData = await categoriasRes.json();
         
         setSucursales(sucursalesData.filter((s: Sucursal) => s.tipo === 'sucursal'));
         setProductos(productosData.data || productosData);
+        setCategorias(categoriasData.data || categoriasData);
       }
     } catch (error) {
       console.error('Error cargando datos:', error);
@@ -241,6 +271,55 @@ export default function StockSucursalesPage() {
     }
   };
 
+  const handleQuickLoad = async () => {
+    try {
+      const response = await authenticatedFetch('/api/admin/stock-config/bulk-load', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          sucursalId: quickLoadData.sucursalId,
+          nombre: `Carga rápida ${new Date().toLocaleDateString()}`,
+          descripcion: 'Carga rápida desde tabla',
+          modo: quickLoadData.modo,
+          items: [{
+            productoId: quickLoadData.productoId,
+            cantidad: quickLoadData.cantidad
+          }]
+        })
+      });
+
+      if (response.ok) {
+        setShowQuickLoadModal(false);
+        setQuickLoadData({
+          productoId: '',
+          sucursalId: '',
+          cantidad: 0,
+          modo: 'incrementar'
+        });
+        alert('Stock cargado exitosamente');
+        loadDashboardData();
+      } else {
+        const errorData = await response.json();
+        alert(`Error: ${errorData.error}`);
+      }
+    } catch (error) {
+      console.error('Error en carga rápida:', error);
+      alert('Error en la carga rápida');
+    }
+  };
+
+  const openQuickLoadModal = (productoId: string, sucursalId: string) => {
+    setQuickLoadData({
+      productoId,
+      sucursalId,
+      cantidad: 0,
+      modo: 'incrementar'
+    });
+    setShowQuickLoadModal(true);
+  };
+
   const getStatusConfig = (estado: string) => {
     switch (estado) {
       case 'critico': 
@@ -278,11 +357,21 @@ export default function StockSucursalesPage() {
     }
   };
 
+  // ✅ FILTRADO MEJORADO CON CATEGORÍA
   const filteredAnalysis = dashboardData?.analisisCompleto?.filter((item) => {
     if (statusFilter !== 'todos' && item.estado !== statusFilter) return false;
     if (searchTerm && !item.producto.nombre.toLowerCase().includes(searchTerm.toLowerCase())) return false;
+    if (selectedCategoria) {
+      const producto = productos.find(p => p.id === item.producto.id);
+      if (!producto?.categoria || producto.categoria.id !== selectedCategoria) return false;
+    }
     return true;
   }) || [];
+
+  // ✅ PRODUCTOS FILTRADOS POR CATEGORÍA PARA EL MODAL
+  const productosFilteredForModal = selectedCategoria 
+    ? productos.filter(p => p.categoria?.id === selectedCategoria)
+    : productos;
 
   return (
     <ContrastEnhancer>
@@ -330,19 +419,6 @@ export default function StockSucursalesPage() {
                 </div>
                 
                 <div className="flex flex-wrap gap-3 mt-8 lg:mt-0">
-                  <button
-                    onClick={() => setView('dashboard')}
-                    className={`group relative px-6 py-3 rounded-2xl font-semibold text-sm transition-all duration-300 ${
-                      view === 'dashboard' 
-                        ? 'bg-white text-[#311716] shadow-xl' 
-                        : 'bg-white/10 text-white hover:bg-white/20 backdrop-blur-sm'
-                    }`}
-                  >
-                    <div className="flex items-center space-x-2">
-                      <BarChart3 className="w-5 h-5" />
-                      <span>Dashboard</span>
-                    </div>
-                  </button>
                   
                   <button
                     onClick={() => setShowConfigModal(true)}
@@ -378,9 +454,9 @@ export default function StockSucursalesPage() {
             </div>
           </div>
 
-          {/* Filtros Modernos */}
+          {/* ✅ FILTROS MEJORADOS CON CATEGORÍA */}
           <div className="bg-white/80 backdrop-blur-sm border border-white/20 rounded-3xl shadow-xl p-6">
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-6">
               <div className="space-y-2">
                 <label className="block text-sm font-semibold text-gray-700">Sucursal</label>
                 <div className="relative">
@@ -393,6 +469,24 @@ export default function StockSucursalesPage() {
                     <option value="">Todas las sucursales</option>
                     {sucursales.map(s => (
                       <option key={s.id} value={s.id}>{s.nombre}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* ✅ NUEVO FILTRO POR CATEGORÍA */}
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700">Categoría</label>
+                <div className="relative">
+                  <Tag className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <select
+                    value={selectedCategoria}
+                    onChange={(e) => setSelectedCategoria(e.target.value)}
+                    className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-2xl focus:ring-2 focus:ring-[#eeb077] focus:border-transparent transition-all duration-200"
+                  >
+                    <option value="">Todas las categorías</option>
+                    {categorias.map(c => (
+                      <option key={c.id} value={c.id}>{c.nombre}</option>
                     ))}
                   </select>
                 </div>
@@ -456,7 +550,7 @@ export default function StockSucursalesPage() {
             </div>
           </div>
 
-          {/* Estadísticas Modernizadas */}
+          {/* Estadísticas (mantener igual) */}
           {dashboardData && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
               {/* Total */}
@@ -561,7 +655,7 @@ export default function StockSucursalesPage() {
             </div>
           )}
 
-          {/* Tabla Moderna */}
+          {/* ✅ TABLA MEJORADA CON BOTÓN RÁPIDO */}
           {dashboardData && (
             <div className="bg-white rounded-3xl shadow-xl overflow-hidden border border-gray-100">
               <div className="bg-gradient-to-r from-gray-50 to-white px-8 py-6 border-b border-gray-100">
@@ -603,6 +697,9 @@ export default function StockSucursalesPage() {
                       </th>
                       <th className="px-8 py-4 text-left text-sm font-bold text-gray-700 uppercase tracking-wider">
                         Progreso
+                      </th>
+                      <th className="px-8 py-4 text-center text-sm font-bold text-gray-700 uppercase tracking-wider">
+                        Acciones
                       </th>
                     </tr>
                   </thead>
@@ -681,6 +778,16 @@ export default function StockSucursalesPage() {
                               </div>
                             </div>
                           </td>
+                          {/* ✅ NUEVO BOTÓN RÁPIDO DE CARGA */}
+                          <td className="px-8 py-6 text-center">
+                            <button
+                              onClick={() => openQuickLoadModal(item.producto.id, item.sucursal.id)}
+                              className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-emerald-500 to-green-500 text-white rounded-2xl font-semibold text-sm transition-all duration-300 hover:shadow-lg hover:scale-105 active:scale-95"
+                            >
+                              <ShoppingCart className="w-4 h-4 mr-2" />
+                              Cargar Stock
+                            </button>
+                          </td>
                         </tr>
                       );
                     })}
@@ -690,7 +797,7 @@ export default function StockSucursalesPage() {
             </div>
           )}
 
-          {/* Loading State Moderno */}
+          {/* Loading State */}
           {loading && (
             <div className="flex items-center justify-center h-96">
               <div className="relative">
@@ -703,12 +810,12 @@ export default function StockSucursalesPage() {
             </div>
           )}
 
-          {/* Modales mejorados conservando la funcionalidad original */}
+          {/* ✅ MODALES MEJORADOS */}
           {showConfigModal && (
             <ModernConfigModal
               configData={configData}
               setConfigData={setConfigData}
-              productos={productos}
+              productos={productosFilteredForModal}
               sucursales={sucursales}
               onSave={handleConfigSave}
               onClose={() => setShowConfigModal(false)}
@@ -719,6 +826,7 @@ export default function StockSucursalesPage() {
             <ModernBulkModal
               bulkData={bulkData}
               setBulkData={setBulkData}
+              productos={productosFilteredForModal}
               sucursales={sucursales}
               onSave={handleBulkLoad}
               onClose={() => setShowBulkModal(false)}
@@ -734,14 +842,25 @@ export default function StockSucursalesPage() {
               onClose={() => setShowBulkFileModal(false)}
             />
           )}
+
+          {/* ✅ NUEVO MODAL DE CARGA RÁPIDA */}
+          {showQuickLoadModal && (
+            <QuickLoadModal
+              quickLoadData={quickLoadData}
+              setQuickLoadData={setQuickLoadData}
+              productos={productos}
+              sucursales={sucursales}
+              onSave={handleQuickLoad}
+              onClose={() => setShowQuickLoadModal(false)}
+            />
+          )}
         </div>
       </div>
     </ContrastEnhancer>
   );
 }
 
-// ✅ MODALES MODERNIZADOS
-
+// ✅ MODAL DE CONFIGURACIÓN MEJORADO
 interface ModernConfigModalProps {
   configData: ConfigData;
   setConfigData: (data: ConfigData) => void;
@@ -769,11 +888,12 @@ const ModernConfigModal = ({ configData, setConfigData, productos, sucursales, o
                 value={configData.productoId}
                 onChange={(e) => setConfigData({...configData, productoId: e.target.value})}
                 className="w-full pl-10 pr-4 py-3 bg-white border-2 border-gray-200 rounded-2xl focus:ring-2 focus:ring-[#eeb077] focus:border-transparent transition-all duration-200"
-                disabled={!!configData.productoId}
               >
                 <option value="">Seleccionar producto</option>
                 {productos.map((p) => (
-                  <option key={p.id} value={p.id}>{p.nombre}</option>
+                  <option key={p.id} value={p.id}>
+                    {p.nombre} {p.categoria ? `(${p.categoria.nombre})` : ''}
+                  </option>
                 ))}
               </select>
             </div>
@@ -787,7 +907,6 @@ const ModernConfigModal = ({ configData, setConfigData, productos, sucursales, o
                 value={configData.sucursalId}
                 onChange={(e) => setConfigData({...configData, sucursalId: e.target.value})}
                 className="w-full pl-10 pr-4 py-3 bg-white border-2 border-gray-200 rounded-2xl focus:ring-2 focus:ring-[#eeb077] focus:border-transparent transition-all duration-200"
-                disabled={!!configData.sucursalId}
               >
                 <option value="">Seleccionar sucursal</option>
                 {sucursales.map((s) => (
@@ -856,15 +975,17 @@ const ModernConfigModal = ({ configData, setConfigData, productos, sucursales, o
   </div>
 );
 
+// ✅ MODAL DE CARGA MASIVA MEJORADO CON SELECTOR DE PRODUCTOS
 interface ModernBulkModalProps {
   bulkData: BulkData;
   setBulkData: (data: BulkData) => void;
+  productos: Producto[];
   sucursales: Sucursal[];
   onSave: () => void;
   onClose: () => void;
 }
 
-const ModernBulkModal = ({ bulkData, setBulkData, sucursales, onSave, onClose }: ModernBulkModalProps) => (
+const ModernBulkModal = ({ bulkData, setBulkData, productos, sucursales, onSave, onClose }: ModernBulkModalProps) => (
   <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
     <div className="bg-white rounded-3xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
       <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-8 text-white">
@@ -921,17 +1042,28 @@ const ModernBulkModal = ({ bulkData, setBulkData, sucursales, onSave, onClose }:
           <div className="border-2 border-gray-200 rounded-2xl p-4 bg-gray-50 space-y-3 max-h-64 overflow-y-auto">
             {bulkData.items.map((item, index) => (
               <div key={index} className="flex items-center space-x-3 bg-white p-4 rounded-2xl shadow-sm">
-                <input
-                  type="text"
-                  value={item.nombreProducto || ''}
+                {/* ✅ SELECTOR DE PRODUCTO EN LUGAR DE INPUT MANUAL */}
+                <select
+                  value={item.productoId || ''}
                   onChange={(e) => {
+                    const producto = productos.find(p => p.id === e.target.value);
                     const newItems = [...bulkData.items];
-                    newItems[index] = {...newItems[index], nombreProducto: e.target.value};
+                    newItems[index] = {
+                      ...newItems[index], 
+                      productoId: e.target.value,
+                      nombreProducto: producto?.nombre || ''
+                    };
                     setBulkData({...bulkData, items: newItems});
                   }}
-                  placeholder="Nombre del producto"
                   className="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
+                >
+                  <option value="">Seleccionar producto</option>
+                  {productos.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.nombre} {p.categoria ? `(${p.categoria.nombre})` : ''}
+                    </option>
+                  ))}
+                </select>
                 <input
                   type="number"
                   value={item.cantidad || ''}
@@ -960,7 +1092,7 @@ const ModernBulkModal = ({ bulkData, setBulkData, sucursales, onSave, onClose }:
               onClick={() => {
                 setBulkData({
                   ...bulkData, 
-                  items: [...bulkData.items, { nombreProducto: '', cantidad: 0 }]
+                  items: [...bulkData.items, { productoId: '', nombreProducto: '', cantidad: 0 }]
                 });
               }}
               className="w-full border-2 border-dashed border-gray-300 rounded-2xl p-4 text-gray-500 hover:border-purple-400 hover:text-purple-600 hover:bg-purple-50 transition-all duration-200"
@@ -989,3 +1121,78 @@ const ModernBulkModal = ({ bulkData, setBulkData, sucursales, onSave, onClose }:
     </div>
   </div>
 );
+
+// ✅ NUEVO MODAL DE CARGA RÁPIDA
+interface QuickLoadModalProps {
+  quickLoadData: QuickLoadData;
+  setQuickLoadData: (data: QuickLoadData) => void;
+  productos: Producto[];
+  sucursales: Sucursal[];
+  onSave: () => void;
+  onClose: () => void;
+}
+
+const QuickLoadModal = ({ quickLoadData, setQuickLoadData, productos, sucursales, onSave, onClose }: QuickLoadModalProps) => {
+  const producto = productos.find(p => p.id === quickLoadData.productoId);
+  const sucursal = sucursales.find(s => s.id === quickLoadData.sucursalId);
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
+        <div className="bg-gradient-to-r from-emerald-500 to-green-500 p-6 text-white">
+          <h3 className="text-xl font-bold mb-2">Carga Rápida de Stock</h3>
+          <p className="text-white/80">Actualiza el stock de este producto</p>
+        </div>
+        
+        <div className="p-6 space-y-4">
+          <div className="bg-gray-50 rounded-2xl p-4">
+            <div className="text-sm text-gray-600 mb-1">Producto</div>
+            <div className="font-bold text-gray-900">{producto?.nombre}</div>
+            <div className="text-sm text-gray-500 mt-1">en {sucursal?.nombre}</div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-sm font-bold text-gray-700">Modo de Carga</label>
+            <select
+              value={quickLoadData.modo}
+              onChange={(e) => setQuickLoadData({...quickLoadData, modo: e.target.value as 'incrementar' | 'establecer'})}
+              className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200"
+            >
+              <option value="incrementar">Incrementar stock (+)</option>
+              <option value="establecer">Establecer stock exacto (=)</option>
+            </select>
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-sm font-bold text-gray-700">Cantidad</label>
+            <input
+              type="number"
+              value={quickLoadData.cantidad}
+              onChange={(e) => setQuickLoadData({...quickLoadData, cantidad: parseFloat(e.target.value) || 0})}
+              className="w-full px-4 py-3 bg-white border-2 border-gray-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all duration-200"
+              min="0"
+              placeholder="0"
+              autoFocus
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end space-x-4 p-6 bg-gray-50">
+          <button
+            onClick={onClose}
+            className="px-6 py-3 border-2 border-gray-300 text-gray-700 rounded-2xl font-semibold hover:bg-gray-100 transition-all duration-200"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={onSave}
+            className="px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-500 text-white rounded-2xl font-semibold hover:shadow-lg transition-all duration-200"
+            disabled={quickLoadData.cantidad <= 0}
+          >
+            Cargar Stock
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
