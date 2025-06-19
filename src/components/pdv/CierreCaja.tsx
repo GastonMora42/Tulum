@@ -1,4 +1,4 @@
-// src/components/pdv/CierreCaja.tsx - VERSIÓN CORREGIDA CON FOCO Y CIERRE FORZADO
+// src/components/pdv/CierreCaja.tsx - VERSIÓN CON MARGEN ÚNICO DE $200
 
 'use client';
 
@@ -80,6 +80,9 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
   const [notification, setNotification] = useState<any>(null);
   const [efectivoConteoCompleto, setEfectivoConteoCompleto] = useState(false);
   
+  // 🔧 CONSTANTE: MARGEN ÚNICO DE TOLERANCIA DE $200
+  const MARGEN_TOLERANCIA = 200;
+  
   const router = useRouter();
   
   // Función helper para obtener nombre de usuario
@@ -93,7 +96,7 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
     return 'Usuario desconocido';
   };
   
-  // 🎯 FUNCIÓN DE VALIDACIÓN DEL EFECTIVO - MEJORADA PARA PERMITIR NEGATIVO SIN VENTAS
+  // 🎯 FUNCIÓN DE VALIDACIÓN DEL EFECTIVO - MARGEN ÚNICO DE $200
   const calcularValidacionEfectivo = useCallback(() => {
     if (!ventasResumen || !cierreCaja || efectivoContado <= 0) {
       return {
@@ -111,8 +114,7 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
     const efectivoEsperado = montoInicial + ventasEfectivo - totalEgresos;
     const diferencia = efectivoContado - efectivoEsperado;
     
-    // 🆕 NUEVA LÓGICA: Si no hay ventas en efectivo, permitir diferencias mayores
-    const MARGEN_TOLERANCIA = ventasEfectivo > 0 ? 200 : 1000; // Mayor tolerancia sin ventas en efectivo
+    // 🔧 CAMBIO: MARGEN ÚNICO DE $200 SIEMPRE
     const isValid = Math.abs(diferencia) <= MARGEN_TOLERANCIA;
     
     return {
@@ -391,7 +393,7 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
         
         
         {/* Botón para forzar corrección */}
-        {validation.status === 'incorrect' && !isForcedCorrect && Math.abs(validation.difference) >= 200 && (
+        {validation.status === 'incorrect' && !isForcedCorrect && Math.abs(validation.difference) >= MARGEN_TOLERANCIA && (
           <button
             onClick={handleForceCorrection}
             className="mt-2 px-3 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-lg text-sm font-medium transition-colors"
@@ -432,10 +434,6 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
         throw new Error('Debe contar el efectivo antes de cerrar la caja');
       }
       
-      // 🆕 VALIDACIÓN MEJORADA: Permitir cerrar con negativo si no hay ventas en efectivo
-      const ventasEfectivo = ventasResumen.totalesPorMedioPago?.efectivo?.monto || 0;
-      const puedeUsarLogicaFlexible = ventasEfectivo === 0;
-      
       if (!forzar) {
         // Validar medios electrónicos solo si no es forzado
         const mediosConValidacion = getMediosConValidacion();
@@ -454,12 +452,12 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
           return;
         }
         
-        // 🆕 VALIDACIÓN DE EFECTIVO MEJORADA
-        if (!efectivoValidation.isValid && !puedeUsarLogicaFlexible) {
+        // 🔧 VALIDACIÓN DE EFECTIVO CON MARGEN ÚNICO
+        if (!efectivoValidation.isValid) {
           setNotification({
             type: 'error',
-            message: `Hay una diferencia significativa en el efectivo (${efectivoValidation.difference > 0 ? '+' : ''}$${efectivoValidation.difference.toFixed(2)})`,
-            details: 'Puede usar "Cerrar Forzadamente" para generar una contingencia automática',
+            message: `Hay una diferencia en el efectivo mayor a $${MARGEN_TOLERANCIA.toFixed(0)} (diferencia: ${efectivoValidation.difference > 0 ? '+' : ''}$${efectivoValidation.difference.toFixed(2)})`,
+            details: 'Para cerrar correctamente, la diferencia debe ser menor a $200. Use "Cerrar Forzadamente" para generar una contingencia automática',
             action: 'Verifique el conteo o use cierre forzado'
           });
           setShowForceCloseOptions(true);
@@ -480,8 +478,8 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
         const problemasEncontrados = [];
         
         // Agregar problemas de efectivo
-        if (!efectivoValidation.isValid && !puedeUsarLogicaFlexible) {
-          problemasEncontrados.push(`Efectivo: diferencia de ${efectivoValidation.difference > 0 ? '+' : ''}$${efectivoValidation.difference.toFixed(2)}`);
+        if (!efectivoValidation.isValid) {
+          problemasEncontrados.push(`Efectivo: diferencia de ${efectivoValidation.difference > 0 ? '+' : ''}$${efectivoValidation.difference.toFixed(2)} (tolerancia: $${MARGEN_TOLERANCIA})`);
         }
         
         // Agregar problemas de medios electrónicos
@@ -515,8 +513,8 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
           conteoQR: parseFloat(conteoQR) || 0,
           conteoOtros: 0,
           recuperoFondo: parseFloat(recuperoFondo) || 0,
-          forzarContingencia: forzar || forcedMethods.size > 0 || (!efectivoValidation.isValid && !puedeUsarLogicaFlexible),
-          resolverDiferenciasAutomaticamente: forzar || forcedMethods.size > 0 || puedeUsarLogicaFlexible
+          forzarContingencia: forzar || forcedMethods.size > 0 || !efectivoValidation.isValid,
+          resolverDiferenciasAutomaticamente: forzar || forcedMethods.size > 0
         })
       });
       
@@ -569,9 +567,8 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
   const recuperoRecomendado = calcularRecuperoRecomendado();
   const cuentasAutomaticas = calcularCuentasAutomaticas();
   const ventasEfectivo = ventasResumen?.totalesPorMedioPago?.efectivo?.monto || 0;
-  const puedeUsarLogicaFlexible = ventasEfectivo === 0;
   const mediosConValidacion = getMediosConValidacion();
-  const canClose = efectivoConteoCompleto && (efectivoValidation.isValid || puedeUsarLogicaFlexible);
+  const canClose = efectivoConteoCompleto && efectivoValidation.isValid;
   const hasUnresolvedIssues = !canClose || mediosConValidacion.some(m => m.esperado > 0 && !m.validation.isValid && !m.isForzado);
 
   return (
@@ -590,7 +587,7 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
                   {cierreCaja?.fechaApertura 
                     ? format(new Date(cierreCaja.fechaApertura), 'dd/MM/yyyy HH:mm') 
                     : 'Fecha no disponible'
-                  } • Monto Fijo: ${configuracionCierre?.montoFijo?.toFixed(2) || '0.00'}
+                  } • Monto Fijo: ${configuracionCierre?.montoFijo?.toFixed(2) || '0.00'} • Tolerancia: $200
                 </p>
               </div>
             </div>
@@ -680,16 +677,15 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
                   </p>
                   <p className="text-xs text-gray-500">{ventasResumen?.cantidadVentas} operaciones</p>
                 </div>
-
-                {/* 🆕 INDICADOR ESPECIAL PARA SIN VENTAS EN EFECTIVO */}
-                {puedeUsarLogicaFlexible && (
-                  <div className="bg-yellow-50 rounded-lg p-3 text-center border border-yellow-200">
-                    <p className="text-sm text-yellow-600 mb-1">⚠️ Sin Ventas en Efectivo</p>
-                    <p className="text-xs text-yellow-700">
-                      Se permite mayor flexibilidad en el cierre
-                    </p>
-                  </div>
-                )}
+                
+                {/* 🔧 INFORMACIÓN SOBRE TOLERANCIA */}
+                <div className="bg-gray-50 rounded-lg p-3 text-center border border-gray-200">
+                  <p className="text-sm text-gray-600 mb-1">📏 Tolerancia de Diferencias</p>
+                  <p className="text-lg font-bold text-gray-800">±$200.00</p>
+                  <p className="text-xs text-gray-600 mt-1">
+                    Para cerrar correctamente
+                  </p>
+                </div>
                 
                 {recuperoRecomendado > 0 && (
                   <div className="bg-yellow-50 rounded-lg p-3 text-center border border-yellow-200">
@@ -760,19 +756,19 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
               {/* Indicador visual para efectivo */}
               {efectivoConteoCompleto && (
                 <div className={`absolute top-4 right-4 flex items-center px-3 py-2 rounded-lg font-medium ${
-                  efectivoValidation.isValid || puedeUsarLogicaFlexible
+                  efectivoValidation.isValid
                     ? 'bg-green-100 text-green-800 border border-green-300'
                     : 'bg-red-100 text-red-800 border border-red-300'
                 }`}>
-                  {efectivoValidation.isValid || puedeUsarLogicaFlexible ? (
+                  {efectivoValidation.isValid ? (
                     <>
                       <CheckCircle className="w-5 h-5 mr-2" />
-                      <span>{puedeUsarLogicaFlexible ? 'Flexible' : 'Correcto'}</span>
+                      <span>Dentro de tolerancia</span>
                     </>
                   ) : (
                     <>
                       <XCircle className="w-5 h-5 mr-2" />
-                      <span>Hay Diferencia</span>
+                      <span>Diferencia &gt; $200</span>
                     </>
                   )}
                 </div>
@@ -890,7 +886,7 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
                 </h3>
                 
                 <p className="text-sm text-gray-600 mb-4">
-                  Ingresa los montos contados manualmente. El sistema validará si coinciden exactamente:
+                  Ingresa los montos contados manualmente. Tolerancia: $200 para todas las diferencias.
                 </p>
                 
                 <div className="space-y-4">
@@ -940,7 +936,7 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
                 </div>
                 
                 <p className="text-sm text-amber-700 mb-4">
-                  Se detectaron diferencias que impiden el cierre normal. Puede cerrar forzadamente para generar una contingencia automática con todos los detalles.
+                  Se detectaron diferencias mayores a $200 que impiden el cierre normal. Puede cerrar forzadamente para generar una contingencia automática con todos los detalles.
                 </p>
                 
                 <div className="mb-4">
@@ -1044,7 +1040,7 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
                     ) : !canClose ? (
                       <>
                         <AlertTriangle className="h-4 w-4" />
-                        <span>Revisar Diferencias</span>
+                        <span>Diferencia &gt; $200</span>
                       </>
                     ) : (
                       <>
