@@ -19,12 +19,12 @@ const categoriasMapping = {
   'VARIOS': 'Accesorios'
 };
 
-// Mapeo de sucursales
+// Mapeo de sucursales (ajustado a nombres reales en BD)
 const sucursalesMapping = {
-  'SHOPPING PATAGONIA': 'Shopping Patagonia',
-  'ALTO CAMAHUE': 'Alto Comahue',
-  'MENDOZA SHOPPING': 'Mendoza Shopping',
-  'PALMARES': 'Palmares'
+  'SHOPPING PATAGONIA': 'Shopping patagonia - bariloche',
+  'ALTO CAMAHUE': 'ALTO COMAHUE',
+  'MENDOZA SHOPPING': 'Sucursal Mendoza',
+  'PALMARES': 'Sucursal Mendoza PALMARES'
 };
 
 // Datos de productos desde la planilla
@@ -268,10 +268,10 @@ function procesarLineaProducto(linea, indice) {
     precio,
     stockMinimo,
     stockMaximoPorSucursal: {
-      'Shopping Patagonia': shoppingPatagonia,
-      'Alto Comahue': altoCamahue,
-      'Mendoza Shopping': mendozaShopping,
-      'Palmares': palmares
+      'Shopping patagonia - bariloche': shoppingPatagonia,
+      'ALTO COMAHUE': altoCamahue,
+      'Sucursal Mendoza': mendozaShopping,
+      'Sucursal Mendoza PALMARES': palmares
     }
   };
 }
@@ -338,6 +338,19 @@ async function cargarProductosReales() {
     console.log(`   ✅ ${sucursales.length} sucursales encontradas:`, 
       Array.from(sucursalMap.keys()).join(', '));
     
+    // Verificar que las sucursales esperadas existen
+    const sucursalesEsperadas = [
+      'Shopping patagonia - bariloche',
+      'ALTO COMAHUE', 
+      'Sucursal Mendoza',
+      'Sucursal Mendoza PALMARES'
+    ];
+    
+    const sucursalesFaltantes = sucursalesEsperadas.filter(nombre => !sucursalMap.has(nombre));
+    if (sucursalesFaltantes.length > 0) {
+      console.warn(`   ⚠️ Sucursales faltantes: ${sucursalesFaltantes.join(', ')}`);
+    }
+    
     // 4. Verificar dependencias antes de limpiar
     console.log('\n🔍 Verificando dependencias de productos...');
     const ventasCount = await prisma.itemVenta.count();
@@ -355,41 +368,89 @@ async function cargarProductosReales() {
       await new Promise(resolve => setTimeout(resolve, 3000));
     }
     
-    // 5. Limpiar datos existentes
-    console.log('\n🧹 Limpiando productos existentes...');
+    // 5. Limpiar datos existentes (dividido en transacciones más pequeñas)
+    console.log('\n🧹 Limpiando datos existentes...');
+    console.log('   🔗 Eliminando en orden de dependencias...');
     
+    // Transacción 1: Facturas y ventas
+    console.log('   🗂️ Fase 1: Facturas y ventas...');
     await prisma.$transaction(async (tx) => {
-      // Eliminar configuraciones de stock
-      await tx.stockConfigSucursal.deleteMany({});
-      console.log('   ✅ Configuraciones de stock eliminadas');
+      const reintentosEliminados = await tx.facturaReintento.deleteMany({});
+      console.log(`   ✅ ${reintentosEliminados.count} reintentos de facturas eliminados`);
       
-      // Eliminar movimientos de stock de productos
+      const facturasEliminadas = await tx.facturaElectronica.deleteMany({});
+      console.log(`   ✅ ${facturasEliminadas.count} facturas electrónicas eliminadas`);
+      
+      const pagosEliminados = await tx.pago.deleteMany({});
+      console.log(`   ✅ ${pagosEliminados.count} pagos eliminados`);
+      
+      const itemsVentaEliminados = await tx.itemVenta.deleteMany({});
+      console.log(`   ✅ ${itemsVentaEliminados.count} items de venta eliminados`);
+      
+      const ventasEliminadas = await tx.venta.deleteMany({});
+      console.log(`   ✅ ${ventasEliminadas.count} ventas eliminadas`);
+    });
+    
+    // Transacción 2: Envíos y configuraciones
+    console.log('   🗂️ Fase 2: Envíos y configuraciones...');
+    await prisma.$transaction(async (tx) => {
+      const itemsEnvioEliminados = await tx.itemEnvio.deleteMany({
+        where: { productoId: { not: null } }
+      });
+      console.log(`   ✅ ${itemsEnvioEliminados.count} items de envío (productos) eliminados`);
+      
+      const configsEliminadas = await tx.stockConfigSucursal.deleteMany({});
+      console.log(`   ✅ ${configsEliminadas.count} configuraciones de stock eliminadas`);
+      
+      const alertasEliminadas = await tx.alertaStock.deleteMany({});
+      console.log(`   ✅ ${alertasEliminadas.count} alertas de stock eliminadas`);
+    });
+    
+    // Transacción 3: Cargas masivas
+    console.log('   🗂️ Fase 3: Cargas masivas...');
+    await prisma.$transaction(async (tx) => {
+      const cargaItemsEliminados = await tx.cargaMasivaStockItem.deleteMany({});
+      console.log(`   ✅ ${cargaItemsEliminados.count} items de carga masiva eliminados`);
+      
+      const cargasEliminadas = await tx.cargaMasivaStock.deleteMany({});
+      console.log(`   ✅ ${cargasEliminadas.count} cargas masivas eliminadas`);
+    });
+    
+    // Transacción 4: Stock y movimientos
+    console.log('   🗂️ Fase 4: Stock y movimientos...');
+    await prisma.$transaction(async (tx) => {
+      // Obtener IDs de stock de productos
       const stockIds = await tx.stock.findMany({
         where: { productoId: { not: null } },
         select: { id: true }
       });
       
       if (stockIds.length > 0) {
-        await tx.movimientoStock.deleteMany({
+        const movimientosEliminados = await tx.movimientoStock.deleteMany({
           where: { stockId: { in: stockIds.map(s => s.id) } }
         });
-        console.log('   ✅ Movimientos de stock eliminados');
+        console.log(`   ✅ ${movimientosEliminados.count} movimientos de stock eliminados`);
+      } else {
+        console.log(`   ✅ 0 movimientos de stock eliminados (no había registros)`);
       }
       
-      // Eliminar stock de productos
-      await tx.stock.deleteMany({
+      const stockEliminado = await tx.stock.deleteMany({
         where: { productoId: { not: null } }
       });
-      console.log('   ✅ Stock de productos eliminado');
+      console.log(`   ✅ ${stockEliminado.count} registros de stock eliminados`);
+    });
+    
+    // Transacción 5: Productos y recetas
+    console.log('   🗂️ Fase 5: Productos y recetas...');
+    await prisma.$transaction(async (tx) => {
+      const productoRecetasEliminadas = await tx.productoReceta.deleteMany({});
+      console.log(`   ✅ ${productoRecetasEliminadas.count} asociaciones producto-receta eliminadas`);
       
-      // Eliminar recetas de productos
-      await tx.productoReceta.deleteMany({});
-      console.log('   ✅ Recetas de productos eliminadas');
-      
-      // Eliminar productos
       const productosEliminados = await tx.producto.deleteMany({});
       console.log(`   ✅ ${productosEliminados.count} productos eliminados`);
     });
+    
+    console.log('   🎯 Limpieza completa realizada exitosamente');
     
     // 6. Crear nuevos productos
     console.log('\n📦 Creando productos nuevos...');
@@ -447,19 +508,22 @@ async function cargarProductosReales() {
     
     // 7. Configurar stock por sucursal
     console.log('\n⚙️ Configurando stock por sucursal...');
+    console.log(`   🎯 Configurando para ${sucursales.length} sucursales disponibles`);
     
     let configsCreadas = 0;
+    let configsOmitidas = 0;
     
     for (const producto of productosCreados) {
       for (const [nombreSucursal, stockMaximo] of Object.entries(producto.stockMaximoPorSucursal)) {
         const sucursalId = sucursalMap.get(nombreSucursal);
         
         if (!sucursalId) {
-          console.warn(`   ⚠️ Sucursal "${nombreSucursal}" no encontrada`);
+          console.warn(`   ⚠️ Sucursal "${nombreSucursal}" no encontrada en BD`);
           continue;
         }
         
         if (stockMaximo === 0) {
+          configsOmitidas++;
           continue; // No crear config para stock 0
         }
         
@@ -485,15 +549,26 @@ async function cargarProductosReales() {
     }
     
     console.log(`   ✅ ${configsCreadas} configuraciones de stock creadas`);
+    console.log(`   ⏭️ ${configsOmitidas} configuraciones omitidas (stock 0)`);
     
-    // 8. Mostrar resumen final
+    // 8. Verificar configuraciones por sucursal
+    console.log('\n📊 Configuraciones por sucursal:');
+    for (const [nombre, id] of sucursalMap.entries()) {
+      const configs = await prisma.stockConfigSucursal.count({
+        where: { sucursalId: id }
+      });
+      console.log(`   🏢 ${nombre}: ${configs} productos configurados`);
+    }
+    
+    // 9. Mostrar resumen final
     console.log('\n📊 === RESUMEN FINAL ===');
     console.log(`✅ Productos creados: ${creados}`);
     console.log(`❌ Errores: ${errores}`);
     console.log(`⚙️ Configuraciones de stock: ${configsCreadas}`);
+    console.log(`⏭️ Configuraciones omitidas (stock 0): ${configsOmitidas}`);
     console.log(`📂 Categorías utilizadas: ${new Set(productosProcessed.map(p => p.categoria)).size}`);
     
-    // 9. Verificación de algunos productos
+    // 10. Verificación de algunos productos
     console.log('\n🔍 Muestra de productos creados:');
     const muestra = await prisma.producto.findMany({
       take: 5,
@@ -503,11 +578,11 @@ async function cargarProductosReales() {
           include: { sucursal: true }
         }
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { nombre: 'asc' } // Cambiar a nombre ya que no hay createdAt
     });
     
     muestra.forEach(producto => {
-      console.log(`   📦 ${producto.nombre} - ${producto.categoria.nombre} - $${producto.precio}`);
+      console.log(`   📦 ${producto.nombre} - ${producto.categoria.nombre} - ${producto.precio}`);
       console.log(`      Código: ${producto.codigoBarras}`);
       console.log(`      Configs: ${producto.stockConfigs.length} sucursales`);
     });
@@ -517,7 +592,8 @@ async function cargarProductosReales() {
     return {
       productosCreados: creados,
       errores,
-      configuracionesStock: configsCreadas
+      configuracionesStock: configsCreadas,
+      configuracionesOmitidas: configsOmitidas
     };
     
   } catch (error) {
