@@ -377,27 +377,29 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
     return 0;
   }, [ventasResumen, configuracionCierre, cierreCaja]);
   
-  // 🆕 CALCULAR CUENTAS AUTOMÁTICAS MEJORADAS - RESTAR MONTO FIJO PARA PRÓXIMO TURNO
   const calcularCuentasAutomaticas = useCallback(() => {
     if (efectivoContado <= 0) return null;
     
     const totalEgresos = ventasResumen?.totalEgresos || 0;
     const recuperoNum = parseFloat(recuperoFondo) || 0;
-    const montoFijo = configuracionCierre?.montoFijo || 0;
+    // 🔧 CAMBIO: Usar montoInicial en lugar de montoFijo
+    const montoInicialCaja = cierreCaja?.montoInicial || 0;
     
-    // 🔧 NUEVO CÁLCULO: Restar también el monto fijo que debe quedar para el próximo turno
-    const efectivoParaSobre = efectivoContado - totalEgresos - recuperoNum - montoFijo;
+    // 🔧 NUEVO CÁLCULO: Restar el monto inicial con el que abrió (no el monto fijo configurado)
+    const efectivoParaSobre = efectivoContado - totalEgresos - recuperoNum - montoInicialCaja;
     
     return {
       efectivoContado,
       menosEgresos: totalEgresos,
       menosRecupero: recuperoNum,
-      menosMontoFijo: montoFijo, // 🆕 Nuevo campo
+      // 🔧 CAMBIO: Mostrar el monto inicial como referencia
+      menosMontoInicial: montoInicialCaja,
       efectivoParaSobre,
-      efectivoProximoTurno: montoFijo, // 🆕 Lo que queda para próximo turno
+      // 🔧 CAMBIO: El próximo turno debe abrir con el mismo monto inicial de hoy
+      efectivoProximoTurno: montoInicialCaja,
       esNegativo: efectivoParaSobre < 0
     };
-  }, [efectivoContado, ventasResumen, recuperoFondo, configuracionCierre]);
+  }, [efectivoContado, ventasResumen, recuperoFondo, cierreCaja]);
   
   // Función para manejar cambio del contador de billetes
   const handleBillCounterChange = (total: number) => {
@@ -775,107 +777,114 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
               )}
             </div>
             
-            {/* 🆕 CUENTAS AUTOMÁTICAS MEJORADAS */}
-            {efectivoConteoCompleto && cuentasAutomaticas && (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-                <h3 className="text-lg font-bold text-gray-900 flex items-center mb-4">
-                  <Calculator className="w-5 h-5 text-green-600 mr-2" />
-                  Cuentas Automáticas
-                </h3>
-                
-                <div className="bg-gray-50 rounded-xl p-4">
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center py-2">
-                      <span className="text-gray-700 font-medium">Efectivo total contado:</span>
-                      <span className="text-xl font-bold text-green-600">
-                        +${cuentasAutomaticas.efectivoContado.toFixed(2)}
-                      </span>
-                    </div>
-                    
-                    {cuentasAutomaticas.menosEgresos > 0 && (
-                      <div className="flex justify-between items-center py-2">
-                        <span className="text-gray-700 font-medium">Menos egresos:</span>
-                        <span className="text-xl font-bold text-red-600">
-                          -${cuentasAutomaticas.menosEgresos.toFixed(2)}
-                        </span>
-                      </div>
-                    )}
-                    
-                    {cuentasAutomaticas.menosRecupero > 0 && (
-                      <div className="flex justify-between items-center py-2">
-                        <span className="text-gray-700 font-medium">Menos recupero de fondo:</span>
-                        <span className="text-xl font-bold text-yellow-600">
-                          -${cuentasAutomaticas.menosRecupero.toFixed(2)}
-                        </span>
-                      </div>
-                    )}
-                    
-                    {/* 🆕 NUEVA LÍNEA: MONTO FIJO PARA PRÓXIMO TURNO */}
-                    <div className="flex justify-between items-center py-2">
-                      <span className="text-gray-700 font-medium">Menos monto fijo (próximo turno):</span>
-                      <span className="text-xl font-bold text-blue-600">
-                        -${cuentasAutomaticas.menosMontoFijo.toFixed(2)}
-                      </span>
-                    </div>
-                    
-                    <hr className="border-gray-300" />
-                    
-                    {/* Efectivo para sobre */}
-                    <div className={`flex justify-between items-center py-3 px-4 rounded-lg ${
-                      cuentasAutomaticas.esNegativo ? 'bg-red-100 border border-red-300' : 'bg-green-100 border border-green-300'
-                    }`}>
-                      <span className={`font-bold text-lg ${cuentasAutomaticas.esNegativo ? 'text-red-800' : 'text-green-800'}`}>
-                        💰 Efectivo para sobre:
-                      </span>
-                      <span className={`text-2xl font-black ${cuentasAutomaticas.esNegativo ? 'text-red-800' : 'text-green-800'}`}>
-                        ${cuentasAutomaticas.efectivoParaSobre.toFixed(2)}
-                      </span>
-                    </div>
-                    
-                    {/* 🆕 NUEVA LÍNEA: EFECTIVO PARA PRÓXIMO TURNO */}
-                    <div className="bg-blue-100 border border-blue-300 rounded-lg py-3 px-4">
-                      <div className="flex justify-between items-center">
-                        <span className="font-bold text-lg text-blue-800">
-                          🏪 Efectivo próximo turno:
-                        </span>
-                        <span className="text-2xl font-black text-blue-800">
-                          ${cuentasAutomaticas.efectivoProximoTurno.toFixed(2)}
-                        </span>
-                      </div>
-                      <p className="text-xs text-blue-700 mt-1">
-                        Este monto debe quedar en caja para el próximo turno
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Campo de recupero */}
-                <div className="mt-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Recupero de Fondo (opcional):
-                  </label>
-                  <p className="text-xs text-gray-500 mb-2">
-                    💡 El recupero se descuenta del efectivo para sobre, no afecta la validación del conteo
-                  </p>
-                  <div className="relative">
-                    <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={recuperoFondo}
-                      onChange={(e) => setRecuperoFondo(e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 text-lg font-bold border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
-                      placeholder="0.00"
-                    />
-                  </div>
-                  {recuperoRecomendado > 0 && parseFloat(recuperoFondo) !== recuperoRecomendado && (
-                    <p className="text-sm text-yellow-600 mt-1">
-                      💡 Sugerencia: ${recuperoRecomendado.toFixed(2)}
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
+{/* 🆕 CUENTAS AUTOMÁTICAS MEJORADAS */}
+{efectivoConteoCompleto && cuentasAutomaticas && (
+  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+    <h3 className="text-lg font-bold text-gray-900 flex items-center mb-4">
+      <Calculator className="w-5 h-5 text-green-600 mr-2" />
+      Cuentas Automáticas
+    </h3>
+    
+    <div className="bg-gray-50 rounded-xl p-4">
+      <div className="space-y-4">
+        <div className="flex justify-between items-center py-2">
+          <span className="text-gray-700 font-medium">Efectivo total contado:</span>
+          <span className="text-xl font-bold text-green-600">
+            +${cuentasAutomaticas.efectivoContado.toFixed(2)}
+          </span>
+        </div>
+        
+        {cuentasAutomaticas.menosEgresos > 0 && (
+          <div className="flex justify-between items-center py-2">
+            <span className="text-gray-700 font-medium">Menos egresos:</span>
+            <span className="text-xl font-bold text-red-600">
+              -${cuentasAutomaticas.menosEgresos.toFixed(2)}
+            </span>
+          </div>
+        )}
+        
+        {cuentasAutomaticas.menosRecupero > 0 && (
+          <div className="flex justify-between items-center py-2">
+            <span className="text-gray-700 font-medium">Menos recupero de fondo:</span>
+            <span className="text-xl font-bold text-yellow-600">
+              -${cuentasAutomaticas.menosRecupero.toFixed(2)}
+            </span>
+          </div>
+        )}
+        
+        {/* 🔧 CAMBIO: Mostrar monto inicial en lugar de monto fijo */}
+        <div className="flex justify-between items-center py-2">
+          <span className="text-gray-700 font-medium">Menos monto inicial (próximo turno):</span>
+          <span className="text-xl font-bold text-blue-600">
+            -${cuentasAutomaticas.menosMontoInicial.toFixed(2)}
+          </span>
+        </div>
+        
+        <hr className="border-gray-300" />
+        
+        {/* Efectivo para sobre */}
+        <div className={`flex justify-between items-center py-3 px-4 rounded-lg ${
+          cuentasAutomaticas.esNegativo ? 'bg-red-100 border border-red-300' : 'bg-green-100 border border-green-300'
+        }`}>
+          <span className={`font-bold text-lg ${cuentasAutomaticas.esNegativo ? 'text-red-800' : 'text-green-800'}`}>
+            💰 Efectivo para sobre:
+          </span>
+          <span className={`text-2xl font-black ${cuentasAutomaticas.esNegativo ? 'text-red-800' : 'text-green-800'}`}>
+            ${cuentasAutomaticas.efectivoParaSobre.toFixed(2)}
+          </span>
+        </div>
+        
+        {/* 🔧 CAMBIO: Mostrar que el próximo turno abrirá con el mismo monto inicial */}
+        <div className="bg-blue-100 border border-blue-300 rounded-lg py-3 px-4">
+          <div className="flex justify-between items-center">
+            <span className="font-bold text-lg text-blue-800">
+              🏪 Efectivo próximo turno:
+            </span>
+            <span className="text-2xl font-black text-blue-800">
+              ${cuentasAutomaticas.efectivoProximoTurno.toFixed(2)}
+            </span>
+          </div>
+          <p className="text-xs text-blue-700 mt-1">
+            Próximo turno abrirá con el mismo monto inicial de hoy
+          </p>
+          {/* 🆕 MOSTRAR INFORMACIÓN SOBRE MONTO FIJO CONFIGURADO */}
+          {configuracionCierre && configuracionCierre.montoFijo !== cuentasAutomaticas.efectivoProximoTurno && (
+            <p className="text-xs text-amber-700 mt-1 bg-amber-50 p-2 rounded border border-amber-200">
+              💡 Monto fijo configurado: ${configuracionCierre.montoFijo.toFixed(2)}. 
+              Use recupero de fondo para ajustar durante el turno si es necesario.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+    
+    {/* Campo de recupero - sin cambios */}
+    <div className="mt-6">
+      <label className="block text-sm font-medium text-gray-700 mb-2">
+        Recupero de Fondo (opcional):
+      </label>
+      <p className="text-xs text-gray-500 mb-2">
+        💡 El recupero se descuenta del efectivo para sobre, no afecta la validación del conteo
+      </p>
+      <div className="relative">
+        <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+        <input
+          type="number"
+          step="0.01"
+          value={recuperoFondo}
+          onChange={(e) => setRecuperoFondo(e.target.value)}
+          className="w-full pl-10 pr-4 py-3 text-lg font-bold border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500"
+          placeholder="0.00"
+        />
+      </div>
+      {recuperoRecomendado > 0 && parseFloat(recuperoFondo) !== recuperoRecomendado && (
+        <p className="text-sm text-yellow-600 mt-1">
+          💡 Sugerencia: ${recuperoRecomendado.toFixed(2)}
+        </p>
+      )}
+    </div>
+  </div>
+)}
             
             {/* Medios electrónicos con componentes corregidos */}
             {efectivoConteoCompleto && (
