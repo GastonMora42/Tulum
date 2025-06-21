@@ -178,17 +178,6 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
       document.body.style.overflow = '';
     };
   }, [isOpen, getTotal, printInitialized, availablePrinters]);
-  
-  // Función para validar límites de facturas B
-  const validarLimiteFacturaB = () => {
-    const total = getTotalWithDiscount();
-    const LIMITE_FACTURA_B = 15380;
-    
-    if (tipoFactura === 'B' && total >= LIMITE_FACTURA_B && (!clienteCuit || clienteCuit.trim() === '')) {
-      return `Para montos ≥ $${LIMITE_FACTURA_B.toLocaleString()} se requiere CUIT del cliente`;
-    }
-    return null;
-  };
 
   // Función para validar CUIT
   const validarCuit = (cuit: string): boolean => {
@@ -434,14 +423,7 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
           newErrors.tendered = 'El monto entregado en efectivo debe ser igual o mayor al monto a pagar';
         }
       }
-      
-      // Validar límites de factura B
-      if (facturar && tipoFactura === 'B') {
-        const errorLimite = validarLimiteFacturaB();
-        if (errorLimite) {
-          newErrors.facturaLimite = errorLimite;
-        }
-      }
+
       
       if (Object.keys(newErrors).length > 0) {
         setValidationErrors(newErrors);
@@ -469,10 +451,7 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
           newErrors.clienteCuit = 'El CUIT ingresado no es válido';
         }
       } else if (tipoFactura === 'B') {
-        const errorLimite = validarLimiteFacturaB();
-        if (errorLimite) {
-          newErrors.facturaLimite = errorLimite;
-        }
+       
         
         if (clienteCuit && clienteCuit.trim() !== '' && !validarCuit(clienteCuit)) {
           newErrors.clienteCuit = 'El CUIT ingresado no es válido';

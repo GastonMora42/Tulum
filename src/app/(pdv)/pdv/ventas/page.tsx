@@ -132,85 +132,119 @@ export default function HistorialVentasPage() {
     return Array.from(medios);
   };
   
-  // Cargar ventas
-  useEffect(() => {
-    const loadVentas = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        
-        const sucursalId = localStorage.getItem('sucursalId');
-        let url = '/api/pdv/ventas';
-        
-        if (sucursalId) {
-          url += `?sucursalId=${encodeURIComponent(sucursalId)}`;
-        }
-        
-        console.log('🔄 Cargando ventas desde:', url);
-        
-        const response = await authenticatedFetch(url);
-        
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('❌ Error en respuesta:', response.status, errorText);
-          throw new Error(`Error ${response.status}: ${errorText}`);
-        }
-        
-        const data = await response.json();
-        console.log('📦 Datos recibidos:', typeof data, data);
-        
-        // Verificar y corregir el formato de respuesta
-        let ventasArray: Venta[] = [];
-        
-        if (Array.isArray(data)) {
-          ventasArray = data;
-        } else if (data && typeof data === 'object') {
-          if (Array.isArray(data.data)) {
-            ventasArray = data.data;
-          } else if (Array.isArray(data.ventas)) {
-            ventasArray = data.ventas;
-          } else {
-            console.warn('⚠️ Estructura de datos inesperada:', Object.keys(data));
-            ventasArray = [];
+// En src/app/(pdv)/pdv/ventas/page.tsx
+// Reemplazar el useEffect que carga ventas con este:
+
+useEffect(() => {
+  const loadVentas = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const sucursalId = localStorage.getItem('sucursalId');
+      let url = '/api/pdv/ventas';
+      
+      // Primero obtener información del turno actual
+      let fechaApertura = null;
+      if (sucursalId) {
+        try {
+          const cajaResponse = await authenticatedFetch(`/api/pdv/cierre?sucursalId=${encodeURIComponent(sucursalId)}`);
+          if (cajaResponse.ok) {
+            const cajaData = await cajaResponse.json();
+            if (cajaData.cierreCaja?.fechaApertura) {
+              fechaApertura = cajaData.cierreCaja.fechaApertura;
+            }
           }
+        } catch (error) {
+          console.warn('No se pudo obtener información del turno actual:', error);
+        }
+      }
+      
+      // Construir URL con filtros
+      const params = new URLSearchParams();
+      if (sucursalId) {
+        params.append('sucursalId', sucursalId);
+      }
+      
+      // 🆕 NUEVO: Solo mostrar ventas desde la apertura del turno actual
+      if (fechaApertura) {
+        params.append('desde', fechaApertura);
+        console.log('🔄 Cargando ventas desde apertura del turno:', fechaApertura);
+      } else {
+        // Si no hay turno abierto, mostrar ventas del día actual
+        const hoy = new Date();
+        hoy.setHours(0, 0, 0, 0);
+        params.append('desde', hoy.toISOString());
+        console.log('🔄 Cargando ventas del día actual (sin turno abierto)');
+      }
+      
+      url += `?${params.toString()}`;
+      
+      console.log('🔄 Cargando ventas desde:', url);
+      
+      const response = await authenticatedFetch(url);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Error en respuesta:', response.status, errorText);
+        throw new Error(`Error ${response.status}: ${errorText}`);
+      }
+      
+      const data = await response.json();
+      console.log('📦 Datos recibidos:', typeof data, data);
+      
+      // Verificar y corregir el formato de respuesta
+      let ventasArray: Venta[] = [];
+      
+      if (Array.isArray(data)) {
+        ventasArray = data;
+      } else if (data && typeof data === 'object') {
+        if (Array.isArray(data.data)) {
+          ventasArray = data.data;
+        } else if (Array.isArray(data.ventas)) {
+          ventasArray = data.ventas;
         } else {
-          console.warn('⚠️ Datos no válidos recibidos:', data);
+          console.warn('⚠️ Estructura de datos inesperada:', Object.keys(data));
           ventasArray = [];
         }
-        
-        console.log(`✅ Ventas procesadas: ${ventasArray.length} elementos`);
-        
-        setVentas(ventasArray);
-        
-        // Calcular totales
-        let total = 0;
-        let totalFacturas = 0;
-        
-        ventasArray.forEach((venta: Venta) => {
-          total += venta.total;
-          if (venta.facturada) {
-            totalFacturas += venta.total;
-          }
-        });
-        
-        setTotalVentas(total);
-        setTotalFacturado(totalFacturas);
-        
-        // Aplicar filtros iniciales
-        applyFilters(ventasArray);
-        
-      } catch (err) {
-        console.error('❌ Error al cargar ventas:', err);
-        setError(err instanceof Error ? err.message : 'Error desconocido al cargar ventas');
-        setVentas([]);
-        setFilteredVentas([]);
-      } finally {
-        setIsLoading(false);
+      } else {
+        console.warn('⚠️ Datos no válidos recibidos:', data);
+        ventasArray = [];
       }
-    };
-    
-    loadVentas();
-  }, []);
+      
+      console.log(`✅ Ventas del turno actual: ${ventasArray.length} elementos`);
+      
+      setVentas(ventasArray);
+      
+      // Calcular totales
+      let total = 0;
+      let totalFacturas = 0;
+      
+      ventasArray.forEach((venta: Venta) => {
+        total += venta.total;
+        if (venta.facturada) {
+          totalFacturas += venta.total;
+        }
+      });
+      
+      setTotalVentas(total);
+      setTotalFacturado(totalFacturas);
+      
+      // Aplicar filtros iniciales
+      applyFilters(ventasArray);
+      
+    } catch (err) {
+      console.error('❌ Error al cargar ventas:', err);
+      setError(err instanceof Error ? err.message : 'Error desconocido al cargar ventas');
+      setVentas([]);
+      setFilteredVentas([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  loadVentas();
+}, []);
   
   // Aplicar filtros
   const applyFilters = (data = ventas) => {

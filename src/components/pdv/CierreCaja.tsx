@@ -1,8 +1,8 @@
-// src/components/pdv/CierreCaja.tsx - VERSIÓN CON MARGEN ÚNICO DE $200
+// src/components/pdv/CierreCaja.tsx - VERSIÓN CON INPUTS CORREGIDOS
 
 'use client';
 
-import { useState, useEffect, useCallback, JSX, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, JSX, useMemo, useRef, memo } from 'react';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { 
@@ -44,6 +44,104 @@ interface MedioPagoValidation {
   difference: number;
   status: 'empty' | 'correct' | 'incorrect' | 'forced';
 }
+
+// 🔧 CORRECCIÓN: Componente memoizado fuera del componente principal
+const MedioElectronicoInput = memo(({ 
+  tipo, 
+  nombre, 
+  icono, 
+  valor, 
+  onChange, 
+  colorScheme,
+  validation,
+  forcedMethods,
+  onForceCorrection,
+  MARGEN_TOLERANCIA
+}: {
+  tipo: string;
+  nombre: string;
+  icono: JSX.Element;
+  valor: string;
+  onChange: (value: string) => void;
+  colorScheme: string;
+  validation: MedioPagoValidation;
+  forcedMethods: Set<string>;
+  onForceCorrection: (nombre: string) => void;
+  MARGEN_TOLERANCIA: number;
+}) => {
+  const isForcedCorrect = forcedMethods.has(nombre);
+  
+  return (
+    <div className={`bg-${colorScheme}-50 rounded-xl p-4 border-2 ${
+      validation.status === 'empty' ? `border-${colorScheme}-200` :
+      validation.isValid || isForcedCorrect ? 'border-green-500 bg-green-50' :
+      'border-red-500 bg-red-50'
+    } transition-all duration-200`}>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center">
+          <div className={`w-6 h-6 text-${colorScheme}-600 mr-2`}>
+            {icono}
+          </div>
+          <span className={`font-semibold text-${colorScheme}-800`}>{nombre}</span>
+        </div>
+        
+        {/* Indicador visual */}
+        <div className="flex items-center space-x-2">
+          {validation.status === 'empty' && (
+            <div className="w-4 h-4 bg-gray-300 rounded-full"></div>
+          )}
+          {validation.status === 'correct' && (
+            <div className="flex items-center text-green-600">
+              <CheckCircle className="w-5 h-5 mr-1" />
+              <span className="text-sm font-medium">Correcto</span>
+            </div>
+          )}
+          {validation.status === 'incorrect' && !isForcedCorrect && (
+            <div className="flex items-center text-red-600">
+              <XCircle className="w-5 h-5 mr-1" />
+              <span className="text-sm font-medium">Diferencia</span>
+            </div>
+          )}
+          {isForcedCorrect && (
+            <div className="flex items-center text-amber-600">
+              <Wrench className="w-5 h-5 mr-1" />
+              <span className="text-sm font-medium">Forzado</span>
+            </div>
+          )}
+        </div>
+      </div>
+      
+      <div className="relative">
+        <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+        <input
+          type="number"
+          step="0.01"
+          value={valor}
+          onChange={(e) => onChange(e.target.value)}
+          className={`w-full pl-10 pr-4 py-3 text-lg font-bold border-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+            validation.status === 'empty' ? 'border-gray-300' :
+            validation.isValid || isForcedCorrect ? 'border-green-300 bg-white' :
+            'border-red-300 bg-white'
+          }`}
+          placeholder="Ingrese monto contado..."
+          autoComplete="off"
+        />
+      </div>
+      
+      {/* Botón para forzar corrección */}
+      {validation.status === 'incorrect' && !isForcedCorrect && Math.abs(validation.difference) >= MARGEN_TOLERANCIA && (
+        <button
+          onClick={() => onForceCorrection(nombre)}
+          className="mt-2 px-3 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-lg text-sm font-medium transition-colors"
+        >
+          Forzar Corrección
+        </button>
+      )}
+    </div>
+  );
+});
+
+MedioElectronicoInput.displayName = 'MedioElectronicoInput';
 
 export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
   // Estados principales
@@ -95,6 +193,16 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
     }
     return 'Usuario desconocido';
   };
+  
+  // 🆕 FUNCIÓN MEMOIZADA para manejar forzar corrección
+  const handleForceCorrection = useCallback((nombre: string) => {
+    setForcedMethods(prev => new Set([...prev, nombre]));
+    setNotification({
+      type: 'info',
+      message: `${nombre} marcado como forzado`,
+      details: 'Esto generará una contingencia para revisión'
+    });
+  }, []);
   
   // 🎯 FUNCIÓN DE VALIDACIÓN DEL EFECTIVO - MARGEN ÚNICO DE $200
   const calcularValidacionEfectivo = useCallback(() => {
@@ -197,7 +305,7 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
       
       const [responseCierre, responseConfig] = await Promise.all([
         authenticatedFetch(`/api/pdv/cierre?sucursalId=${encodeURIComponent(sucursalId)}`),
-        authenticatedFetch(`/api/admin/configuracion-cierres?sucursalId=${encodeURIComponent(sucursalId)}`)
+        authenticatedFetch(`/api/pdv/configuracion-cierre?sucursalId=${encodeURIComponent(sucursalId)}`) // 🔧 CAMBIO AQUÍ
       ]);
       
       if (!responseCierre.ok) {
@@ -295,114 +403,6 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
   const handleBillCounterChange = (total: number) => {
     setEfectivoContado(total);
     setEfectivoConteoCompleto(total > 0);
-  };
-  
-  // 🔧 COMPONENTE OPTIMIZADO PARA MEDIOS ELECTRÓNICOS CON USEREF
-  const MedioElectronicoInput = ({ 
-    tipo, 
-    nombre, 
-    icono, 
-    valor, 
-    onChange, 
-    colorScheme 
-  }: {
-    tipo: string;
-    nombre: string;
-    icono: JSX.Element;
-    valor: string;
-    onChange: (value: string) => void;
-    colorScheme: string;
-  }) => {
-    const inputRef = useRef<HTMLInputElement>(null);
-    
-    // Memoizar la validación para evitar recálculos innecesarios
-    const validation = useMemo(() => validateMedioElectronico(tipo, valor), [tipo, valor]);
-    const isForcedCorrect = forcedMethods.has(nombre);
-    
-    // Función optimizada para cambios
-    const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-      onChange(e.target.value);
-    }, [onChange]);
-    
-    // Función para forzar corrección
-    const handleForceCorrection = useCallback(() => {
-      setForcedMethods(prev => new Set([...prev, nombre]));
-      setNotification({
-        type: 'info',
-        message: `${nombre} marcado como forzado`,
-        details: 'Esto generará una contingencia para revisión'
-      });
-    }, [nombre]);
-    
-    return (
-      <div className={`bg-${colorScheme}-50 rounded-xl p-4 border-2 ${
-        validation.status === 'empty' ? `border-${colorScheme}-200` :
-        validation.isValid || isForcedCorrect ? 'border-green-500 bg-green-50' :
-        'border-red-500 bg-red-50'
-      } transition-all duration-200`}>
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center">
-            <div className={`w-6 h-6 text-${colorScheme}-600 mr-2`}>
-              {icono}
-            </div>
-            <span className={`font-semibold text-${colorScheme}-800`}>{nombre}</span>
-          </div>
-          
-          {/* Indicador visual */}
-          <div className="flex items-center space-x-2">
-            {validation.status === 'empty' && (
-              <div className="w-4 h-4 bg-gray-300 rounded-full"></div>
-            )}
-            {validation.status === 'correct' && (
-              <div className="flex items-center text-green-600">
-                <CheckCircle className="w-5 h-5 mr-1" />
-                <span className="text-sm font-medium">Correcto</span>
-              </div>
-            )}
-            {validation.status === 'incorrect' && !isForcedCorrect && (
-              <div className="flex items-center text-red-600">
-                <XCircle className="w-5 h-5 mr-1" />
-                <span className="text-sm font-medium">Diferencia</span>
-              </div>
-            )}
-            {isForcedCorrect && (
-              <div className="flex items-center text-amber-600">
-                <Wrench className="w-5 h-5 mr-1" />
-                <span className="text-sm font-medium">Forzado</span>
-              </div>
-            )}
-          </div>
-        </div>
-        
-        <div className="relative">
-          <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-          <input
-            ref={inputRef}
-            type="number"
-            step="0.01"
-            value={valor}
-            onChange={handleChange}
-            className={`w-full pl-10 pr-4 py-3 text-lg font-bold border-2 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-              validation.status === 'empty' ? 'border-gray-300' :
-              validation.isValid || isForcedCorrect ? 'border-green-300 bg-white' :
-              'border-red-300 bg-white'
-            }`}
-            placeholder="Ingrese monto contado..."
-          />
-        </div>
-        
-        
-        {/* Botón para forzar corrección */}
-        {validation.status === 'incorrect' && !isForcedCorrect && Math.abs(validation.difference) >= MARGEN_TOLERANCIA && (
-          <button
-            onClick={handleForceCorrection}
-            className="mt-2 px-3 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-lg text-sm font-medium transition-colors"
-          >
-            Forzar Corrección
-          </button>
-        )}
-      </div>
-    );
   };
   
   // 🆕 FUNCIÓN PARA OBTENER TODOS LOS MEDIOS CON VALIDACIÓN
@@ -877,7 +877,7 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
               </div>
             )}
             
-            {/* Medios electrónicos con indicadores visuales */}
+            {/* Medios electrónicos con componentes corregidos */}
             {efectivoConteoCompleto && (
               <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
                 <h3 className="text-lg font-bold text-gray-900 flex items-center mb-4">
@@ -899,6 +899,10 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
                       valor={conteoTarjetaCredito}
                       onChange={setConteoTarjetaCredito}
                       colorScheme="blue"
+                      validation={validateMedioElectronico('tarjeta_credito', conteoTarjetaCredito)}
+                      forcedMethods={forcedMethods}
+                      onForceCorrection={handleForceCorrection}
+                      MARGEN_TOLERANCIA={MARGEN_TOLERANCIA}
                     />
                   )}
                   
@@ -910,6 +914,10 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
                       valor={conteoTarjetaDebito}
                       onChange={setConteoTarjetaDebito}
                       colorScheme="purple"
+                      validation={validateMedioElectronico('tarjeta_debito', conteoTarjetaDebito)}
+                      forcedMethods={forcedMethods}
+                      onForceCorrection={handleForceCorrection}
+                      MARGEN_TOLERANCIA={MARGEN_TOLERANCIA}
                     />
                   )}
                   
@@ -921,6 +929,10 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
                       valor={conteoQR}
                       onChange={setConteoQR}
                       colorScheme="orange"
+                      validation={validateMedioElectronico('qr', conteoQR)}
+                      forcedMethods={forcedMethods}
+                      onForceCorrection={handleForceCorrection}
+                      MARGEN_TOLERANCIA={MARGEN_TOLERANCIA}
                     />
                   )}
                 </div>

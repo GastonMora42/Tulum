@@ -305,12 +305,6 @@ export async function POST(req: NextRequest) {
       if (cuitLimpio.length !== 11 || !/^\d{11}$/.test(cuitLimpio)) {
         throw new Error('El CUIT debe tener 11 dígitos');
       }
-    } else if (tipoFactura === 'B') {
-      // Factura B: verificar límites para consumidor final
-      const LIMITE_FACTURA_B = 15380;
-      if (venta.total >= LIMITE_FACTURA_B && (!body.clienteCuit || body.clienteCuit.trim() === '')) {
-        throw new Error(`Para facturas B con monto ≥ $${LIMITE_FACTURA_B.toLocaleString()} se requiere CUIT/DNI del cliente`);
-      }
     }
     
     // Obtener servicio de facturación

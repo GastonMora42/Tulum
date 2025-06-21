@@ -1,13 +1,16 @@
 {
-  "/api/admin/ubicaciones/route": "app/api/admin/ubicaciones/route.js",
-  "/api/productos/route": "app/api/productos/route.js",
-  "/api/admin/categorias/route": "app/api/admin/categorias/route.js",
-  "/api/admin/stock-config/dashboard/route": "app/api/admin/stock-config/dashboard/route.js",
-  "/favicon.ico/route": "app/favicon.ico/route.js",
   "/api/auth/me/route": "app/api/auth/me/route.js",
-  "/api/admin/stock-config/bulk-load/route": "app/api/admin/stock-config/bulk-load/route.js",
+  "/api/auth/login/route": "app/api/auth/login/route.js",
+  "/api/admin/categorias/route": "app/api/admin/categorias/route.js",
+  "/api/pdv/cierre/route": "app/api/pdv/cierre/route.js",
+  "/api/admin/sucursales/[id]/impresoras/route": "app/api/admin/sucursales/[id]/impresoras/route.js",
+  "/api/productos/cache/route": "app/api/productos/cache/route.js",
+  "/api/auth/refresh/route": "app/api/auth/refresh/route.js",
+  "/api/system/printers/route": "app/api/system/printers/route.js",
+  "/api/pdv/configuracion-cierre/route": "app/api/pdv/configuracion-cierre/route.js",
   "/(auth)/login/page": "app/(auth)/login/page.js",
-  "/page": "app/page.js",
+  "/(pdv)/pdv/page": "app/(pdv)/pdv/page.js",
+  "/(pdv)/pdv/ventas/page": "app/(pdv)/pdv/ventas/page.js",
   "/(admin)/admin/page": "app/(admin)/admin/page.js",
-  "/(admin)/admin/stock-sucursales/page": "app/(admin)/admin/stock-sucursales/page.js"
+  "/(pdv)/pdv/cierre/page": "app/(pdv)/pdv/cierre/page.js"
 }
