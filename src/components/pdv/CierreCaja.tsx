@@ -382,20 +382,18 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
     
     const totalEgresos = ventasResumen?.totalEgresos || 0;
     const recuperoNum = parseFloat(recuperoFondo) || 0;
-    // 🔧 CAMBIO: Usar montoInicial en lugar de montoFijo
     const montoInicialCaja = cierreCaja?.montoInicial || 0;
     
-    // 🔧 NUEVO CÁLCULO: Restar el monto inicial con el que abrió (no el monto fijo configurado)
-    const efectivoParaSobre = efectivoContado - totalEgresos - recuperoNum - montoInicialCaja;
+    // ✅ CORRECTO: Solo restar recupero y monto inicial
+    const efectivoParaSobre = efectivoContado - recuperoNum - montoInicialCaja;
     
     return {
       efectivoContado,
-      menosEgresos: totalEgresos,
+      // ✅ Mostrar egresos como informativos, no como resta
+      egresosInformativos: totalEgresos,
       menosRecupero: recuperoNum,
-      // 🔧 CAMBIO: Mostrar el monto inicial como referencia
       menosMontoInicial: montoInicialCaja,
       efectivoParaSobre,
-      // 🔧 CAMBIO: El próximo turno debe abrir con el mismo monto inicial de hoy
       efectivoProximoTurno: montoInicialCaja,
       esNegativo: efectivoParaSobre < 0
     };
@@ -794,14 +792,14 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
           </span>
         </div>
         
-        {cuentasAutomaticas.menosEgresos > 0 && (
-          <div className="flex justify-between items-center py-2">
-            <span className="text-gray-700 font-medium">Menos egresos:</span>
-            <span className="text-xl font-bold text-red-600">
-              -${cuentasAutomaticas.menosEgresos.toFixed(2)}
-            </span>
-          </div>
-        )}
+        {cuentasAutomaticas.egresosInformativos > 0 && (
+  <div className="flex justify-between items-center py-2 bg-gray-100 rounded-lg">
+    <span className="text-gray-700 font-medium">ℹ️ Egresos del turno:</span>
+    <span className="text-lg font-bold text-gray-600">
+      ${cuentasAutomaticas.egresosInformativos.toFixed(2)}
+    </span>
+  </div>
+)}
         
         {cuentasAutomaticas.menosRecupero > 0 && (
           <div className="flex justify-between items-center py-2">

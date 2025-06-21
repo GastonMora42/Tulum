@@ -494,7 +494,7 @@ export async function PATCH(req: NextRequest) {
     let sugerenciaProximaApertura = cierreCaja.montoInicial;
     
     // Calcular efectivo para sobre considerando que se deja el monto inicial para próximo turno
-    const efectivoParaSobre = efectivoFinalReal - totalEgresos - recuperoValidado - cierreCaja.montoInicial;
+    const efectivoParaSobre = efectivoFinalReal - recuperoValidado - cierreCaja.montoInicial;
     
     // Si el efectivo final después de descontar todo es menor al monto inicial, generar alerta
     if (efectivoParaSobre < 0) {
