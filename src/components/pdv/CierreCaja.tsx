@@ -385,7 +385,8 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
     const montoInicialCaja = cierreCaja?.montoInicial || 0;
     
     // ✅ CORRECTO: Solo restar recupero y monto inicial
-    const efectivoParaSobre = efectivoContado - recuperoNum - montoInicialCaja;
+    const efectivoParaSobreCalculado = efectivoContado - recuperoNum - montoInicialCaja;
+    const esNegativo = efectivoParaSobreCalculado < 0;
     
     return {
       efectivoContado,
@@ -393,9 +394,10 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
       egresosInformativos: totalEgresos,
       menosRecupero: recuperoNum,
       menosMontoInicial: montoInicialCaja,
-      efectivoParaSobre,
+      efectivoParaSobre: esNegativo ? 0 : efectivoParaSobreCalculado, // 🆕 Mostrar 0 cuando es negativo
       efectivoProximoTurno: montoInicialCaja,
-      esNegativo: efectivoParaSobre < 0
+      esNegativo,
+      recuperoProximoTurno: esNegativo ? Math.abs(efectivoParaSobreCalculado) : 0 // 🆕 Monto para recupero
     };
   }, [efectivoContado, ventasResumen, recuperoFondo, cierreCaja]);
   
