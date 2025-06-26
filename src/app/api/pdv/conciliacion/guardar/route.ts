@@ -1,4 +1,4 @@
-// src/app/api/pdv/conciliacion/guardar/route.ts - VERSIÓN CORREGIDA POR CATEGORÍA
+// src/app/api/pdv/conciliacion/guardar/route.ts - VERSIÓN CORREGIDA CON BLOQUEO GRANULAR
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/server/db/client';
 import { authMiddleware } from '@/server/api/middlewares/auth';
@@ -40,8 +40,11 @@ export async function POST(req: NextRequest) {
     }
     
     // 🔧 VERIFICAR CONTINGENCIAS SOLO DE LA CATEGORÍA ESPECÍFICA
+    console.log(`[GUARDAR] Verificando contingencias para categoría: ${categoriaId || 'general'}`);
+    
     let contingenciasBloqueo = [];
     if (categoriaId) {
+      // 🆕 Buscar contingencias MUY ESPECÍFICAS de esta categoría solamente
       contingenciasBloqueo = await prisma.contingencia.findMany({
         where: {
           ubicacionId: sucursalId,
@@ -50,13 +53,15 @@ export async function POST(req: NextRequest) {
           AND: [
             {
               OR: [
-                { descripcion: { contains: `Categoría: ${categoriaId}` } },
-                { descripcion: { contains: `categoriaId-${categoriaId}` } }
+                { descripcion: { contains: `categoriaId-${categoriaId}` } },
+                { descripcion: { contains: `Categoría: ${categoriaId}` } }
               ]
             }
           ]
         }
       });
+      
+      console.log(`[GUARDAR] Contingencias específicas encontradas para categoría ${categoriaId}: ${contingenciasBloqueo.length}`);
     } else {
       // Conciliación general
       contingenciasBloqueo = await prisma.contingencia.findMany({
@@ -66,6 +71,8 @@ export async function POST(req: NextRequest) {
           estado: { in: ['pendiente', 'en_revision'] }
         }
       });
+      
+      console.log(`[GUARDAR] Contingencias generales encontradas: ${contingenciasBloqueo.length}`);
     }
     
     if (contingenciasBloqueo.length > 0 && !forzarContingencia) {
@@ -75,9 +82,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { 
           error: categoriaId 
-            ? `La categoría "${nombreCategoria}" tiene una contingencia de conciliación pendiente que debe ser resuelta antes de realizar nueva conciliación.`
+            ? `La categoría "${nombreCategoria}" tiene una contingencia de conciliación pendiente que debe ser resuelta antes de realizar nueva conciliación. Las demás categorías pueden conciliarse normalmente.`
             : 'Existe una contingencia de conciliación general pendiente que debe ser resuelta antes de realizar nueva conciliación.',
-          categoriaAfectada: categoriaId
+          categoriaAfectada: categoriaId,
+          categoriaNombre: nombreCategoria,
+          soloEstaCategoria: !!categoriaId // 🆕 Indicar que solo afecta esta categoría
         },
         { status: 409 }
       );
@@ -128,10 +137,10 @@ export async function POST(req: NextRequest) {
     }
     
     const resultado = await prisma.$transaction(async (tx) => {
-      // Actualizar conciliación con información de categoría
+      // 🆕 ACTUALIZAR CONCILIACIÓN CON IDENTIFICADORES MEJORADOS DE CATEGORÍA
       const observacionesFinales = categoriaId 
-        ? `${observaciones || ''}\nConciliación de categoría: ${categoriaNombre} | categoriaId-${categoriaId} | Categoría: ${categoriaId}`
-        : observaciones || '';
+        ? `${observaciones || ''}\nConciliación de categoría: ${categoriaNombre} | categoriaId-${categoriaId} | Categoría: ${categoriaId} | FINALIZADA_${new Date().toISOString()}`
+        : `${observaciones || ''}\nConciliación general | FINALIZADA_${new Date().toISOString()}`;
       
       await tx.conciliacion.update({
         where: { id },
@@ -149,20 +158,18 @@ export async function POST(req: NextRequest) {
         
         const fechaFormateada = format(new Date(), 'dd/MM/yyyy HH:mm');
         
-        // 🔧 TÍTULO Y DESCRIPCIÓN ESPECÍFICOS PARA CATEGORÍA CON IDENTIFICADOR MEJORADO
+        // 🆕 TÍTULO Y DESCRIPCIÓN ESPECÍFICOS CON IDENTIFICADORES ÚNICOS
         const titulo = categoriaId 
-          ? `Diferencias en Conciliación - ${categoriaNombre} - ${fechaFormateada}`
-          : `Diferencias en Conciliación de Inventario - ${fechaFormateada}`;
+          ? `Diferencias Conciliación - ${categoriaNombre} - ${fechaFormateada}`
+          : `Diferencias Conciliación General - ${fechaFormateada}`;
         
         const tipoContingencia = categoriaId ? 'conciliacion' : 'conciliacion_general';
         
-        const contingencia = await tx.contingencia.create({
-          data: {
-            titulo,
-            descripcion: `
-${categoriaId ? 'CONCILIACIÓN DE CATEGORÍA CON DIFERENCIAS' : 'CONCILIACIÓN DE INVENTARIO CON DIFERENCIAS'}
+        // 🆕 DESCRIPCIÓN CON IDENTIFICADORES ÚNICOS Y ESPECÍFICOS
+        const descripcionContingencia = categoriaId ? `
+CONCILIACIÓN DE CATEGORÍA CON DIFERENCIAS
 
-${categoriaId ? `Categoría: ${categoriaNombre} (categoriaId-${categoriaId})` : 'Conciliación General'}
+Categoría: ${categoriaNombre} (categoriaId-${categoriaId})
 Fecha: ${fechaFormateada}
 Sucursal: ${sucursalId}
 Realizada por: ${user.name}
@@ -178,8 +185,37 @@ ACCIONES REQUERIDAS:
 - Ajustar el stock del sistema si corresponde
 - Documentar las correcciones realizadas
 
-${categoriaId ? `\n🔒 BLOQUEO: Esta contingencia bloquea futuras conciliaciones ÚNICAMENTE de la categoría "${categoriaNombre}" hasta su resolución. Las demás categorías pueden seguir funcionando normalmente.` : '\n🔒 BLOQUEO: Esta contingencia bloquea futuras conciliaciones generales hasta su resolución.'}
-            `.trim(),
+🔒 BLOQUEO GRANULAR: Esta contingencia bloquea ÚNICAMENTE futuras conciliaciones de la categoría "${categoriaNombre}" (ID: ${categoriaId}) hasta su resolución. Las demás categorías pueden seguir conciliándose normalmente.
+
+IDENTIFICADORES DE BLOQUEO:
+- categoriaId-${categoriaId}
+- Categoría: ${categoriaId}
+- Sucursal: ${sucursalId}
+        `.trim() : `
+CONCILIACIÓN GENERAL CON DIFERENCIAS
+
+Fecha: ${fechaFormateada}
+Sucursal: ${sucursalId}
+Realizada por: ${user.name}
+
+PRODUCTOS CON DIFERENCIAS:
+${detallesTexto}
+
+${observaciones ? `\nObservaciones del vendedor:\n${observaciones}` : ''}
+
+ACCIONES REQUERIDAS:
+- Verificar las diferencias encontradas
+- Investigar posibles causas (movimientos no registrados, mermas, etc.)
+- Ajustar el stock del sistema si corresponde
+- Documentar las correcciones realizadas
+
+🔒 BLOQUEO GENERAL: Esta contingencia bloquea futuras conciliaciones generales hasta su resolución.
+        `.trim();
+        
+        const contingencia = await tx.contingencia.create({
+          data: {
+            titulo,
+            descripcion: descripcionContingencia,
             origen: 'sucursal',
             creadoPor: user.id,
             estado: 'pendiente',
@@ -189,19 +225,20 @@ ${categoriaId ? `\n🔒 BLOQUEO: Esta contingencia bloquea futuras conciliacione
           }
         });
         
-        console.log(`[CONCILIACIÓN] Contingencia generada: ${contingencia.id} para ${categoriaId ? `categoría ${categoriaNombre}` : 'conciliación general'}`);
+        console.log(`[GUARDAR] Contingencia generada: ${contingencia.id} para ${categoriaId ? `categoría ${categoriaNombre} (${categoriaId})` : 'conciliación general'}`);
       }
       
       return { 
         success: true,
         hayDiferencias: hayDiferencias || forzarContingencia,
         mensaje: hayDiferencias || forzarContingencia
-          ? `Conciliación de ${categoriaId ? categoriaNombre : 'inventario'} finalizada con diferencias. Se ha generado una contingencia para revisión administrativa. ${categoriaId ? 'Las demás categorías pueden seguir funcionando normalmente.' : ''}` 
-          : `Conciliación de ${categoriaId ? categoriaNombre : 'inventario'} completada exitosamente. Los números coinciden perfectamente.`,
+          ? `Conciliación de ${categoriaId ? `la categoría "${categoriaNombre}"` : 'inventario'} finalizada con diferencias. Se ha generado una contingencia para revisión administrativa. ${categoriaId ? 'Las demás categorías pueden seguir funcionando normalmente.' : ''}` 
+          : `Conciliación de ${categoriaId ? `la categoría "${categoriaNombre}"` : 'inventario'} completada exitosamente. Los números coinciden perfectamente.`,
         diferencias: diferenciasPorProducto.length,
         contingenciaGenerada: hayDiferencias || forzarContingencia,
         categoriaId: categoriaId || null,
         categoriaNombre: categoriaNombre || null,
+        soloEstaCategoria: !!categoriaId, // 🆕 Indicar que solo afecta esta categoría
         bloqueaTodasLasCategorias: !categoriaId // 🆕 Indicar si bloquea todas las categorías
       };
     });
