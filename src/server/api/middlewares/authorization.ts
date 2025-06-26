@@ -1,4 +1,4 @@
-// src/server/api/middlewares/authorization.ts - VERSIÓN ACTUALIZADA CON PERMISOS DE RECEPCIÓN
+// src/server/api/middlewares/authorization.ts - VERSIÓN CORREGIDA CON PERMISOS CLAROS
 import { NextRequest, NextResponse } from 'next/server';
 
 export function checkPermission(requiredPermission: string | string[]) {
@@ -12,27 +12,41 @@ export function checkPermission(requiredPermission: string | string[]) {
       );
     }
     
-    // Tratar admin como rol especial con todos los permisos
+    // 🆕 ADMINISTRADORES: Acceso total a todas las operaciones
     if (user.roleId === 'role-admin') {
+      console.log(`[AUTH] Admin ${user.email} - Acceso garantizado a: ${Array.isArray(requiredPermission) ? requiredPermission.join(', ') : requiredPermission}`);
       return null; // Sin error, continuar
     }
 
-    // 🆕 MEJORADO: Para vendedores, permitir operaciones de caja, ventas Y RECEPCIÓN DE ENVÍOS
+    // 🆕 VENDEDORES: Permisos específicos para operaciones de PDV y recepción
     if (user.roleId === 'role-vendedor') {
       const permsToCheck = Array.isArray(requiredPermission) ? requiredPermission : [requiredPermission];
       const vendedorPermisos = [
-        'caja:ver', 'caja:crear', 
-        'venta:crear', 'venta:ver', 'venta:facturar', 
+        // Operaciones de caja
+        'caja:ver', 'caja:crear', 'caja:cerrar',
+        
+        // Operaciones de venta
+        'venta:crear', 'venta:ver', 'venta:facturar', 'venta:cancelar',
+        
+        // Consulta de productos y stock
         'producto:ver', 'stock:ver', 
-        'contingencia:crear',
-        // 🆕 NUEVOS PERMISOS PARA RECEPCIÓN DE ENVÍOS
-        'envio:recibir', 'envio:ver',
-        'stock:ajustar_recepcion', // Permiso específico para ajustar stock en contexto de recepción
+        
+        // 🆕 RECEPCIÓN DE ENVÍOS - PERMISOS CLAVE
+        'envio:recibir', 'envio:ver', 'envio:listar',
+        
+        // Ajuste de stock solo en contexto de recepción
+        'stock:ajustar_recepcion',
+        
+        // Contingencias
+        'contingencia:crear', 'contingencia:ver',
+        
+        // Conciliaciones
         'conciliacion:crear', 'conciliacion:ver', 'conciliacion:guardar'
       ];
       
       // Verificar si ALGUNO de los permisos coincide (OR en lugar de AND)
       if (permsToCheck.some(p => vendedorPermisos.includes(p))) {
+        console.log(`[AUTH] Vendedor ${user.email} - Permiso concedido para: ${permsToCheck.join(', ')}`);
         return null; // Permitir estas operaciones
       }
       
@@ -44,24 +58,27 @@ export function checkPermission(requiredPermission: string | string[]) {
                                   req.headers.get('x-context') === 'envio-recepcion';
         
         if (isReceivingContext) {
-          console.log(`[AUTH] Permitiendo ajuste de stock para vendedor en contexto de recepción: ${path}`);
+          console.log(`[AUTH] Vendedor ${user.email} - Permiso especial para ajuste de stock en contexto de recepción: ${path}`);
           return null; // Permitir ajuste de stock en contexto de recepción
         } else {
+          console.log(`[AUTH] Vendedor ${user.email} - Denegado ajuste de stock fuera de contexto de recepción`);
           return NextResponse.json(
             { error: 'Como vendedor, solo puede ajustar stock en el contexto de recepción de envíos.' },
             { status: 403 }
           );
         }
       }
+      
+      // Si llega aquí, el permiso no está en la lista de vendedor
+      console.log(`[AUTH] Vendedor ${user.email} - Permiso denegado para: ${permsToCheck.join(', ')}`);
     }
         
-    // Para rol fábrica, permitir operaciones de producción y envíos
+    // 🆕 OPERADORES DE FÁBRICA: Permisos para producción y envíos
     if (user.roleId === 'role-fabrica') {
+      const permsToCheck = Array.isArray(requiredPermission) ? requiredPermission : [requiredPermission];
+      
       // Restricción específica para ajuste de stock en rol fábrica
-      if (requiredPermission === 'stock:ajustar' || 
-          (Array.isArray(requiredPermission) && requiredPermission.includes('stock:ajustar'))) {
-        
-        // Permitir ajustes en el contexto de producciones o envíos
+      if (permsToCheck.includes('stock:ajustar')) {
         const path = req.nextUrl.pathname;
         const isProductionOrShipping = path.includes('/produccion') || 
                                        path.includes('/envios') ||
@@ -69,6 +86,7 @@ export function checkPermission(requiredPermission: string | string[]) {
                                        req.headers.get('x-context') === 'envio';
         
         if (!isProductionOrShipping) {
+          console.log(`[AUTH] Operador fábrica ${user.email} - Denegado ajuste directo de stock`);
           return NextResponse.json(
             { error: 'Como operador de fábrica, no puede ajustar el stock directamente. Debe utilizar el flujo de producción o envíos.' },
             { status: 403 }
@@ -77,26 +95,36 @@ export function checkPermission(requiredPermission: string | string[]) {
       }
 
       const fabricaPermisos = [
-        'produccion:crear', 'produccion:editar', 'produccion:ver',
-        'envio:crear', 'envio:recibir', 'envio:enviar', 'envio:marcar_enviado',
-        'stock:ver', 'stock:ajustar'
+        // Operaciones de producción
+        'produccion:crear', 'produccion:editar', 'produccion:ver', 'produccion:finalizar',
+        
+        // Operaciones de envío desde fábrica
+        'envio:crear', 'envio:recibir', 'envio:enviar', 'envio:marcar_enviado', 'envio:ver',
+        
+        // Consulta y ajuste de stock (en contexto)
+        'stock:ver', 'stock:ajustar',
+        
+        // Insumos y materias primas
+        'insumo:ver', 'insumo:crear', 'insumo:editar',
+        
+        // Contingencias relacionadas con producción
+        'contingencia:crear', 'contingencia:ver'
       ];
 
-      const permsToCheck = Array.isArray(requiredPermission) 
-        ? requiredPermission 
-        : [requiredPermission];
-    
       // Verificar si ALGUNO de los permisos coincide
       if (permsToCheck.some(p => fabricaPermisos.includes(p))) {
+        console.log(`[AUTH] Operador fábrica ${user.email} - Permiso concedido para: ${permsToCheck.join(', ')}`);
         return null; // Permitir estas operaciones
       }
+      
+      console.log(`[AUTH] Operador fábrica ${user.email} - Permiso denegado para: ${permsToCheck.join(', ')}`);
     }
     
     // Para otros roles, verificar permiso específico en la base de datos
     if (!user.role || !user.role.permissions) {
-      console.error('No se encontraron permisos para el usuario:', user.id);
+      console.error(`[AUTH] No se encontraron permisos para el usuario: ${user.id} (rol: ${user.roleId})`);
       return NextResponse.json(
-        { error: 'No tiene permiso para esta acción' },
+        { error: 'No tiene permiso para esta acción - configuración de rol inválida' },
         { status: 403 }
       );
     }
@@ -109,7 +137,7 @@ export function checkPermission(requiredPermission: string | string[]) {
       } catch (e) {
         console.error('Error al parsear permisos:', e);
         return NextResponse.json(
-          { error: 'Error en permisos de usuario' },
+          { error: 'Error en permisos de usuario - formato inválido' },
           { status: 500 }
         );
       }
@@ -120,14 +148,23 @@ export function checkPermission(requiredPermission: string | string[]) {
     
     if (Array.isArray(permissions) && 
         (permissions.includes('*') || permissionsToCheck.some(perm => permissions.includes(perm)))) {
+      console.log(`[AUTH] Usuario ${user.email} - Permiso concedido por configuración de rol`);
       return null; // Sin error, continuar
     }
     
-    console.log(`Usuario ${user.id} no tiene permiso ${Array.isArray(requiredPermission) ? requiredPermission.join(' o ') : requiredPermission}`);
-    console.log('Permisos disponibles:', permissions);
+    console.log(`[AUTH] Usuario ${user.id} (${user.roleId}) - ACCESO DENEGADO`);
+    console.log(`[AUTH] Permisos requeridos: ${Array.isArray(requiredPermission) ? requiredPermission.join(' o ') : requiredPermission}`);
+    console.log(`[AUTH] Permisos disponibles:`, permissions);
     
     return NextResponse.json(
-      { error: 'No tiene permiso para esta acción' },
+      { 
+        error: 'No tiene permiso para esta acción',
+        details: {
+          required: Array.isArray(requiredPermission) ? requiredPermission : [requiredPermission],
+          role: user.roleId,
+          available: Array.isArray(permissions) ? permissions : []
+        }
+      },
       { status: 403 }
     );
   };

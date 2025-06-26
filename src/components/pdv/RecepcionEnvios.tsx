@@ -1,4 +1,4 @@
-// src/components/pdv/RecepcionEnvios.tsx - VERSIÓN MEJORADA SIN MARCAR COMO ENVIADO
+// src/components/pdv/RecepcionEnvios.tsx - VERSIÓN MEJORADA PARA ADMIN Y VENDEDORES
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -6,7 +6,7 @@ import { format } from 'date-fns';
 import { 
   Package, CheckCircle, AlertTriangle, Clock, Truck, 
   Calendar, User, FileText, ChevronRight, RefreshCw,
-  MapPin, Hash, Weight, AlertCircle
+  MapPin, Hash, Weight, AlertCircle, Shield, UserCheck
 } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
 
@@ -51,6 +51,14 @@ interface Envio {
     email: string;
   };
   items: ItemEnvio[];
+  metadata?: {
+    puedeRecibir: boolean;
+    consultadoPor: {
+      rol: string;
+      nombre: string;
+      restriccionSucursal: string | null;
+    };
+  };
 }
 
 interface RecepcionEnviosProps {
@@ -63,6 +71,8 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
   const [isReceiving, setIsReceiving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [userSucursal, setUserSucursal] = useState<string | null>(null);
   
   // Estados para el modal de recepción
   const [selectedEnvio, setSelectedEnvio] = useState<Envio | null>(null);
@@ -70,20 +80,39 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
   const [cantidadesRecibidas, setCantidadesRecibidas] = useState<Record<string, number>>({});
   const [observaciones, setObservaciones] = useState('');
 
+  const fetchUserInfo = async () => {
+    try {
+      const response = await authenticatedFetch('/api/auth/me');
+      if (response.ok) {
+        const userData = await response.json();
+        setUserRole(userData.roleId);
+        setUserSucursal(userData.sucursalId);
+      }
+    } catch (error) {
+      console.error('Error al obtener información del usuario:', error);
+    }
+  };
+
   const fetchEnvios = async () => {
     try {
       setIsLoading(true);
       setError(null);
       
-      const sucursalId = localStorage.getItem('sucursalId');
-      if (!sucursalId) {
-        throw new Error('No se ha definido una sucursal');
+      let queryParams = '?estado=enviado,en_transito';
+      
+      // 🆕 LÓGICA DIFERENCIADA POR ROL
+      if (userRole === 'role-vendedor') {
+        // Vendedores solo ven envíos dirigidos a su sucursal
+        if (!userSucursal) {
+          throw new Error('Vendedor sin sucursal asignada');
+        }
+        queryParams += `&destinoId=${encodeURIComponent(userSucursal)}`;
+      } else if (userRole === 'role-admin') {
+        // Administradores ven todos los envíos pendientes de recepción
+        console.log('Admin: Cargando todos los envíos pendientes de recepción');
       }
       
-      // 🔧 OBTENER ENVÍOS PENDIENTES DE RECEPCIÓN
-      const response = await authenticatedFetch(
-        `/api/envios?destinoId=${encodeURIComponent(sucursalId)}&estado=enviado,en_transito`
-      );
+      const response = await authenticatedFetch(`/api/envios${queryParams}`);
       
       if (!response.ok) {
         const errorData = await response.json();
@@ -101,20 +130,39 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
   };
 
   useEffect(() => {
-    fetchEnvios();
+    fetchUserInfo();
   }, []);
 
-  const handleOpenReceiveModal = (envio: Envio) => {
-    setSelectedEnvio(envio);
-    setShowReceiveModal(true);
-    
-    // Inicializar cantidades recibidas con las cantidades enviadas por defecto
-    const cantidadesIniciales: Record<string, number> = {};
-    envio.items.forEach(item => {
-      cantidadesIniciales[item.id] = item.cantidad;
-    });
-    setCantidadesRecibidas(cantidadesIniciales);
-    setObservaciones('');
+  useEffect(() => {
+    if (userRole) {
+      fetchEnvios();
+    }
+  }, [userRole, userSucursal]);
+
+  const handleOpenReceiveModal = async (envio: Envio) => {
+    try {
+      // 🆕 OBTENER DETALLES COMPLETOS DEL ENVÍO ANTES DE ABRIR MODAL
+      const response = await authenticatedFetch(`/api/pdv/envios/${envio.id}/recibir`);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al cargar detalles del envío');
+      }
+      
+      const envioDetallado = await response.json();
+      setSelectedEnvio(envioDetallado);
+      setShowReceiveModal(true);
+      
+      // Inicializar cantidades recibidas con las cantidades enviadas por defecto
+      const cantidadesIniciales: Record<string, number> = {};
+      envioDetallado.items.forEach((item: ItemEnvio) => {
+        cantidadesIniciales[item.id] = item.cantidad;
+      });
+      setCantidadesRecibidas(cantidadesIniciales);
+      setObservaciones('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al cargar detalles del envío');
+    }
   };
 
   const handleCloseReceiveModal = () => {
@@ -162,7 +210,7 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
         }
       }
       
-      const response = await authenticatedFetch(`/api/fabrica/envios/${selectedEnvio.id}/recibir`, {
+      const response = await authenticatedFetch(`/api/pdv/envios/${selectedEnvio.id}/recibir`, {
         method: 'POST',
         body: JSON.stringify({
           items,
@@ -177,11 +225,13 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
       
       const resultado = await response.json();
       
-      setSuccess(
-        hayDiferencias 
-          ? 'Envío recibido con diferencias. Se ha generado una contingencia para revisión.'
-          : 'Envío recibido correctamente. El stock ha sido actualizado.'
-      );
+      // 🆕 MENSAJE DIFERENCIADO SEGÚN EL ROL
+      const roleMensaje = userRole === 'role-admin' ? '(Admin)' : '(Vendedor)';
+      const baseMessage = hayDiferencias 
+        ? 'Envío recibido con diferencias. Se ha generado una contingencia para revisión.'
+        : 'Envío recibido correctamente. El stock ha sido actualizado.';
+      
+      setSuccess(`${baseMessage} ${roleMensaje}`);
       
       // Cerrar modal y refrescar lista
       handleCloseReceiveModal();
@@ -234,6 +284,31 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
     return cantidadRecibida !== item.cantidad;
   }) : false;
 
+  // 🆕 COMPONENTE INDICADOR DE ROL
+  const RoleIndicator = () => {
+    if (!userRole) return null;
+    
+    return (
+      <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+        userRole === 'role-admin' 
+          ? 'bg-purple-100 text-purple-800 border border-purple-300'
+          : 'bg-green-100 text-green-800 border border-green-300'
+      }`}>
+        {userRole === 'role-admin' ? (
+          <>
+            <Shield className="h-4 w-4 mr-1" />
+            Administrador
+          </>
+        ) : (
+          <>
+            <UserCheck className="h-4 w-4 mr-1" />
+            Vendedor
+          </>
+        )}
+      </div>
+    );
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -247,6 +322,20 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
 
   return (
     <div className="space-y-4">
+      {/* Header con indicador de rol */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-3">
+          <h2 className="text-lg font-semibold text-gray-900">Recepción de Envíos</h2>
+          <RoleIndicator />
+        </div>
+        
+        {userRole === 'role-admin' && (
+          <div className="text-sm text-gray-600 bg-purple-50 px-3 py-2 rounded-md border border-purple-200">
+            💡 Como administrador, puede recibir envíos en cualquier sucursal
+          </div>
+        )}
+      </div>
+
       {/* Mensajes de estado */}
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md flex items-center">
@@ -267,7 +356,12 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
         <div className="text-center py-8">
           <Package className="mx-auto h-12 w-12 text-gray-400 mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No hay envíos pendientes</h3>
-          <p className="text-gray-500">Todos los envíos han sido recepcionados.</p>
+          <p className="text-gray-500">
+            {userRole === 'role-admin' 
+              ? 'No hay envíos pendientes de recepción en ninguna sucursal.'
+              : 'No hay envíos pendientes para su sucursal.'
+            }
+          </p>
           <button
             onClick={fetchEnvios}
             className="mt-4 inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
@@ -291,6 +385,13 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${getEstadoBadge(envio.estado)}`}>
                       {envio.estado === 'enviado' ? 'Enviado' : 'En Tránsito'}
                     </span>
+
+                    {/* 🆕 INDICADOR ESPECIAL PARA ADMINS */}
+                    {userRole === 'role-admin' && (
+                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800 border border-purple-300">
+                        Admin Access
+                      </span>
+                    )}
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
@@ -303,22 +404,30 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
                     </div>
                     
                     <div className="flex items-center">
+                      <MapPin className="h-4 w-4 text-blue-400 mr-2" />
+                      <div>
+                        <div className="font-medium text-gray-900">Hacia: {envio.destino.nombre}</div>
+                        <div className="text-gray-500 capitalize">{envio.destino.tipo}</div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center">
                       <Calendar className="h-4 w-4 text-gray-400 mr-2" />
                       <div>
                         <div className="font-medium text-gray-900">Fecha de envío:</div>
                         <div className="text-gray-500">{formatDate(envio.fechaEnvio)}</div>
                       </div>
                     </div>
-                    
-                    <div className="flex items-center">
-                      <Package className="h-4 w-4 text-gray-400 mr-2" />
-                      <div>
-                        <div className="font-medium text-gray-900">{envio.items.length} producto{envio.items.length !== 1 ? 's' : ''}</div>
-                        <div className="text-gray-500">
-                          {envio.items.slice(0, 2).map(item => getItemName(item)).join(', ')}
-                          {envio.items.length > 2 && ' y más...'}
-                        </div>
-                      </div>
+                  </div>
+                  
+                  <div className="mt-2 flex items-center">
+                    <Package className="h-4 w-4 text-gray-400 mr-2" />
+                    <div className="text-sm">
+                      <span className="font-medium text-gray-900">{envio.items.length} producto{envio.items.length !== 1 ? 's' : ''}: </span>
+                      <span className="text-gray-500">
+                        {envio.items.slice(0, 2).map(item => getItemName(item)).join(', ')}
+                        {envio.items.length > 2 && ' y más...'}
+                      </span>
                     </div>
                   </div>
                 </div>
@@ -348,15 +457,18 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
         </div>
       )}
 
-      {/* Modal de Recepción */}
+      {/* Modal de Recepción - Sin cambios significativos, ya está bien */}
       {showReceiveModal && selectedEnvio && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
           <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
             <div className="mt-3">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-medium text-gray-900">
-                  Recepcionar Envío #{selectedEnvio.id.slice(-6)}
-                </h3>
+                <div className="flex items-center space-x-3">
+                  <h3 className="text-lg font-medium text-gray-900">
+                    Recepcionar Envío #{selectedEnvio.id.slice(-6)}
+                  </h3>
+                  <RoleIndicator />
+                </div>
                 <button
                   onClick={handleCloseReceiveModal}
                   className="text-gray-400 hover:text-gray-600"
@@ -370,10 +482,14 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
               
               {/* Información del envío */}
               <div className="bg-gray-50 rounded-lg p-4 mb-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                   <div>
                     <span className="font-medium text-gray-700">Origen:</span>
                     <span className="ml-2 text-gray-900">{selectedEnvio.origen.nombre}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Destino:</span>
+                    <span className="ml-2 text-gray-900">{selectedEnvio.destino.nombre}</span>
                   </div>
                   <div>
                     <span className="font-medium text-gray-700">Fecha de envío:</span>
@@ -382,7 +498,7 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
                 </div>
               </div>
               
-              {/* Lista de productos/insumos - VERSIÓN MEJORADA */}
+              {/* Lista de productos/insumos */}
               <div className="space-y-4 mb-6">
                 <div className="flex items-center justify-between">
                   <h4 className="font-medium text-gray-900">Conteo Físico de Productos:</h4>
@@ -411,7 +527,7 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
                           </div>
                           <div>
                             <h5 className="font-medium text-gray-900 text-lg">{getItemName(item)}</h5>
-                            <p className="text-sm text-gray-500">Unidad: {getItemUnit(item)}</p>
+                            <p className="text-sm text-gray-500">Unidad: {getItemUnit(item)} | Enviado: {item.cantidad}</p>
                           </div>
                         </div>
                       </div>

@@ -1,4 +1,4 @@
-// src/app/api/pdv/envios/[id]/recibir/route.ts - NUEVA API PARA PDV
+// src/app/api/pdv/envios/[id]/recibir/route.ts - VERSIÓN CORREGIDA PARA ADMIN Y VENDEDORES
 import { NextRequest, NextResponse } from 'next/server';
 import { authMiddleware } from '@/server/api/middlewares/auth';
 import { checkPermission } from '@/server/api/middlewares/authorization';
@@ -47,15 +47,66 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     // Obtener usuario
     const user = (req as any).user;
     
-    // 🔧 VALIDAR QUE EL USUARIO SEA VENDEDOR Y TENGA SUCURSAL ASIGNADA
-    if (user.roleId === 'role-vendedor' && !user.sucursalId) {
+    // 🆕 NUEVA LÓGICA: Diferente validación para vendedores vs administradores
+    if (user.roleId === 'role-vendedor') {
+      // 🔧 VALIDACIONES ESPECÍFICAS PARA VENDEDORES
+      if (!user.sucursalId) {
+        return NextResponse.json(
+          { error: 'El vendedor debe tener una sucursal asignada para recibir envíos' },
+          { status: 403 }
+        );
+      }
+      
+      // Verificar que el envío está dirigido a la sucursal del vendedor
+      const envio = await prisma.envio.findUnique({
+        where: { id },
+        select: { destinoId: true, estado: true }
+      });
+      
+      if (!envio) {
+        return NextResponse.json(
+          { error: 'Envío no encontrado' },
+          { status: 404 }
+        );
+      }
+      
+      if (envio.destinoId !== user.sucursalId) {
+        return NextResponse.json(
+          { error: 'No tiene permiso para recibir este envío. El envío no está dirigido a su sucursal.' },
+          { status: 403 }
+        );
+      }
+      
+      console.log(`[API PDV] Vendedor ${user.email} recibiendo envío para su sucursal ${user.sucursalId}`);
+      
+    } else if (user.roleId === 'role-admin') {
+      // 🆕 LÓGICA PARA ADMINISTRADORES: Sin restricciones de sucursal
+      console.log(`[API PDV] Administrador ${user.email} recibiendo envío ${id} - sin restricciones de sucursal`);
+      
+      // Solo verificar que el envío existe
+      const envio = await prisma.envio.findUnique({
+        where: { id },
+        select: { id: true, estado: true, destinoId: true, destino: { select: { nombre: true } } }
+      });
+      
+      if (!envio) {
+        return NextResponse.json(
+          { error: 'Envío no encontrado' },
+          { status: 404 }
+        );
+      }
+      
+      console.log(`[API PDV] Admin recibiendo envío dirigido a: ${envio.destino?.nombre} (${envio.destinoId})`);
+      
+    } else {
+      // Otros roles no permitidos
       return NextResponse.json(
-        { error: 'El vendedor debe tener una sucursal asignada para recibir envíos' },
+        { error: 'Su rol no tiene permisos para recibir envíos' },
         { status: 403 }
       );
     }
     
-    // Verificar que el envío existe
+    // Verificar que el envío existe y obtener detalles completos
     const envio = await prisma.envio.findUnique({
       where: { id },
       include: {
@@ -83,18 +134,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         { error: `El envío no puede ser recibido porque está en estado ${envio.estado}. Los estados válidos son 'enviado' y 'en_transito'.` },
         { status: 400 }
       );
-    }
-    
-    // 🔧 VERIFICAR QUE EL DESTINO COINCIDE CON LA SUCURSAL DEL VENDEDOR (PARA VENDEDORES)
-    if (user.roleId === 'role-vendedor') {
-      const userSucursalId = user.sucursalId;
-      
-      if (envio.destinoId !== userSucursalId) {
-        return NextResponse.json(
-          { error: 'No tiene permiso para recibir este envío. El envío no está dirigido a su sucursal.' },
-          { status: 403 }
-        );
-      }
     }
     
     // 🆕 AGREGAR HEADER DE CONTEXTO PARA EL SERVICIO DE STOCK
@@ -127,7 +166,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         itemsConDiferencia: items.filter(item => {
           const itemEnvio = envio.items.find(i => i.id === item.itemEnvioId);
           return itemEnvio && itemEnvio.cantidad !== item.cantidadRecibida;
-        }).length
+        }).length,
+        recibidoPor: {
+          rol: user.roleId,
+          nombre: user.name,
+          email: user.email,
+          sucursal: user.roleId === 'role-vendedor' ? user.sucursalId : 'Admin - Sin restricción'
+        }
       }
     });
     
@@ -140,7 +185,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 }
 
-// 🆕 GET PARA OBTENER DETALLES DEL ENVÍO ANTES DE RECEPCIÓN
+// 🆕 GET MEJORADO PARA OBTENER DETALLES DEL ENVÍO ANTES DE RECEPCIÓN
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   const authError = await authMiddleware(req);
   if (authError) return authError;
@@ -184,15 +229,40 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       );
     }
     
-    // Verificar permisos para vendedores
-    if (user.roleId === 'role-vendedor' && envio.destinoId !== user.sucursalId) {
+    // 🆕 VERIFICAR PERMISOS DIFERENCIADOS POR ROL
+    if (user.roleId === 'role-vendedor') {
+      // Vendedores solo pueden ver envíos dirigidos a su sucursal
+      if (envio.destinoId !== user.sucursalId) {
+        return NextResponse.json(
+          { error: 'No tiene permiso para ver este envío' },
+          { status: 403 }
+        );
+      }
+    } else if (user.roleId === 'role-admin') {
+      // Administradores pueden ver cualquier envío
+      console.log(`[API PDV] Admin ${user.email} consultando envío ${id}`);
+    } else {
+      // Otros roles restringidos
       return NextResponse.json(
-        { error: 'No tiene permiso para ver este envío' },
+        { error: 'Su rol no tiene permisos para ver envíos' },
         { status: 403 }
       );
     }
     
-    return NextResponse.json(envio);
+    // 🆕 AGREGAR METADATOS ÚTILES PARA EL FRONTEND
+    const response = {
+      ...envio,
+      metadata: {
+        puedeRecibir: ['enviado', 'en_transito'].includes(envio.estado),
+        consultadoPor: {
+          rol: user.roleId,
+          nombre: user.name,
+          restriccionSucursal: user.roleId === 'role-vendedor' ? user.sucursalId : null
+        }
+      }
+    };
+    
+    return NextResponse.json(response);
     
   } catch (error: any) {
     console.error('Error al obtener envío:', error);
