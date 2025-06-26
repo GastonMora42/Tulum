@@ -377,45 +377,52 @@ export function CierreCaja({ id, onSuccess }: CierreCajaUXMejoradoProps) {
     return 0;
   }, [ventasResumen, configuracionCierre, cierreCaja]);
   
-// En src/components/pdv/CierreCaja.tsx
-// Reemplazar la función calcularCuentasAutomaticas existente
-
-const calcularCuentasAutomaticas = useCallback(() => {
-  if (efectivoContado <= 0) return null;
-  
-  const totalEgresos = ventasResumen?.totalEgresos || 0;
-  const recuperoNum = parseFloat(recuperoFondo) || 0;
-  const montoInicialCaja = cierreCaja?.montoInicial || 0;
-  
-  // ✅ CORRECTO: Solo restar recupero y monto inicial
-  const efectivoParaSobreCalculado = efectivoContado - recuperoNum - montoInicialCaja;
-  const esNegativo = efectivoParaSobreCalculado < 0;
-  
-  // 🆕 LÓGICA CORREGIDA: Calcular el efectivo real que tendrá el próximo turno
-  let efectivoRealProximoTurno = montoInicialCaja; // Por defecto, el monto inicial
-  let tipoAperturaProximo = 'normal'; // 'normal', 'reducido'
-  
-  if (esNegativo) {
-    // Si es negativo, el próximo turno abrirá con lo que realmente quede
-    efectivoRealProximoTurno = efectivoContado - recuperoNum;
-    tipoAperturaProximo = 'reducido';
-  }
-  
-  return {
-    efectivoContado,
-    egresosInformativos: totalEgresos,
-    menosRecupero: recuperoNum,
-    menosMontoInicial: montoInicialCaja,
-    efectivoParaSobre: esNegativo ? 0 : efectivoParaSobreCalculado,
-    // 🆕 CORREGIDO: Efectivo real para próximo turno
-    efectivoProximoTurno: efectivoRealProximoTurno,
-    tipoAperturaProximo, // 🆕 NUEVO: Tipo de apertura
-    montoInicialReferencia: montoInicialCaja, // 🆕 NUEVO: Para comparación
-    esNegativo,
-    recuperoProximoTurno: esNegativo ? Math.abs(efectivoParaSobreCalculado) : 0
-  };
-}, [efectivoContado, ventasResumen, recuperoFondo, cierreCaja]);
-
+  const calcularCuentasAutomaticas = useCallback(() => {
+    if (efectivoContado <= 0) return null;
+    
+    const totalEgresos = ventasResumen?.totalEgresos || 0;
+    const recuperoNum = parseFloat(recuperoFondo) || 0;
+    const montoInicialCaja = cierreCaja?.montoInicial || 0;
+    
+    // Efectivo para sobre (sin cambios)
+    const efectivoParaSobreCalculado = efectivoContado - recuperoNum - montoInicialCaja;
+    const esNegativo = efectivoParaSobreCalculado < 0;
+    
+    // 🔧 CORRECCIÓN: Calcular el efectivo real que tendrá el próximo turno
+    let efectivoRealProximoTurno = montoInicialCaja; // Por defecto, el monto inicial
+    let tipoAperturaProximo = 'normal';
+    let mensajeAperturaProximo = `Próximo turno abrirá con el mismo monto inicial de hoy`;
+    
+    // 🆕 NUEVA LÓGICA: Si hay recupero, sumarlo al monto inicial para el próximo turno
+    if (recuperoNum > 0) {
+      efectivoRealProximoTurno = montoInicialCaja + recuperoNum;
+      tipoAperturaProximo = 'con_recupero';
+      mensajeAperturaProximo = `Monto inicial (${montoInicialCaja.toFixed(2)}) + Recupero (${recuperoNum.toFixed(2)}) = Total para próximo turno`;
+    }
+    
+    // Si el resultado es negativo, el próximo turno tendrá menos efectivo
+    if (esNegativo) {
+      efectivoRealProximoTurno = efectivoContado - recuperoNum;
+      tipoAperturaProximo = 'reducido';
+      mensajeAperturaProximo = `⚠️ Próximo turno abrirá con efectivo reducido debido a balance negativo`;
+    }
+    
+    return {
+      efectivoContado,
+      egresosInformativos: totalEgresos,
+      menosRecupero: recuperoNum,
+      menosMontoInicial: montoInicialCaja,
+      efectivoParaSobre: esNegativo ? 0 : efectivoParaSobreCalculado,
+      // 🔧 CORREGIDO: Efectivo real para próximo turno con recupero incluido
+      efectivoProximoTurno: efectivoRealProximoTurno,
+      tipoAperturaProximo,
+      mensajeAperturaProximo, // 🆕 NUEVO: Mensaje explicativo
+      montoInicialReferencia: montoInicialCaja,
+      recuperoAplicado: recuperoNum, // 🆕 NUEVO: Para mostrar claramente el recupero
+      esNegativo,
+      recuperoProximoTurno: esNegativo ? Math.abs(efectivoParaSobreCalculado) : 0
+    };
+  }, [efectivoContado, ventasResumen, recuperoFondo, cierreCaja]);  
 
   // Función para manejar cambio del contador de billetes
   const handleBillCounterChange = (total: number) => {
@@ -850,8 +857,8 @@ const calcularCuentasAutomaticas = useCallback(() => {
           </span>
         </div>
         
-        {/* 🔧 CAMBIO: Mostrar que el próximo turno abrirá con el mismo monto inicial */}
-        <div className="bg-blue-100 border border-blue-300 rounded-lg py-3 px-4">
+{/* 🔧 CAMBIO: Mostrar efectivo próximo turno con recupero incluido correctamente */}
+<div className="bg-blue-100 border border-blue-300 rounded-lg py-3 px-4">
   <div className="flex justify-between items-center">
     <span className="font-bold text-lg text-blue-800">
       🏪 Efectivo próximo turno:
@@ -860,19 +867,43 @@ const calcularCuentasAutomaticas = useCallback(() => {
       ${cuentasAutomaticas.efectivoProximoTurno.toFixed(2)}
     </span>
   </div>
-  <p className="text-xs text-blue-700 mt-1">
-    Próximo turno abrirá con el mismo monto inicial de hoy
-  </p>
-          {/* 🆕 MOSTRAR INFORMACIÓN SOBRE MONTO FIJO CONFIGURADO */}
-          {configuracionCierre && configuracionCierre.montoFijo !== cuentasAutomaticas.efectivoProximoTurno && (
-            <p className="text-xs text-amber-700 mt-1 bg-amber-50 p-2 rounded border border-amber-200">
-              💡 Monto fijo configurado: ${configuracionCierre.montoFijo.toFixed(2)}. 
-              Use recupero de fondo para ajustar durante el turno si es necesario.
-            </p>
-          )}
-        </div>
+  
+  {/* 🆕 NUEVO: Mostrar desglose cuando hay recupero */}
+  {cuentasAutomaticas.recuperoAplicado > 0 && cuentasAutomaticas.tipoAperturaProximo === 'con_recupero' && (
+    <div className="mt-2 text-xs text-blue-700 bg-blue-50 p-2 rounded border border-blue-200">
+      <div className="flex justify-between">
+        <span>Monto inicial:</span>
+        <span>${cuentasAutomaticas.montoInicialReferencia.toFixed(2)}</span>
+      </div>
+      <div className="flex justify-between">
+        <span>+ Recupero aplicado:</span>
+        <span className="text-green-700">+${cuentasAutomaticas.recuperoAplicado.toFixed(2)}</span>
+      </div>
+      <hr className="my-1 border-blue-300" />
+      <div className="flex justify-between font-semibold">
+        <span>Total próximo turno:</span>
+        <span>${cuentasAutomaticas.efectivoProximoTurno.toFixed(2)}</span>
       </div>
     </div>
+  )}
+  
+  <p className="text-xs text-blue-700 mt-1">
+    {cuentasAutomaticas.mensajeAperturaProximo}
+  </p>
+  
+  {/* 🆕 MOSTRAR INFORMACIÓN SOBRE MONTO FIJO CONFIGURADO cuando hay diferencia */}
+  {configuracionCierre && Math.abs(configuracionCierre.montoFijo - cuentasAutomaticas.efectivoProximoTurno) > 0.01 && (
+    <p className="text-xs text-amber-700 mt-1 bg-amber-50 p-2 rounded border border-amber-200">
+      💡 Monto fijo configurado: ${configuracionCierre.montoFijo.toFixed(2)}. 
+      {cuentasAutomaticas.efectivoProximoTurno > configuracionCierre.montoFijo 
+        ? ` El próximo turno tendrá ${(cuentasAutomaticas.efectivoProximoTurno - configuracionCierre.montoFijo).toFixed(2)} extra.`
+        : ` El próximo turno tendrá ${(configuracionCierre.montoFijo - cuentasAutomaticas.efectivoProximoTurno).toFixed(2)} menos del ideal.`
+      }
+    </p>
+  )}
+</div>
+</div>
+</div>
     
     {/* Campo de recupero - sin cambios */}
     <div className="mt-6">

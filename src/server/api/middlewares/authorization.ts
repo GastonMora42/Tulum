@@ -1,4 +1,4 @@
-// src/server/api/middlewares/authorization.ts - VERSIÓN MEJORADA CON EDICIÓN DE UBICACIONES
+// src/server/api/middlewares/authorization.ts - VERSIÓN ACTUALIZADA CON PERMISOS DE RECEPCIÓN
 import { NextRequest, NextResponse } from 'next/server';
 
 export function checkPermission(requiredPermission: string | string[]) {
@@ -17,19 +17,41 @@ export function checkPermission(requiredPermission: string | string[]) {
       return null; // Sin error, continuar
     }
 
-    // 🆕 MEJORADO: Para vendedores, permitir operaciones de caja y ventas
+    // 🆕 MEJORADO: Para vendedores, permitir operaciones de caja, ventas Y RECEPCIÓN DE ENVÍOS
     if (user.roleId === 'role-vendedor') {
       const permsToCheck = Array.isArray(requiredPermission) ? requiredPermission : [requiredPermission];
       const vendedorPermisos = [
         'caja:ver', 'caja:crear', 
         'venta:crear', 'venta:ver', 'venta:facturar', 
         'producto:ver', 'stock:ver', 
-        'contingencia:crear'
+        'contingencia:crear',
+        // 🆕 NUEVOS PERMISOS PARA RECEPCIÓN DE ENVÍOS
+        'envio:recibir', 'envio:ver',
+        'stock:ajustar_recepcion', // Permiso específico para ajustar stock en contexto de recepción
+        'conciliacion:crear', 'conciliacion:ver', 'conciliacion:guardar'
       ];
       
-      // 🔧 CAMBIO IMPORTANTE: Verificar si ALGUNO de los permisos coincide (OR en lugar de AND)
+      // Verificar si ALGUNO de los permisos coincide (OR en lugar de AND)
       if (permsToCheck.some(p => vendedorPermisos.includes(p))) {
         return null; // Permitir estas operaciones
+      }
+      
+      // 🔧 LÓGICA ESPECIAL: Permitir ajuste de stock solo en contexto de recepción de envíos
+      if (permsToCheck.includes('stock:ajustar')) {
+        const path = req.nextUrl.pathname;
+        const isReceivingContext = path.includes('/recibir') || 
+                                  path.includes('/recepcion') ||
+                                  req.headers.get('x-context') === 'envio-recepcion';
+        
+        if (isReceivingContext) {
+          console.log(`[AUTH] Permitiendo ajuste de stock para vendedor en contexto de recepción: ${path}`);
+          return null; // Permitir ajuste de stock en contexto de recepción
+        } else {
+          return NextResponse.json(
+            { error: 'Como vendedor, solo puede ajustar stock en el contexto de recepción de envíos.' },
+            { status: 403 }
+          );
+        }
       }
     }
         
@@ -42,11 +64,13 @@ export function checkPermission(requiredPermission: string | string[]) {
         // Permitir ajustes en el contexto de producciones o envíos
         const path = req.nextUrl.pathname;
         const isProductionOrShipping = path.includes('/produccion') || 
-                                       path.includes('/envios');
+                                       path.includes('/envios') ||
+                                       req.headers.get('x-context') === 'produccion' ||
+                                       req.headers.get('x-context') === 'envio';
         
         if (!isProductionOrShipping) {
           return NextResponse.json(
-            { error: 'Como operador de fábrica, no puede ajustar el stock directamente. Debe utilizar el flujo de solicitud y recepción de insumos.' },
+            { error: 'Como operador de fábrica, no puede ajustar el stock directamente. Debe utilizar el flujo de producción o envíos.' },
             { status: 403 }
           );
         }
@@ -54,15 +78,15 @@ export function checkPermission(requiredPermission: string | string[]) {
 
       const fabricaPermisos = [
         'produccion:crear', 'produccion:editar', 'produccion:ver',
-        'envio:crear', 'envio:recibir', 'envio:enviar',
-        'stock:ver'
+        'envio:crear', 'envio:recibir', 'envio:enviar', 'envio:marcar_enviado',
+        'stock:ver', 'stock:ajustar'
       ];
 
       const permsToCheck = Array.isArray(requiredPermission) 
         ? requiredPermission 
         : [requiredPermission];
     
-      // 🔧 CAMBIO IMPORTANTE: Verificar si ALGUNO de los permisos coincide
+      // Verificar si ALGUNO de los permisos coincide
       if (permsToCheck.some(p => fabricaPermisos.includes(p))) {
         return null; // Permitir estas operaciones
       }
@@ -91,7 +115,7 @@ export function checkPermission(requiredPermission: string | string[]) {
       }
     }
     
-    // 🔧 MEJORADO: Verificar permiso wildcard o específico usando OR
+    // Verificar permiso wildcard o específico usando OR
     const permissionsToCheck = Array.isArray(requiredPermission) ? requiredPermission : [requiredPermission];
     
     if (Array.isArray(permissions) && 

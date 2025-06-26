@@ -1,4 +1,4 @@
-// src/app/api/pdv/conciliacion/route.ts - VERSIÓN CORREGIDA CON CATEGORÍAS
+// src/app/api/pdv/conciliacion/route.ts - VERSIÓN COMPLETAMENTE ROBUSTA
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/server/db/client';
 import { authMiddleware } from '@/server/api/middlewares/auth';
@@ -11,9 +11,12 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const sucursalId = searchParams.get('sucursalId');
-    const categoriaId = searchParams.get('categoriaId'); // 🆕 Filtro por categoría
+    const categoriaId = searchParams.get('categoriaId'); // Opcional
+    
+    console.log(`[API Conciliación GET] Iniciando para sucursal: ${sucursalId}, categoría: ${categoriaId || 'todas'}`);
     
     if (!sucursalId) {
+      console.error('[API Conciliación GET] Error: sucursalId no proporcionado');
       return NextResponse.json(
         { error: 'Se requiere el ID de la sucursal' },
         { status: 400 }
@@ -22,114 +25,187 @@ export async function GET(req: NextRequest) {
     
     const user = (req as any).user;
     if (user.sucursalId && user.sucursalId !== sucursalId && user.roleId !== 'role-admin') {
+      console.error(`[API Conciliación GET] Error de permisos: usuario ${user.id} intentando acceder a sucursal ${sucursalId}`);
       return NextResponse.json(
         { error: 'No tiene permisos para acceder a esta sucursal' },
         { status: 403 }
       );
     }
     
-    // 🆕 VERIFICAR SOLO CONTINGENCIAS DE CONCILIACIÓN DE LA CATEGORÍA ESPECÍFICA
-    let contingenciasBloqueo;
-    if (categoriaId) {
-      // Si es una categoría específica, buscar contingencias solo de esa categoría
-      contingenciasBloqueo = await prisma.contingencia.findMany({
-        where: {
-          ubicacionId: sucursalId,
-          tipo: 'conciliacion',
-          estado: { in: ['pendiente', 'en_revision'] },
-          descripcion: { contains: `Categoría: ${categoriaId}` } // Buscar por descripción que contenga la categoría
-        }
-      });
-    } else {
-      // Si es conciliación general, verificar si hay contingencias generales
-      contingenciasBloqueo = await prisma.contingencia.findMany({
-        where: {
-          ubicacionId: sucursalId,
-          tipo: 'conciliacion_general', // 🆕 Nuevo tipo para conciliaciones generales
-          estado: { in: ['pendiente', 'en_revision'] }
-        }
-      });
+    // PASO 1: Verificar contingencias
+    console.log('[API Conciliación GET] Verificando contingencias...');
+    let contingenciasBloqueo: any[] = [];
+    
+    try {
+      if (categoriaId) {
+        // Buscar contingencias específicas de esta categoría
+        contingenciasBloqueo = await prisma.contingencia.findMany({
+          where: {
+            ubicacionId: sucursalId,
+            tipo: 'conciliacion',
+            estado: { in: ['pendiente', 'en_revision'] },
+            OR: [
+              { descripcion: { contains: `Categoría: ${categoriaId}` } },
+              { descripcion: { contains: `categoriaId-${categoriaId}` } }
+            ]
+          }
+        });
+      } else {
+        // Para vista general, buscar contingencias que puedan bloquear
+        contingenciasBloqueo = await prisma.contingencia.findMany({
+          where: {
+            ubicacionId: sucursalId,
+            OR: [
+              { tipo: 'conciliacion_general' },
+              { tipo: 'conciliacion' }
+            ],
+            estado: { in: ['pendiente', 'en_revision'] }
+          }
+        });
+      }
+      
+      console.log(`[API Conciliación GET] Contingencias encontradas: ${contingenciasBloqueo.length}`);
+      
+    } catch (contingenciaError) {
+      console.error('[API Conciliación GET] Error al verificar contingencias:', contingenciaError);
+      // No bloquear por error en contingencias, continuar
     }
     
     if (contingenciasBloqueo.length > 0) {
+      console.log('[API Conciliación GET] Contingencias bloquean la conciliación');
+      let mensajeBloqueo = '';
+      
+      if (categoriaId) {
+        try {
+          const categoria = await prisma.categoria.findUnique({
+            where: { id: categoriaId },
+            select: { nombre: true }
+          });
+          const nombreCategoria = categoria?.nombre || 'Categoría desconocida';
+          mensajeBloqueo = `La categoría "${nombreCategoria}" tiene una contingencia de conciliación pendiente.`;
+        } catch {
+          mensajeBloqueo = `La categoría seleccionada tiene una contingencia de conciliación pendiente.`;
+        }
+      } else {
+        mensajeBloqueo = `Existen ${contingenciasBloqueo.length} contingencia(s) de conciliación pendiente(s).`;
+      }
+      
       return NextResponse.json(
         { 
-          error: categoriaId 
-            ? `Existe una contingencia de conciliación pendiente para esta categoría.`
-            : `Existe una contingencia de conciliación general pendiente.`,
+          error: mensajeBloqueo,
+          categoriaAfectada: categoriaId,
           contingencias: contingenciasBloqueo.map(c => ({
             id: c.id,
             titulo: c.titulo,
-            fechaCreacion: c.fechaCreacion
+            fechaCreacion: c.fechaCreacion,
+            tipo: c.tipo
           }))
         },
         { status: 409 }
       );
     }
     
-    // 🆕 BUSCAR CONCILIACIÓN ACTIVA - ESPECÍFICA PARA LA CATEGORÍA O GENERAL
-    const whereCondition: any = {
-      sucursalId, 
-      estado: { in: ['pendiente', 'en_proceso'] }
-    };
+    // PASO 2: Buscar conciliación activa
+    console.log('[API Conciliación GET] Buscando conciliación activa...');
+    let conciliacionActiva = null;
     
-    if (categoriaId) {
-      whereCondition.observaciones = { contains: `Categoría: ${categoriaId}` };
+    try {
+      let whereCondition: any = {
+        sucursalId, 
+        estado: { in: ['pendiente', 'en_proceso'] }
+      };
+      
+      if (categoriaId) {
+        // Para categoría específica
+        whereCondition.observaciones = { 
+          OR: [
+            { contains: `Categoría: ${categoriaId}` },
+            { contains: `categoriaId-${categoriaId}` }
+          ]
+        };
+      }
+      
+      conciliacionActiva = await prisma.conciliacion.findFirst({
+        where: whereCondition,
+        orderBy: { fecha: 'desc' }
+      });
+      
+      console.log(`[API Conciliación GET] Conciliación activa: ${conciliacionActiva ? conciliacionActiva.id : 'ninguna'}`);
+      
+    } catch (conciliacionError) {
+      console.error('[API Conciliación GET] Error al buscar conciliación activa:', conciliacionError);
+      throw new Error('Error en base de datos al buscar conciliación activa');
     }
     
-    const conciliacionActiva = await prisma.conciliacion.findFirst({
-      where: whereCondition,
-      orderBy: { fecha: 'desc' }
-    });
-    
     if (!conciliacionActiva) {
+      console.log('[API Conciliación GET] No se encontró conciliación activa');
       return NextResponse.json(
-        { message: 'No hay conciliación activa para esta categoría' },
+        { message: categoriaId ? 'No hay conciliación activa para esta categoría' : 'No hay conciliación activa' },
         { status: 404 }
       );
     }
     
-    // 🔧 OBTENER PRODUCTOS CON CATEGORÍAS INCLUIDAS
-    const whereStockCondition: any = {
-      ubicacionId: sucursalId,
-      productoId: { not: null }
-    };
+    // PASO 3: Obtener productos
+    console.log('[API Conciliación GET] Obteniendo productos...');
+    let productos = [];
     
-    // 🆕 Si se especifica categoría, filtrar productos por categoría
-    if (categoriaId) {
-      whereStockCondition.producto = {
-        categoriaId: categoriaId
+    try {
+      const whereStockCondition: any = {
+        ubicacionId: sucursalId,
+        productoId: { not: null }
       };
-    }
-    
-    const productos = await prisma.stock.findMany({
-      where: whereStockCondition,
-      include: {
-        producto: {
-          include: {
-            categoria: true // 🔧 INCLUIR CATEGORÍA
+      
+      // Solo filtrar por categoría si se especifica
+      if (categoriaId) {
+        whereStockCondition.producto = {
+          categoriaId: categoriaId
+        };
+      }
+      
+      productos = await prisma.stock.findMany({
+        where: whereStockCondition,
+        include: {
+          producto: {
+            include: {
+              categoria: true
+            }
           }
         }
-      }
-    });
+      });
+      
+      console.log(`[API Conciliación GET] Productos encontrados: ${productos.length}`);
+      
+    } catch (productosError) {
+      console.error('[API Conciliación GET] Error al obtener productos:', productosError);
+      throw new Error('Error en base de datos al obtener productos');
+    }
     
+    // PASO 4: Formatear respuesta
+    console.log('[API Conciliación GET] Formateando respuesta...');
     const formattedData = {
       id: conciliacionActiva.id,
       fecha: conciliacionActiva.fecha,
       estado: conciliacionActiva.estado,
       usuario: conciliacionActiva.usuarioId,
-      categoriaId: categoriaId || null, // 🆕 Incluir categoría en respuesta
+      categoriaId: categoriaId || null,
       productos: productos.map(stock => {
         let stockFisico = null;
-        if (conciliacionActiva.detalles) {
-          const detalles = typeof conciliacionActiva.detalles === 'string' 
-            ? JSON.parse(conciliacionActiva.detalles) 
-            : conciliacionActiva.detalles;
-            
-          const item = detalles.find((d: any) => d.productoId === stock.productoId);
-          if (item) {
-            stockFisico = item.stockFisico;
+        
+        try {
+          if (conciliacionActiva.detalles) {
+            const detalles = typeof conciliacionActiva.detalles === 'string' 
+              ? JSON.parse(conciliacionActiva.detalles) 
+              : conciliacionActiva.detalles;
+              
+            if (Array.isArray(detalles)) {
+              const item = detalles.find((d: any) => d.productoId === stock.productoId);
+              if (item && typeof item.stockFisico === 'number') {
+                stockFisico = item.stockFisico;
+              }
+            }
           }
+        } catch (detallesError) {
+          console.warn(`[API Conciliación GET] Error procesando detalles para producto ${stock.productoId}:`, detallesError);
         }
         
         return {
@@ -138,7 +214,7 @@ export async function GET(req: NextRequest) {
           stockTeorico: stock.cantidad,
           stockFisico: stockFisico,
           diferencia: stockFisico !== null ? stockFisico - stock.cantidad : 0,
-          categoriaId: stock.producto?.categoriaId || 'sin-categoria', // 🔧 INCLUIR CATEGORIA ID
+          categoriaId: stock.producto?.categoriaId || 'sin-categoria',
           categoria: {
             id: stock.producto?.categoria?.id || 'sin-categoria',
             nombre: stock.producto?.categoria?.nombre || 'Sin categoría'
@@ -147,11 +223,18 @@ export async function GET(req: NextRequest) {
       })
     };
     
+    console.log(`[API Conciliación GET] Respuesta formateada exitosamente`);
     return NextResponse.json(formattedData);
+    
   } catch (error: any) {
-    console.error('Error al obtener conciliación:', error);
+    console.error('[API Conciliación GET] Error completo:', error);
+    console.error('[API Conciliación GET] Stack trace:', error.stack);
+    
     return NextResponse.json(
-      { error: error.message || 'Error al obtener conciliación' },
+      { 
+        error: error.message || 'Error interno del servidor al obtener conciliación',
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      },
       { status: 500 }
     );
   }
@@ -163,9 +246,12 @@ export async function POST(req: NextRequest) {
   
   try {
     const body = await req.json();
-    const { sucursalId, categoriaId } = body; // 🆕 Recibir categoriaId
+    const { sucursalId, categoriaId } = body;
+    
+    console.log(`[API Conciliación POST] Iniciando creación para sucursal: ${sucursalId}, categoría: ${categoriaId || 'todas'}`);
     
     if (!sucursalId) {
+      console.error('[API Conciliación POST] Error: sucursalId no proporcionado');
       return NextResponse.json(
         { error: 'Se requiere el ID de la sucursal' },
         { status: 400 }
@@ -174,27 +260,89 @@ export async function POST(req: NextRequest) {
     
     const user = (req as any).user;
     if (user.sucursalId && user.sucursalId !== sucursalId && user.roleId !== 'role-admin') {
+      console.error(`[API Conciliación POST] Error de permisos: usuario ${user.id} intentando crear en sucursal ${sucursalId}`);
       return NextResponse.json(
         { error: 'No tiene permisos para crear conciliaciones en esta sucursal' },
         { status: 403 }
       );
     }
     
-    // 🆕 VERIFICAR SI YA EXISTE UNA CONCILIACIÓN ACTIVA PARA ESTA CATEGORÍA
-    const whereCondition: any = {
-      sucursalId,
-      estado: { in: ['pendiente', 'en_proceso'] }
-    };
+    // PASO 1: Verificar contingencias (similar al GET)
+    console.log('[API Conciliación POST] Verificando contingencias...');
+    let contingenciasBloqueo: any[] = [];
     
-    if (categoriaId) {
-      whereCondition.observaciones = { contains: `Categoría: ${categoriaId}` };
+    try {
+      if (categoriaId) {
+        contingenciasBloqueo = await prisma.contingencia.findMany({
+          where: {
+            ubicacionId: sucursalId,
+            tipo: 'conciliacion',
+            estado: { in: ['pendiente', 'en_revision'] },
+            OR: [
+              { descripcion: { contains: `Categoría: ${categoriaId}` } },
+              { descripcion: { contains: `categoriaId-${categoriaId}` } }
+            ]
+          }
+        });
+      } else {
+        contingenciasBloqueo = await prisma.contingencia.findMany({
+          where: {
+            ubicacionId: sucursalId,
+            tipo: 'conciliacion_general',
+            estado: { in: ['pendiente', 'en_revision'] }
+          }
+        });
+      }
+    } catch (contingenciaError) {
+      console.error('[API Conciliación POST] Error verificando contingencias:', contingenciaError);
+      // Continuar sin bloquear
     }
     
-    const conciliacionExistente = await prisma.conciliacion.findFirst({
-      where: whereCondition
-    });
+    if (contingenciasBloqueo.length > 0) {
+      console.log('[API Conciliación POST] Contingencias bloquean la creación');
+      return NextResponse.json({
+        error: categoriaId 
+          ? `La categoría tiene una contingencia pendiente`
+          : 'Existe una contingencia de conciliación general pendiente',
+        categoriaAfectada: categoriaId,
+        contingencias: contingenciasBloqueo.map(c => ({
+          id: c.id,
+          titulo: c.titulo,
+          fechaCreacion: c.fechaCreacion
+        }))
+      }, { status: 409 });
+    }
+    
+    // PASO 2: Verificar conciliación existente
+    console.log('[API Conciliación POST] Verificando conciliación existente...');
+    let conciliacionExistente = null;
+    
+    try {
+      let whereCondition: any = {
+        sucursalId,
+        estado: { in: ['pendiente', 'en_proceso'] }
+      };
+      
+      if (categoriaId) {
+        whereCondition.observaciones = { 
+          OR: [
+            { contains: `Categoría: ${categoriaId}` },
+            { contains: `categoriaId-${categoriaId}` }
+          ]
+        };
+      }
+      
+      conciliacionExistente = await prisma.conciliacion.findFirst({
+        where: whereCondition
+      });
+      
+    } catch (existenteError) {
+      console.error('[API Conciliación POST] Error verificando conciliación existente:', existenteError);
+      throw new Error('Error en base de datos al verificar conciliación existente');
+    }
     
     if (conciliacionExistente) {
+      console.log(`[API Conciliación POST] Conciliación existente encontrada: ${conciliacionExistente.id}`);
       return NextResponse.json({
         id: conciliacionExistente.id,
         fecha: conciliacionExistente.fecha,
@@ -206,86 +354,120 @@ export async function POST(req: NextRequest) {
       });
     }
     
-    // 🆕 OBTENER NOMBRE DE CATEGORÍA SI SE ESPECIFICA
+    // PASO 3: Obtener información de categoría
     let categoriaNombre = '';
     if (categoriaId) {
-      const categoria = await prisma.categoria.findUnique({
-        where: { id: categoriaId }
-      });
-      categoriaNombre = categoria?.nombre || 'Categoría desconocida';
+      try {
+        const categoria = await prisma.categoria.findUnique({
+          where: { id: categoriaId }
+        });
+        categoriaNombre = categoria?.nombre || 'Categoría desconocida';
+      } catch (categoriaError) {
+        console.warn('[API Conciliación POST] Error obteniendo categoría:', categoriaError);
+        categoriaNombre = 'Categoría desconocida';
+      }
     }
     
-    // 🔧 OBTENER PRODUCTOS FILTRADOS POR CATEGORÍA
-    const whereStockCondition: any = {
-      ubicacionId: sucursalId,
-      productoId: { not: null }
-    };
+    // PASO 4: Obtener productos
+    console.log('[API Conciliación POST] Obteniendo productos...');
+    let productos = [];
     
-    if (categoriaId) {
-      whereStockCondition.producto = {
-        categoriaId: categoriaId
+    try {
+      const whereStockCondition: any = {
+        ubicacionId: sucursalId,
+        productoId: { not: null }
       };
-    }
-    
-    const productos = await prisma.stock.findMany({
-      where: whereStockCondition,
-      include: {
-        producto: {
-          include: {
-            categoria: true
+      
+      if (categoriaId) {
+        whereStockCondition.producto = {
+          categoriaId: categoriaId
+        };
+      }
+      
+      productos = await prisma.stock.findMany({
+        where: whereStockCondition,
+        include: {
+          producto: {
+            include: {
+              categoria: true
+            }
           }
         }
-      }
-    });
+      });
+      
+      console.log(`[API Conciliación POST] Productos encontrados: ${productos.length}`);
+      
+    } catch (productosError) {
+      console.error('[API Conciliación POST] Error obteniendo productos:', productosError);
+      throw new Error('Error en base de datos al obtener productos');
+    }
     
-    // 🆕 CREAR NUEVA CONCILIACIÓN CON IDENTIFICACIÓN DE CATEGORÍA
-    const currentDate = new Date();
-    const conciliacionId = categoriaId 
-      ? `conciliacion-${format(currentDate, 'yyyyMMdd')}-${sucursalId}-${categoriaId}`
-      : `conciliacion-${format(currentDate, 'yyyyMMdd')}-${sucursalId}`;
+    // PASO 5: Crear nueva conciliación
+    console.log('[API Conciliación POST] Creando nueva conciliación...');
     
-    const observacionesBase = categoriaId 
-      ? `Conciliación de categoría: ${categoriaNombre} | Categoría: ${categoriaId}`
-      : 'Conciliación general de inventario';
-    
-    const nuevaConciliacion = await prisma.conciliacion.create({
-      data: {
-        id: conciliacionId,
-        sucursalId,
-        fecha: currentDate,
-        estado: 'pendiente',
-        usuarioId: user.id,
-        observaciones: observacionesBase,
-        detalles: []
-      }
-    });
-    
-    // Preparar la respuesta
-    const formattedData = {
-      id: nuevaConciliacion.id,
-      fecha: nuevaConciliacion.fecha,
-      estado: nuevaConciliacion.estado,
-      usuario: user.id,
-      categoriaId: categoriaId || null,
-      productos: productos.map(stock => ({
-        id: stock.productoId || 'unknown',
-        nombre: stock.producto?.nombre || 'Producto desconocido',
-        stockTeorico: stock.cantidad,
-        stockFisico: null,
-        diferencia: 0,
-        categoriaId: stock.producto?.categoriaId || 'sin-categoria',
-        categoria: {
-          id: stock.producto?.categoria?.id || 'sin-categoria',
-          nombre: stock.producto?.categoria?.nombre || 'Sin categoría'
+    try {
+      const currentDate = new Date();
+      const timestamp = format(currentDate, 'yyyyMMdd-HHmmss');
+      const conciliacionId = categoriaId 
+        ? `conciliacion-${timestamp}-${sucursalId.slice(-6)}-${categoriaId.slice(-6)}`
+        : `conciliacion-${timestamp}-${sucursalId.slice(-6)}`;
+      
+      const observacionesBase = categoriaId 
+        ? `Conciliación de categoría: ${categoriaNombre} | categoriaId-${categoriaId} | Categoría: ${categoriaId}`
+        : 'Conciliación general de inventario';
+      
+      const nuevaConciliacion = await prisma.conciliacion.create({
+        data: {
+          id: conciliacionId,
+          sucursalId,
+          fecha: currentDate,
+          estado: 'pendiente',
+          usuarioId: user.id,
+          observaciones: observacionesBase,
+          detalles: []
         }
-      }))
-    };
+      });
+      
+      console.log(`[API Conciliación POST] Nueva conciliación creada: ${nuevaConciliacion.id}`);
+      
+      // PASO 6: Formatear respuesta
+      const formattedData = {
+        id: nuevaConciliacion.id,
+        fecha: nuevaConciliacion.fecha,
+        estado: nuevaConciliacion.estado,
+        usuario: user.id,
+        categoriaId: categoriaId || null,
+        productos: productos.map(stock => ({
+          id: stock.productoId || 'unknown',
+          nombre: stock.producto?.nombre || 'Producto desconocido',
+          stockTeorico: stock.cantidad,
+          stockFisico: null,
+          diferencia: 0,
+          categoriaId: stock.producto?.categoriaId || 'sin-categoria',
+          categoria: {
+            id: stock.producto?.categoria?.id || 'sin-categoria',
+            nombre: stock.producto?.categoria?.nombre || 'Sin categoría'
+          }
+        }))
+      };
+      
+      console.log(`[API Conciliación POST] Respuesta formateada exitosamente`);
+      return NextResponse.json(formattedData);
+      
+    } catch (createError) {
+      console.error('[API Conciliación POST] Error creando conciliación:', createError);
+      throw new Error('Error en base de datos al crear conciliación');
+    }
     
-    return NextResponse.json(formattedData);
   } catch (error: any) {
-    console.error('Error al crear conciliación:', error);
+    console.error('[API Conciliación POST] Error completo:', error);
+    console.error('[API Conciliación POST] Stack trace:', error.stack);
+    
     return NextResponse.json(
-      { error: error.message || 'Error al crear conciliación' },
+      { 
+        error: error.message || 'Error interno del servidor al crear conciliación',
+        details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      },
       { status: 500 }
     );
   }

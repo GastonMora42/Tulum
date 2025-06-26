@@ -1,26 +1,21 @@
-// src/components/pdv/RecepcionEnvios.tsx
+// src/components/pdv/RecepcionEnvios.tsx - VERSIÓN MEJORADA SIN MARCAR COMO ENVIADO
 'use client';
 
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
-import { Check, X, AlertTriangle, Package, Truck, ArrowRight } from 'lucide-react';
+import { 
+  Package, CheckCircle, AlertTriangle, Clock, Truck, 
+  Calendar, User, FileText, ChevronRight, RefreshCw,
+  MapPin, Hash, Weight, AlertCircle
+} from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
-import { useOffline } from '@/hooks/useOffline';
 
-interface Envio {
-  fechaCreacion: string;
+interface ItemEnvio {
   id: string;
-  origen: { nombre: string };
-  destino: { nombre: string };
-  fechaEnvio?: string; // Opcional para manejar casos donde no existe
-  estado: string;
-  items: EnvioItem[];
-}
-
-interface EnvioItem {
-  id: string;
+  productoId: string | null;
+  insumoId: string | null;
   cantidad: number;
-  cantidadRecibida?: number;
+  cantidadRecibida: number | null;
   producto?: {
     id: string;
     nombre: string;
@@ -32,555 +27,488 @@ interface EnvioItem {
   };
 }
 
+interface Envio {
+  id: string;
+  origenId: string;
+  destinoId: string;
+  fechaCreacion: string;
+  fechaEnvio: string | null;
+  fechaRecepcion: string | null;
+  estado: string;
+  origen: {
+    id: string;
+    nombre: string;
+    tipo: string;
+  };
+  destino: {
+    id: string;
+    nombre: string;
+    tipo: string;
+  };
+  usuario: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  items: ItemEnvio[];
+}
+
 interface RecepcionEnviosProps {
   onSuccess?: () => void;
 }
 
 export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
   const [envios, setEnvios] = useState<Envio[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isReceiving, setIsReceiving] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+  
+  // Estados para el modal de recepción
   const [selectedEnvio, setSelectedEnvio] = useState<Envio | null>(null);
+  const [showReceiveModal, setShowReceiveModal] = useState(false);
   const [cantidadesRecibidas, setCantidadesRecibidas] = useState<Record<string, number>>({});
   const [observaciones, setObservaciones] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isStepTwo, setIsStepTwo] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  
-  const { isOnline, registrarRecepcionEnvioOffline } = useOffline();
-  
-  // Cargar envíos pendientes
-  useEffect(() => {
-    const loadEnvios = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        
-        const sucursalId = localStorage.getItem('sucursalId');
-        if (!sucursalId) {
-          throw new Error('No se ha definido una sucursal');
-        }
-        
-        console.log(`Cargando envíos para sucursal: ${sucursalId}`);
-        
-        // Obtener envíos pendientes de recepción - Estado ampliado para capturar más casos
-        const response = await authenticatedFetch(`/api/envios?destinoId=${sucursalId}&estado=pendiente,enviado,en_transito`);
-        
-        if (!response.ok) {
-          throw new Error('Error al cargar envíos pendientes');
-        }
-        
-        const data = await response.json();
-        console.log(`Envíos recibidos: ${data.length}`, data);
-        
-        setEnvios(data);
-        
-        if (data.length === 0) {
-          console.log('No se encontraron envíos pendientes para esta sucursal');
-        }
-      } catch (err) {
-        console.error('Error al cargar envíos:', err);
-        setError('No se pudieron cargar los envíos pendientes');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    loadEnvios();
-  }, []);
-  
-  // Inicializar cantidades recibidas cuando se selecciona un envío
-  useEffect(() => {
-    if (selectedEnvio) {
-      const initialCantidades: Record<string, number> = {};
-      selectedEnvio.items.forEach(item => {
-        initialCantidades[item.id] = item.cantidad;
-      });
-      setCantidadesRecibidas(initialCantidades);
-    }
-  }, [selectedEnvio]);
-  
-  // Seleccionar un envío
-  const handleSelectEnvio = (envio: Envio) => {
-    setSelectedEnvio(envio);
-    setIsStepTwo(false);
-    setObservaciones('');
-    setError(null);
-    setSuccessMessage(null);
-  };
-  
-  // Actualizar cantidad recibida
-  const handleCantidadChange = (itemId: string, value: string) => {
-    const cantidad = parseInt(value);
-    if (!isNaN(cantidad) && cantidad >= 0) {
-      setCantidadesRecibidas(prev => ({
-        ...prev,
-        [itemId]: cantidad
-      }));
-    }
-  };
-  
-  // Continuar al paso 2
-  const handleContinue = () => {
-    setIsStepTwo(true);
-  };
-  
-  // Verificar si hay diferencias
-  const hasDifferences = () => {
-    if (!selectedEnvio) return false;
-    
-    return selectedEnvio.items.some(item => 
-      cantidadesRecibidas[item.id] !== item.cantidad
-    );
-  };
-  
-  // Recibir envío
-  const handleRecibirEnvio = async () => {
-    if (!selectedEnvio) return;
-    
-    try {
-      setIsSaving(true);
-      setError(null);
-      
-      const items = selectedEnvio.items.map(item => ({
-        itemEnvioId: item.id,
-        cantidadRecibida: cantidadesRecibidas[item.id]
-      }));
-      
-      if (isOnline) {
-// En RecepcionEnvios.tsx
-const itemsCompletos = items.map(item => {
-  const envioItem = selectedEnvio.items.find(i => i.id === item.itemEnvioId);
-  return {
-    ...item,
-    productoId: envioItem?.producto?.id  // Incluir el ID de producto
-  };
-});
 
-const response = await authenticatedFetch(`/api/fabrica/envios/${selectedEnvio.id}/recibir`, {
-  method: 'POST',
-  body: JSON.stringify({
-    items: itemsCompletos,
-    observaciones
-  })
-});
-        
-        if (!response.ok) {
-          const data = await response.json();
-          throw new Error(data.error || 'Error al recibir envío');
-        }
-        
-        const result = await response.json();
-        
-        // Si hay diferencias, se creará una contingencia automáticamente
-        setSuccessMessage(
-          hasDifferences()
-            ? 'Envío recibido. Se ha creado una contingencia por las diferencias encontradas.'
-            : 'Envío recibido correctamente.'
-        );
-      } else {
-        // Procesar offline
-        await registrarRecepcionEnvioOffline(
-          selectedEnvio.id,
-          items.map(item => {
-            const envioItem = selectedEnvio.items.find(i => i.id === item.itemEnvioId);
-            return {
-              productoId: envioItem?.producto?.id || '',
-              cantidadRecibida: item.cantidadRecibida
-            };
-          }).filter(item => item.productoId)
-        );
-        
-        setSuccessMessage('Envío recibido en modo offline. Se sincronizará cuando haya conexión.');
-      }
-      
-      // Actualizar lista de envíos
-      setEnvios(prevEnvios => prevEnvios.filter(e => e.id !== selectedEnvio.id));
-      setSelectedEnvio(null);
-      setIsStepTwo(false);
-      
-      if (onSuccess) {
-        onSuccess();
-      }
-    } catch (err) {
-      console.error('Error:', err);
-      setError(err instanceof Error ? err.message : 'Error al recibir envío');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-  
-  const handleMarcarEnviado = async (envioId: string) => {
+  const fetchEnvios = async () => {
     try {
       setIsLoading(true);
       setError(null);
       
-      const response = await authenticatedFetch(`/api/envios/marcar`, {
-        method: 'POST',
-        body: JSON.stringify({ envioId })
-      });
+      const sucursalId = localStorage.getItem('sucursalId');
+      if (!sucursalId) {
+        throw new Error('No se ha definido una sucursal');
+      }
+      
+      // 🔧 OBTENER ENVÍOS PENDIENTES DE RECEPCIÓN
+      const response = await authenticatedFetch(
+        `/api/envios?destinoId=${encodeURIComponent(sucursalId)}&estado=enviado,en_transito`
+      );
       
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Error al marcar envío como enviado');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al cargar envíos pendientes');
       }
       
-      const responseData = await response.json();
-      
-      // Actualizar la lista de envíos usando los datos del servidor
-      if (responseData && responseData.envio) {
-        setEnvios(prevEnvios => prevEnvios.map(e => 
-          e.id === envioId ? responseData.envio : e
-        ));
-      } else {
-        // Actualizar manualmente si no hay datos del servidor
-        setEnvios(prevEnvios => prevEnvios.map(e => 
-          e.id === envioId ? { 
-            ...e,
-            estado: 'en_transito' // Cambiado de 'enviado' a 'en_transito' 
-          } : e
-        ));
-      }
-      
-      setSuccessMessage('Envío marcado como enviado correctamente');
-      
-      // Recargar completamente los envíos después
-      setTimeout(() => {
-        if (onSuccess) onSuccess();
-      }, 1500);
+      const data = await response.json();
+      setEnvios(data);
     } catch (err) {
-      console.error('Error:', err);
-      setError(err instanceof Error ? err.message : 'Error al marcar envío');
+      console.error('Error al cargar envíos:', err);
+      setError(err instanceof Error ? err.message : 'Error al cargar envíos');
     } finally {
       setIsLoading(false);
     }
   };
-  
-  // Cancelar recepción
-  const handleCancel = () => {
-    setSelectedEnvio(null);
-    setIsStepTwo(false);
+
+  useEffect(() => {
+    fetchEnvios();
+  }, []);
+
+  const handleOpenReceiveModal = (envio: Envio) => {
+    setSelectedEnvio(envio);
+    setShowReceiveModal(true);
+    
+    // Inicializar cantidades recibidas con las cantidades enviadas por defecto
+    const cantidadesIniciales: Record<string, number> = {};
+    envio.items.forEach(item => {
+      cantidadesIniciales[item.id] = item.cantidad;
+    });
+    setCantidadesRecibidas(cantidadesIniciales);
     setObservaciones('');
-    setError(null);
-    setSuccessMessage(null);
   };
+
+  const handleCloseReceiveModal = () => {
+    setSelectedEnvio(null);
+    setShowReceiveModal(false);
+    setCantidadesRecibidas({});
+    setObservaciones('');
+  };
+
+  const handleCantidadChange = (itemId: string, cantidad: number) => {
+    setCantidadesRecibidas(prev => ({
+      ...prev,
+      [itemId]: cantidad
+    }));
+  };
+
+  const handleReceiveEnvio = async () => {
+    if (!selectedEnvio) return;
+    
+    try {
+      setIsReceiving(selectedEnvio.id);
+      setError(null);
+      
+      // Preparar datos para el envío
+      const items = selectedEnvio.items.map(item => ({
+        itemEnvioId: item.id,
+        cantidadRecibida: cantidadesRecibidas[item.id] || 0
+      }));
+      
+      // Verificar si hay diferencias
+      const hayDiferencias = selectedEnvio.items.some(item => {
+        const cantidadRecibida = cantidadesRecibidas[item.id] || 0;
+        return cantidadRecibida !== item.cantidad;
+      });
+      
+      if (hayDiferencias) {
+        const confirmar = window.confirm(
+          'Se detectaron diferencias entre las cantidades enviadas y recibidas. ' +
+          'Se generará una contingencia automáticamente. ¿Desea continuar?'
+        );
+        
+        if (!confirmar) {
+          setIsReceiving(null);
+          return;
+        }
+      }
+      
+      const response = await authenticatedFetch(`/api/fabrica/envios/${selectedEnvio.id}/recibir`, {
+        method: 'POST',
+        body: JSON.stringify({
+          items,
+          observaciones
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al recibir envío');
+      }
+      
+      const resultado = await response.json();
+      
+      setSuccess(
+        hayDiferencias 
+          ? 'Envío recibido con diferencias. Se ha generado una contingencia para revisión.'
+          : 'Envío recibido correctamente. El stock ha sido actualizado.'
+      );
+      
+      // Cerrar modal y refrescar lista
+      handleCloseReceiveModal();
+      fetchEnvios();
+      
+      if (onSuccess) onSuccess();
+      
+      // Limpiar mensaje de éxito después de 5 segundos
+      setTimeout(() => setSuccess(null), 5000);
+      
+    } catch (err) {
+      console.error('Error al recibir envío:', err);
+      setError(err instanceof Error ? err.message : 'Error al recibir envío');
+    } finally {
+      setIsReceiving(null);
+    }
+  };
+
+  const getEstadoBadge = (estado: string) => {
+    switch (estado) {
+      case 'enviado':
+        return 'bg-blue-100 text-blue-800 border border-blue-300';
+      case 'en_transito':
+        return 'bg-indigo-100 text-indigo-800 border border-indigo-300';
+      default:
+        return 'bg-gray-100 text-gray-800 border border-gray-300';
+    }
+  };
+
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return 'No disponible';
+    try {
+      return format(new Date(dateString), 'dd/MM/yyyy HH:mm');
+    } catch (e) {
+      return dateString;
+    }
+  };
+
+  const getItemName = (item: ItemEnvio) => {
+    return item.producto?.nombre || item.insumo?.nombre || 'Producto desconocido';
+  };
+
+  const getItemUnit = (item: ItemEnvio) => {
+    return item.insumo?.unidadMedida || 'und';
+  };
+
+  // Verificar si hay diferencias en el modal
+  const hasDifferences = selectedEnvio ? selectedEnvio.items.some(item => {
+    const cantidadRecibida = cantidadesRecibidas[item.id] || 0;
+    return cantidadRecibida !== item.cantidad;
+  }) : false;
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center p-8">
-        <div className="animate-spin h-10 w-10 border-4 border-[#9c7561] border-t-transparent rounded-full"></div>
-        <span className="ml-3 text-lg text-gray-700">Cargando envíos...</span>
-      </div>
-    );
-  }
-
-  if (envios.length === 0 && !selectedEnvio) {
-    return (
-      <div className="bg-white rounded-lg shadow-sm p-8 text-center">
-        <Truck className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">No hay envíos pendientes</h3>
-        <p className="text-gray-600 mb-4">No tienes envíos pendientes de recepción en este momento</p>
-        <div className="p-4 bg-blue-50 border-l-4 border-blue-400 text-blue-700 text-sm">
-          <p>Recuerda que los envíos deben ser <strong>marcados como enviados</strong> desde la fábrica para aparecer aquí.</p>
-          <p className="mt-2">Contacta con el administrador si crees que debería haber envíos pendientes.</p>
+        <div className="text-center">
+          <div className="animate-spin h-8 w-8 border-4 border-[#9c7561] border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p className="text-gray-600">Cargando envíos pendientes...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm">
-      {/* Mensajes de éxito/error */}
+    <div className="space-y-4">
+      {/* Mensajes de estado */}
       {error && (
-        <div className="p-4 bg-red-50 border-l-4 border-red-500 text-red-700 mb-4">
-          <div className="flex">
-            <AlertTriangle className="h-5 w-5 mr-2" />
-            <p>{error}</p>
-          </div>
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md flex items-center">
+          <AlertTriangle className="h-5 w-5 mr-2" />
+          {error}
         </div>
       )}
       
-      {successMessage && (
-        <div className="p-4 bg-green-50 border-l-4 border-green-500 text-green-700 mb-4">
-          <div className="flex">
-            <Check className="h-5 w-5 mr-2" />
-            <p>{successMessage}</p>
-          </div>
+      {success && (
+        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md flex items-center">
+          <CheckCircle className="h-5 w-5 mr-2" />
+          {success}
         </div>
       )}
-      
-      {/* Paso 1: Seleccionar envío */}
-      {!selectedEnvio && (
-        <div>
-          <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-            <h2 className="text-lg font-medium text-gray-900">Envíos Pendientes de Recepción</h2>
-          </div>
-          
-          <div className="divide-y divide-gray-200">
-            {envios.map(envio => (
-              <div key={envio.id} className="p-4 hover:bg-gray-50 border-b border-gray-200">
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <h3 className="text-md font-medium text-gray-900">
-                      Envío #{envio.id.substring(0, 8)}
-                    </h3>
-                    <p className="text-sm text-gray-600">
-                      Desde: {envio.origen.nombre}
-                    </p>
-                  </div>
-                  <div className="text-sm text-right">
-                    <p className="font-medium text-gray-900">
-                      {format(new Date(envio.fechaEnvio || envio.fechaCreacion), 'dd/MM/yyyy')}
-                    </p>
-                    <span className={`inline-flex px-2 py-1 text-xs rounded-full ${
-                      envio.estado === 'enviado' ? 'bg-green-100 text-green-800' : 
-                      'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {envio.estado === 'enviado' ? 'Listo para recibir' : 'Pendiente de envío'}
+
+      {/* Lista de envíos */}
+      {envios.length === 0 ? (
+        <div className="text-center py-8">
+          <Package className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No hay envíos pendientes</h3>
+          <p className="text-gray-500">Todos los envíos han sido recepcionados.</p>
+          <button
+            onClick={fetchEnvios}
+            className="mt-4 inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+          >
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Actualizar
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {envios.map(envio => (
+            <div key={envio.id} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center space-x-3 mb-2">
+                    <div className="flex items-center">
+                      <Hash className="h-4 w-4 text-gray-400 mr-1" />
+                      <span className="text-sm font-mono text-gray-600">#{envio.id.slice(-6)}</span>
+                    </div>
+                    
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getEstadoBadge(envio.estado)}`}>
+                      {envio.estado === 'enviado' ? 'Enviado' : 'En Tránsito'}
                     </span>
                   </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    <div className="flex items-center">
+                      <MapPin className="h-4 w-4 text-gray-400 mr-2" />
+                      <div>
+                        <div className="font-medium text-gray-900">Desde: {envio.origen.nombre}</div>
+                        <div className="text-gray-500 capitalize">{envio.origen.tipo}</div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center">
+                      <Calendar className="h-4 w-4 text-gray-400 mr-2" />
+                      <div>
+                        <div className="font-medium text-gray-900">Fecha de envío:</div>
+                        <div className="text-gray-500">{formatDate(envio.fechaEnvio)}</div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center">
+                      <Package className="h-4 w-4 text-gray-400 mr-2" />
+                      <div>
+                        <div className="font-medium text-gray-900">{envio.items.length} producto{envio.items.length !== 1 ? 's' : ''}</div>
+                        <div className="text-gray-500">
+                          {envio.items.slice(0, 2).map(item => getItemName(item)).join(', ')}
+                          {envio.items.length > 2 && ' y más...'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
                 
-                <div className="text-sm text-gray-700 mb-3">
-                  <span className="font-medium">{envio.items?.length || 0}</span> productos/insumos
-                </div>
-                
-                {/* Botones de acción según estado */}
-                <div className="flex justify-end gap-2">
-                {envio.estado === 'enviado' || envio.estado === 'en_transito' ? (
-  <button 
-    onClick={() => handleSelectEnvio(envio)}
-    className="px-3 py-1 bg-[#311716] text-white rounded hover:bg-[#462625] text-sm"
-  >
-    Recibir envío
-  </button>
-) : (
-  <button 
-    onClick={() => handleMarcarEnviado(envio.id)}
-    className="px-3 py-1 bg-amber-600 text-white rounded hover:bg-amber-700 text-sm"
-  >
-    Marcar como enviado
-  </button>
-)}
+                <div className="ml-4 flex-shrink-0">
+                  <button
+                    onClick={() => handleOpenReceiveModal(envio)}
+                    disabled={isReceiving === envio.id}
+                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isReceiving === envio.id ? (
+                      <>
+                        <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+                        Procesando...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Recepcionar
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </div>
       )}
-      
-      {/* Paso 2: Verificar cantidades */}
-      {selectedEnvio && !isStepTwo && (
-        <div>
-          <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-            <h2 className="text-lg font-medium text-gray-900">
-              Verificación de Envío #{selectedEnvio.id.substring(0, 8)}
-            </h2>
-            <button
-              onClick={handleCancel}
-              className="text-gray-600 hover:text-gray-900"
-            >
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-          
-          <div className="p-6">
-            <div className="mb-6">
-              <div className="flex justify-between text-sm mb-2">
-                <span className="text-gray-600">Origen:</span>
-                <span className="font-medium">{selectedEnvio.origen.nombre}</span>
+
+      {/* Modal de Recepción */}
+      {showReceiveModal && selectedEnvio && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-gray-900">
+                  Recepcionar Envío #{selectedEnvio.id.slice(-6)}
+                </h3>
+                <button
+                  onClick={handleCloseReceiveModal}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <span className="sr-only">Cerrar</span>
+                  <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
-              <div className="flex justify-between text-sm mb-2">
-                <span className="text-gray-600">Destino:</span>
-                <span className="font-medium">{selectedEnvio.destino.nombre}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Fecha de envío:</span>
-                <span className="font-medium">
-                  {format(new Date(selectedEnvio.fechaEnvio || selectedEnvio.fechaCreacion), 'dd/MM/yyyy HH:mm')}
-                </span>
-              </div>
-            </div>
-            
-            <div className="mb-6">
-              <h3 className="text-md font-medium text-gray-900 mb-3">
-                Verifica las cantidades recibidas:
-              </h3>
               
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Producto/Insumo
-                      </th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Cantidad Enviada
-                      </th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Cantidad Recibida
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {selectedEnvio.items.map(item => (
-                      <tr key={item.id}>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {item.producto ? item.producto.nombre : item.insumo?.nombre || 'Producto/Insumo'}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 text-center">
-                          {item.cantidad} {item.insumo?.unidadMedida || ''}
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap text-sm text-center">
-                          <input
-                            type="number"
-                            min="0"
-                            value={cantidadesRecibidas[item.id] || 0}
-                            onChange={e => handleCantidadChange(item.id, e.target.value)}
-                            className="w-24 border border-gray-300 rounded-md p-2 text-center"
-                          />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            
-            <div className="flex justify-end">
-              <button
-                onClick={handleCancel}
-                className="mr-3 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-              
-              <button
-                onClick={handleContinue}
-                className="px-4 py-2 bg-[#311716] text-white rounded-md hover:bg-[#462625]"
-              >
-                Continuar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {/* Paso 3: Confirmar y enviar */}
-      {selectedEnvio && isStepTwo && (
-        <div>
-          <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-            <h2 className="text-lg font-medium text-gray-900">
-              Confirmar Recepción
-            </h2>
-            <button
-              onClick={() => setIsStepTwo(false)}
-              className="text-gray-600 hover:text-gray-900"
-            >
-              <ArrowRight className="h-5 w-5 transform rotate-180" />
-            </button>
-          </div>
-          
-          <div className="p-6">
-            {hasDifferences() && (
-              <div className="p-4 bg-yellow-50 border-l-4 border-yellow-500 text-yellow-700 mb-6">
-                <div className="flex">
-                  <AlertTriangle className="h-5 w-5 mr-2" />
+              {/* Información del envío */}
+              <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                   <div>
-                    <p className="font-medium">Atención: Hay diferencias en las cantidades</p>
-                    <p className="text-sm">
-                      Se creará una contingencia automáticamente para resolver estas diferencias.
-                    </p>
+                    <span className="font-medium text-gray-700">Origen:</span>
+                    <span className="ml-2 text-gray-900">{selectedEnvio.origen.nombre}</span>
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Fecha de envío:</span>
+                    <span className="ml-2 text-gray-900">{formatDate(selectedEnvio.fechaEnvio)}</span>
                   </div>
                 </div>
               </div>
-            )}
-            
-            <div className="mb-6">
-              <h3 className="text-md font-medium text-gray-900 mb-3">
-                Resumen de la recepción:
-              </h3>
               
-              <div className="overflow-x-auto mb-4">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Producto/Insumo
-                      </th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Enviado
-                      </th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Recibido
-                      </th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Diferencia
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {selectedEnvio.items.map(item => {
-                      const recibido = cantidadesRecibidas[item.id] || 0;
-                      const diferencia = recibido - item.cantidad;
+              {/* Lista de productos/insumos - VERSIÓN MEJORADA */}
+              <div className="space-y-4 mb-6">
+                <div className="flex items-center justify-between">
+                  <h4 className="font-medium text-gray-900">Conteo Físico de Productos:</h4>
+                  <div className="text-sm text-gray-500">
+                    {selectedEnvio.items.length} producto{selectedEnvio.items.length !== 1 ? 's' : ''} para verificar
+                  </div>
+                </div>
+                
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                  <div className="flex items-start">
+                    <Package className="h-5 w-5 text-blue-600 mr-2 mt-0.5" />
+                    <div className="text-sm text-blue-800">
+                      <p className="font-medium mb-1">Instrucciones:</p>
+                      <p>Ingrese la cantidad exacta que está recibiendo físicamente. El sistema comparará automáticamente con lo enviado y detectará cualquier diferencia.</p>
+                    </div>
+                  </div>
+                </div>
+                
+                {selectedEnvio.items.map((item, index) => (
+                  <div key={item.id} className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center mb-2">
+                          <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-sm font-medium text-gray-600 mr-3">
+                            {index + 1}
+                          </div>
+                          <div>
+                            <h5 className="font-medium text-gray-900 text-lg">{getItemName(item)}</h5>
+                            <p className="text-sm text-gray-500">Unidad: {getItemUnit(item)}</p>
+                          </div>
+                        </div>
+                      </div>
                       
-                      return (
-                        <tr key={item.id}>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {item.producto ? item.producto.nombre : item.insumo?.nombre || 'Producto/Insumo'}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 text-center">
-                            {item.cantidad}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-center font-medium">
-                            {recibido}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-center">
-                            <span className={`
-                              ${diferencia > 0 ? 'text-green-600' : diferencia < 0 ? 'text-red-600' : 'text-gray-600'}
-                              font-medium
-                            `}>
-                              {diferencia > 0 ? '+' : ''}{diferencia}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                      <div className="flex items-center space-x-4">
+                        <div className="text-right">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Cantidad física recibida:
+                          </label>
+                          <div className="flex items-center">
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={cantidadesRecibidas[item.id] || ''}
+                              onChange={(e) => handleCantidadChange(item.id, parseInt(e.target.value) || 0)}
+                              className="w-20 px-3 py-2 text-center text-lg font-semibold border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                              placeholder="0"
+                              autoFocus={index === 0}
+                            />
+                            <span className="ml-2 text-sm text-gray-500 font-medium">{getItemUnit(item)}</span>
+                          </div>
+                        </div>
+                        
+                        {/* Estado visual */}
+                        <div className="w-24 text-center">
+                          {cantidadesRecibidas[item.id] === undefined || cantidadesRecibidas[item.id] === null ? (
+                            <div className="flex flex-col items-center text-gray-400">
+                              <Clock className="h-6 w-6 mb-1" />
+                              <span className="text-xs">Pendiente</span>
+                            </div>
+                          ) : cantidadesRecibidas[item.id] === item.cantidad ? (
+                            <div className="flex flex-col items-center text-green-600">
+                              <CheckCircle className="h-6 w-6 mb-1" />
+                              <span className="text-xs font-medium">Correcto</span>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center text-orange-600">
+                              <AlertCircle className="h-6 w-6 mb-1" />
+                              <span className="text-xs font-medium">Diferencia</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
               
-              <div className="mb-4">
-                <label htmlFor="observaciones" className="block text-sm font-medium text-gray-700 mb-1">
-                  Observaciones:
+              {/* Observaciones */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Observaciones (opcional):
                 </label>
                 <textarea
-                  id="observaciones"
                   rows={3}
                   value={observaciones}
-                  onChange={e => setObservaciones(e.target.value)}
-                  className="w-full border border-gray-300 rounded-md p-2"
-                  placeholder="Ingrese cualquier observación sobre la recepción..."
-                ></textarea>
+                  onChange={(e) => setObservaciones(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="Cualquier observación sobre la recepción..."
+                />
               </div>
-            </div>
-            
-            <div className="flex justify-end">
-              <button
-                onClick={() => setIsStepTwo(false)}
-                className="mr-3 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-              >
-                Atrás
-              </button>
               
-
-              <button
-                onClick={handleRecibirEnvio}
-                disabled={isSaving}
-                className="px-4 py-2 bg-[#311716] text-white rounded-md hover:bg-[#462625] disabled:opacity-50"
-              >
-                {isSaving ? 'Procesando...' : 'Confirmar Recepción'}
-              </button>
+              {/* Alerta de diferencias */}
+              {hasDifferences && (
+                <div className="bg-orange-50 border border-orange-200 rounded-md p-4 mb-6">
+                  <div className="flex">
+                    <AlertTriangle className="h-5 w-5 text-orange-400" />
+                    <div className="ml-3">
+                      <h3 className="text-sm font-medium text-orange-800">
+                        Diferencias detectadas
+                      </h3>
+                      <p className="mt-1 text-sm text-orange-700">
+                        Se ha detectado diferencias entre las cantidades enviadas y recibidas. 
+                        Se generará automáticamente una contingencia para su revisión administrativa.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Botones */}
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={handleCloseReceiveModal}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleReceiveEnvio}
+                  disabled={isReceiving !== null}
+                  className="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
+                >
+                  {isReceiving ? 'Procesando...' : 'Confirmar Recepción'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

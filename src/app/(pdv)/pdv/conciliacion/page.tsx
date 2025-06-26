@@ -82,86 +82,134 @@ export default function ConciliacionPage() {
     }
   }, [hasContingenciasPendientes]);
 
-  const verificarContingenciasPendientes = async () => {
-    try {
-      const sucursalId = localStorage.getItem('sucursalId');
-      if (!sucursalId) return;
-
-      const response = await authenticatedFetch(
-        `/api/contingencias?origen=sucursal&estado=pendiente&ubicacionId=${sucursalId}&tipo=conciliacion`
-      );
-
-      if (response.ok) {
-        const contingencias = await response.json();
-        const contingenciasConciliacion = contingencias.filter((c: any) => 
-          c.tipo === 'conciliacion' && (c.estado === 'pendiente' || c.estado === 'en_revision')
-        );
-
-        if (contingenciasConciliacion.length > 0) {
-          setHasContingenciasPendientes(true);
-          setContingenciasPendientes(contingenciasConciliacion);
-        }
-      }
-    } catch (error) {
-      console.error('Error verificando contingencias:', error);
+const loadConciliacion = useCallback(async () => {
+  try {
+    setIsLoading(true);
+    setError(null);
+    
+    const sucursalId = localStorage.getItem('sucursalId');
+    if (!sucursalId) {
+      throw new Error('No se ha definido una sucursal para este punto de venta');
     }
-  };
-
-  const loadConciliacion = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
+    
+    console.log(`[Conciliación] 🏪 Iniciando carga para sucursal: ${sucursalId}`);
+    console.log(`[Conciliación] 📱 URL: ${window.location.origin}/api/pdv/conciliacion?sucursalId=${encodeURIComponent(sucursalId)}`);
+    
+    // PASO 1: Intentar obtener conciliación existente
+    console.log(`[Conciliación] 📡 Enviando petición GET...`);
+    let response = await authenticatedFetch(`/api/pdv/conciliacion?sucursalId=${encodeURIComponent(sucursalId)}`);
+    
+    console.log(`[Conciliación] 📊 Respuesta recibida - Status: ${response.status} ${response.statusText}`);
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch((jsonError) => {
+        console.error('[Conciliación] ❌ Error parseando JSON de error:', jsonError);
+        return { error: `Error HTTP ${response.status}: ${response.statusText}` };
+      });
       
-      const sucursalId = localStorage.getItem('sucursalId');
-      if (!sucursalId) {
-        throw new Error('No se ha definido una sucursal');
-      }
+      console.log(`[Conciliación] 📋 Datos de error:`, errorData);
       
-      let response = await authenticatedFetch(`/api/pdv/conciliacion?sucursalId=${sucursalId}`);
-      
-      if (!response.ok && response.status === 404) {
+      if (response.status === 404) {
+        console.log('[Conciliación] 🆕 No hay conciliación activa, creando nueva...');
+        
         const createResponse = await authenticatedFetch('/api/pdv/conciliacion', {
           method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
           body: JSON.stringify({ sucursalId })
         });
         
+        console.log(`[Conciliación] 🏗️ Respuesta de creación - Status: ${createResponse.status}`);
+        
         if (!createResponse.ok) {
-          throw new Error('Error al crear nueva conciliación');
+          const createErrorData = await createResponse.json().catch(() => ({}));
+          console.error('[Conciliación] ❌ Error creando conciliación:', createErrorData);
+          throw new Error(createErrorData.error || `Error HTTP ${createResponse.status} al crear conciliación`);
         }
         
         response = createResponse;
-      } else if (!response.ok) {
-        throw new Error('Error al cargar datos de conciliación');
+        console.log('[Conciliación] ✅ Conciliación creada exitosamente');
+      } 
+      else if (response.status === 409) {
+        console.log('[Conciliación] 🚫 Contingencias detectadas:', errorData);
+        setHasContingenciasPendientes(true);
+        setContingenciasPendientes(errorData.contingencias || []);
+        return;
       }
-      
-      const data = await response.json();
-      
-      const conciliacionFormateada: Conciliacion = {
-        id: data.id,
-        fecha: data.fecha,
-        estado: data.estado || 'pendiente',
-        intentosGlobales: 0,
-        productos: data.productos.map((p: any) => ({
-          id: p.id,
-          nombre: p.nombre,
-          stockTeorico: p.stockTeorico,
+      else {
+        console.error(`[Conciliación] ❌ Error HTTP ${response.status}:`, errorData);
+        throw new Error(errorData.error || `Error del servidor (${response.status}): ${errorData.message || 'Error desconocido'}`);
+      }
+    }
+    
+    // PASO 2: Procesar datos de respuesta
+    console.log('[Conciliación] 📦 Procesando datos de respuesta...');
+    const data = await response.json().catch((jsonError) => {
+      console.error('[Conciliación] ❌ Error parseando JSON de respuesta:', jsonError);
+      throw new Error('Error al procesar la respuesta del servidor - JSON inválido');
+    });
+    
+    console.log('[Conciliación] 📊 Datos recibidos:', {
+      id: data.id,
+      estado: data.estado,
+      productosCount: data.productos?.length || 0,
+      hasProductos: Array.isArray(data.productos),
+      keys: Object.keys(data)
+    });
+    
+    // PASO 3: Validar estructura de datos
+    if (!data.id) {
+      console.error('[Conciliación] ❌ Datos incompletos - falta ID:', data);
+      throw new Error('Respuesta del servidor incompleta: falta ID de conciliación');
+    }
+    
+    if (!Array.isArray(data.productos)) {
+      console.error('[Conciliación] ❌ Datos incompletos - productos no es array:', data.productos);
+      throw new Error('Respuesta del servidor incompleta: lista de productos inválida');
+    }
+    
+    if (data.productos.length === 0) {
+      console.warn('[Conciliación] ⚠️ No hay productos para conciliar en esta sucursal');
+    }
+    
+    // PASO 4: Formatear datos de conciliación
+    console.log('[Conciliación] 🔄 Formateando datos...');
+    const conciliacionFormateada: Conciliacion = {
+      id: data.id,
+      fecha: data.fecha,
+      estado: data.estado || 'pendiente',
+      intentosGlobales: 0,
+      productos: data.productos.map((p: any, index: number) => {
+        if (!p.id || !p.nombre) {
+          console.warn(`[Conciliación] ⚠️ Producto ${index} tiene datos incompletos:`, p);
+        }
+        
+        return {
+          id: p.id || `producto-${index}`,
+          nombre: p.nombre || 'Producto sin nombre',
+          stockTeorico: typeof p.stockTeorico === 'number' ? p.stockTeorico : 0,
           stockFisico: p.stockFisico,
           diferencia: p.diferencia || 0,
           conteoIntentos: 0,
           completado: p.stockFisico !== null && p.stockFisico !== undefined,
           categoriaId: p.categoriaId || 'sin-categoria',
           categoria: p.categoria || { id: 'sin-categoria', nombre: 'Sin categoría' }
-        }))
-      };
-      
-      setConciliacion(conciliacionFormateada);
-      
-      // 🆕 PROCESAR CATEGORÍAS
-      const categoriasMap = new Map<string, Categoria>();
-      
-      conciliacionFormateada.productos.forEach(producto => {
-        const catId = producto.categoria.id;
-        const catNombre = producto.categoria.nombre;
+        };
+      })
+    };
+    
+    setConciliacion(conciliacionFormateada);
+    console.log(`[Conciliación] ✅ Conciliación cargada: ${conciliacionFormateada.productos.length} productos`);
+    
+    // PASO 5: Procesar categorías
+    console.log('[Conciliación] 🏷️ Procesando categorías...');
+    const categoriasMap = new Map<string, Categoria>();
+    
+    conciliacionFormateada.productos.forEach((producto, index) => {
+      try {
+        const catId = producto.categoria?.id || 'sin-categoria';
+        const catNombre = producto.categoria?.nombre || 'Sin categoría';
         
         if (!categoriasMap.has(catId)) {
           categoriasMap.set(catId, {
@@ -179,39 +227,123 @@ export default function ConciliacionPage() {
         if (producto.completado) {
           categoria.completedCount++;
         }
-      });
-      
-      const categoriasArray = Array.from(categoriasMap.values()).sort((a, b) => 
-        a.nombre.localeCompare(b.nombre)
-      );
-      
-      setCategorias(categoriasArray);
-      
-      // Seleccionar primera categoría por defecto
-      if (categoriasArray.length > 0 && !activeCategoryId) {
-        setActiveCategoryId(categoriasArray[0].id);
+      } catch (categoriaError) {
+        console.error(`[Conciliación] ❌ Error procesando categoría del producto ${index}:`, categoriaError);
       }
-      
-      const initialCounts: Record<string, number> = {};
-      const completed = new Set<string>();
-      
-      conciliacionFormateada.productos.forEach(producto => {
-        if (producto.stockFisico !== null) {
-          initialCounts[producto.id] = producto.stockFisico;
-          completed.add(producto.id);
-        }
-      });
-      
-      setStockCounts(initialCounts);
-      setCompletedProducts(completed);
-      
-    } catch (err) {
-      console.error('Error:', err);
-      setError(err instanceof Error ? err.message : 'Error al cargar datos');
-    } finally {
-      setIsLoading(false);
+    });
+    
+    const categoriasArray = Array.from(categoriasMap.values()).sort((a, b) => 
+      a.nombre.localeCompare(b.nombre)
+    );
+    
+    setCategorias(categoriasArray);
+    console.log(`[Conciliación] 🏷️ Categorías procesadas: ${categoriasArray.length}`);
+    
+    // Seleccionar primera categoría por defecto
+    if (categoriasArray.length > 0 && !activeCategoryId) {
+      setActiveCategoryId(categoriasArray[0].id);
+      console.log(`[Conciliación] 🎯 Categoría activa por defecto: ${categoriasArray[0].nombre}`);
     }
-  };
+    
+    // PASO 6: Inicializar conteos
+    console.log('[Conciliación] 🔢 Inicializando conteos...');
+    const initialCounts: Record<string, number> = {};
+    const completed = new Set<string>();
+    
+    conciliacionFormateada.productos.forEach(producto => {
+      if (producto.stockFisico !== null && producto.stockFisico !== undefined) {
+        initialCounts[producto.id] = producto.stockFisico;
+        completed.add(producto.id);
+      }
+    });
+    
+    setStockCounts(initialCounts);
+    setCompletedProducts(completed);
+    
+    console.log(`[Conciliación] ✅ Carga completada exitosamente`);
+    console.log(`[Conciliación] 📊 Resumen: ${conciliacionFormateada.productos.length} productos, ${categoriasArray.length} categorías, ${completed.size} completados`);
+    
+  } catch (err) {
+    console.error('[Conciliación] ❌ Error completo en carga:', err);
+    console.error('[Conciliación] 📍 Stack trace:', err instanceof Error ? err.stack : 'No stack trace');
+    
+    let errorMessage = 'Error desconocido al cargar datos de conciliación';
+    
+    if (err instanceof Error) {
+      errorMessage = err.message;
+      
+      // Mensajes de error más específicos
+      if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+        errorMessage = 'Error de conexión. Verifique su conexión a internet e intente nuevamente.';
+      } else if (err.message.includes('401') || err.message.includes('unauthorized')) {
+        errorMessage = 'Su sesión ha expirado. Por favor, inicie sesión nuevamente.';
+      } else if (err.message.includes('403') || err.message.includes('forbidden')) {
+        errorMessage = 'No tiene permisos para realizar esta acción.';
+      } else if (err.message.includes('500')) {
+        errorMessage = 'Error interno del servidor. Contacte al administrador del sistema.';
+      }
+    }
+    
+    setError(errorMessage);
+    
+    // En desarrollo, mostrar detalles adicionales
+    if (process.env.NODE_ENV === 'development') {
+      console.group('[Conciliación] 🔧 Debug Info');
+      console.log('Error original:', err);
+      console.log('User Agent:', navigator.userAgent);
+      console.log('URL actual:', window.location.href);
+      console.log('Sucursal ID:', localStorage.getItem('sucursalId'));
+      console.log('Tokens disponibles:', {
+        accessToken: !!localStorage.getItem('accessToken'),
+        refreshToken: !!localStorage.getItem('refreshToken')
+      });
+      console.groupEnd();
+    }
+    
+  } finally {
+    setIsLoading(false);
+  }
+}, []); // Sin dependencias para evitar loops infinitos
+
+// También agregar esta función mejorada para verificar contingencias:
+const verificarContingenciasPendientes = useCallback(async () => {
+  try {
+    const sucursalId = localStorage.getItem('sucursalId');
+    if (!sucursalId) return;
+
+    console.log('[Conciliación] 🔍 Verificando contingencias para sucursal:', sucursalId);
+
+    const response = await authenticatedFetch(
+      `/api/contingencias?origen=sucursal&estado=pendiente&ubicacionId=${encodeURIComponent(sucursalId)}&tipo=conciliacion`
+    );
+
+    if (response.ok) {
+      const contingencias = await response.json();
+      const contingenciasConciliacion = contingencias.filter((c: any) => 
+        (c.tipo === 'conciliacion' || c.tipo === 'conciliacion_general') && 
+        (c.estado === 'pendiente' || c.estado === 'en_revision')
+      );
+
+      console.log('[Conciliación] 📋 Contingencias encontradas:', contingenciasConciliacion.length);
+
+      if (contingenciasConciliacion.length > 0) {
+        setHasContingenciasPendientes(true);
+        setContingenciasPendientes(contingenciasConciliacion);
+        console.log('[Conciliación] 🚫 Conciliación bloqueada por contingencias');
+      } else {
+        setHasContingenciasPendientes(false);
+        setContingenciasPendientes([]);
+        console.log('[Conciliación] ✅ No hay contingencias bloqueantes');
+      }
+    } else {
+      console.warn('[Conciliación] ⚠️ Error al verificar contingencias:', response.status);
+      // No bloquear la aplicación por error en verificación de contingencias
+    }
+  } catch (error) {
+    console.error('[Conciliación] ❌ Error verificando contingencias:', error);
+    // No bloquear la aplicación por error en verificación de contingencias
+  }
+}, []);
 
   const isProductCorrect = useCallback((productoId: string, stockFisico: number): boolean => {
     const producto = conciliacion?.productos.find(p => p.id === productoId);

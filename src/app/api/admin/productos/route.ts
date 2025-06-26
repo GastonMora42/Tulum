@@ -1,83 +1,138 @@
-// src/app/api/admin/productos/route.ts
+// src/app/api/admin/productos/route.ts - VERSIÓN CORREGIDA PARA FÁBRICA
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/server/db/client';
 import { authMiddleware } from '@/server/api/middlewares/auth';
 import { checkPermission } from '@/server/api/middlewares/authorization';
-import { z } from 'zod';
-import { barcodeService } from '@/server/services/producto/barcodeService';
-import { v4 as uuidv4 } from 'uuid';
-
-// Esquema de validación para crear producto
-const productoSchema = z.object({
-  nombre: z.string().min(3, { message: 'El nombre debe tener al menos 3 caracteres' }),
-  descripcion: z.string().optional(),
-  precio: z.number().positive({ message: 'El precio debe ser positivo' }),
-  codigoBarras: z.string().optional(),
-  imagen: z.string().optional(),
-  categoriaId: z.string(),
-  stockMinimo: z.number().int().nonnegative().optional().default(0),
-  activo: z.boolean().optional().default(true)
-});
 
 export async function GET(req: NextRequest) {
   // Aplicar middleware de autenticación
   const authError = await authMiddleware(req);
   if (authError) return authError;
-
+  
   try {
     const { searchParams } = new URL(req.url);
-    
-    // Parámetros de paginación y filtrado
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '20');
-    const search = searchParams.get('search') || '';
+    const conStock = searchParams.get('conStock') === 'true';
     const categoriaId = searchParams.get('categoriaId');
-    const soloActivos = searchParams.get('soloActivos') === 'true';
+    const ubicacionId = searchParams.get('ubicacionId');
+    const incluirInactivos = searchParams.get('incluirInactivos') === 'true';
+    const limit = parseInt(searchParams.get('limit') || '1000'); // 🔧 AUMENTAR LÍMITE
+    const search = searchParams.get('search');
     
-    // Construir where para filtrado
-    const where: any = {};
+    const user = (req as any).user;
     
+    // 🔧 CORRECCIÓN: Construir where condition más flexible
+    const whereCondition: any = {};
+    
+    // Solo filtrar por activo si no se especifica incluirInactivos
+    if (!incluirInactivos) {
+      whereCondition.activo = true;
+    }
+    
+    // Filtro por categoría
+    if (categoriaId) {
+      whereCondition.categoriaId = categoriaId;
+    }
+    
+    // Filtro de búsqueda
     if (search) {
-      where.OR = [
+      whereCondition.OR = [
         { nombre: { contains: search, mode: 'insensitive' } },
         { descripcion: { contains: search, mode: 'insensitive' } },
-        { codigoBarras: { contains: search } }
+        { codigoBarras: { contains: search, mode: 'insensitive' } }
       ];
     }
     
-    if (categoriaId) {
-      where.categoriaId = categoriaId;
-    }
-    
-    if (soloActivos) {
-      where.activo = true;
-    }
-    
-    // Contar total de productos
-    const total = await prisma.producto.count({ where });
-    
-    // Obtener productos
-    const productos = await prisma.producto.findMany({
-      where,
-      include: {
-        categoria: true
-      },
-      skip: (page - 1) * limit,
-      take: limit,
-      orderBy: {
-        nombre: 'asc'
-      }
+    console.log(`[API Productos] Buscando productos con filtros:`, {
+      conStock,
+      categoriaId,
+      ubicacionId,
+      incluirInactivos,
+      limit,
+      search,
+      userRole: user.roleId
     });
     
-    return NextResponse.json({
-      data: productos,
-      pagination: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit)
-      }
-    });
+    if (conStock && ubicacionId) {
+      // 🔧 CORRECCIÓN: Consulta optimizada para productos con stock
+      const productosConStock = await prisma.stock.findMany({
+        where: {
+          ubicacionId,
+          productoId: { not: null },
+          producto: whereCondition // 🔧 Aplicar filtros a productos
+        },
+        include: {
+          producto: {
+            include: {
+              categoria: true
+            }
+          }
+        },
+        take: limit,
+        orderBy: [
+          { producto: { nombre: 'asc' } }
+        ]
+      });
+      
+      // Transformar datos
+      const productos = productosConStock
+        .filter(stock => stock.producto) // 🔧 Asegurar que el producto existe
+        .map(stock => ({
+          id: stock.producto!.id,
+          nombre: stock.producto!.nombre,
+          descripcion: stock.producto!.descripcion,
+          precio: stock.producto!.precio,
+          codigoBarras: stock.producto!.codigoBarras,
+          imagen: stock.producto!.imagen,
+          categoriaId: stock.producto!.categoriaId,
+          categoria: stock.producto!.categoria,
+          stockMinimo: stock.producto!.stockMinimo,
+          activo: stock.producto!.activo,
+          stock: stock.cantidad // Stock actual en la ubicación
+        }));
+      
+      console.log(`[API Productos] Encontrados ${productos.length} productos con stock`);
+      return NextResponse.json(productos);
+      
+    } else {
+      // 🔧 CORRECCIÓN: Consulta para todos los productos sin filtro de stock
+      const productos = await prisma.producto.findMany({
+        where: whereCondition,
+        include: {
+          categoria: true,
+          // 🆕 INCLUIR STOCK PARA REFERENCIA (opcional)
+          stocks: ubicacionId ? {
+            where: { ubicacionId },
+            select: { cantidad: true }
+          } : false
+        },
+        take: limit,
+        orderBy: [
+          { nombre: 'asc' }
+        ]
+      });
+      
+      // 🔧 TRANSFORMAR DATOS INCLUYENDO STOCK SI ESTÁ DISPONIBLE
+      const productosTransformados = productos.map(producto => ({
+        id: producto.id,
+        nombre: producto.nombre,
+        descripcion: producto.descripcion,
+        precio: producto.precio,
+        codigoBarras: producto.codigoBarras,
+        imagen: producto.imagen,
+        categoriaId: producto.categoriaId,
+        categoria: producto.categoria,
+        stockMinimo: producto.stockMinimo,
+        activo: producto.activo,
+        // 🆕 INCLUIR STOCK SI ESTÁ DISPONIBLE
+        stock: ubicacionId && producto.stocks && producto.stocks.length > 0 
+          ? producto.stocks[0].cantidad 
+          : undefined
+      }));
+      
+      console.log(`[API Productos] Encontrados ${productosTransformados.length} productos totales`);
+      return NextResponse.json(productosTransformados);
+    }
+    
   } catch (error: any) {
     console.error('Error al obtener productos:', error);
     return NextResponse.json(
@@ -87,66 +142,93 @@ export async function GET(req: NextRequest) {
   }
 }
 
-export async function POST(req: NextRequest) {
-  // Aplicar middleware de autenticación
+// 🆕 NUEVA API ESPECÍFICA PARA FÁBRICA
+// src/app/api/fabrica/productos/route.ts
+export async function getFabricaProductos(req: NextRequest) {
   const authError = await authMiddleware(req);
   if (authError) return authError;
   
-  // Verificar permiso
-  const permissionError = await checkPermission('producto:crear')(req);
-  if (permissionError) return permissionError;
-  
   try {
-    const body = await req.json();
+    const { searchParams } = new URL(req.url);
+    const search = searchParams.get('search');
+    const categoriaId = searchParams.get('categoriaId');
+    const limit = parseInt(searchParams.get('limit') || '1000');
     
-    // Validar datos de entrada
-    const validation = productoSchema.safeParse(body);
-    if (!validation.success) {
-      return NextResponse.json(
-        { error: 'Datos de entrada inválidos', details: validation.error.errors },
-        { status: 400 }
-      );
-    }
+    const user = (req as any).user;
     
-    // Generar ID temporal para el código de barras
-    const tempId = uuidv4();
+    // 🔧 DETERMINAR ID DE FÁBRICA
+    let fabricaId = 'ubicacion-fabrica'; // ID por defecto
     
-    // Generar código de barras si no se proporcionó uno
-    let codigoBarras = validation.data.codigoBarras;
-    if (!codigoBarras) {
-      codigoBarras = await barcodeService.generateBarcode(tempId);
-    }
-    
-    // Verificar si ya existe un producto con ese código
-    if (codigoBarras) {
-      const existingProducto = await prisma.producto.findFirst({
-        where: { codigoBarras }
+    // Si el usuario tiene una sucursal asignada y es de tipo fábrica, usarla
+    if (user.sucursalId) {
+      const sucursalUsuario = await prisma.ubicacion.findUnique({
+        where: { id: user.sucursalId }
       });
       
-      if (existingProducto) {
-        return NextResponse.json(
-          { error: 'Ya existe un producto con este código de barras' },
-          { status: 400 }
-        );
+      if (sucursalUsuario && sucursalUsuario.tipo === 'fabrica') {
+        fabricaId = user.sucursalId;
       }
     }
     
-    // Crear producto con el código generado
-    const producto = await prisma.producto.create({
-      data: {
-        ...validation.data,
-        codigoBarras
-      },
+    console.log(`[API Fábrica Productos] Obteniendo productos para fábrica: ${fabricaId}`);
+    
+    // Construir filtros
+    const whereCondition: any = {
+      activo: true // Solo productos activos por defecto
+    };
+    
+    if (categoriaId) {
+      whereCondition.categoriaId = categoriaId;
+    }
+    
+    if (search) {
+      whereCondition.OR = [
+        { nombre: { contains: search, mode: 'insensitive' } },
+        { descripcion: { contains: search, mode: 'insensitive' } },
+        { codigoBarras: { contains: search, mode: 'insensitive' } }
+      ];
+    }
+    
+    // 🔧 OBTENER TODOS LOS PRODUCTOS CON SU STOCK EN FÁBRICA
+    const productos = await prisma.producto.findMany({
+      where: whereCondition,
       include: {
-        categoria: true
-      }
+        categoria: true,
+        stocks: {
+          where: { ubicacionId: fabricaId },
+          select: { cantidad: true }
+        }
+      },
+      take: limit,
+      orderBy: [
+        { categoria: { nombre: 'asc' } },
+        { nombre: 'asc' }
+      ]
     });
     
-    return NextResponse.json(producto, { status: 201 });
+    // Transformar datos para incluir stock
+    const productosConStock = productos.map(producto => ({
+      id: producto.id,
+      nombre: producto.nombre,
+      descripcion: producto.descripcion,
+      precio: producto.precio,
+      codigoBarras: producto.codigoBarras,
+      imagen: producto.imagen,
+      categoriaId: producto.categoriaId,
+      categoria: producto.categoria,
+      stockMinimo: producto.stockMinimo,
+      activo: producto.activo,
+      stock: producto.stocks && producto.stocks.length > 0 ? producto.stocks[0].cantidad : 0
+    }));
+    
+    console.log(`[API Fábrica Productos] Encontrados ${productosConStock.length} productos`);
+    
+    return NextResponse.json(productosConStock);
+    
   } catch (error: any) {
-    console.error('Error al crear producto:', error);
+    console.error('Error al obtener productos de fábrica:', error);
     return NextResponse.json(
-      { error: error.message || 'Error al crear producto' },
+      { error: error.message || 'Error al obtener productos de fábrica' },
       { status: 500 }
     );
   }
