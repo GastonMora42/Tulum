@@ -1,4 +1,4 @@
-// src/app/api/pdv/conciliacion/guardar/route.ts - VERSIÓN CORREGIDA CON BLOQUEO GRANULAR
+// src/app/api/pdv/conciliacion/guardar/route.ts - VERSIÓN CORREGIDA CON SINTAXIS PRISMA CORRECTA
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/server/db/client';
 import { authMiddleware } from '@/server/api/middlewares/auth';
@@ -39,24 +39,21 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    // 🔧 VERIFICAR CONTINGENCIAS SOLO DE LA CATEGORÍA ESPECÍFICA
+    // 🔧 VERIFICAR CONTINGENCIAS SOLO DE LA CATEGORÍA ESPECÍFICA - SINTAXIS CORREGIDA
     console.log(`[GUARDAR] Verificando contingencias para categoría: ${categoriaId || 'general'}`);
     
     let contingenciasBloqueo = [];
     if (categoriaId) {
-      // 🆕 Buscar contingencias MUY ESPECÍFICAS de esta categoría solamente
+      // 🔧 CORRECCIÓN: OR al nivel superior
       contingenciasBloqueo = await prisma.contingencia.findMany({
         where: {
           ubicacionId: sucursalId,
           tipo: 'conciliacion',
           estado: { in: ['pendiente', 'en_revision'] },
-          AND: [
-            {
-              OR: [
-                { descripcion: { contains: `categoriaId-${categoriaId}` } },
-                { descripcion: { contains: `Categoría: ${categoriaId}` } }
-              ]
-            }
+          OR: [
+            // 🔧 SINTAXIS CORRECTA: OR al nivel superior con múltiples condiciones en descripcion
+            { descripcion: { contains: `categoriaId-${categoriaId}` } },
+            { descripcion: { contains: `Categoría: ${categoriaId}` } }
           ]
         }
       });

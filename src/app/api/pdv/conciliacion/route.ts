@@ -1,4 +1,4 @@
-// src/app/api/pdv/conciliacion/route.ts - VERSIÓN CORREGIDA PARA BLOQUEO GRANULAR POR CATEGORÍA
+// src/app/api/pdv/conciliacion/route.ts - VERSIÓN CORREGIDA CON SINTAXIS PRISMA CORRECTA
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/server/db/client';
 import { authMiddleware } from '@/server/api/middlewares/auth';
@@ -38,21 +38,16 @@ export async function GET(req: NextRequest) {
     
     try {
       if (categoriaId) {
-        // 🆕 Buscar contingencias MUY ESPECÍFICAS de esta categoría
+        // 🆕 Buscar contingencias MUY ESPECÍFICAS de esta categoría - SINTAXIS CORREGIDA
         contingenciasBloqueo = await prisma.contingencia.findMany({
           where: {
             ubicacionId: sucursalId,
             tipo: 'conciliacion',
             estado: { in: ['pendiente', 'en_revision'] },
-            AND: [
-              {
-                OR: [
-                  // Buscar por identificador específico de categoría
-                  { descripcion: { contains: `categoriaId-${categoriaId}` } },
-                  // Buscar por nombre de categoría en descripción
-                  { descripcion: { contains: `Categoría: ${categoriaId}` } }
-                ]
-              }
+            OR: [
+              // 🔧 CORRECCIÓN: OR al nivel superior, no dentro del campo
+              { descripcion: { contains: `categoriaId-${categoriaId}` } },
+              { descripcion: { contains: `Categoría: ${categoriaId}` } }
             ]
           }
         });
@@ -116,7 +111,7 @@ export async function GET(req: NextRequest) {
       );
     }
     
-    // 🔧 PASO 2: Buscar conciliación activa para esta categoría específica
+    // 🔧 PASO 2: Buscar conciliación activa para esta categoría específica - SINTAXIS CORREGIDA
     console.log('[API Conciliación GET] Buscando conciliación activa...');
     let conciliacionActiva = null;
     
@@ -127,11 +122,12 @@ export async function GET(req: NextRequest) {
       };
       
       if (categoriaId) {
-        // 🆕 Para categoría específica, buscar conciliación que contenga el identificador
-        whereCondition.observaciones = { 
+        // 🔧 CORRECCIÓN: OR al nivel superior para búsqueda en observaciones
+        whereCondition = {
+          ...whereCondition,
           OR: [
-            { contains: `categoriaId-${categoriaId}` },
-            { contains: `Categoría: ${categoriaId}` }
+            { observaciones: { contains: `categoriaId-${categoriaId}` } },
+            { observaciones: { contains: `Categoría: ${categoriaId}` } }
           ]
         };
       } else {
@@ -290,25 +286,21 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    // 🔧 PASO 1: Verificar contingencias SOLO de la categoría específica
+    // 🔧 PASO 1: Verificar contingencias SOLO de la categoría específica - SINTAXIS CORREGIDA
     console.log('[API Conciliación POST] Verificando contingencias...');
     let contingenciasBloqueo: any[] = [];
     
     try {
       if (categoriaId) {
-        // 🆕 Solo buscar contingencias específicas de ESTA categoría
+        // 🔧 CORRECCIÓN: OR al nivel superior
         contingenciasBloqueo = await prisma.contingencia.findMany({
           where: {
             ubicacionId: sucursalId,
             tipo: 'conciliacion',
             estado: { in: ['pendiente', 'en_revision'] },
-            AND: [
-              {
-                OR: [
-                  { descripcion: { contains: `categoriaId-${categoriaId}` } },
-                  { descripcion: { contains: `Categoría: ${categoriaId}` } }
-                ]
-              }
+            OR: [
+              { descripcion: { contains: `categoriaId-${categoriaId}` } },
+              { descripcion: { contains: `Categoría: ${categoriaId}` } }
             ]
           }
         });
@@ -357,7 +349,7 @@ export async function POST(req: NextRequest) {
       }, { status: 409 });
     }
     
-    // 🔧 PASO 2: Verificar conciliación existente para ESTA categoría específica
+    // 🔧 PASO 2: Verificar conciliación existente para ESTA categoría específica - SINTAXIS CORREGIDA
     console.log('[API Conciliación POST] Verificando conciliación existente...');
     let conciliacionExistente = null;
     
@@ -368,11 +360,12 @@ export async function POST(req: NextRequest) {
       };
       
       if (categoriaId) {
-        // Solo buscar conciliaciones de ESTA categoría específica
-        whereCondition.observaciones = { 
+        // 🔧 CORRECCIÓN: OR al nivel superior
+        whereCondition = {
+          ...whereCondition,
           OR: [
-            { contains: `categoriaId-${categoriaId}` },
-            { contains: `Categoría: ${categoriaId}` }
+            { observaciones: { contains: `categoriaId-${categoriaId}` } },
+            { observaciones: { contains: `Categoría: ${categoriaId}` } }
           ]
         };
       } else {

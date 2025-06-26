@@ -491,7 +491,7 @@ export default function ConciliacionPage() {
             <div>
               <h1 className="text-2xl font-bold text-[#311716] flex items-center">
                 <BarChart className="mr-3 h-7 w-7 text-[#9c7561]" />
-                Conciliación Granular por Categorías
+                Conciliación por Categorías
               </h1>
               <p className="text-gray-600 mt-1">
                 {activeCategoryId 
