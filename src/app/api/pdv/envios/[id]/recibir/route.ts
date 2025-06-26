@@ -1,4 +1,4 @@
-// src/app/api/pdv/envios/[id]/recibir/route.ts - VERSIÓN CORREGIDA PARA ADMIN Y VENDEDORES
+// src/app/api/pdv/envios/[id]/recibir/route.ts - VERSIÓN CORREGIDA
 import { NextRequest, NextResponse } from 'next/server';
 import { authMiddleware } from '@/server/api/middlewares/auth';
 import { checkPermission } from '@/server/api/middlewares/authorization';
@@ -17,17 +17,17 @@ const recepcionPDVSchema = z.object({
   observaciones: z.string().optional()
 });
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   // Aplicar middleware de autenticación
   const authError = await authMiddleware(req);
   if (authError) return authError;
   
   // 🔧 VERIFICAR PERMISO ESPECÍFICO PARA RECEPCIÓN DE ENVÍOS
-  const permissionError = await checkPermission('envio:recibir')(req);
+  const permissionError = await checkPermission(['envio:recibir', 'envio:ver'])(req);
   if (permissionError) return permissionError;
   
   try {
-    const { id } = params;
+    const { id } = await params;
     console.log(`[API PDV] Procesando recepción de envío ${id} en PDV`);
     
     const body = await req.json();
@@ -47,77 +47,18 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     // Obtener usuario
     const user = (req as any).user;
     
-    // 🆕 NUEVA LÓGICA: Diferente validación para vendedores vs administradores
-    if (user.roleId === 'role-vendedor') {
-      // 🔧 VALIDACIONES ESPECÍFICAS PARA VENDEDORES
-      if (!user.sucursalId) {
-        return NextResponse.json(
-          { error: 'El vendedor debe tener una sucursal asignada para recibir envíos' },
-          { status: 403 }
-        );
-      }
-      
-      // Verificar que el envío está dirigido a la sucursal del vendedor
-      const envio = await prisma.envio.findUnique({
-        where: { id },
-        select: { destinoId: true, estado: true }
-      });
-      
-      if (!envio) {
-        return NextResponse.json(
-          { error: 'Envío no encontrado' },
-          { status: 404 }
-        );
-      }
-      
-      if (envio.destinoId !== user.sucursalId) {
-        return NextResponse.json(
-          { error: 'No tiene permiso para recibir este envío. El envío no está dirigido a su sucursal.' },
-          { status: 403 }
-        );
-      }
-      
-      console.log(`[API PDV] Vendedor ${user.email} recibiendo envío para su sucursal ${user.sucursalId}`);
-      
-    } else if (user.roleId === 'role-admin') {
-      // 🆕 LÓGICA PARA ADMINISTRADORES: Sin restricciones de sucursal
-      console.log(`[API PDV] Administrador ${user.email} recibiendo envío ${id} - sin restricciones de sucursal`);
-      
-      // Solo verificar que el envío existe
-      const envio = await prisma.envio.findUnique({
-        where: { id },
-        select: { id: true, estado: true, destinoId: true, destino: { select: { nombre: true } } }
-      });
-      
-      if (!envio) {
-        return NextResponse.json(
-          { error: 'Envío no encontrado' },
-          { status: 404 }
-        );
-      }
-      
-      console.log(`[API PDV] Admin recibiendo envío dirigido a: ${envio.destino?.nombre} (${envio.destinoId})`);
-      
-    } else {
-      // Otros roles no permitidos
-      return NextResponse.json(
-        { error: 'Su rol no tiene permisos para recibir envíos' },
-        { status: 403 }
-      );
-    }
-    
-    // Verificar que el envío existe y obtener detalles completos
+    // 🆕 VERIFICAR QUE EL ENVÍO EXISTE PRIMERO
     const envio = await prisma.envio.findUnique({
       where: { id },
       include: {
+        origen: true,
+        destino: true,
         items: {
           include: {
             producto: true,
             insumo: true
           }
-        },
-        destino: true,
-        origen: true
+        }
       }
     });
     
@@ -128,18 +69,81 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       );
     }
     
-    // Verificar estado del envío
-    if (envio.estado !== 'enviado' && envio.estado !== 'en_transito') {
+    console.log(`[API PDV] Envío encontrado: ${envio.origen.nombre} → ${envio.destino.nombre} (Estado: ${envio.estado})`);
+    
+    // 🆕 NUEVA LÓGICA: Validaciones diferenciadas para vendedores vs administradores
+    if (user.roleId === 'role-vendedor') {
+      // 🔧 VALIDACIONES ESPECÍFICAS PARA VENDEDORES
+      if (!user.sucursalId) {
+        return NextResponse.json(
+          { error: 'El vendedor debe tener una sucursal asignada para recibir envíos' },
+          { status: 403 }
+        );
+      }
+      
+      // Verificar que el envío está dirigido a la sucursal del vendedor
+      if (envio.destinoId !== user.sucursalId) {
+        return NextResponse.json(
+          { 
+            error: 'No tiene permiso para recibir este envío. El envío no está dirigido a su sucursal.',
+            details: {
+              envioDestino: envio.destino.nombre,
+              sucursalUsuario: user.sucursalId
+            }
+          },
+          { status: 403 }
+        );
+      }
+      
+      console.log(`[API PDV] Vendedor ${user.email} autorizado para recibir envío en su sucursal ${user.sucursalId}`);
+      
+    } else if (user.roleId === 'role-admin') {
+      // 🆕 LÓGICA PARA ADMINISTRADORES: Sin restricciones de sucursal
+      console.log(`[API PDV] Administrador ${user.email} recibiendo envío ${id} - acceso completo`);
+      
+    } else {
+      // Otros roles no permitidos
       return NextResponse.json(
-        { error: `El envío no puede ser recibido porque está en estado ${envio.estado}. Los estados válidos son 'enviado' y 'en_transito'.` },
+        { error: 'Su rol no tiene permisos para recibir envíos' },
+        { status: 403 }
+      );
+    }
+    
+    // 🔧 VERIFICAR ESTADO DEL ENVÍO
+    const estadosValidos = ['enviado', 'en_transito'];
+    if (!estadosValidos.includes(envio.estado)) {
+      return NextResponse.json(
+        { 
+          error: `El envío no puede ser recibido porque está en estado "${envio.estado}". Estados válidos: ${estadosValidos.join(', ')}.`,
+          estadoActual: envio.estado,
+          estadosValidos
+        },
         { status: 400 }
       );
+    }
+    
+    // 🔧 VALIDAR QUE TODOS LOS ITEMS PERTENECEN AL ENVÍO
+    const itemsEnvioIds = new Set(envio.items.map(item => item.id));
+    const itemsRecibidosIds = new Set(items.map(item => item.itemEnvioId));
+    
+    for (const itemRecibidoId of itemsRecibidosIds) {
+      if (!itemsEnvioIds.has(itemRecibidoId)) {
+        return NextResponse.json(
+          { 
+            error: `El item ${itemRecibidoId} no pertenece a este envío`,
+            itemsValidos: Array.from(itemsEnvioIds)
+          },
+          { status: 400 }
+        );
+      }
     }
     
     // 🆕 AGREGAR HEADER DE CONTEXTO PARA EL SERVICIO DE STOCK
     req.headers.set('x-context', 'envio-recepcion');
     
-    console.log(`[API PDV] Invocando envioService.recibirEnvio para el envío ${id}`);
+    console.log(`[API PDV] Todas las validaciones pasadas. Invocando envioService.recibirEnvio para el envío ${id}`);
+    
+    // 🔧 LLAMAR AL SERVICIO CON VALIDACIÓN ADICIONAL
     const resultado = await envioService.recibirEnvio({
       envioId: id,
       usuarioId: user.id,
@@ -155,7 +159,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return itemEnvio && itemEnvio.cantidad !== item.cantidadRecibida;
     });
     
+    // 🔧 RESPUESTA MEJORADA CON MÁS INFORMACIÓN
     return NextResponse.json({
+      success: true,
       envio: resultado,
       hayDiferencias,
       message: hayDiferencias 
@@ -167,6 +173,17 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
           const itemEnvio = envio.items.find(i => i.id === item.itemEnvioId);
           return itemEnvio && itemEnvio.cantidad !== item.cantidadRecibida;
         }).length,
+        diferencias: items.filter(item => {
+          const itemEnvio = envio.items.find(i => i.id === item.itemEnvioId);
+          return itemEnvio && itemEnvio.cantidad !== item.cantidadRecibida;
+        }).map(item => {
+          const itemEnvio = envio.items.find(i => i.id === item.itemEnvioId);
+          return {
+            item: itemEnvio?.producto?.nombre || itemEnvio?.insumo?.nombre,
+            enviado: itemEnvio?.cantidad || 0,
+            recibido: item.cantidadRecibida
+          };
+        }),
         recibidoPor: {
           rol: user.roleId,
           nombre: user.name,
@@ -179,22 +196,25 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   } catch (error: any) {
     console.error('Error al recibir envío en PDV:', error);
     return NextResponse.json(
-      { error: error.message || 'Error al recibir envío' },
+      { 
+        error: error.message || 'Error al recibir envío',
+        details: error.stack || 'Sin detalles adicionales'
+      },
       { status: 500 }
     );
   }
 }
 
 // 🆕 GET MEJORADO PARA OBTENER DETALLES DEL ENVÍO ANTES DE RECEPCIÓN
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const authError = await authMiddleware(req);
   if (authError) return authError;
   
-  const permissionError = await checkPermission('envio:ver')(req);
+  const permissionError = await checkPermission(['envio:ver', 'envio:recibir'])(req);
   if (permissionError) return permissionError;
   
   try {
-    const { id } = params;
+    const { id } = await params;
     const user = (req as any).user;
     
     const envio = await prisma.envio.findUnique({
@@ -250,10 +270,12 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     }
     
     // 🆕 AGREGAR METADATOS ÚTILES PARA EL FRONTEND
+    const estadosValidosParaRecepcion = ['enviado', 'en_transito'];
     const response = {
       ...envio,
       metadata: {
-        puedeRecibir: ['enviado', 'en_transito'].includes(envio.estado),
+        puedeRecibir: estadosValidosParaRecepcion.includes(envio.estado),
+        estadosValidosParaRecepcion,
         consultadoPor: {
           rol: user.roleId,
           nombre: user.name,

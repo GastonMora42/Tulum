@@ -1,4 +1,4 @@
-// src/server/api/middlewares/authorization.ts - VERSIÓN CORREGIDA CON PERMISOS CLAROS
+// src/server/api/middlewares/authorization.ts - VERSIÓN CORREGIDA PARA RECEPCIÓN DE ENVÍOS
 import { NextRequest, NextResponse } from 'next/server';
 
 export function checkPermission(requiredPermission: string | string[]) {
@@ -31,11 +31,11 @@ export function checkPermission(requiredPermission: string | string[]) {
         // Consulta de productos y stock
         'producto:ver', 'stock:ver', 
         
-        // 🆕 RECEPCIÓN DE ENVÍOS - PERMISOS CLAVE
+        // 🆕 RECEPCIÓN DE ENVÍOS - PERMISOS CLAVE CORREGIDOS
         'envio:recibir', 'envio:ver', 'envio:listar',
         
-        // Ajuste de stock solo en contexto de recepción
-        'stock:ajustar_recepcion',
+        // 🔧 PERMISOS DE STOCK EN CONTEXTO DE RECEPCIÓN
+        'stock:ajustar_recepcion', 'stock:ajustar',
         
         // Contingencias
         'contingencia:crear', 'contingencia:ver',
@@ -50,20 +50,31 @@ export function checkPermission(requiredPermission: string | string[]) {
         return null; // Permitir estas operaciones
       }
       
-      // 🔧 LÓGICA ESPECIAL: Permitir ajuste de stock solo en contexto de recepción de envíos
+      // 🔧 LÓGICA ESPECIAL: Permitir ajuste de stock en contexto de recepción de envíos
       if (permsToCheck.includes('stock:ajustar')) {
         const path = req.nextUrl.pathname;
+        const contextHeader = req.headers.get('x-context');
+        
+        // Verificar contextos válidos para vendedores
         const isReceivingContext = path.includes('/recibir') || 
                                   path.includes('/recepcion') ||
-                                  req.headers.get('x-context') === 'envio-recepcion';
+                                  contextHeader === 'envio-recepcion' ||
+                                  contextHeader === 'pdv-recepcion';
         
         if (isReceivingContext) {
-          console.log(`[AUTH] Vendedor ${user.email} - Permiso especial para ajuste de stock en contexto de recepción: ${path}`);
+          console.log(`[AUTH] Vendedor ${user.email} - Permiso especial para ajuste de stock en contexto de recepción: ${path} (context: ${contextHeader})`);
           return null; // Permitir ajuste de stock en contexto de recepción
         } else {
-          console.log(`[AUTH] Vendedor ${user.email} - Denegado ajuste de stock fuera de contexto de recepción`);
+          console.log(`[AUTH] Vendedor ${user.email} - Denegado ajuste de stock fuera de contexto de recepción (path: ${path}, context: ${contextHeader})`);
           return NextResponse.json(
-            { error: 'Como vendedor, solo puede ajustar stock en el contexto de recepción de envíos.' },
+            { 
+              error: 'Como vendedor, solo puede ajustar stock en el contexto de recepción de envíos.',
+              details: {
+                path,
+                context: contextHeader,
+                allowedContexts: ['envio-recepcion', 'pdv-recepcion']
+              }
+            },
             { status: 403 }
           );
         }
@@ -71,6 +82,17 @@ export function checkPermission(requiredPermission: string | string[]) {
       
       // Si llega aquí, el permiso no está en la lista de vendedor
       console.log(`[AUTH] Vendedor ${user.email} - Permiso denegado para: ${permsToCheck.join(', ')}`);
+      return NextResponse.json(
+        { 
+          error: 'No tiene permisos suficientes para esta operación',
+          details: {
+            rol: 'vendedor',
+            permisosRequeridos: permsToCheck,
+            permisosDisponibles: vendedorPermisos.slice(0, 10) // Solo mostrar algunos para no saturar
+          }
+        },
+        { status: 403 }
+      );
     }
         
     // 🆕 OPERADORES DE FÁBRICA: Permisos para producción y envíos
@@ -80,10 +102,13 @@ export function checkPermission(requiredPermission: string | string[]) {
       // Restricción específica para ajuste de stock en rol fábrica
       if (permsToCheck.includes('stock:ajustar')) {
         const path = req.nextUrl.pathname;
+        const contextHeader = req.headers.get('x-context');
+        
         const isProductionOrShipping = path.includes('/produccion') || 
                                        path.includes('/envios') ||
-                                       req.headers.get('x-context') === 'produccion' ||
-                                       req.headers.get('x-context') === 'envio';
+                                       contextHeader === 'produccion' ||
+                                       contextHeader === 'envio' ||
+                                       contextHeader === 'fabrica-produccion';
         
         if (!isProductionOrShipping) {
           console.log(`[AUTH] Operador fábrica ${user.email} - Denegado ajuste directo de stock`);
@@ -118,6 +143,17 @@ export function checkPermission(requiredPermission: string | string[]) {
       }
       
       console.log(`[AUTH] Operador fábrica ${user.email} - Permiso denegado para: ${permsToCheck.join(', ')}`);
+      return NextResponse.json(
+        { 
+          error: 'No tiene permisos para esta operación como operador de fábrica',
+          details: {
+            rol: 'fabrica',
+            permisosRequeridos: permsToCheck,
+            permisosDisponibles: fabricaPermisos.slice(0, 10)
+          }
+        },
+        { status: 403 }
+      );
     }
     
     // Para otros roles, verificar permiso específico en la base de datos

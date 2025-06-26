@@ -1,4 +1,4 @@
-// src/server/services/envio/envioService.ts
+// src/server/services/envio/envioService.ts - VERSIÓN CORREGIDA PARA STOCK
 import prisma from '@/server/db/client';
 import { stockService } from '@/server/services/stock/stockService';
 
@@ -18,12 +18,12 @@ interface RecibirEnvioParams {
   items: Array<{
     itemEnvioId: string;
     cantidadRecibida: number;
-    productoId?: string; // Opcional para pasar directo desde el cliente
   }>;
   observaciones?: string;
 }
 
 class EnvioService {
+  
   // Crear nuevo envío
   async crearEnvio(params: CrearEnvioParams) {
     const { origenId, destinoId, usuarioId, items } = params;
@@ -56,7 +56,7 @@ class EnvioService {
       );
       
       if (!verificacion.disponible) {
-        throw new Error(`No hay suficiente stock del producto ${item.productoId}`);
+        throw new Error(`No hay suficiente stock del producto ${item.productoId}. Disponible: ${verificacion.stockActual}, Requerido: ${item.cantidad}`);
       }
     }
     
@@ -137,13 +137,13 @@ class EnvioService {
       throw new Error(`No se puede marcar como enviado un envío en estado ${envio.estado}`);
     }
     
-    console.log(`[EnvioService] Actualizando estado a 'en_transito' para el envío ${envioId}`);
+    console.log(`[EnvioService] Actualizando estado a 'enviado' para el envío ${envioId}`);
     
-    // CAMBIO: Actualizado para usar "en_transito" en lugar de "enviado"
+    // 🔧 CORREGIDO: Usar estado 'enviado' para PDV
     return prisma.envio.update({
       where: { id: envioId },
       data: {
-        estado: 'en_transito',  // Cambiado de 'enviado' a 'en_transito'
+        estado: 'enviado', // Estado que PDV puede recibir
         fechaEnvio: new Date()
       },
       include: {
@@ -154,23 +154,50 @@ class EnvioService {
     });
   }
   
-  // Recibir envío
+  // 🔧 MÉTODO DE RECEPCIÓN CORREGIDO
   async recibirEnvio(params: RecibirEnvioParams) {
     const { envioId, usuarioId, items, observaciones } = params;
     
-    console.log(`[EnvioService] Recibiendo envío ${envioId} por usuario ${usuarioId}`);
-    console.log(`[EnvioService] Items a recibir:`, items);
+    console.log(`[EnvioService] 🚀 INICIANDO RECEPCIÓN DE ENVÍO ${envioId}`);
+    console.log(`[EnvioService] Usuario: ${usuarioId}`);
+    console.log(`[EnvioService] Items a recibir:`, items.map(i => `${i.itemEnvioId}: ${i.cantidadRecibida}`));
     
-    // Verificar que el envío existe y está en tránsito o enviado
+    // 🔧 VERIFICAR QUE EL ENVÍO EXISTE Y ESTÁ EN ESTADO CORRECTO
     const envio = await prisma.envio.findUnique({
       where: { id: envioId },
       include: {
         items: {
           include: {
-            producto: true  // Incluir datos del producto
+            producto: {
+              select: {
+                id: true,
+                nombre: true,
+                codigoBarras: true
+              }
+            },
+            insumo: {
+              select: {
+                id: true,
+                nombre: true,
+                unidadMedida: true
+              }
+            }
           }
         },
-        destino: true
+        destino: {
+          select: {
+            id: true,
+            nombre: true,
+            tipo: true
+          }
+        },
+        origen: {
+          select: {
+            id: true,
+            nombre: true,
+            tipo: true
+          }
+        }
       }
     });
     
@@ -178,15 +205,17 @@ class EnvioService {
       throw new Error('El envío no existe');
     }
     
-    // CAMBIO: Aceptar tanto 'en_transito' como 'enviado'
-    if (envio.estado !== 'en_transito' && envio.estado !== 'enviado') {
-      throw new Error(`El envío no está en estado correcto para recepción. Estado actual: ${envio.estado}`);
+    console.log(`[EnvioService] ✅ Envío encontrado: ${envio.origen.nombre} → ${envio.destino.nombre}`);
+    console.log(`[EnvioService] Estado actual: ${envio.estado}`);
+    console.log(`[EnvioService] Items en envío: ${envio.items.length}`);
+    
+    // 🔧 ACEPTAR TANTO 'enviado' COMO 'en_transito'
+    const estadosValidos = ['enviado', 'en_transito'];
+    if (!estadosValidos.includes(envio.estado)) {
+      throw new Error(`El envío no está en estado correcto para recepción. Estado actual: ${envio.estado}. Estados válidos: ${estadosValidos.join(', ')}`);
     }
     
-    console.log(`[EnvioService] Envío encontrado en estado: ${envio.estado}`);
-    console.log(`[EnvioService] Destino: ${envio.destino.nombre} (${envio.destinoId})`);
-    
-    // Verificar que los items recibidos corresponden al envío
+    // 🔧 VALIDAR QUE TODOS LOS ITEMS RECIBIDOS PERTENECEN AL ENVÍO
     const itemsEnvioMap = new Map(envio.items.map(item => [item.id, item]));
     
     for (const itemRecibido of items) {
@@ -195,40 +224,34 @@ class EnvioService {
       }
     }
     
-    // Procesar recepción en transacción
+    console.log(`[EnvioService] ✅ Validaciones completadas. Iniciando transacción de recepción...`);
+    
+    // 🔧 PROCESAR RECEPCIÓN EN TRANSACCIÓN
     return prisma.$transaction(async tx => {
-      // Actualizar envío
-      await tx.envio.update({
-        where: { id: envioId },
-        data: {
-          estado: 'recibido',
-          fechaRecepcion: new Date()
-        }
-      });
-      
-      console.log(`[EnvioService] Envío marcado como recibido`);
+      console.log(`[EnvioService] 📦 Procesando recepción en transacción...`);
       
       // Variable para controlar si hay discrepancias
       let hayDiscrepancia = false;
+      const discrepancias = [];
       
-      // Procesar cada item
+      // 🔧 PROCESAR CADA ITEM CON LOGS DETALLADOS
       for (const itemRecibido of items) {
         const itemEnvio = itemsEnvioMap.get(itemRecibido.itemEnvioId)!;
         
-        // CAMBIO: Verificar que el producto tiene ID válido
-        if (!itemEnvio.productoId && !itemEnvio.producto?.id) {
-          console.error(`[EnvioService] Error: Item ${itemRecibido.itemEnvioId} no tiene productoId válido`);
-          throw new Error(`El ítem ${itemRecibido.itemEnvioId} no tiene un producto asociado válido`);
+        console.log(`[EnvioService] 📋 Procesando item: ${itemRecibido.itemEnvioId}`);
+        console.log(`[EnvioService] Producto/Insumo: ${itemEnvio.producto?.nombre || itemEnvio.insumo?.nombre}`);
+        console.log(`[EnvioService] Cantidad enviada: ${itemEnvio.cantidad}`);
+        console.log(`[EnvioService] Cantidad recibida: ${itemRecibido.cantidadRecibida}`);
+        
+        // 🔧 VERIFICAR QUE TENEMOS UN PRODUCTO O INSUMO VÁLIDO
+        const tieneProducto = itemEnvio.productoId && itemEnvio.producto;
+        const tieneInsumo = itemEnvio.insumoId && itemEnvio.insumo;
+        
+        if (!tieneProducto && !tieneInsumo) {
+          throw new Error(`El ítem ${itemRecibido.itemEnvioId} no tiene un producto o insumo asociado válido`);
         }
         
-        // Usar el ID de producto más confiable disponible
-        const productoId = itemEnvio.productoId || itemEnvio.producto?.id;
-        
-        console.log(`[EnvioService] Procesando item: ${itemRecibido.itemEnvioId}`);
-        console.log(`[EnvioService] Producto ID: ${productoId}`);
-        console.log(`[EnvioService] Cantidad enviada: ${itemEnvio.cantidad}, Cantidad recibida: ${itemRecibido.cantidadRecibida}`);
-        
-        // Actualizar cantidad recibida
+        // Actualizar cantidad recibida en el item del envío
         await tx.itemEnvio.update({
           where: { id: itemRecibido.itemEnvioId },
           data: {
@@ -236,63 +259,125 @@ class EnvioService {
           }
         });
         
-        // CAMBIO: Asegurar que nunca se pasa undefined como productoId
-        await stockService.ajustarStock({
-          productoId: productoId!,  // Usar el ID definitivo y asegurar que no es undefined
-          ubicacionId: envio.destinoId,
-          cantidad: itemRecibido.cantidadRecibida,
-          motivo: `Recepción de envío #${envioId}`,
-          usuarioId,
-          envioId
-        });
+        console.log(`[EnvioService] ✅ Cantidad recibida actualizada en item envío`);
         
-        console.log(`[EnvioService] Stock actualizado para producto ${productoId} en ubicación ${envio.destinoId}`);
-
-        // Si hay discrepancia, crear contingencia
+        // 🔧 ACTUALIZAR STOCK EN DESTINO (SOLO SI LA CANTIDAD RECIBIDA > 0)
+        if (itemRecibido.cantidadRecibida > 0) {
+          try {
+            if (tieneProducto) {
+              // Actualizar stock de producto
+              const ajusteStock = await stockService.ajustarStock({
+                productoId: itemEnvio.productoId!,
+                ubicacionId: envio.destinoId,
+                cantidad: itemRecibido.cantidadRecibida,
+                motivo: `Recepción de envío #${envioId}`,
+                usuarioId,
+                envioId,
+                allowNegative: false // No permitir stock negativo en recepción
+              });
+              
+              console.log(`[EnvioService] ✅ Stock de producto actualizado: ${ajusteStock.stock.cantidad}`);
+              
+            } else if (tieneInsumo) {
+              // Actualizar stock de insumo
+              const ajusteStock = await stockService.ajustarStock({
+                insumoId: itemEnvio.insumoId!,
+                ubicacionId: envio.destinoId,
+                cantidad: itemRecibido.cantidadRecibida,
+                motivo: `Recepción de envío #${envioId}`,
+                usuarioId,
+                envioId,
+                allowNegative: false
+              });
+              
+              console.log(`[EnvioService] ✅ Stock de insumo actualizado: ${ajusteStock.stock.cantidad}`);
+            }
+          } catch (stockError) {
+            console.error(`[EnvioService] ❌ Error al actualizar stock:`, stockError);
+            throw new Error(`Error al actualizar stock para item ${itemRecibido.itemEnvioId}: ${stockError instanceof Error ? stockError.message : 'Error desconocido'}`);
+          }
+        } else {
+          console.log(`[EnvioService] ⚠️ Cantidad recibida es 0, no se actualiza stock`);
+        }
+        
+        // 🔧 DETECTAR DISCREPANCIAS
         if (itemRecibido.cantidadRecibida !== itemEnvio.cantidad) {
           hayDiscrepancia = true;
+          const discrepancia = {
+            itemId: itemRecibido.itemEnvioId,
+            nombre: itemEnvio.producto?.nombre || itemEnvio.insumo?.nombre,
+            enviado: itemEnvio.cantidad,
+            recibido: itemRecibido.cantidadRecibida,
+            diferencia: itemRecibido.cantidadRecibida - itemEnvio.cantidad
+          };
+          discrepancias.push(discrepancia);
           
-          await tx.contingencia.create({
-            data: {
-              titulo: `Discrepancia en envío #${envioId}`,
-              descripcion: `Producto ${productoId}: Enviado ${itemEnvio.cantidad}, Recibido ${itemRecibido.cantidadRecibida}`,
-              origen: 'sucursal',
-              envioId,
-              creadoPor: usuarioId,
-              estado: 'pendiente'
-            }
-          });
-          
-          console.log(`[EnvioService] Creada contingencia por discrepancia en item ${itemRecibido.itemEnvioId}`);
+          console.log(`[EnvioService] ⚠️ Discrepancia detectada:`, discrepancia);
         }
       }
       
-      // Marcar envío con contingencia si hubo discrepancias
+      // 🔧 CREAR CONTINGENCIA SI HAY DISCREPANCIAS
       if (hayDiscrepancia) {
-        await tx.envio.update({
-          where: { id: envioId },
+        const descripcionDiscrepancias = discrepancias.map(d => 
+          `${d.nombre}: Enviado ${d.enviado}, Recibido ${d.recibido} (${d.diferencia > 0 ? '+' : ''}${d.diferencia})`
+        ).join('; ');
+        
+        await tx.contingencia.create({
           data: {
-            estado: 'con_contingencia'
+            titulo: `Discrepancia en recepción de envío #${envioId}`,
+            descripcion: `Se detectaron diferencias en la recepción: ${descripcionDiscrepancias}. ${observaciones ? 'Observaciones: ' + observaciones : ''}`,
+            origen: 'sucursal',
+            envioId,
+            ubicacionId: envio.destinoId,
+            creadoPor: usuarioId,
+            estado: 'pendiente',
+            tipo: 'stock',
+            urgente: discrepancias.some(d => Math.abs(d.diferencia) > 5) // Urgente si hay diferencias grandes
           }
         });
         
-        console.log(`[EnvioService] Envío marcado con contingencia por discrepancias`);
+        console.log(`[EnvioService] 🚨 Contingencia creada por discrepancias`);
       }
       
-      console.log(`[EnvioService] Recepción completada exitosamente`);
+      // 🔧 ACTUALIZAR ESTADO DEL ENVÍO
+      const estadoFinal = hayDiscrepancia ? 'con_contingencia' : 'recibido';
       
-      return tx.envio.findUnique({
+      await tx.envio.update({
+        where: { id: envioId },
+        data: {
+          estado: estadoFinal,
+          fechaRecepcion: new Date()
+        }
+      });
+      
+      console.log(`[EnvioService] ✅ Envío marcado como: ${estadoFinal}`);
+      
+      // 🔧 OBTENER ENVÍO COMPLETO ACTUALIZADO
+      const envioFinalizado = await tx.envio.findUnique({
         where: { id: envioId },
         include: {
           items: {
             include: {
-              producto: true
+              producto: true,
+              insumo: true
             }
           },
           origen: true,
-          destino: true
+          destino: true,
+          usuario: {
+            select: {
+              id: true,
+              name: true,
+              email: true
+            }
+          }
         }
       });
+      
+      console.log(`[EnvioService] 🎉 RECEPCIÓN COMPLETADA EXITOSAMENTE`);
+      console.log(`[EnvioService] Resumen: ${items.length} items procesados, ${discrepancias.length} discrepancias`);
+      
+      return envioFinalizado;
     });
   }
   
@@ -335,7 +420,8 @@ class EnvioService {
       include: {
         items: {
           include: {
-            producto: true
+            producto: true,
+            insumo: true
           }
         },
         origen: true,

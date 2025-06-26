@@ -1,4 +1,4 @@
-// src/components/pdv/RecepcionEnvios.tsx - VERSIÓN MEJORADA PARA ADMIN Y VENDEDORES
+// src/components/pdv/RecepcionEnvios.tsx - VERSIÓN CORREGIDA Y MEJORADA
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -6,7 +6,8 @@ import { format } from 'date-fns';
 import { 
   Package, CheckCircle, AlertTriangle, Clock, Truck, 
   Calendar, User, FileText, ChevronRight, RefreshCw,
-  MapPin, Hash, Weight, AlertCircle, Shield, UserCheck
+  MapPin, Hash, Weight, AlertCircle, Shield, UserCheck,
+  Plus, Minus, Eye, Save
 } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
 
@@ -19,6 +20,10 @@ interface ItemEnvio {
   producto?: {
     id: string;
     nombre: string;
+    codigoBarras?: string;
+    categoria?: {
+      nombre: string;
+    };
   };
   insumo?: {
     id: string;
@@ -53,6 +58,7 @@ interface Envio {
   items: ItemEnvio[];
   metadata?: {
     puedeRecibir: boolean;
+    estadosValidosParaRecepcion: string[];
     consultadoPor: {
       rol: string;
       nombre: string;
@@ -85,11 +91,13 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
       const response = await authenticatedFetch('/api/auth/me');
       if (response.ok) {
         const userData = await response.json();
-        setUserRole(userData.roleId);
-        setUserSucursal(userData.sucursalId);
+        setUserRole(userData.user.roleId);
+        setUserSucursal(userData.user.sucursalId);
+        console.log(`[RecepcionEnvios] Usuario: ${userData.user.email} (${userData.user.roleId}), Sucursal: ${userData.user.sucursalId}`);
       }
     } catch (error) {
       console.error('Error al obtener información del usuario:', error);
+      setError('Error al obtener información del usuario');
     }
   };
 
@@ -98,19 +106,21 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
       setIsLoading(true);
       setError(null);
       
-      let queryParams = '?estado=enviado,en_transito';
+      console.log(`[RecepcionEnvios] Cargando envíos para usuario ${userRole} en sucursal ${userSucursal}`);
       
-      // 🆕 LÓGICA DIFERENCIADA POR ROL
+      // 🔧 CONSTRUCCIÓN DE QUERY MEJORADA
+      let queryParams = '?estado=enviado,en_transito&limit=20';
+      
+      // 🆕 LÓGICA DIFERENCIADA POR ROL - SIMPLIFICADA
       if (userRole === 'role-vendedor') {
-        // Vendedores solo ven envíos dirigidos a su sucursal
-        if (!userSucursal) {
-          throw new Error('Vendedor sin sucursal asignada');
-        }
-        queryParams += `&destinoId=${encodeURIComponent(userSucursal)}`;
+        // Para vendedores, el backend ya filtra automáticamente por su sucursal
+        console.log('[RecepcionEnvios] Vendedor: El backend filtrará automáticamente por sucursal');
       } else if (userRole === 'role-admin') {
-        // Administradores ven todos los envíos pendientes de recepción
-        console.log('Admin: Cargando todos los envíos pendientes de recepción');
+        // Para administradores, ver todos los envíos pendientes de recepción
+        console.log('[RecepcionEnvios] Admin: Cargando todos los envíos pendientes');
       }
+      
+      console.log(`[RecepcionEnvios] Query final: /api/envios${queryParams}`);
       
       const response = await authenticatedFetch(`/api/envios${queryParams}`);
       
@@ -120,7 +130,18 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
       }
       
       const data = await response.json();
-      setEnvios(data);
+      console.log(`[RecepcionEnvios] Recibidos ${data.length} envíos:`, data.map((e: Envio) => `${e.id.slice(-6)}: ${e.origen.nombre} → ${e.destino.nombre} (${e.estado})`));
+      
+      // 🔧 FILTRAR ENVÍOS QUE PUEDEN SER RECIBIDOS
+      const enviosRecibibles = data.filter((envio: Envio) => {
+        const puedeRecibir = envio.metadata?.puedeRecibir ?? ['enviado', 'en_transito'].includes(envio.estado);
+        console.log(`[RecepcionEnvios] Envío ${envio.id.slice(-6)}: puede recibir = ${puedeRecibir}`);
+        return puedeRecibir;
+      });
+      
+      console.log(`[RecepcionEnvios] ${enviosRecibibles.length} envíos pueden ser recibidos`);
+      setEnvios(enviosRecibibles);
+      
     } catch (err) {
       console.error('Error al cargar envíos:', err);
       setError(err instanceof Error ? err.message : 'Error al cargar envíos');
@@ -141,6 +162,8 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
 
   const handleOpenReceiveModal = async (envio: Envio) => {
     try {
+      console.log(`[RecepcionEnvios] Abriendo modal para envío ${envio.id}`);
+      
       // 🆕 OBTENER DETALLES COMPLETOS DEL ENVÍO ANTES DE ABRIR MODAL
       const response = await authenticatedFetch(`/api/pdv/envios/${envio.id}/recibir`);
       
@@ -150,17 +173,23 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
       }
       
       const envioDetallado = await response.json();
+      console.log(`[RecepcionEnvios] Detalles del envío obtenidos:`, envioDetallado);
+      
       setSelectedEnvio(envioDetallado);
       setShowReceiveModal(true);
       
-      // Inicializar cantidades recibidas con las cantidades enviadas por defecto
+      // 🔧 INICIALIZAR CANTIDADES RECIBIDAS CON LAS CANTIDADES ENVIADAS POR DEFECTO
       const cantidadesIniciales: Record<string, number> = {};
       envioDetallado.items.forEach((item: ItemEnvio) => {
-        cantidadesIniciales[item.id] = item.cantidad;
+        cantidadesIniciales[item.id] = item.cantidad; // Por defecto, asumimos que se recibe todo
       });
       setCantidadesRecibidas(cantidadesIniciales);
       setObservaciones('');
+      
+      console.log(`[RecepcionEnvios] Cantidades iniciales:`, cantidadesIniciales);
+      
     } catch (err) {
+      console.error('Error al cargar detalles del envío:', err);
       setError(err instanceof Error ? err.message : 'Error al cargar detalles del envío');
     }
   };
@@ -173,9 +202,10 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
   };
 
   const handleCantidadChange = (itemId: string, cantidad: number) => {
+    console.log(`[RecepcionEnvios] Actualizando cantidad para item ${itemId}: ${cantidad}`);
     setCantidadesRecibidas(prev => ({
       ...prev,
-      [itemId]: cantidad
+      [itemId]: Math.max(0, cantidad) // No permitir cantidades negativas
     }));
   };
 
@@ -186,22 +216,39 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
       setIsReceiving(selectedEnvio.id);
       setError(null);
       
-      // Preparar datos para el envío
+      console.log(`[RecepcionEnvios] Iniciando recepción del envío ${selectedEnvio.id}`);
+      
+      // 🔧 PREPARAR DATOS PARA EL ENVÍO
       const items = selectedEnvio.items.map(item => ({
         itemEnvioId: item.id,
         cantidadRecibida: cantidadesRecibidas[item.id] || 0
       }));
       
-      // Verificar si hay diferencias
+      console.log(`[RecepcionEnvios] Items a enviar:`, items);
+      
+      // 🔧 VERIFICAR SI HAY DIFERENCIAS
       const hayDiferencias = selectedEnvio.items.some(item => {
         const cantidadRecibida = cantidadesRecibidas[item.id] || 0;
         return cantidadRecibida !== item.cantidad;
       });
       
+      console.log(`[RecepcionEnvios] Hay diferencias: ${hayDiferencias}`);
+      
+      // 🔧 CONFIRMAR SI HAY DIFERENCIAS SIGNIFICATIVAS
       if (hayDiferencias) {
+        const diferenciasDetalle = selectedEnvio.items
+          .filter(item => {
+            const cantidadRecibida = cantidadesRecibidas[item.id] || 0;
+            return cantidadRecibida !== item.cantidad;
+          })
+          .map(item => {
+            const cantidadRecibida = cantidadesRecibidas[item.id] || 0;
+            const diferencia = cantidadRecibida - item.cantidad;
+            return `${getItemName(item)}: Enviado ${item.cantidad}, Recibido ${cantidadRecibida} (${diferencia > 0 ? '+' : ''}${diferencia})`;
+          });
+        
         const confirmar = window.confirm(
-          'Se detectaron diferencias entre las cantidades enviadas y recibidas. ' +
-          'Se generará una contingencia automáticamente. ¿Desea continuar?'
+          `Se detectaron diferencias entre las cantidades enviadas y recibidas:\n\n${diferenciasDetalle.join('\n')}\n\nSe generará una contingencia automáticamente para revisión administrativa. ¿Desea continuar?`
         );
         
         if (!confirmar) {
@@ -210,37 +257,53 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
         }
       }
       
+      // 🔧 ENVIAR SOLICITUD DE RECEPCIÓN
+      const requestBody = {
+        items,
+        observaciones: observaciones.trim() || undefined
+      };
+      
+      console.log(`[RecepcionEnvios] Enviando solicitud:`, requestBody);
+      
       const response = await authenticatedFetch(`/api/pdv/envios/${selectedEnvio.id}/recibir`, {
         method: 'POST',
-        body: JSON.stringify({
-          items,
-          observaciones
-        })
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
       });
       
       if (!response.ok) {
         const errorData = await response.json();
+        console.error('[RecepcionEnvios] Error del servidor:', errorData);
         throw new Error(errorData.error || 'Error al recibir envío');
       }
       
       const resultado = await response.json();
+      console.log(`[RecepcionEnvios] Resultado de recepción:`, resultado);
       
-      // 🆕 MENSAJE DIFERENCIADO SEGÚN EL ROL
-      const roleMensaje = userRole === 'role-admin' ? '(Admin)' : '(Vendedor)';
-      const baseMessage = hayDiferencias 
-        ? 'Envío recibido con diferencias. Se ha generado una contingencia para revisión.'
-        : 'Envío recibido correctamente. El stock ha sido actualizado.';
+      // 🆕 MENSAJE DIFERENCIADO SEGÚN EL RESULTADO
+      const baseMessage = resultado.hayDiferencias 
+        ? '✅ Envío recibido con diferencias. Se ha generado una contingencia para revisión administrativa.'
+        : '✅ Envío recibido correctamente. El stock ha sido actualizado.';
       
-      setSuccess(`${baseMessage} ${roleMensaje}`);
+      const roleMensaje = userRole === 'role-admin' ? ' (Administrador)' : ' (Vendedor)';
+      
+      setSuccess(`${baseMessage}${roleMensaje}`);
+      
+      // 🔧 MOSTRAR RESUMEN SI ESTÁ DISPONIBLE
+      if (resultado.resumen) {
+        console.log(`[RecepcionEnvios] Resumen de recepción:`, resultado.resumen);
+      }
       
       // Cerrar modal y refrescar lista
       handleCloseReceiveModal();
-      fetchEnvios();
+      await fetchEnvios();
       
       if (onSuccess) onSuccess();
       
-      // Limpiar mensaje de éxito después de 5 segundos
-      setTimeout(() => setSuccess(null), 5000);
+      // Limpiar mensaje de éxito después de 8 segundos
+      setTimeout(() => setSuccess(null), 8000);
       
     } catch (err) {
       console.error('Error al recibir envío:', err);
@@ -276,6 +339,10 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
 
   const getItemUnit = (item: ItemEnvio) => {
     return item.insumo?.unidadMedida || 'und';
+  };
+
+  const getItemCode = (item: ItemEnvio) => {
+    return item.producto?.codigoBarras || 'Sin código';
   };
 
   // Verificar si hay diferencias en el modal
@@ -329,25 +396,34 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
           <RoleIndicator />
         </div>
         
-        {userRole === 'role-admin' && (
-          <div className="text-sm text-gray-600 bg-purple-50 px-3 py-2 rounded-md border border-purple-200">
-            💡 Como administrador, puede recibir envíos en cualquier sucursal
-          </div>
-        )}
+        <button
+          onClick={fetchEnvios}
+          disabled={isLoading}
+          className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+        >
+          <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          Actualizar
+        </button>
       </div>
+
+      {userRole === 'role-admin' && (
+        <div className="text-sm text-gray-600 bg-purple-50 px-3 py-2 rounded-md border border-purple-200">
+          💡 Como administrador, puede recibir envíos dirigidos a cualquier sucursal
+        </div>
+      )}
 
       {/* Mensajes de estado */}
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md flex items-center">
-          <AlertTriangle className="h-5 w-5 mr-2" />
-          {error}
+          <AlertTriangle className="h-5 w-5 mr-2 flex-shrink-0" />
+          <span>{error}</span>
         </div>
       )}
       
       {success && (
         <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md flex items-center">
-          <CheckCircle className="h-5 w-5 mr-2" />
-          {success}
+          <CheckCircle className="h-5 w-5 mr-2 flex-shrink-0" />
+          <span>{success}</span>
         </div>
       )}
 
@@ -396,7 +472,7 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
                   
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                     <div className="flex items-center">
-                      <MapPin className="h-4 w-4 text-gray-400 mr-2" />
+                      <MapPin className="h-4 w-4 text-gray-400 mr-2 flex-shrink-0" />
                       <div>
                         <div className="font-medium text-gray-900">Desde: {envio.origen.nombre}</div>
                         <div className="text-gray-500 capitalize">{envio.origen.tipo}</div>
@@ -404,7 +480,7 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
                     </div>
                     
                     <div className="flex items-center">
-                      <MapPin className="h-4 w-4 text-blue-400 mr-2" />
+                      <MapPin className="h-4 w-4 text-blue-400 mr-2 flex-shrink-0" />
                       <div>
                         <div className="font-medium text-gray-900">Hacia: {envio.destino.nombre}</div>
                         <div className="text-gray-500 capitalize">{envio.destino.tipo}</div>
@@ -412,7 +488,7 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
                     </div>
                     
                     <div className="flex items-center">
-                      <Calendar className="h-4 w-4 text-gray-400 mr-2" />
+                      <Calendar className="h-4 w-4 text-gray-400 mr-2 flex-shrink-0" />
                       <div>
                         <div className="font-medium text-gray-900">Fecha de envío:</div>
                         <div className="text-gray-500">{formatDate(envio.fechaEnvio)}</div>
@@ -421,12 +497,12 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
                   </div>
                   
                   <div className="mt-2 flex items-center">
-                    <Package className="h-4 w-4 text-gray-400 mr-2" />
+                    <Package className="h-4 w-4 text-gray-400 mr-2 flex-shrink-0" />
                     <div className="text-sm">
-                      <span className="font-medium text-gray-900">{envio.items.length} producto{envio.items.length !== 1 ? 's' : ''}: </span>
+                      <span className="font-medium text-gray-900">{envio.items.length} ítem{envio.items.length !== 1 ? 's' : ''}: </span>
                       <span className="text-gray-500">
                         {envio.items.slice(0, 2).map(item => getItemName(item)).join(', ')}
-                        {envio.items.length > 2 && ' y más...'}
+                        {envio.items.length > 2 && ` y ${envio.items.length - 2} más...`}
                       </span>
                     </div>
                   </div>
@@ -457,10 +533,10 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
         </div>
       )}
 
-      {/* Modal de Recepción - Sin cambios significativos, ya está bien */}
+      {/* 🔧 MODAL DE RECEPCIÓN MEJORADO */}
       {showReceiveModal && selectedEnvio && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white">
+          <div className="relative top-20 mx-auto p-5 border w-11/12 md:w-3/4 lg:w-1/2 shadow-lg rounded-md bg-white max-h-[80vh] overflow-y-auto">
             <div className="mt-3">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center space-x-3">
@@ -501,18 +577,18 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
               {/* Lista de productos/insumos */}
               <div className="space-y-4 mb-6">
                 <div className="flex items-center justify-between">
-                  <h4 className="font-medium text-gray-900">Conteo Físico de Productos:</h4>
+                  <h4 className="font-medium text-gray-900">Verificación y Recepción de Items:</h4>
                   <div className="text-sm text-gray-500">
-                    {selectedEnvio.items.length} producto{selectedEnvio.items.length !== 1 ? 's' : ''} para verificar
+                    {selectedEnvio.items.length} ítem{selectedEnvio.items.length !== 1 ? 's' : ''} para verificar
                   </div>
                 </div>
                 
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
                   <div className="flex items-start">
-                    <Package className="h-5 w-5 text-blue-600 mr-2 mt-0.5" />
+                    <Package className="h-5 w-5 text-blue-600 mr-2 mt-0.5 flex-shrink-0" />
                     <div className="text-sm text-blue-800">
                       <p className="font-medium mb-1">Instrucciones:</p>
-                      <p>Ingrese la cantidad exacta que está recibiendo físicamente. El sistema comparará automáticamente con lo enviado y detectará cualquier diferencia.</p>
+                      <p>Verifique físicamente cada ítem y ajuste las cantidades según lo que realmente recibe. El sistema detectará automáticamente cualquier diferencia y generará contingencias si es necesario.</p>
                     </div>
                   </div>
                 </div>
@@ -521,34 +597,58 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
                   <div key={item.id} className="border border-gray-200 rounded-lg p-4 hover:border-gray-300 transition-colors">
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
-                        <div className="flex items-center mb-2">
+                        <div className="flex items-center mb-3">
                           <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-sm font-medium text-gray-600 mr-3">
                             {index + 1}
                           </div>
                           <div>
                             <h5 className="font-medium text-gray-900 text-lg">{getItemName(item)}</h5>
-                            <p className="text-sm text-gray-500">Unidad: {getItemUnit(item)} | Enviado: {item.cantidad}</p>
+                            <div className="text-sm text-gray-500 space-y-1">
+                              <p>Código: {getItemCode(item)}</p>
+                              <p>Unidad: {getItemUnit(item)} | Enviado: {item.cantidad}</p>
+                              {item.producto?.categoria && (
+                                <p>Categoría: {item.producto.categoria.nombre}</p>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
                       
                       <div className="flex items-center space-x-4">
+                        {/* 🔧 CONTROLES DE CANTIDAD MEJORADOS */}
                         <div className="text-right">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                          <label className="block text-sm font-medium text-gray-700 mb-2">
                             Cantidad física recibida:
                           </label>
-                          <div className="flex items-center">
+                          <div className="flex items-center border border-gray-300 rounded-md">
+                            <button
+                              type="button"
+                              onClick={() => handleCantidadChange(item.id, (cantidadesRecibidas[item.id] || 0) - 1)}
+                              disabled={(cantidadesRecibidas[item.id] || 0) <= 0}
+                              className="p-2 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <Minus className="h-4 w-4" />
+                            </button>
                             <input
                               type="number"
                               min="0"
                               step="1"
                               value={cantidadesRecibidas[item.id] || ''}
                               onChange={(e) => handleCantidadChange(item.id, parseInt(e.target.value) || 0)}
-                              className="w-20 px-3 py-2 text-center text-lg font-semibold border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                              className="w-20 px-3 py-2 text-center text-lg font-semibold border-0 focus:outline-none focus:ring-0"
                               placeholder="0"
                               autoFocus={index === 0}
                             />
-                            <span className="ml-2 text-sm text-gray-500 font-medium">{getItemUnit(item)}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleCantidadChange(item.id, (cantidadesRecibidas[item.id] || 0) + 1)}
+                              className="p-2 hover:bg-gray-100"
+                            >
+                              <Plus className="h-4 w-4" />
+                            </button>
+                          </div>
+                          <div className="text-center mt-1">
+                            <span className="text-sm text-gray-500 font-medium">{getItemUnit(item)}</span>
                           </div>
                         </div>
                         
@@ -568,6 +668,9 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
                             <div className="flex flex-col items-center text-orange-600">
                               <AlertCircle className="h-6 w-6 mb-1" />
                               <span className="text-xs font-medium">Diferencia</span>
+                              <span className="text-xs">
+                                {cantidadesRecibidas[item.id] > item.cantidad ? '+' : ''}{cantidadesRecibidas[item.id] - item.cantidad}
+                              </span>
                             </div>
                           )}
                         </div>
@@ -586,8 +689,8 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
                   rows={3}
                   value={observaciones}
                   onChange={(e) => setObservaciones(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-                  placeholder="Cualquier observación sobre la recepción..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                  placeholder="Cualquier observación sobre la recepción, estado de los productos, etc..."
                 />
               </div>
               
@@ -595,15 +698,32 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
               {hasDifferences && (
                 <div className="bg-orange-50 border border-orange-200 rounded-md p-4 mb-6">
                   <div className="flex">
-                    <AlertTriangle className="h-5 w-5 text-orange-400" />
+                    <AlertTriangle className="h-5 w-5 text-orange-400 flex-shrink-0" />
                     <div className="ml-3">
                       <h3 className="text-sm font-medium text-orange-800">
                         Diferencias detectadas
                       </h3>
                       <p className="mt-1 text-sm text-orange-700">
-                        Se ha detectado diferencias entre las cantidades enviadas y recibidas. 
-                        Se generará automáticamente una contingencia para su revisión administrativa.
+                        Se han detectado diferencias entre las cantidades enviadas y recibidas. 
+                        Se generará automáticamente una contingencia para revisión administrativa.
                       </p>
+                      <div className="mt-2 text-sm text-orange-700">
+                        <strong>Diferencias:</strong>
+                        <ul className="list-disc list-inside mt-1">
+                          {selectedEnvio.items
+                            .filter(item => cantidadesRecibidas[item.id] !== item.cantidad)
+                            .map(item => {
+                              const cantidadRecibida = cantidadesRecibidas[item.id] || 0;
+                              const diferencia = cantidadRecibida - item.cantidad;
+                              return (
+                                <li key={item.id}>
+                                  {getItemName(item)}: {diferencia > 0 ? '+' : ''}{diferencia} {getItemUnit(item)}
+                                </li>
+                              );
+                            })
+                          }
+                        </ul>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -620,9 +740,19 @@ export function RecepcionEnvios({ onSuccess }: RecepcionEnviosProps) {
                 <button
                   onClick={handleReceiveEnvio}
                   disabled={isReceiving !== null}
-                  className="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50"
+                  className="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isReceiving ? 'Procesando...' : 'Confirmar Recepción'}
+                  {isReceiving ? (
+                    <>
+                      <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2 inline-block"></div>
+                      Procesando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Confirmar Recepción
+                    </>
+                  )}
                 </button>
               </div>
             </div>
