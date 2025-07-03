@@ -1,3 +1,4 @@
+// src/app/api/admin/users/[id]/route.ts - CORREGIDO PARA NEXT.JS 15
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/server/db/client';
 import { z } from 'zod';
@@ -9,13 +10,17 @@ const updateUserSchema = z.object({
   sucursalId: z.string().optional().nullable()
 });
 
+// ✅ CORREGIDO: await params en Next.js 15
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // ✅ AWAIT params antes de acceder a propiedades
+    const { id } = await params;
+    
     const user = await prisma.user.findUnique({
-      where: { id: params.id },
+      where: { id },
       include: {
         role: true,
         sucursal: true
@@ -39,11 +44,14 @@ export async function GET(
   }
 }
 
+// ✅ CORREGIDO: await params en PATCH también
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // ✅ AWAIT params antes de acceder a propiedades
+    const { id } = await params;
     const body = await req.json();
     
     // Validar datos de entrada
@@ -59,7 +67,7 @@ export async function PATCH(
     
     // Verificar si el usuario existe
     const existingUser = await prisma.user.findUnique({
-      where: { id: params.id }
+      where: { id }
     });
     
     if (!existingUser) {
@@ -71,7 +79,7 @@ export async function PATCH(
     
     // Actualizar usuario
     const updatedUser = await prisma.user.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         ...(name && { name }),
         ...(roleId && { roleId }),

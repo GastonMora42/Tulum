@@ -1,12 +1,14 @@
+// src/app/(admin)/admin/usuarios/[id]/page.tsx - CORREGIDO PARA NEXT.JS 15
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, use } from 'react'; // ✅ IMPORTAR use de React
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ContrastEnhancer } from '@/components/ui/ContrastEnhancer';
 import { HCInput, HCLabel, HCSelect } from '@/components/ui/HighContrastComponents';
+import { authenticatedFetch } from '@/hooks/useAuth';
 
 interface User {
   id: string;
@@ -44,13 +46,19 @@ const userSchema = z.object({
 
 type UserFormData = z.infer<typeof userSchema>;
 
-export default function EditarUsuarioPage({ params }: { params: { id: string } }) {
+// ✅ COMPONENTE PRINCIPAL CON UNWRAP DE PARAMS
+export default function EditarUsuarioPage({ params }: { params: Promise<{ id: string }> }) {
+  // ✅ USAR React.use() PARA UNWRAP PARAMS
+  const resolvedParams = use(params);
+  const userId = resolvedParams.id;
+  
   const [user, setUser] = useState<User | null>(null);
   const [roles, setRoles] = useState<Role[]>([]);
   const [ubicaciones, setUbicaciones] = useState<Ubicacion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [ubicacionesError, setUbicacionesError] = useState<string | null>(null);
   const router = useRouter();
   
   const { 
@@ -75,33 +83,65 @@ export default function EditarUsuarioPage({ params }: { params: { id: string } }
     const fetchData = async () => {
       try {
         setIsLoading(true);
+        setError(null);
         
-        // Cargar usuario
-        const userResponse = await fetch(`/api/admin/users/${params.id}`);
-        if (!userResponse.ok) throw new Error('Error al cargar usuario');
-        const userData = await userResponse.json();
-        setUser(userData);
-        
-        // Establecer valores iniciales en el formulario
-        setValue('name', userData.name);
-        setValue('roleId', userData.roleId);
-        if (userData.sucursalId) {
-          setValue('sucursalId', userData.sucursalId);
+        // ✅ CARGAR USUARIO CON MANEJO DE ERRORES MEJORADO
+        try {
+          const userResponse = await authenticatedFetch(`/api/admin/users/${userId}`);
+          if (!userResponse.ok) {
+            if (userResponse.status === 404) {
+              throw new Error('Usuario no encontrado');
+            }
+            throw new Error(`Error al cargar usuario: ${userResponse.status}`);
+          }
+          const userData = await userResponse.json();
+          setUser(userData);
+          
+          // Establecer valores iniciales en el formulario
+          setValue('name', userData.name);
+          setValue('roleId', userData.roleId);
+          if (userData.sucursalId) {
+            setValue('sucursalId', userData.sucursalId);
+          }
+        } catch (userErr) {
+          console.error('Error cargando usuario:', userErr);
+          setError(userErr instanceof Error ? userErr.message : 'Error al cargar usuario');
+          return; // No continuar si no podemos cargar el usuario
         }
         
-        // Cargar roles
-        const rolesResponse = await fetch('/api/admin/roles');
-        if (!rolesResponse.ok) throw new Error('Error al cargar roles');
-        const rolesData = await rolesResponse.json();
-        setRoles(rolesData);
+        // ✅ CARGAR ROLES CON MANEJO DE ERRORES MEJORADO  
+        try {
+          const rolesResponse = await authenticatedFetch('/api/admin/roles');
+          if (!rolesResponse.ok) {
+            throw new Error(`Error al cargar roles: ${rolesResponse.status}`);
+          }
+          const rolesData = await rolesResponse.json();
+          setRoles(rolesData);
+        } catch (rolesErr) {
+          console.error('Error cargando roles:', rolesErr);
+          setError('Error al cargar roles. Por favor, recargue la página.');
+          return;
+        }
         
-        // Cargar ubicaciones
-        const ubicacionesResponse = await fetch('/api/admin/ubicaciones');
-        if (!ubicacionesResponse.ok) throw new Error('Error al cargar ubicaciones');
-        const ubicacionesData = await ubicacionesResponse.json();
-        setUbicaciones(ubicacionesData);
+        // ✅ CARGAR UBICACIONES CON MANEJO MEJORADO DE ERRORES
+        try {
+          const ubicacionesResponse = await authenticatedFetch('/api/admin/ubicaciones');
+          if (!ubicacionesResponse.ok) {
+            console.warn(`Error al cargar ubicaciones: ${ubicacionesResponse.status}`);
+            setUbicacionesError('No se pudieron cargar las ubicaciones. Las opciones de sucursal no estarán disponibles.');
+            setUbicaciones([]);
+          } else {
+            const ubicacionesData = await ubicacionesResponse.json();
+            setUbicaciones(ubicacionesData);
+            setUbicacionesError(null);
+          }
+        } catch (ubicacionesErr) {
+          console.warn('Error cargando ubicaciones:', ubicacionesErr);
+          setUbicacionesError('No se pudieron cargar las ubicaciones. Las opciones de sucursal no estarán disponibles.');
+          setUbicaciones([]);
+        }
       } catch (err) {
-        console.error('Error al cargar datos:', err);
+        console.error('Error general al cargar datos:', err);
         setError('Error al cargar datos necesarios');
       } finally {
         setIsLoading(false);
@@ -109,14 +149,14 @@ export default function EditarUsuarioPage({ params }: { params: { id: string } }
     };
     
     fetchData();
-  }, [params.id, setValue]);
+  }, [userId, setValue]); // ✅ USAR userId EN LUGAR DE params.id
   
   const onSubmit = async (data: UserFormData) => {
     try {
       setIsSaving(true);
       setError(null);
       
-      const response = await fetch(`/api/admin/users/${params.id}`, {
+      const response = await authenticatedFetch(`/api/admin/users/${userId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
@@ -147,6 +187,7 @@ export default function EditarUsuarioPage({ params }: { params: { id: string } }
     return (
       <ContrastEnhancer>
         <div className="text-center py-10">
+          <div className="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full mx-auto mb-2"></div>
           <p className="text-lg text-black">Cargando...</p>
         </div>
       </ContrastEnhancer>
@@ -187,6 +228,14 @@ export default function EditarUsuarioPage({ params }: { params: { id: string } }
           {error && (
             <div className="mb-4 p-4 bg-red-100 text-red-700 rounded-md">
               {error}
+            </div>
+          )}
+          
+          {/* ✅ MOSTRAR ADVERTENCIA SOBRE UBICACIONES SI HAY ERROR */}
+          {ubicacionesError && (
+            <div className="mb-4 p-4 bg-yellow-100 text-yellow-700 rounded-md">
+              <p className="font-medium">⚠️ Advertencia:</p>
+              <p className="text-sm mt-1">{ubicacionesError}</p>
             </div>
           )}
           
@@ -231,25 +280,31 @@ export default function EditarUsuarioPage({ params }: { params: { id: string } }
               )}
             </div>
             
-            {/* Mostrar selección de sucursal solo si es vendedor */}
+            {/* ✅ MOSTRAR SELECCIÓN DE SUCURSAL SOLO SI ES VENDEDOR Y HAY UBICACIONES */}
             {isVendedor && (
               <div>
                 <HCLabel htmlFor="sucursalId" className="block text-sm font-medium mb-1">
                   Sucursal
                 </HCLabel>
-                <HCSelect
-                  id="sucursalId"
-                  {...register('sucursalId')}
-                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                >
-                  <option value="">Seleccionar sucursal</option>
-                  {ubicaciones
-                    .filter(ubicacion => ubicacion.tipo === 'sucursal')
-                    .map(ubicacion => (
-                      <option key={ubicacion.id} value={ubicacion.id}>{ubicacion.nombre}</option>
-                    ))
-                  }
-                </HCSelect>
+                {ubicaciones.length > 0 ? (
+                  <HCSelect
+                    id="sucursalId"
+                    {...register('sucursalId')}
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                  >
+                    <option value="">Seleccionar sucursal</option>
+                    {ubicaciones
+                      .filter(ubicacion => ubicacion.tipo === 'sucursal')
+                      .map(ubicacion => (
+                        <option key={ubicacion.id} value={ubicacion.id}>{ubicacion.nombre}</option>
+                      ))
+                    }
+                  </HCSelect>
+                ) : (
+                  <div className="mt-1 p-2 bg-gray-100 border border-gray-300 rounded-md text-sm text-gray-500">
+                    {ubicacionesError ? 'No se pudieron cargar las sucursales' : 'Cargando sucursales...'}
+                  </div>
+                )}
               </div>
             )}
             
@@ -257,7 +312,7 @@ export default function EditarUsuarioPage({ params }: { params: { id: string } }
               <button
                 type="submit"
                 disabled={isSaving}
-                className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSaving ? 'Guardando...' : 'Guardar Cambios'}
               </button>
