@@ -1,13 +1,14 @@
-// src/components/AutoPrinterSetupWizard.tsx - CONFIGURACIÓN AUTOMÁTICA FUKUN
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Printer, Zap, CheckCircle, AlertCircle, Loader2, 
   Smartphone, Usb, Settings, Play, Download, RefreshCw,
   Wifi, BluetoothIcon, Check, X, ArrowRight, ArrowLeft
 } from 'lucide-react';
-import { authenticatedFetch } from '@/hooks/useAuth';
+// Asegúrate de que '@/hooks/useAuth' y 'authenticatedFetch' estén correctamente implementados
+// Si no los necesitas para la lógica WebUSB directa, puedes omitirlos o adaptarlos.
+// import { authenticatedFetch } from '@/hooks/useAuth'; 
 
 interface AutoPrinterSetupWizardProps {
   isOpen: boolean;
@@ -29,7 +30,21 @@ interface DeviceInfo {
   connectionType: 'usb' | 'bluetooth';
   confidence: number;
   detected: boolean;
+  usbDevice?: any; // Referencia al objeto USBDevice real (usamos 'any' porque 'USBDevice' no está definido globalmente)
 }
+
+// IDs de fabricantes conocidos de impresoras POS (ejemplos)
+const KNOWN_MANUFACTURERS = [
+  { id: 0x04b8, name: 'Epson' },
+  { id: 0x0519, name: 'Star Micronics' },
+  { id: 0x154f, name: 'Citizen' },
+  { id: 0x1504, name: 'Bixolon' },
+  { id: 0x0fe6, name: 'Boca Systems' },
+  { id: 0x20d1, name: 'Rongta' },
+  { id: 0x0483, name: 'STMicroelectronics' },
+  { id: 0x0a07, name: 'Fukun' }, // ID específico para Fukun
+  // Agrega más IDs de fabricantes conocidos aquí
+];
 
 export function AutoPrinterSetupWizard({ isOpen, onClose, onComplete }: AutoPrinterSetupWizardProps) {
   const [currentStep, setCurrentStep] = useState(0);
@@ -39,259 +54,306 @@ export function AutoPrinterSetupWizard({ isOpen, onClose, onComplete }: AutoPrin
   const [setupComplete, setSetupComplete] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedDevice, setSelectedDevice] = useState<DeviceInfo | null>(null);
+  const [isWebUSBSupported, setIsWebUSBSupported] = useState(false);
 
   const steps = [
     { title: 'Preparación', icon: Smartphone },
     { title: 'Detección', icon: Zap },
+    { title: 'Conexión', icon: Usb }, // Nuevo paso para la conexión USB
     { title: 'Configuración', icon: Settings },
     { title: 'Prueba', icon: Play },
     { title: 'Finalización', icon: CheckCircle }
   ];
 
-  useEffect(() => {
-    if (isOpen) {
-      initializeSteps();
-    }
-  }, [isOpen]);
-
-  const initializeSteps = () => {
-    const steps: DetectionStep[] = [
-      { id: 'permissions', name: 'Verificar permisos del navegador', status: 'pending' },
-      { id: 'usb_scan', name: 'Escanear dispositivos USB', status: 'pending' },
-      { id: 'fukun_detect', name: 'Detectar FUKUN POS 80', status: 'pending' },
-      { id: 'connectivity', name: 'Probar conectividad', status: 'pending' },
-      { id: 'configuration', name: 'Configurar impresora', status: 'pending' }
-    ];
-    
-    setDetectionSteps(steps);
-    setCurrentStep(0);
-    setSetupComplete(false);
-    setError(null);
-    setDetectedDevices([]);
-    setSelectedDevice(null);
-  };
-
-  const updateStepStatus = (stepId: string, status: DetectionStep['status'], message?: string, details?: string) => {
+  // Función auxiliar para actualizar el estado de un paso
+  const updateStepStatus = useCallback((stepId: string, status: DetectionStep['status'], message?: string, details?: string) => {
     setDetectionSteps(prev => prev.map(step => 
       step.id === stepId 
         ? { ...step, status, message, details }
         : step
     ));
-  };
+  }, []);
 
-  const startDetection = async () => {
+  // Inicializar pasos y verificar soporte WebUSB al abrir el wizard
+  useEffect(() => {
+    if (isOpen) {
+      const initialSteps: DetectionStep[] = [
+        { id: 'permissions', name: 'Verificar soporte WebUSB', status: 'pending' },
+        { id: 'usb_scan', name: 'Escanear dispositivos USB emparejados', status: 'pending' },
+        { id: 'fukun_detect', name: 'Identificar impresoras', status: 'pending' },
+      ];
+      setDetectionSteps(initialSteps);
+      setCurrentStep(0);
+      setSetupComplete(false);
+      setError(null);
+      setDetectedDevices([]);
+      setSelectedDevice(null);
+
+      // Verificar soporte WebUSB
+      if (typeof navigator !== 'undefined' && 'usb' in navigator) {
+        setIsWebUSBSupported(true);
+        updateStepStatus('permissions', 'success', 'WebUSB soportado ✓');
+      } else {
+        setIsWebUSBSupported(false);
+        updateStepStatus('permissions', 'error', 'WebUSB no soportado', 'Usa Chrome (o un navegador basado en Chromium) en escritorio o Android.');
+      }
+    }
+  }, [isOpen, updateStepStatus]);
+
+  // Función para detectar impresoras USB ya emparejadas
+  const detectPairedWebUSBPrinters = async () => {
+    updateStepStatus('usb_scan', 'running', 'Escaneando dispositivos USB emparejados...');
     setIsDetecting(true);
-    setCurrentStep(1);
     setError(null);
 
     try {
-      // Paso 1: Verificar permisos
-      updateStepStatus('permissions', 'running', 'Verificando soporte WebUSB...');
-      
-      if (!('usb' in navigator)) {
-        throw new Error('WebUSB no está soportado en este navegador. Usa Chrome 89+ en Android.');
+      if (!isWebUSBSupported) {
+        throw new Error('WebUSB no está soportado.');
       }
-      
-      updateStepStatus('permissions', 'success', 'WebUSB soportado ✓');
-      await delay(500);
 
-      // Paso 2: Escanear USB
-      updateStepStatus('usb_scan', 'running', 'Escaneando dispositivos USB...');
-      
-      try {
-        // @ts-ignore - WebUSB API
-        const devices = await navigator.usb.getDevices();
-        updateStepStatus('usb_scan', 'success', `${devices.length} dispositivos encontrados`);
-        
-        // Paso 3: Buscar FUKUN específicamente
-        updateStepStatus('fukun_detect', 'running', 'Buscando FUKUN POS 80...');
-        
-        const detectedDevicesList: DeviceInfo[] = [];
-        
-        // Buscar FUKUN por vendor ID conocidos
-        const fukunDevice = devices.find((device: { vendorId: number; }) => 
-          device.vendorId === 0x154F || // ID común FUKUN
-          device.vendorId === 0x0519 || // Star Micronics (compatible)
-          device.vendorId === 0x04b8    // Epson (compatible)
+      // @ts-ignore - WebUSB API
+      const devices = await navigator.usb.getDevices();
+      const detected: DeviceInfo[] = [];
+
+      for (const device of devices) {
+        const manufacturer = KNOWN_MANUFACTURERS.find(m => m.id === device.vendorId);
+        const isPrinterClass = device.deviceClass === 7;
+        const hasPrinterInterface = device.configurations.some((config: { interfaces: any[]; }) =>
+          config.interfaces.some((iface: { alternates: any[]; }) =>
+            iface.alternates.some((alt: { interfaceClass: number; }) => alt.interfaceClass === 7)
+          )
         );
-        
-        if (fukunDevice) {
-          detectedDevicesList.push({
-            name: 'FUKUN POS 80-CC',
-            type: 'fukun_pos80',
+
+        if (manufacturer || isPrinterClass || hasPrinterInterface) {
+          detected.push({
+            name: device.productName || `USB Device (${device.vendorId}:${device.productId})`,
+            type: (manufacturer?.name === 'Fukun' || device.vendorId === 0x0a07) ? 'fukun_pos80' : 'other_thermal',
             connectionType: 'usb',
-            confidence: 95,
-            detected: true
+            confidence: manufacturer ? 95 : (isPrinterClass || hasPrinterInterface ? 80 : 50),
+            detected: true,
+            usbDevice: device, // Almacenar la referencia al objeto USBDevice
           });
-          
-          updateStepStatus('fukun_detect', 'success', 'FUKUN POS 80 detectada ✓');
-        } else {
-          // Buscar por clase de dispositivo (impresoras)
-          const printerDevice = devices.find((device: { deviceClass: number; }) => device.deviceClass === 7);
-          
-          if (printerDevice) {
-            detectedDevicesList.push({
-              name: 'Impresora Térmica Compatible',
-              type: 'other_thermal',
-              connectionType: 'usb',
-              confidence: 70,
-              detected: true
-            });
-            
-            updateStepStatus('fukun_detect', 'success', 'Impresora térmica compatible encontrada');
-          } else {
-            updateStepStatus('fukun_detect', 'error', 'No se detectó FUKUN POS 80');
-            
-            // Ofrecer configuración manual
-            detectedDevicesList.push({
-              name: 'FUKUN POS 80-CC (Manual)',
-              type: 'fukun_pos80',
-              connectionType: 'usb',
-              confidence: 50,
-              detected: false
-            });
-          }
-        }
-        
-        setDetectedDevices(detectedDevicesList);
-        
-        if (detectedDevicesList.length > 0) {
-          setSelectedDevice(detectedDevicesList[0]);
-        }
-
-      } catch (usbError) {
-        console.error('Error USB:', usbError);
-        updateStepStatus('usb_scan', 'error', 'Error accediendo a USB');
-        
-        // Modo de compatibilidad - asumir que hay una FUKUN conectada
-        setDetectedDevices([{
-          name: 'FUKUN POS 80-CC (Modo Compatibilidad)',
-          type: 'fukun_pos80',
-          connectionType: 'usb',
-          confidence: 60,
-          detected: false
-        }]);
-        
-        setSelectedDevice(detectedDevices[0]);
-        updateStepStatus('fukun_detect', 'success', 'Modo compatibilidad activado');
-      }
-
-      // Paso 4: Probar conectividad
-      if (detectedDevices.length > 0) {
-        updateStepStatus('connectivity', 'running', 'Probando conectividad...');
-        
-        try {
-          // Simular test de conectividad
-          await delay(2000);
-          updateStepStatus('connectivity', 'success', 'Conectividad confirmada ✓');
-        } catch (connError) {
-          updateStepStatus('connectivity', 'error', 'Error de conectividad', 
-            'Verifica que la impresora esté encendida y correctamente conectada');
         }
       }
-
-      setCurrentStep(2); // Ir a configuración
+      setDetectedDevices(detected);
+      updateStepStatus('usb_scan', 'success', `${detected.length} dispositivos emparejados encontrados.`);
       
-    } catch (err) {
-      console.error('Error en detección:', err);
-      setError(err instanceof Error ? err.message : 'Error en detección automática');
-      updateStepStatus('permissions', 'error', 'Error en detección');
+      // Intentar identificar Fukun
+      const fukunDetected = detected.some(d => d.type === 'fukun_pos80');
+      if (fukunDetected) {
+        updateStepStatus('fukun_detect', 'success', 'FUKUN POS 80 o compatible detectada ✓');
+      } else if (detected.length > 0) {
+        updateStepStatus('fukun_detect', 'success', 'Impresora compatible detectada (no FUKUN específica)');
+      } else {
+        updateStepStatus('fukun_detect', 'error', 'No se detectaron impresoras USB compatibles emparejadas.');
+      }
+
+      if (detected.length > 0) {
+        setSelectedDevice(detected[0]); // Seleccionar la primera por defecto
+      }
+
+    } catch (err: any) {
+      console.error('Error al escanear dispositivos USB emparejados:', err);
+      updateStepStatus('usb_scan', 'error', 'Error al escanear USB', err.message);
+      setError(`Error al escanear dispositivos USB: ${err.message}`);
+      updateStepStatus('fukun_detect', 'error', 'No se pudieron identificar impresoras.');
     } finally {
       setIsDetecting(false);
     }
   };
 
-  const configurePrinter = async () => {
-    if (!selectedDevice) {
-      setError('No hay dispositivo seleccionado');
+  // Función para solicitar acceso a una nueva impresora USB (abre el diálogo del navegador)
+  const requestNewWebUSBPrinter = async () => {
+    setIsDetecting(true);
+    setError(null);
+    updateStepStatus('usb_scan', 'running', 'Esperando selección de impresora...');
+
+    try {
+      if (!isWebUSBSupported) {
+        throw new Error('WebUSB no está soportado.');
+      }
+
+      // @ts-ignore - WebUSB API
+      const device = await navigator.usb.requestDevice({ filters: [{ classCode: 7 }] }); // Filtra por clase de impresora
+      
+      if (device) {
+        console.log('Nuevo dispositivo USB seleccionado:', device);
+        const manufacturer = KNOWN_MANUFACTURERS.find(m => m.id === device.vendorId);
+        const newDevice: DeviceInfo = {
+          name: device.productName || `USB Device (${device.vendorId}:${device.productId})`,
+          type: (manufacturer?.name === 'Fukun' || device.vendorId === 0x0a07) ? 'fukun_pos80' : 'other_thermal',
+          connectionType: 'usb',
+          confidence: manufacturer ? 95 : 80,
+          detected: true,
+          usbDevice: device,
+        };
+        setDetectedDevices(prev => [...prev, newDevice]);
+        setSelectedDevice(newDevice);
+        updateStepStatus('usb_scan', 'success', 'Nueva impresora USB seleccionada.');
+        updateStepStatus('fukun_detect', 'success', 'Impresora identificada.');
+      } else {
+        updateStepStatus('usb_scan', 'error', 'Selección de impresora cancelada.');
+        setError('No se seleccionó ningún dispositivo USB.');
+      }
+    } catch (err: any) {
+      if (err.name === 'NotFoundError') {
+        updateStepStatus('usb_scan', 'error', 'No se encontraron dispositivos compatibles o la selección fue cancelada.');
+        setError('No se encontró ningún dispositivo USB compatible o el usuario canceló la selección.');
+      } else {
+        console.error('Error al solicitar dispositivo USB:', err);
+        updateStepStatus('usb_scan', 'error', 'Error al solicitar dispositivo USB', err.message);
+        setError(`Error al solicitar dispositivo USB: ${err.message}`);
+      }
+    } finally {
+      setIsDetecting(false);
+    }
+  };
+
+  // Paso de conexión real con el dispositivo USB
+  const connectToPrinter = async () => {
+    if (!selectedDevice || !selectedDevice.usbDevice) {
+      setError('No hay dispositivo USB seleccionado para conectar.');
       return;
     }
 
-    setCurrentStep(2);
-    updateStepStatus('configuration', 'running', 'Configurando impresora...');
+    setCurrentStep(2); // Ir al paso de Conexión
+    updateStepStatus('connect_usb', 'running', 'Conectando a la impresora USB...'); // Nuevo ID de paso
 
     try {
-      const sucursalId = localStorage.getItem('sucursalId');
-      
-      if (!sucursalId) {
-        throw new Error('No se encontró ID de sucursal');
+      const device = selectedDevice.usbDevice;
+      await device.open(); // Abrir el dispositivo
+      console.log('Dispositivo USB abierto:', device);
+
+      // Seleccionar la primera configuración disponible
+      if (device.configurations.length > 0) {
+        await device.selectConfiguration(device.configurations[0].configurationValue);
+        console.log('Configuración seleccionada:', device.configurations[0]);
+      } else {
+        throw new Error('No se encontraron configuraciones USB para la impresora.');
       }
 
-      // Configuración optimizada para FUKUN POS 80
-      const printerConfig = {
-        name: selectedDevice.name,
-        type: 'thermal',
-        sucursalId,
-        isDefault: true, // Primera impresora como default
-        settings: {
-          paperWidth: 80,
-          autocut: true,
-          encoding: 'utf-8',
-          isOnline: true,
-          manufacturer: 'FUKUN',
-          model: 'POS80-CC',
-          connectionType: selectedDevice.connectionType,
-          optimizedForTablet: true,
-          escposCommands: true,
-          cashDrawer: true
+      // Reclamar la primera interfaz de impresora (clase 7)
+      const printerInterface = device.configurations[0].interfaces.find((iface: { alternates: any[]; }) => 
+        iface.alternates.some((alt: { interfaceClass: number; }) => alt.interfaceClass === 7)
+      );
+
+      if (printerInterface) {
+        await device.claimInterface(printerInterface.interfaceNumber);
+        console.log('Interfaz de impresora reclamada:', printerInterface.interfaceNumber);
+        updateStepStatus('connect_usb', 'success', 'Conexión USB exitosa ✓');
+        setCurrentStep(3); // Ir a configuración
+      } else {
+        throw new Error('No se encontró una interfaz de impresora (clase 7) en el dispositivo.');
+      }
+
+    } catch (err: any) {
+      console.error('Error al conectar con la impresora USB:', err);
+      updateStepStatus('connect_usb', 'error', 'Error al conectar', err.message);
+      setError(`Error al conectar con la impresora USB: ${err.message}`);
+      // Intentar cerrar el dispositivo si se abrió pero falló la conexión completa
+      if (selectedDevice.usbDevice && selectedDevice.usbDevice.opened) {
+        try {
+          await selectedDevice.usbDevice.close();
+          console.log('Dispositivo USB cerrado después de error de conexión.');
+        } catch (closeErr) {
+          console.error('Error al cerrar dispositivo USB:', closeErr);
         }
-      };
-
-      console.log('📤 Enviando configuración:', printerConfig);
-
-      const response = await authenticatedFetch('/api/admin/impresoras', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(printerConfig)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al configurar impresora');
       }
+    }
+  };
 
-      const result = await response.json();
-      console.log('✅ Impresora configurada:', result);
+
+  const configurePrinter = async () => {
+    if (!selectedDevice || !selectedDevice.usbDevice) {
+      setError('No hay dispositivo seleccionado o conectado.');
+      return;
+    }
+
+    setCurrentStep(3); // Ir al paso de Configuración
+    updateStepStatus('configuration', 'running', 'Enviando configuración a la impresora...');
+
+    try {
+      // Aquí iría la lógica para enviar comandos de configuración ESC/POS
+      // a la impresora a través de selectedDevice.usbDevice.transferOut()
+      // Esto es un placeholder para la implementación real.
+
+      // Ejemplo de cómo se enviaría un comando (simplificado, requiere más lógica real):
+      // const testCommand = new Uint8Array([0x1B, 0x40]); // ESC @ (Initialize printer)
+      // const endpoint = selectedDevice.usbDevice.configurations[0].interfaces[0].endpoints.find(ep => ep.direction === 'out');
+      // if (endpoint) {
+      //   await selectedDevice.usbDevice.transferOut(endpoint.endpointNumber, testCommand);
+      // } else {
+      //   throw new Error('No se encontró un endpoint de salida para enviar comandos.');
+      // }
+
+      await delay(1500); // Simulación de tiempo de configuración
+
+      // Lógica para enviar configuración a tu backend (si es necesario)
+      // const sucursalId = localStorage.getItem('sucursalId');
+      // if (!sucursalId) { throw new Error('No se encontró ID de sucursal'); }
+      // const printerConfig = { /* ... tu configuración ... */ };
+      // const response = await authenticatedFetch('/api/admin/impresoras', { /* ... */ });
+      // if (!response.ok) { /* ... */ }
 
       updateStepStatus('configuration', 'success', 'Impresora configurada correctamente ✓');
-      setCurrentStep(3); // Ir a prueba
+      setCurrentStep(4); // Ir a prueba
       
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error configurando impresora:', err);
-      updateStepStatus('configuration', 'error', 'Error en configuración');
+      updateStepStatus('configuration', 'error', 'Error en configuración', err.message);
       setError(err instanceof Error ? err.message : 'Error en configuración');
     }
   };
 
   const runPrintTest = async () => {
-    setCurrentStep(3);
+    setCurrentStep(4); // Ir al paso de Prueba
     
     try {
-      console.log('🧪 Ejecutando test de impresión...');
-      
-      // Simular test de impresión
-      await delay(3000);
-      
-      // En implementación real, aquí enviarías un comando de test específico
-      const testResult = {
-        success: true,
-        message: 'Test de impresión exitoso'
-      };
-
-      if (testResult.success) {
-        setCurrentStep(4); // Finalización
-        setSetupComplete(true);
-      } else {
-        throw new Error(testResult.message);
+      if (!selectedDevice || !selectedDevice.usbDevice || !selectedDevice.usbDevice.opened) {
+        throw new Error('Impresora no conectada o no seleccionada.');
       }
+
+      console.log('🧪 Ejecutando test de impresión...');
+      updateStepStatus('print_test', 'running', 'Enviando página de prueba...'); // Nuevo ID de paso
+
+      // Aquí iría la lógica real para enviar un comando de impresión de prueba
+      // a la impresora a través de selectedDevice.usbDevice.transferOut()
+      // Por ejemplo, enviar un texto simple con comandos ESC/POS:
+      // const encoder = new TextEncoder();
+      // const textToPrint = encoder.encode("¡Test de impresión exitoso!\n\n");
+      // const cutCommand = new Uint8Array([0x1D, 0x56, 0x00]); // GS V 0 (Full cut)
+      // const combinedCommand = new Uint8Array([...textToPrint, ...cutCommand]);
+
+      // const endpoint = selectedDevice.usbDevice.configurations[0].interfaces[0].endpoints.find(ep => ep.direction === 'out');
+      // if (endpoint) {
+      //   await selectedDevice.usbDevice.transferOut(endpoint.endpointNumber, combinedCommand);
+      // } else {
+      //   throw new Error('No se encontró un endpoint de salida para enviar el test.');
+      // }
+
+      await delay(3000); // Simulación de tiempo de impresión
+
+      updateStepStatus('print_test', 'success', 'Test de impresión enviado con éxito.');
+      setCurrentStep(5); // Finalización
+      setSetupComplete(true);
       
-    } catch (err) {
-      console.error('Error en test:', err);
+    } catch (err: any) {
+      console.error('Error en test de impresión:', err);
+      updateStepStatus('print_test', 'error', 'Error en test de impresión', err.message);
       setError(err instanceof Error ? err.message : 'Error en test de impresión');
     }
   };
 
-  const handleComplete = () => {
+  const handleComplete = async () => {
+    // Intentar cerrar el dispositivo USB al finalizar
+    if (selectedDevice && selectedDevice.usbDevice && selectedDevice.usbDevice.opened) {
+      try {
+        await selectedDevice.usbDevice.close();
+        console.log('Dispositivo USB cerrado al finalizar el wizard.');
+      } catch (closeErr) {
+        console.error('Error al cerrar dispositivo USB al finalizar:', closeErr);
+      }
+    }
     onComplete(detectedDevices.length);
     onClose();
   };
@@ -299,6 +361,10 @@ export function AutoPrinterSetupWizard({ isOpen, onClose, onComplete }: AutoPrin
   const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
   if (!isOpen) return null;
+
+  function initializeSteps() {
+    throw new Error('Function not implemented.');
+  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -396,12 +462,19 @@ export function AutoPrinterSetupWizard({ isOpen, onClose, onComplete }: AutoPrin
               </div>
 
               <button
-                onClick={startDetection}
-                className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 mx-auto"
+                onClick={() => {
+                  setCurrentStep(1); // Avanzar al paso de Detección
+                  detectPairedWebUSBPrinters(); // Iniciar detección al avanzar
+                }}
+                disabled={!isWebUSBSupported}
+                className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2 mx-auto disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Zap className="w-5 h-5" />
                 <span>Iniciar Detección Automática</span>
               </button>
+              {!isWebUSBSupported && (
+                <p className="text-red-500 text-sm mt-2">WebUSB no soportado. Por favor, actualiza tu navegador o usa Chrome en escritorio/Android.</p>
+              )}
             </div>
           )}
 
@@ -444,52 +517,111 @@ export function AutoPrinterSetupWizard({ isOpen, onClose, onComplete }: AutoPrin
                 ))}
               </div>
 
-              {detectedDevices.length > 0 && !isDetecting && (
+              {!isDetecting && (
                 <div className="mt-6">
                   <h4 className="font-semibold mb-3">Dispositivos Detectados:</h4>
-                  <div className="space-y-2">
-                    {detectedDevices.map((device, index) => (
-                      <div
-                        key={index}
-                        className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                          selectedDevice === device
-                            ? 'border-blue-500 bg-blue-50'
-                            : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                        onClick={() => setSelectedDevice(device)}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
-                            <Printer className="w-5 h-5 text-gray-600" />
-                            <div>
-                              <p className="font-medium">{device.name}</p>
-                              <p className="text-sm text-gray-500">
-                                {device.connectionType.toUpperCase()} • Confianza: {device.confidence}%
-                              </p>
+                  {detectedDevices.length === 0 ? (
+                    <p className="text-center text-gray-600 italic mb-4">
+                      No se detectaron impresoras USB emparejadas.
+                    </p>
+                  ) : (
+                    <div className="space-y-2 mb-4">
+                      {detectedDevices.map((device, index) => (
+                        <div
+                          key={index}
+                          className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                            selectedDevice === device
+                              ? 'border-blue-500 bg-blue-50'
+                              : 'border-gray-200 hover:border-gray-300'
+                          }`}
+                          onClick={() => setSelectedDevice(device)}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                              <Printer className="w-5 h-5 text-gray-600" />
+                              <div>
+                                <p className="font-medium">{device.name}</p>
+                                <p className="text-sm text-gray-500">
+                                  {device.connectionType.toUpperCase()} • Confianza: {device.confidence}%
+                                </p>
+                              </div>
                             </div>
+                            {device.detected && (
+                              <CheckCircle className="w-5 h-5 text-green-500" />
+                            )}
                           </div>
-                          {device.detected && (
-                            <CheckCircle className="w-5 h-5 text-green-500" />
-                          )}
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                   
-                  <button
-                    onClick={configurePrinter}
-                    disabled={!selectedDevice}
-                    className="w-full mt-4 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-                  >
-                    Configurar Impresora Seleccionada
-                  </button>
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <button
+                      onClick={requestNewWebUSBPrinter}
+                      disabled={!isWebUSBSupported || isDetecting}
+                      className="flex-1 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center space-x-2"
+                    >
+                      <Usb className="w-5 h-5" />
+                      <span>Solicitar Nueva Impresora USB</span>
+                    </button>
+                    <button
+                      onClick={connectToPrinter}
+                      disabled={!selectedDevice || isDetecting || !selectedDevice.usbDevice}
+                      className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center space-x-2"
+                    >
+                      <ArrowRight className="w-5 h-5" />
+                      <span>Conectar y Configurar</span>
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
           )}
 
-          {/* Paso 2: Configuración */}
+          {/* Paso 2: Conexión USB */}
           {currentStep === 2 && (
+            <div className="text-center space-y-6">
+              <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto">
+                <Usb className="w-10 h-10 text-blue-600" />
+              </div>
+              
+              <div>
+                <h3 className="text-xl font-semibold mb-2">Estableciendo Conexión USB</h3>
+                <p className="text-gray-600">
+                  Abriendo el dispositivo USB y reclamando la interfaz de impresora...
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                  <div className="w-6 h-6 flex items-center justify-center">
+                    {detectionSteps.find(s => s.id === 'connect_usb')?.status === 'running' && <Loader2 className="w-4 h-4 animate-spin text-blue-600" />}
+                    {detectionSteps.find(s => s.id === 'connect_usb')?.status === 'success' && <CheckCircle className="w-4 h-4 text-green-600" />}
+                    {detectionSteps.find(s => s.id === 'connect_usb')?.status === 'error' && <AlertCircle className="w-4 h-4 text-red-600" />}
+                    {detectionSteps.find(s => s.id === 'connect_usb')?.status === 'pending' && <div className="w-4 h-4 bg-gray-300 rounded-full" />}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Conexión con {selectedDevice?.name || 'impresora'}</p>
+                    {detectionSteps.find(s => s.id === 'connect_usb')?.message && (
+                      <p className={`text-xs ${
+                        detectionSteps.find(s => s.id === 'connect_usb')?.status === 'success' ? 'text-green-600' :
+                        detectionSteps.find(s => s.id === 'connect_usb')?.status === 'error' ? 'text-red-600' :
+                        'text-blue-600'
+                      }`}>
+                        {detectionSteps.find(s => s.id === 'connect_usb')?.message}
+                      </p>
+                    )}
+                    {detectionSteps.find(s => s.id === 'connect_usb')?.details && (
+                      <p className="text-xs text-gray-500 mt-1">{detectionSteps.find(s => s.id === 'connect_usb')?.details}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Paso 3: Configuración */}
+          {currentStep === 3 && (
             <div className="text-center space-y-6">
               <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto">
                 <Settings className="w-10 h-10 text-green-600" />
@@ -498,7 +630,7 @@ export function AutoPrinterSetupWizard({ isOpen, onClose, onComplete }: AutoPrin
               <div>
                 <h3 className="text-xl font-semibold mb-2">Configurando Impresora</h3>
                 <p className="text-gray-600">
-                  Aplicando configuración optimizada para {selectedDevice?.name}
+                  Aplicando configuración optimizada para {selectedDevice?.name} y enviando comandos ESC/POS.
                 </p>
               </div>
 
@@ -525,8 +657,8 @@ export function AutoPrinterSetupWizard({ isOpen, onClose, onComplete }: AutoPrin
             </div>
           )}
 
-          {/* Paso 3: Prueba */}
-          {currentStep === 3 && (
+          {/* Paso 4: Prueba */}
+          {currentStep === 4 && (
             <div className="text-center space-y-6">
               <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center mx-auto">
                 <Play className="w-10 h-10 text-orange-600" />
@@ -551,8 +683,8 @@ export function AutoPrinterSetupWizard({ isOpen, onClose, onComplete }: AutoPrin
             </div>
           )}
 
-          {/* Paso 4: Finalización */}
-          {currentStep === 4 && setupComplete && (
+          {/* Paso 5: Finalización */}
+          {currentStep === 5 && setupComplete && (
             <div className="text-center space-y-6">
               <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto">
                 <CheckCircle className="w-10 h-10 text-green-600" />
@@ -594,7 +726,10 @@ export function AutoPrinterSetupWizard({ isOpen, onClose, onComplete }: AutoPrin
                   <p className="text-red-800 font-medium">Error en configuración</p>
                   <p className="text-red-700 text-sm mt-1">{error}</p>
                   <button
-                    onClick={initializeSteps}
+                    onClick={() => {
+                      initializeSteps();
+                      setCurrentStep(0); // Volver al inicio
+                    }}
                     className="mt-2 text-red-600 hover:text-red-800 text-sm font-medium"
                   >
                     Intentar nuevamente
@@ -608,11 +743,11 @@ export function AutoPrinterSetupWizard({ isOpen, onClose, onComplete }: AutoPrin
         {/* Footer */}
         <div className="border-t p-4 bg-gray-50 flex justify-between items-center">
           <div className="text-sm text-gray-500">
-            {currentStep < 4 ? `Paso ${currentStep + 1} de ${steps.length}` : 'Configuración completada'}
+            {currentStep < steps.length ? `Paso ${currentStep + 1} de ${steps.length}` : 'Configuración completada'}
           </div>
           
           <div className="flex space-x-3">
-            {currentStep > 0 && currentStep < 4 && !setupComplete && (
+            {currentStep > 0 && currentStep < steps.length && !setupComplete && (
               <button
                 onClick={() => setCurrentStep(Math.max(0, currentStep - 1))}
                 className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"

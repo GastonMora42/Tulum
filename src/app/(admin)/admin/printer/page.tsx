@@ -1,4 +1,3 @@
-// src/app/(admin)/admin/printer/page.tsx - VERSIÓN CORREGIDA
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -10,6 +9,7 @@ import {
 } from 'lucide-react';
 import { usePrint } from '@/hooks/usePrint';
 import { authenticatedFetch } from '@/hooks/useAuth';
+import { AutoPrinterSetupWizard } from '@/components/AutoPrinterSetupWizard'; // Importar el wizard
 
 interface PrintAdminPageProps {
   sucursalId?: string;
@@ -18,7 +18,7 @@ interface PrintAdminPageProps {
 export default function PrintAdminPage({ sucursalId }: PrintAdminPageProps) {
   const [activeTab, setActiveTab] = useState<'overview' | 'printers' | 'jobs' | 'reports' | 'settings'>('overview');
   const [showMonitoring, setShowMonitoring] = useState(false);
-  const [showSetupWizard, setShowSetupWizard] = useState(false);
+  const [showSetupWizard, setShowSetupWizard] = useState(false); // Estado para controlar la visibilidad del wizard
   const [printers, setPrinters] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -35,8 +35,8 @@ export default function PrintAdminPage({ sucursalId }: PrintAdminPageProps) {
   const [recentJobs, setRecentJobs] = useState<any[]>([]);
   const [alerts, setAlerts] = useState<any[]>([]);
 
-  // 🔧 CORRECCIÓN: Manejo seguro del hook usePrint
-  const [printService, setPrintService] = useState<any>(null);
+  // 🔧 CORRECCIÓN: Manejo seguro del hook usePrint (si es necesario)
+  // const [printService, setPrintService] = useState<any>(null); // Comentado si no se usa directamente aquí
 
   useEffect(() => {
     initializePrintService();
@@ -52,10 +52,10 @@ export default function PrintAdminPage({ sucursalId }: PrintAdminPageProps) {
       // Cargar impresoras configuradas desde la API
       await loadPrintersFromAPI();
       
-      // Simular estadísticas iniciales
+      // Simular estadísticas iniciales (se actualizarán con datos reales si se implementa)
       setStats({
-        totalPrinters: printers.length,
-        onlinePrinters: printers.filter(p => p.settings?.isOnline !== false).length,
+        totalPrinters: printers.length, // Se recalculará después de loadPrintersFromAPI
+        onlinePrinters: printers.filter(p => p.settings?.isOnline !== false).length, // Se recalculará
         totalJobsToday: 0,
         successRate: 100,
         avgResponseTime: 0
@@ -92,6 +92,12 @@ export default function PrintAdminPage({ sucursalId }: PrintAdminPageProps) {
       if (response.ok) {
         const printersData = await response.json();
         setPrinters(printersData);
+        // Actualizar estadísticas después de cargar impresoras
+        setStats(prev => ({
+          ...prev,
+          totalPrinters: printersData.length,
+          onlinePrinters: printersData.filter((p: any) => p.settings?.isOnline !== false).length
+        }));
         console.log(`✅ ${printersData.length} impresoras cargadas`);
       } else {
         const errorData = await response.json();
@@ -108,14 +114,7 @@ export default function PrintAdminPage({ sucursalId }: PrintAdminPageProps) {
     try {
       setIsLoading(true);
       await loadPrintersFromAPI();
-      
-      // Actualizar estadísticas
-      setStats(prev => ({
-        ...prev,
-        totalPrinters: printers.length,
-        onlinePrinters: printers.filter(p => p.settings?.isOnline !== false).length
-      }));
-      
+      // Las estadísticas se actualizan dentro de loadPrintersFromAPI ahora
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al actualizar impresoras');
     } finally {
@@ -123,8 +122,11 @@ export default function PrintAdminPage({ sucursalId }: PrintAdminPageProps) {
     }
   };
 
+  // Callback cuando el AutoPrinterSetupWizard completa la configuración
   const handleSetupComplete = async (count: number) => {
-    await refreshPrinters();
+    console.log(`Wizard completado. Se detectaron/configuraron ${count} impresoras.`);
+    setShowSetupWizard(false); // Cerrar el wizard
+    await refreshPrinters(); // Recargar la lista de impresoras desde la API
   };
 
   const formatDuration = (seconds: number) => {
@@ -140,67 +142,9 @@ export default function PrintAdminPage({ sucursalId }: PrintAdminPageProps) {
     }
   };
 
-  // 🔧 CORRECCIÓN: Auto-detectar impresoras FUKUN
-  const detectFukunPrinters = async () => {
-    try {
-      setIsLoading(true);
-      console.log('🔍 Detectando impresoras FUKUN...');
-      
-      // Simular detección de FUKUN POS 80
-      const fukunPrinter = {
-        name: 'FUKUN POS80-CC',
-        type: 'thermal',
-        manufacturer: 'FUKUN',
-        connectionType: 'USB',
-        paperWidth: 80,
-        autocut: true,
-        detected: true
-      };
-      
-      // Agregar a la lista si no existe
-      const exists = printers.find(p => p.name.includes('FUKUN') || p.name.includes('POS80'));
-      
-      if (!exists) {
-        const currentSucursalId = sucursalId || localStorage.getItem('sucursalId');
-        
-        if (currentSucursalId) {
-          const response = await authenticatedFetch('/api/admin/impresoras', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              name: fukunPrinter.name,
-              type: fukunPrinter.type,
-              sucursalId: currentSucursalId,
-              isDefault: printers.length === 0, // Primera impresora como default
-              settings: {
-                paperWidth: fukunPrinter.paperWidth,
-                autocut: fukunPrinter.autocut,
-                encoding: 'utf-8',
-                isOnline: true,
-                manufacturer: fukunPrinter.manufacturer,
-                connectionType: fukunPrinter.connectionType
-              }
-            })
-          });
-          
-          if (response.ok) {
-            console.log('✅ Impresora FUKUN agregada correctamente');
-            await refreshPrinters();
-          } else {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Error al agregar impresora FUKUN');
-          }
-        }
-      } else {
-        console.log('ℹ️ Impresora FUKUN ya está configurada');
-      }
-      
-    } catch (err) {
-      console.error('❌ Error detectando FUKUN:', err);
-      setError(err instanceof Error ? err.message : 'Error en detección');
-    } finally {
-      setIsLoading(false);
-    }
+  // 🔧 CORRECCIÓN: Esta función ahora solo abre el wizard
+  const openSetupWizard = () => {
+    setShowSetupWizard(true);
   };
 
   const testPrinter = async (printerId: string) => {
@@ -215,14 +159,17 @@ export default function PrintAdminPage({ sucursalId }: PrintAdminPageProps) {
       
       if (response.ok) {
         const result = await response.json();
-        alert(`✅ Test exitoso: ${result.message}`);
+        console.log(`✅ Test exitoso para ${printerId}: ${result.message}`);
+        // Considerar mostrar un mensaje de éxito en la UI (no con alert)
       } else {
         const errorData = await response.json();
-        alert(`❌ Test fallido: ${errorData.error}`);
+        console.error(`❌ Test fallido para ${printerId}: ${errorData.error}`);
+        // Considerar mostrar un mensaje de error en la UI (no con alert)
       }
     } catch (err) {
       console.error('❌ Error en test:', err);
-      alert(`❌ Error en test: ${err instanceof Error ? err.message : 'Error desconocido'}`);
+      console.error(`❌ Error en test para ${printerId}: ${err instanceof Error ? err.message : 'Error desconocido'}`);
+      // Considerar mostrar un mensaje de error en la UI (no con alert)
     }
   };
 
@@ -287,11 +234,11 @@ export default function PrintAdminPage({ sucursalId }: PrintAdminPageProps) {
               </div>
 
               <button
-                onClick={detectFukunPrinters}
+                onClick={openSetupWizard} // Llama a la función que abre el wizard
                 className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
               >
                 <Zap className="w-4 h-4" />
-                <span>Detectar FUKUN</span>
+                <span>Configurar Impresora</span> {/* Texto más genérico */}
               </button>
             </div>
           </div>
@@ -396,12 +343,12 @@ export default function PrintAdminPage({ sucursalId }: PrintAdminPageProps) {
                     <div className="text-center py-8">
                       <Printer className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                       <h4 className="text-lg font-medium text-gray-900 mb-2">No hay impresoras configuradas</h4>
-                      <p className="text-gray-600 mb-6">Detecta automáticamente tu impresora FUKUN POS 80</p>
+                      <p className="text-gray-600 mb-6">Configura tu impresora FUKUN POS 80</p>
                       <button
-                        onClick={detectFukunPrinters}
+                        onClick={openSetupWizard} // Llama a la función que abre el wizard
                         className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                       >
-                        Detectar Impresoras
+                        Configurar Impresoras
                       </button>
                     </div>
                   ) : (
@@ -412,7 +359,7 @@ export default function PrintAdminPage({ sucursalId }: PrintAdminPageProps) {
                       </div>
                       <div className="flex items-center space-x-2 text-blue-600">
                         <Printer className="w-5 h-5" />
-                        <span>{printers.length} impresora(s) configurada(s)</span>
+                        <span>{stats.totalPrinters} impresora(s) configurada(s)</span>
                       </div>
                     </div>
                   )}
@@ -436,11 +383,11 @@ export default function PrintAdminPage({ sucursalId }: PrintAdminPageProps) {
                       <span>Actualizar</span>
                     </button>
                     <button
-                      onClick={detectFukunPrinters}
+                      onClick={openSetupWizard} // Llama a la función que abre el wizard
                       className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                     >
                       <Plus className="w-4 h-4" />
-                      <span>Detectar FUKUN</span>
+                      <span>Configurar Nueva</span> {/* Texto más genérico */}
                     </button>
                   </div>
                 </div>
@@ -449,12 +396,12 @@ export default function PrintAdminPage({ sucursalId }: PrintAdminPageProps) {
                   <div className="text-center py-12 bg-gray-50 rounded-xl border-2 border-dashed border-gray-300">
                     <Printer className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                     <h3 className="text-lg font-medium text-gray-900 mb-2">No hay impresoras configuradas</h3>
-                    <p className="text-gray-600 mb-6">Detecta automáticamente tu impresora FUKUN POS 80</p>
+                    <p className="text-gray-600 mb-6">Configura tu impresora FUKUN POS 80</p>
                     <button
-                      onClick={detectFukunPrinters}
+                      onClick={openSetupWizard} // Llama a la función que abre el wizard
                       className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                     >
-                      Detectar Impresoras
+                      Configurar Impresoras
                     </button>
                   </div>
                 ) : (
@@ -534,6 +481,13 @@ export default function PrintAdminPage({ sucursalId }: PrintAdminPageProps) {
           </div>
         </div>
       </div>
+
+      {/* AutoPrinterSetupWizard */}
+      <AutoPrinterSetupWizard
+        isOpen={showSetupWizard}
+        onClose={() => setShowSetupWizard(false)}
+        onComplete={handleSetupComplete}
+      />
     </div>
   );
 }
