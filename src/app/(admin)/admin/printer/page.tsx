@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { usePrint } from '@/hooks/usePrint';
 import { authenticatedFetch } from '@/hooks/useAuth';
-import { AutoPrinterSetupWizard } from '@/components/AutoPrinterSetupWizard'; // Importar el wizard
+import { SimpleFukunSetup } from '@/components/SimpleFukunSetup'; // Importar el wizard
 
 interface PrintAdminPageProps {
   sucursalId?: string;
@@ -483,11 +483,16 @@ export default function PrintAdminPage({ sucursalId }: PrintAdminPageProps) {
       </div>
 
       {/* AutoPrinterSetupWizard */}
-      <AutoPrinterSetupWizard
-        isOpen={showSetupWizard}
-        onClose={() => setShowSetupWizard(false)}
-        onComplete={handleSetupComplete}
-      />
+      <SimpleFukunSetup
+  isOpen={showSetupWizard}
+  onClose={() => setShowSetupWizard(false)}
+  onComplete={(success) => {
+    setShowSetupWizard(false);
+    if (success) {
+      refreshPrinters();
+    }
+  }}
+/>
     </div>
   );
 }
