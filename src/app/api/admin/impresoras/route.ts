@@ -215,54 +215,27 @@ export async function GET(req: NextRequest) {
   }
 }
 
+// src/app/api/admin/impresoras/route.ts - CORRECCIÓN MANEJO DUPLICADOS
 export async function POST(req: NextRequest) {
+  const authError = await authMiddleware(req);
+  if (authError) return authError;
+
+  const permissionError = await checkPermission(['admin', 'venta:crear'])(req);
+  if (permissionError) return permissionError;
+
   try {
     console.log('📝 [IMPRESORAS-API] Iniciando POST request');
     
-    const authError = await authMiddleware(req);
-    if (authError) return authError;
-
-    const permissionError = await checkPermission(['admin', 'venta:crear'])(req);
-    if (permissionError) return permissionError;
-
     const body = await req.json();
-    console.log('📋 [IMPRESORAS-API] Datos recibidos:', { 
-      name: body.name, 
-      type: body.type, 
-      sucursalId: body.sucursalId 
-    });
-
-    // 🔧 CORRECCIÓN: Validaciones más estrictas
     const { name, type, sucursalId, isDefault, settings } = body;
 
-    if (!name || typeof name !== 'string' || name.trim().length === 0) {
-      return NextResponse.json(
-        { error: 'Nombre de impresora es requerido y no puede estar vacío' },
-        { status: 400 }
-      );
-    }
+    console.log('📋 [IMPRESORAS-API] Datos recibidos:', { name, type, sucursalId });
 
-    if (!type || !['thermal', 'laser', 'inkjet'].includes(type)) {
+    // Validaciones básicas
+    if (!name || !type || !sucursalId) {
       return NextResponse.json(
-        { error: 'Tipo de impresora debe ser: thermal, laser o inkjet' },
+        { error: 'Nombre, tipo y sucursalId son requeridos' },
         { status: 400 }
-      );
-    }
-
-    if (!sucursalId || typeof sucursalId !== 'string') {
-      return NextResponse.json(
-        { error: 'ID de sucursal es requerido' },
-        { status: 400 }
-      );
-    }
-
-    const user = (req as any).user;
-    
-    // Verificar acceso a la sucursal
-    if (user.sucursalId && user.sucursalId !== sucursalId && user.roleId !== 'role-admin') {
-      return NextResponse.json(
-        { error: 'No tiene permisos para configurar impresoras en esta sucursal' },
-        { status: 403 }
       );
     }
 
@@ -281,86 +254,135 @@ export async function POST(req: NextRequest) {
 
     console.log(`🏢 [IMPRESORAS-API] Sucursal validada: ${sucursal.nombre}`);
 
-    // 🔧 CORRECCIÓN: Manejo de impresora por defecto en transacción
-    try {
-      const result = await prisma.$transaction(async (tx) => {
-        // Si es por defecto, quitar el flag de otras impresoras de la misma sucursal
+    // 🔧 VERIFICAR SI YA EXISTE UNA IMPRESORA CON EL MISMO NOMBRE
+    const existingPrinter = await prisma.configuracionImpresora.findFirst({
+      where: {
+        sucursalId,
+        nombre: name
+      }
+    });
+
+    let impresora;
+
+    if (existingPrinter) {
+      console.log('🔄 [IMPRESORAS-API] Impresora existente encontrada, actualizando...');
+      
+      // Si existe, actualizar en lugar de crear
+      impresora = await prisma.$transaction(async (tx) => {
+        // Si la nueva impresora será por defecto, quitar el default de otras
         if (isDefault) {
-          console.log('🔄 [IMPRESORAS-API] Actualizando impresoras por defecto...');
           await tx.configuracionImpresora.updateMany({
-            where: { 
-              sucursalId,
-              activa: true
-            },
+            where: { sucursalId, esPorDefecto: true },
             data: { esPorDefecto: false }
           });
         }
 
-        // Preparar configuración con valores por defecto
-        const defaultSettings = {
-          isOnline: true,
-          paperWidth: 80,
-          autocut: true,
-          encoding: 'utf-8'
-        };
-
-        const finalSettings = { ...defaultSettings, ...settings };
-
-        console.log('💾 [IMPRESORAS-API] Creando nueva impresora...');
-        
-        // Crear nueva impresora
-        const nuevaImpresora = await tx.configuracionImpresora.create({
+        // Actualizar la impresora existente
+        const updated = await tx.configuracionImpresora.update({
+          where: { id: existingPrinter.id },
           data: {
-            nombre: name.trim(),
             tipo: type,
-            sucursalId,
-            esPorDefecto: Boolean(isDefault),
-            configuracion: finalSettings,
-            activa: true
-          },
-          include: {
-            sucursal: {
-              select: { id: true, nombre: true }
-            }
+            esPorDefecto: isDefault || false,
+            configuracion: settings || {},
+            activa: true,
+            updatedAt: new Date()
           }
         });
 
-        return nuevaImpresora;
+        return updated;
       });
 
-      console.log(`✅ [IMPRESORAS-API] Impresora creada: ${result.nombre}`);
+      console.log(`✅ [IMPRESORAS-API] Impresora actualizada: ${impresora.id}`);
 
-      const responseData = {
-        id: result.id,
-        name: result.nombre,
-        type: result.tipo,
-        sucursalId: result.sucursalId,
-        isDefault: result.esPorDefecto,
-        settings: result.configuracion,
-        sucursal: result.sucursal?.nombre || 'N/A',
-        createdAt: result.createdAt
-      };
-
-      return NextResponse.json(responseData, { status: 201 });
-
-    } catch (transactionError) {
-      console.error('❌ [IMPRESORAS-API] Error en transacción:', transactionError);
+    } else {
+      console.log('💾 [IMPRESORAS-API] Creando nueva impresora...');
       
-      return NextResponse.json(
-        { 
-          error: 'Error al crear configuración de impresora',
-          details: transactionError instanceof Error ? transactionError.message : 'Error de transacción'
-        },
-        { status: 500 }
-      );
+      // Si no existe, crear nueva
+      impresora = await prisma.$transaction(async (tx) => {
+        // Si será por defecto, quitar el default de otras impresoras
+        if (isDefault) {
+          console.log('🔄 [IMPRESORAS-API] Actualizando impresoras por defecto...');
+          
+          await tx.configuracionImpresora.updateMany({
+            where: { sucursalId, esPorDefecto: true },
+            data: { esPorDefecto: false }
+          });
+        }
+
+        // Crear la nueva impresora
+        const newPrinter = await tx.configuracionImpresora.create({
+          data: {
+            nombre: name,
+            tipo: type,
+            sucursalId,
+            esPorDefecto: isDefault || false,
+            configuracion: settings || {},
+            activa: true
+          }
+        });
+
+        return newPrinter;
+      });
+
+      console.log(`✅ [IMPRESORAS-API] Nueva impresora creada: ${impresora.id}`);
     }
 
-  } catch (error) {
-    console.error('❌ [IMPRESORAS-API] Error general en POST:', error);
+    // Respuesta exitosa
+    return NextResponse.json({
+      success: true,
+      message: existingPrinter ? 'Impresora actualizada correctamente' : 'Impresora creada correctamente',
+      impresora: {
+        id: impresora.id,
+        nombre: impresora.nombre,
+        tipo: impresora.tipo,
+        sucursalId: impresora.sucursalId,
+        esPorDefecto: impresora.esPorDefecto,
+        activa: impresora.activa,
+        configuracion: impresora.configuracion
+      }
+    }, { status: existingPrinter ? 200 : 201 });
+
+  } catch (error: any) {
+    console.error('❌ [IMPRESORAS-API] Error en transacción:', error);
+
+    // Manejo específico de errores de Prisma
+    if (error.code === 'P2002') {
+      // Error de restricción única - intentar recuperación
+      console.log('🔄 [IMPRESORAS-API] Intento de recuperación por duplicado...');
+      
+      try {
+        // Corregido: obtener los datos del body correctamente
+        const body = await req.json();
+        const existingPrinter = await prisma.configuracionImpresora.findFirst({
+          where: {
+            sucursalId: body?.sucursalId,
+            nombre: body?.name
+          }
+        });
+
+        if (existingPrinter) {
+          return NextResponse.json({
+            success: true,
+            message: 'Impresora ya existe',
+            impresora: {
+              id: existingPrinter.id,
+              nombre: existingPrinter.nombre,
+              tipo: existingPrinter.tipo,
+              sucursalId: existingPrinter.sucursalId,
+              esPorDefecto: existingPrinter.esPorDefecto,
+              activa: existingPrinter.activa
+            }
+          }, { status: 200 });
+        }
+      } catch (recoveryError) {
+        console.error('❌ [IMPRESORAS-API] Error en recuperación:', recoveryError);
+      }
+    }
+
     return NextResponse.json(
       { 
         error: 'Error interno del servidor',
-        details: error instanceof Error ? error.message : 'Error desconocido'
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
       },
       { status: 500 }
     );

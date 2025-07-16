@@ -1,4 +1,4 @@
-// src/components/pdv/CheckoutModal.tsx - VERSIÓN CORREGIDA CON SISTEMA DE IMPRESIÓN ACTUALIZADO
+// src/components/pdv/CheckoutModal.tsx - VERSIÓN CORREGIDA COMPLETA
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -89,7 +89,7 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
     return payments.every(p => p.method === 'efectivo');
   };
 
-  // 🆕 FUNCIÓN PARA MANEJAR LÓGICA DE FACTURACIÓN AUTOMÁTICA
+  // 🆕 FUNCIÓN PARA MANEJAR LÓGICA DE FACTURACIÓN AUTOMÁTICA (CORREGIDA)
   const updateBillingLogic = (newPayments: Payment[]) => {
     const allPaymentsAreCash = newPayments.every(p => p.method === 'efectivo');
     const hasNonCashPayments = newPayments.some(p => p.method !== 'efectivo');
@@ -106,10 +106,8 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
       setFacturacionObligatoria(true);
       setFacturar(true);
       
-      // Cambiar a factura A si el monto es alto
-      if (getTotalWithDiscount() > 50000) {
-        setTipoFactura('A');
-      }
+      // ✅ CORRECCIÓN: Mantener factura B como default, sin cambio automático por monto
+      setTipoFactura('B'); // Siempre default a B, usuario puede cambiar manualmente
     }
   };
 
@@ -145,7 +143,7 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
       setValidationErrors({});
       setFacturar(false);
       setFacturacionObligatoria(false);
-      setTipoFactura('B');
+      setTipoFactura('B'); // ✅ Default a B, no A por monto
       setClienteNombre('');
       setClienteCuit('');
       
@@ -439,7 +437,7 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
     }
     
     if (currentStep === 2 && facturar) {
-      // Validaciones según tipo de factura
+      // ✅ VALIDACIONES CORREGIDAS según tipo de factura
       if (tipoFactura === 'A') {
         if (!clienteNombre || clienteNombre.trim() === '') {
           newErrors.clienteNombre = 'La razón social es obligatoria para facturas A';
@@ -451,11 +449,12 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
           newErrors.clienteCuit = 'El CUIT ingresado no es válido';
         }
       } else if (tipoFactura === 'B') {
-       
-        
+        // ✅ CORRECCIÓN: Facturas B sin restricción de monto
+        // Solo validar CUIT si se proporciona
         if (clienteCuit && clienteCuit.trim() !== '' && !validarCuit(clienteCuit)) {
-          newErrors.clienteCuit = 'El CUIT ingresado no es válido';
+          newErrors.clienteCuit = 'El CUIT/DNI ingresado no es válido';
         }
+        // ✅ Sin validación de monto - Facturas B pueden ser de cualquier valor
       }
       
       if (Object.keys(newErrors).length > 0) {
@@ -1099,6 +1098,26 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                         </span>
                       </div>
                     )}
+
+                    {/* ✅ NUEVO: Indicador para facturas B sin restricción */}
+                    {facturar && tipoFactura === 'B' && (
+                      <div className="mt-2 text-sm text-green-600 bg-green-50 p-3 rounded flex items-center">
+                        <CheckCircle className="mr-2 h-4 w-4" />
+                        <span>
+                          Factura B - Sin restricción de monto (IVA incluido)
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Indicador para pagos electrónicos */}
+                    {facturacionObligatoria && (
+                      <div className="mt-2 text-sm text-orange-600 bg-orange-50 p-3 rounded flex items-center">
+                        <AlertTriangle className="mr-2 h-4 w-4" />
+                        <span>
+                          Facturación obligatoria por pago electrónico
+                        </span>
+                      </div>
+                    )}
                     
                     {/* Selector de tipo de factura */}
                     {facturar && (
@@ -1254,13 +1273,6 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                       <p className="text-sm">{validationErrors.total}</p>
                     </div>
                   )}
-
-                  {validationErrors.facturaLimite && (
-                    <div className="p-3 bg-amber-50 text-amber-700 rounded-lg flex items-center">
-                      <AlertCircle size={16} className="mr-2 flex-shrink-0" />
-                      <p className="text-sm">{validationErrors.facturaLimite}</p>
-                    </div>
-                  )}
                 </div>
               </div>
             )}
@@ -1277,18 +1289,20 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                       </h3>
                     </div>
                     
-                    {/* Información específica según tipo */}
+                    {/* ✅ INFORMACIÓN ESPECÍFICA CORREGIDA según tipo */}
                     <div className="text-sm text-gray-600 bg-white p-4 rounded-lg border-l-4 border-blue-400">
                       {tipoFactura === 'A' ? (
                         <>
                           <strong>Factura A - Responsable Inscripto:</strong><br />
                           • CUIT y Razón Social son obligatorios<br />
+                          • IVA discriminado<br />
                         </>
                       ) : (
                         <>
                           <strong>Factura B - Consumidor Final:</strong><br />
-                          • CUIT/DNI opcional (excepto para montos ≥ $15.380)<br />
+                          • CUIT/DNI opcional<br />
                           • IVA incluido en el precio<br />
+                          • ✅ Sin restricción de monto<br />
                         </>
                       )}
                     </div>
@@ -1318,8 +1332,7 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                     {/* Campo CUIT/DNI */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        {tipoFactura === 'A' ? 'CUIT: *' : 
-                         (getTotalWithDiscount() >= 15380 ? 'CUIT/DNI: *' : 'CUIT/DNI (opcional):')}
+                        {tipoFactura === 'A' ? 'CUIT: *' : 'CUIT/DNI (opcional):'}
                       </label>
                       <input
                         type="text"
@@ -1328,21 +1341,15 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                         className={`w-full p-3 border rounded-lg focus:ring-1 focus:ring-[#9c7561] focus:border-[#9c7561] text-lg ${
                           validationErrors.clienteCuit ? 'border-red-300 bg-red-50' : 'border-gray-300'
                         }`}
-                        placeholder={tipoFactura === 'A' ? '20-12345678-9' : 'CUIT/DNI sin guiones'}
+                        placeholder={tipoFactura === 'A' ? '20-12345678-9' : 'CUIT/DNI sin guiones (opcional)'}
                         maxLength={13}
                       />
                       {validationErrors.clienteCuit && (
                         <p className="text-sm text-red-500 mt-1">{validationErrors.clienteCuit}</p>
                       )}
-                      
-                      {validationErrors.facturaLimite && (
-                        <p className="text-sm text-amber-600 mt-2 bg-amber-50 p-3 rounded">
-                          {validationErrors.facturaLimite}
-                        </p>
-                      )}
                     </div>
                     
-                    {/* Información adicional según el tipo */}
+                    {/* ✅ INFORMACIÓN ADICIONAL CORREGIDA según el tipo */}
                     <div className="bg-blue-50 p-4 rounded-lg text-blue-800 text-sm">
                       <div className="flex items-start">
                         <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0 text-blue-500" />
@@ -1354,7 +1361,7 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                           ) : (
                             <p>
                               <strong>Factura B:</strong> Si no proporciona datos, se emitirá como "Consumidor Final". 
-                              {getTotalWithDiscount() >= 15380 && ' Para este monto es obligatorio identificar al cliente.'}
+                              Las facturas B pueden ser de cualquier monto.
                             </p>
                           )}
                         </div>

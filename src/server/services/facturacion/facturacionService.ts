@@ -205,7 +205,6 @@ export class FacturacionService {
 
       logger.log(`Config AFIP: CUIT ${configAFIP.cuit}, PV ${configAFIP.puntoVenta}`, 'SUCCESS');
 
-      // 4. Determinar tipo de comprobante
       let comprobanteTipo: number;
       let tipoComprobanteLetra: string;
       
@@ -216,14 +215,20 @@ export class FacturacionService {
         comprobanteTipo = AFIP_CONFIG.defaultValues.cbteTipos.B.factura;
         tipoComprobanteLetra = 'B';
       }
-
+      
       logger.log(`Tipo: ${tipoComprobanteLetra} (${comprobanteTipo})`, 'INFO');
-
-      // 5. Validar topes
-      if (tipoComprobanteLetra === 'B' && venta.total >= 15380) {
-        throw new Error(`Factura B $${venta.total} supera tope $15.380 - Requiere CUIT`);
+      
+      // ❌ REMOVIDA: Validación de tope para facturas B
+      // ✅ NUEVA LÓGICA: Facturas B sin restricción de monto
+      if (tipoComprobanteLetra === 'B') {
+        logger.log(`Factura B de $${venta.total} - Sin restricción de monto`, 'INFO');
       }
-
+      
+      // ✅ Solo validar facturas A si no tienen CUIT (lo cual sería extraño)
+      if (tipoComprobanteLetra === 'A' && (!venta.clienteCuit || venta.clienteCuit.trim() === '')) {
+        throw new Error('Factura A requiere CUIT del cliente');
+      }
+      
       // 6. Crear factura en procesando
       facturaId = uuidv4();
       logger.log(`Creando factura ${facturaId}...`, 'INFO');

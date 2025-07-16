@@ -294,18 +294,31 @@ export async function POST(req: NextRequest) {
         
         const tipoFactura = body.tipoFactura || 'B'; // Default a B
         
-    if (tipoFactura === 'A') {
-      // Factura A requiere CUIT y nombre obligatorios
-      if (!body.clienteCuit || !body.clienteNombre) {
-        throw new Error('Para facturas tipo A se requiere CUIT y razón social del cliente');
-      }
-      
-      // Validar formato de CUIT
-      const cuitLimpio = body.clienteCuit.replace(/[-\s]/g, '');
-      if (cuitLimpio.length !== 11 || !/^\d{11}$/.test(cuitLimpio)) {
-        throw new Error('El CUIT debe tener 11 dígitos');
-      }
-    }
+        if (tipoFactura === 'A') {
+          // Factura A requiere CUIT y nombre obligatorios
+          if (!body.clienteCuit || !body.clienteNombre) {
+            throw new Error('Para facturas tipo A se requiere CUIT y razón social del cliente');
+          }
+          
+          // Validar formato de CUIT
+          const cuitLimpio = body.clienteCuit.replace(/[-\s]/g, '');
+          if (cuitLimpio.length !== 11 || !/^\d{11}$/.test(cuitLimpio)) {
+            throw new Error('El CUIT debe tener 11 dígitos');
+          }
+        }
+        
+        // ❌ REMOVIDA: Restricción de monto para facturas B
+        // ✅ NUEVA LÓGICA: Facturas B sin restricción de monto
+        if (tipoFactura === 'B') {
+          // Solo validar CUIT si se proporciona
+          if (body.clienteCuit && body.clienteCuit.trim() !== '') {
+            const cuitLimpio = body.clienteCuit.replace(/[-\s]/g, '');
+            if (!/^\d{11}$/.test(cuitLimpio)) {
+              throw new Error('El CUIT/DNI ingresado no es válido');
+            }
+          }
+          // ✅ Sin restricción de monto - Facturas B pueden ser de cualquier valor
+        }
     
     // Obtener servicio de facturación
     const { getFacturacionService } = await import('@/server/services/facturacion/factoryService');

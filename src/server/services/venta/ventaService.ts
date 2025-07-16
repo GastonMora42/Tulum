@@ -101,33 +101,39 @@ class VentaService {
     
     console.log(`[VentaService] Usuario válido: ${usuario.name}`);
     
-    // 🔧 VALIDACIÓN DE FACTURACIÓN
-    if (facturar) {
-      if (!tipoFactura || !['A', 'B', 'C'].includes(tipoFactura)) {
-        throw new Error('Tipo de factura inválido. Debe ser A, B o C');
-      }
-      
-      // Validaciones específicas por tipo
-      if (tipoFactura === 'A') {
-        if (!clienteNombre || !clienteCuit) {
-          throw new Error('Para facturas tipo A se requiere nombre y CUIT del cliente');
-        }
-        
-        // Validar formato CUIT
-        const cuitLimpio = clienteCuit.replace(/[-\s]/g, '');
-        if (!/^\d{11}$/.test(cuitLimpio)) {
-          throw new Error('El CUIT debe tener 11 dígitos numéricos');
-        }
-      }
-      
-      if (tipoFactura === 'B' && total >= 15380) {
-        if (!clienteCuit || clienteCuit.trim() === '') {
-          throw new Error(`Para facturas B con monto ≥ $15.380 se requiere CUIT/DNI del cliente`);
-        }
-      }
-      
-      console.log(`[VentaService] Validación de facturación OK - Tipo: ${tipoFactura}`);
+if (facturar) {
+  if (!tipoFactura || !['A', 'B', 'C'].includes(tipoFactura)) {
+    throw new Error('Tipo de factura inválido. Debe ser A, B o C');
+  }
+  
+  // Validaciones específicas por tipo
+  if (tipoFactura === 'A') {
+    if (!clienteNombre || !clienteCuit) {
+      throw new Error('Para facturas tipo A se requiere nombre y CUIT del cliente');
     }
+    
+    // Validar formato CUIT
+    const cuitLimpio = clienteCuit.replace(/[-\s]/g, '');
+    if (!/^\d{11}$/.test(cuitLimpio)) {
+      throw new Error('El CUIT debe tener 11 dígitos numéricos');
+    }
+  }
+  
+  // ❌ REMOVIDA: Restricción de monto para facturas B
+  // ✅ NUEVA LÓGICA: Facturas B pueden ser de cualquier monto
+  if (tipoFactura === 'B') {
+    // Solo validar CUIT si se proporciona
+    if (clienteCuit && clienteCuit.trim() !== '') {
+      const cuitLimpio = clienteCuit.replace(/[-\s]/g, '');
+      if (!/^\d{11}$/.test(cuitLimpio)) {
+        throw new Error('El CUIT/DNI ingresado no es válido');
+      }
+    }
+    // ✅ Sin restricción de monto - Facturas B pueden ser de cualquier valor
+  }
+  
+  console.log(`[VentaService] Validación de facturación OK - Tipo: ${tipoFactura}`);
+}
     
     // Verificar stock disponible para todos los items
     console.log(`[VentaService] Verificando stock para ${items.length} items...`);

@@ -152,160 +152,290 @@ export class FukunPrintServiceFixed {
     /**
      * 🔧 GENERAR COMANDOS ESC/POS MEJORADOS
      */
-    private generateFacturaCommands(facturaData: any): Uint8Array {
-      const commands: number[] = [];
-      
-      console.log('🔧 [FUKUN] Generando comandos ESC/POS...');
+ // src/services/print/fukunPrintServiceFixed.ts - FUNCIÓN generateFacturaCommands MEJORADA
+/**
+ * 🔧 GENERAR COMANDOS ESC/POS MEJORADOS CON TODOS LOS DATOS
+ */
+private generateFacturaCommands(facturaData: any): Uint8Array {
+  const commands: number[] = [];
   
-      // Inicializar impresora
-      commands.push(...FukunPrintServiceFixed.COMMANDS.INIT);
+  console.log('🔧 [FUKUN] Generando comandos ESC/POS mejorados...');
+
+  // Inicializar impresora
+  commands.push(...FukunPrintServiceFixed.COMMANDS.INIT);
+
+  // ===== HEADER EMPRESARIAL =====
+  commands.push(...FukunPrintServiceFixed.COMMANDS.ALIGN_CENTER);
+  commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_ON);
+  commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_DOUBLE_HEIGHT);
+  commands.push(...this.textToBytes('TULUM'));
+  commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_NORMAL);
+  commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
   
-      // Header centrado
-      commands.push(...FukunPrintServiceFixed.COMMANDS.ALIGN_CENTER);
-      commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_ON);
-      commands.push(...this.textToBytes('TULUM AROMATERAPIA'));
+  commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_ON);
+  commands.push(...this.textToBytes('ALMACEN DE AROMAS'));
+  commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_OFF);
+  commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+
+  // Información de la sucursal
+  const sucursalNombre = facturaData.venta?.sucursal?.nombre || 'Sucursal Principal';
+  const sucursalDireccion = facturaData.venta?.sucursal?.direccion || '';
+  const sucursalTelefono = facturaData.venta?.sucursal?.telefono || '';
+  
+  commands.push(...this.textToBytes(sucursalNombre));
+  commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+  
+  if (sucursalDireccion) {
+    commands.push(...this.textToBytes(sucursalDireccion));
+    commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+  }
+  
+  if (sucursalTelefono) {
+    commands.push(...this.textToBytes(`Tel: ${sucursalTelefono}`));
+    commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+  }
+
+  // ===== INFORMACIÓN DE FACTURA =====
+  commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+  commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_DOUBLE_HEIGHT);
+  commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_ON);
+  
+  const tipoFactura = facturaData.tipoComprobante || 'B';
+  commands.push(...this.textToBytes(`FACTURA ${tipoFactura}`));
+  
+  commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_NORMAL);
+  commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_OFF);
+  commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+
+  // Número de factura
+  const numeroFactura = String(facturaData.numeroFactura || '00000001').padStart(8, '0');
+  commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_ON);
+  commands.push(...this.textToBytes(`N° ${numeroFactura}`));
+  commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_OFF);
+  commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+
+  // CAE y Vencimiento (si existe)
+  if (facturaData.cae) {
+    commands.push(...this.textToBytes(`CAE: ${facturaData.cae}`));
+    commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+    
+    if (facturaData.vencimientoCae) {
+      const vencimiento = new Date(facturaData.vencimientoCae).toLocaleDateString('es-AR');
+      commands.push(...this.textToBytes(`Venc CAE: ${vencimiento}`));
       commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
-      commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_OFF);
-  
-      // Información de la sucursal
-      const sucursalNombre = facturaData.venta?.sucursal?.nombre || 'Sucursal Principal';
-      commands.push(...this.textToBytes(sucursalNombre));
-      commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
-  
-      // Tipo de factura
-      commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_DOUBLE_HEIGHT);
-      commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_ON);
-      commands.push(...this.textToBytes(`FACTURA ${facturaData.tipoComprobante || 'B'}`));
-      commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_NORMAL);
-      commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_OFF);
-      commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
-  
-      // Número de factura
-      const numeroFactura = String(facturaData.numeroFactura || '00000001').padStart(8, '0');
-      commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_ON);
-      commands.push(...this.textToBytes(`N° ${numeroFactura}`));
-      commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_OFF);
-      commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
-      commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
-  
-      // Fecha y cliente (izquierda)
-      commands.push(...FukunPrintServiceFixed.COMMANDS.ALIGN_LEFT);
-      
-      // Fecha
-      const fecha = facturaData.fechaEmision 
-        ? new Date(facturaData.fechaEmision).toLocaleDateString('es-AR')
-        : new Date().toLocaleDateString('es-AR');
-      commands.push(...this.textToBytes(`Fecha: ${fecha}`));
-      commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
-  
-      // Hora
-      const hora = new Date().toLocaleTimeString('es-AR', { 
-        hour: '2-digit', 
-        minute: '2-digit' 
-      });
-      commands.push(...this.textToBytes(`Hora: ${hora}`));
-      commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
-  
-      // Cliente (si existe)
-      if (facturaData.venta?.clienteNombre) {
-        commands.push(...this.textToBytes(`Cliente: ${facturaData.venta.clienteNombre}`));
-        commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
-      }
-  
-      if (facturaData.venta?.clienteCuit) {
-        commands.push(...this.textToBytes(`CUIT: ${facturaData.venta.clienteCuit}`));
-        commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
-      }
-  
-      // Línea separadora
-      commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
-      commands.push(...this.textToBytes('----------------------------------------'));
-      commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
-  
-      // 🔧 ITEMS DE LA VENTA CON VALIDACIÓN
-      if (facturaData.venta?.items && Array.isArray(facturaData.venta.items)) {
-        console.log(`📦 [FUKUN] Procesando ${facturaData.venta.items.length} items...`);
-        
-        for (let i = 0; i < facturaData.venta.items.length; i++) {
-          const item = facturaData.venta.items[i];
-          
-          // Validar item
-          if (!item || !item.producto) {
-            console.warn(`⚠️ [FUKUN] Item ${i} inválido, saltando...`);
-            continue;
-          }
-  
-          // Nombre del producto (truncado a 32 chars para 80mm)
-          const nombreProducto = this.truncateText(
-            item.producto.nombre || 'Producto sin nombre', 
-            32
-          );
-          commands.push(...this.textToBytes(nombreProducto));
-          commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
-  
-          // Cantidad x precio = subtotal
-          const cantidad = item.cantidad || 1;
-          const precio = parseFloat(item.precioUnitario || 0);
-          const subtotal = cantidad * precio;
-          
-          const lineaDetalle = `${cantidad} x $${precio.toFixed(2)} = $${subtotal.toFixed(2)}`;
-          commands.push(...this.textToBytes(lineaDetalle));
-          commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
-          
-          // Espacio entre items
-          if (i < facturaData.venta.items.length - 1) {
-            commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
-          }
-        }
-      } else {
-        console.warn('⚠️ [FUKUN] No se encontraron items válidos');
-        commands.push(...this.textToBytes('Sin items'));
-        commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
-      }
-  
-      // Total
-      commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
-      commands.push(...this.textToBytes('----------------------------------------'));
-      commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
-      commands.push(...FukunPrintServiceFixed.COMMANDS.ALIGN_CENTER);
-      commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_DOUBLE_HEIGHT);
-      commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_ON);
-      
-      const total = parseFloat(facturaData.venta?.total || 0);
-      commands.push(...this.textToBytes(`TOTAL: $${total.toFixed(2)}`));
-      
-      commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_NORMAL);
-      commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_OFF);
-      commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
-      commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
-  
-      // CAE (si existe)
-      if (facturaData.cae) {
-        commands.push(...FukunPrintServiceFixed.COMMANDS.ALIGN_LEFT);
-        commands.push(...this.textToBytes(`CAE: ${facturaData.cae}`));
-        commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
-        
-        if (facturaData.vencimientoCae) {
-          const vencimiento = new Date(facturaData.vencimientoCae).toLocaleDateString('es-AR');
-          commands.push(...this.textToBytes(`Vencimiento: ${vencimiento}`));
-          commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
-        }
-      }
-  
-      // Footer
-      commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
-      commands.push(...FukunPrintServiceFixed.COMMANDS.ALIGN_CENTER);
-      commands.push(...this.textToBytes('Gracias por su compra!'));
-      commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
-      commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
-  
-      // Alimentar papel y cortar
-      commands.push(...[0x1B, 0x64, 0x03]); // Alimentar 3 líneas
-      commands.push(...FukunPrintServiceFixed.COMMANDS.CUT);
-  
-      console.log(`✅ [FUKUN] Comandos generados: ${commands.length} bytes`);
-      return new Uint8Array(commands);
     }
+  }
+
+  commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+
+  // ===== FECHA Y HORA =====
+  commands.push(...FukunPrintServiceFixed.COMMANDS.ALIGN_LEFT);
+  
+  // Fecha
+  const fecha = facturaData.fechaEmision 
+    ? new Date(facturaData.fechaEmision).toLocaleDateString('es-AR')
+    : new Date().toLocaleDateString('es-AR');
+  commands.push(...this.textToBytes(`Fecha: ${fecha}`));
+  commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+
+  // Hora
+  const hora = facturaData.fechaEmision
+    ? new Date(facturaData.fechaEmision).toLocaleTimeString('es-AR', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        second: '2-digit'
+      })
+    : new Date().toLocaleTimeString('es-AR', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        second: '2-digit'
+      });
+  commands.push(...this.textToBytes(`Hora: ${hora}`));
+  commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+
+  // ===== DATOS DEL CLIENTE =====
+  commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+  
+  // Cliente
+  const clienteNombre = facturaData.venta?.clienteNombre || 'Consumidor Final';
+  commands.push(...this.textToBytes(`Cliente: ${clienteNombre}`));
+  commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+
+  // CUIT/DNI
+  const clienteCuit = facturaData.venta?.clienteCuit || 'No informado';
+  const tipoCuit = facturaData.venta?.clienteCuit && facturaData.venta.clienteCuit.length === 11 ? 'CUIT' : 'DNI';
+  commands.push(...this.textToBytes(`${tipoCuit}: ${clienteCuit}`));
+  commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+
+  // ===== LÍNEA SEPARADORA =====
+  commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+  commands.push(...this.textToBytes('========================================'));
+  commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+
+  // ===== PRODUCTOS =====
+  if (facturaData.venta?.items && Array.isArray(facturaData.venta.items)) {
+    console.log(`📦 [FUKUN] Procesando ${facturaData.venta.items.length} items...`);
+    
+    for (let i = 0; i < facturaData.venta.items.length; i++) {
+      const item = facturaData.venta.items[i];
+      
+      // Validar item
+      if (!item || !item.producto) {
+        console.warn(`⚠️ [FUKUN] Item ${i} inválido, saltando...`);
+        continue;
+      }
+
+      // Nombre del producto (descripción completa)
+      const nombreProducto = item.producto.nombre || 'Producto sin nombre';
+      const descripcion = item.producto.descripcion || '';
+      
+      // Si hay descripción, mostrarla también
+      if (descripcion && descripcion !== nombreProducto) {
+        commands.push(...this.textToBytes(this.truncateText(nombreProducto, 38)));
+        commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+        commands.push(...this.textToBytes(`  ${this.truncateText(descripcion, 36)}`));
+        commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+      } else {
+        // Permitir nombres más largos sin descripción
+        const lineasNombre = this.wrapText(nombreProducto, 38);
+        for (const linea of lineasNombre) {
+          commands.push(...this.textToBytes(linea));
+          commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+        }
+      }
+
+      // Cantidad x precio = subtotal (en línea separada)
+      const cantidad = item.cantidad || 1;
+      const precio = parseFloat(item.precioUnitario || 0);
+      const descuento = parseFloat(item.descuento || 0);
+      const subtotal = cantidad * precio * (1 - descuento / 100);
+      
+      let lineaDetalle = `${cantidad} x $${precio.toFixed(2)}`;
+      if (descuento > 0) {
+        lineaDetalle += ` (-${descuento}%)`;
+      }
+      lineaDetalle += ` = $${subtotal.toFixed(2)}`;
+      
+      commands.push(...this.textToBytes(lineaDetalle));
+      commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+      
+      // Espacio entre items (solo si no es el último)
+      if (i < facturaData.venta.items.length - 1) {
+        commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+      }
+    }
+  } else {
+    console.warn('⚠️ [FUKUN] No se encontraron items válidos');
+    commands.push(...this.textToBytes('Sin items disponibles'));
+    commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+  }
+
+  // ===== TOTAL =====
+  commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+  commands.push(...this.textToBytes('========================================'));
+  commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+  
+  commands.push(...FukunPrintServiceFixed.COMMANDS.ALIGN_CENTER);
+  commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_DOUBLE_HEIGHT);
+  commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_ON);
+  
+  const total = parseFloat(facturaData.venta?.total || 0);
+  commands.push(...this.textToBytes(`TOTAL: $${total.toFixed(2)}`));
+  
+  commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_NORMAL);
+  commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_OFF);
+  commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+  commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+
+  // ===== INFORMACIÓN FISCAL ADICIONAL (solo para facturas) =====
+  if (facturaData.cae && tipoFactura !== 'TICKET') {
+    commands.push(...FukunPrintServiceFixed.COMMANDS.ALIGN_LEFT);
+    
+    // Información AFIP
+    commands.push(...this.textToBytes('-- DATOS FISCALES --'));
+    commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+    
+    commands.push(...this.textToBytes(`Comprobante Autorizado`));
+    commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+    
+    if (tipoFactura === 'A') {
+      commands.push(...this.textToBytes('IVA Responsable Inscripto'));
+    } else {
+      commands.push(...this.textToBytes('IVA Incluido'));
+    }
+    commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+    commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+  }
+
+  // ===== FOOTER =====
+  commands.push(...FukunPrintServiceFixed.COMMANDS.ALIGN_CENTER);
+  commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_ON);
+  commands.push(...this.textToBytes('MUCHAS GRACIAS POR SU COMPRA!'));
+  commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_OFF);
+  commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+  commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+
+  // ===== INFORMACIÓN DE CONTACTO =====
+  commands.push(...this.textToBytes('Visite nuestras redes sociales'));
+  commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+  commands.push(...this.textToBytes('@tulumaromaterapia'));
+  commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+  commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+
+  // ===== QR CODE PARA CAE (si existe) =====
+  if (facturaData.cae) {
+    commands.push(...this.textToBytes('Escanee el QR para verificar'));
+    commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+    commands.push(...this.textToBytes('el comprobante en AFIP:'));
+    commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+    commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+    
+    // Aquí iría el QR code (requiere comandos específicos del modelo)
+    // Por ahora, incluimos la URL de verificación
+    const qrUrl = `https://www.afip.gob.ar/fe/qr/`;
+    commands.push(...this.textToBytes(qrUrl));
+    commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+    commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+  }
+
+  // ===== FINALIZAR =====
+  // Alimentar papel y cortar
+  commands.push(...[0x1B, 0x64, 0x04]); // Alimentar 4 líneas
+  commands.push(...FukunPrintServiceFixed.COMMANDS.CUT);
+
+  console.log(`✅ [FUKUN] Comandos mejorados generados: ${commands.length} bytes`);
+  return new Uint8Array(commands);
+}
+
+/**
+ * FUNCIÓN AUXILIAR: Dividir texto largo en múltiples líneas
+ */
+private wrapText(text: string, maxLength: number): string[] {
+  if (text.length <= maxLength) {
+    return [text];
+  }
+  
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let currentLine = '';
+  
+  for (const word of words) {
+    if ((currentLine + ' ' + word).length <= maxLength) {
+      currentLine += (currentLine ? ' ' : '') + word;
+    } else {
+      if (currentLine) {
+        lines.push(currentLine);
+      }
+      currentLine = word;
+    }
+  }
+  
+  if (currentLine) {
+    lines.push(currentLine);
+  }
+  
+  return lines;
+}
   
     /**
      * TEST DE IMPRESIÓN
