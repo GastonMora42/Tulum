@@ -1,4 +1,8 @@
-// src/services/print/fukunPrintServiceFixed.ts - SOLUCIÓN INTEGRADA
+
+// =================================================================
+// 2. CORRECCIÓN: src/services/print/fukunPrintServiceFixed.ts
+// =================================================================
+
 export class FukunPrintServiceFixed {
     private device: USBDevice | null = null;
     private isConnected = false;
@@ -40,11 +44,11 @@ export class FukunPrintServiceFixed {
     };
   
     /**
-     * PASO 1: Conectar automáticamente a la impresora Fukun
+     * CONECTAR A FUKUN
      */
     async connectToFukun(): Promise<{ success: boolean; message: string }> {
       try {
-        console.log('🔌 Conectando a impresora Fukun...');
+        console.log('🔌 [FUKUN] Conectando a impresora Fukun...');
   
         // Primero intentar con dispositivos ya emparejados
         const devices = await navigator.usb.getDevices();
@@ -59,12 +63,11 @@ export class FukunPrintServiceFixed {
   
         // Si no hay dispositivos emparejados, solicitar permiso
         if (!targetDevice) {
-          console.log('📱 Solicitando acceso a dispositivo USB...');
+          console.log('📱 [FUKUN] Solicitando acceso a dispositivo USB...');
           
           try {
             targetDevice = await navigator.usb.requestDevice({
               filters: [
-                // Filtros específicos para impresoras POS
                 ...FukunPrintServiceFixed.VENDOR_IDS.map(vendorId => ({ vendorId })),
                 { classCode: 7 }, // Clase impresora
                 { classCode: 255 }, // Clase vendor-specific (común en POS)
@@ -94,7 +97,7 @@ export class FukunPrintServiceFixed {
         };
   
       } catch (error) {
-        console.error('❌ Error conectando:', error);
+        console.error('❌ [FUKUN] Error conectando:', error);
         return {
           success: false,
           message: `Error de conexión: ${error instanceof Error ? error.message : 'Error desconocido'}`
@@ -103,63 +106,7 @@ export class FukunPrintServiceFixed {
     }
   
     /**
-     * Configurar dispositivo USB para comunicación
-     */
-    private async setupDevice(device: USBDevice): Promise<void> {
-      try {
-        // Abrir dispositivo
-        if (!device.opened) {
-          await device.open();
-        }
-  
-        // Seleccionar configuración
-        if (device.configuration === null) {
-          await device.selectConfiguration(1);
-        }
-  
-        // Buscar interfaz de impresora
-        let printerInterface: USBInterface | null = null;
-        
-        for (const iface of device.configuration!.interfaces) {
-          for (const alternate of iface.alternates) {
-            // Buscar clase de impresora (7) o vendor-specific (255)
-            if (alternate.interfaceClass === 7 || alternate.interfaceClass === 255) {
-              printerInterface = iface;
-              break;
-            }
-          }
-          if (printerInterface) break;
-        }
-  
-        if (!printerInterface) {
-          throw new Error('No se encontró interfaz de impresora en el dispositivo');
-        }
-  
-        // Reclamar interfaz
-        await device.claimInterface(printerInterface.interfaceNumber);
-  
-        // Buscar endpoint de salida
-        const alternate = printerInterface.alternates[0];
-        this.endpoint = alternate.endpoints.find(ep => ep.direction === 'out') || null;
-  
-        if (!this.endpoint) {
-          throw new Error('No se encontró endpoint de salida');
-        }
-  
-        this.device = device;
-        this.isConnected = true;
-  
-        console.log('✅ Dispositivo configurado correctamente');
-        console.log(`📋 Interfaz: ${printerInterface.interfaceNumber}, Endpoint: ${this.endpoint.endpointNumber}`);
-  
-      } catch (error) {
-        console.error('❌ Error configurando dispositivo:', error);
-        throw error;
-      }
-    }
-  
-    /**
-     * PASO 2: Función principal para imprimir facturas
+     * 🔧 FUNCIÓN PRINCIPAL PARA IMPRIMIR FACTURA (MEJORADA)
      */
     async printFactura(facturaData: any): Promise<{ success: boolean; message: string }> {
       if (!this.isConnected || !this.device || !this.endpoint) {
@@ -170,12 +117,23 @@ export class FukunPrintServiceFixed {
       }
   
       try {
-        console.log('🖨️ Generando contenido de factura...');
+        console.log('🖨️ [FUKUN] Generando contenido de factura...');
+        console.log('📋 [FUKUN] Datos recibidos:', {
+          id: facturaData.id,
+          tipoComprobante: facturaData.tipoComprobante,
+          numeroFactura: facturaData.numeroFactura,
+          ventaTotal: facturaData.venta?.total,
+          itemsCount: facturaData.venta?.items?.length || 0
+        });
         
         const printData = this.generateFacturaCommands(facturaData);
         
-        console.log('📤 Enviando datos a impresora...');
+        console.log('📤 [FUKUN] Enviando datos a impresora...');
+        console.log(`📊 [FUKUN] Tamaño de datos: ${printData.length} bytes`);
+        
         await this.sendDataToDevice(printData);
+        
+        console.log('✅ [FUKUN] Factura enviada a impresora correctamente');
         
         return {
           success: true,
@@ -183,7 +141,7 @@ export class FukunPrintServiceFixed {
         };
   
       } catch (error) {
-        console.error('❌ Error imprimiendo factura:', error);
+        console.error('❌ [FUKUN] Error imprimiendo factura:', error);
         return {
           success: false,
           message: `Error de impresión: ${error instanceof Error ? error.message : 'Error desconocido'}`
@@ -192,10 +150,12 @@ export class FukunPrintServiceFixed {
     }
   
     /**
-     * PASO 3: Generar comandos ESC/POS para la factura
+     * 🔧 GENERAR COMANDOS ESC/POS MEJORADOS
      */
     private generateFacturaCommands(facturaData: any): Uint8Array {
       const commands: number[] = [];
+      
+      console.log('🔧 [FUKUN] Generando comandos ESC/POS...');
   
       // Inicializar impresora
       commands.push(...FukunPrintServiceFixed.COMMANDS.INIT);
@@ -207,25 +167,53 @@ export class FukunPrintServiceFixed {
       commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
       commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_OFF);
   
+      // Información de la sucursal
+      const sucursalNombre = facturaData.venta?.sucursal?.nombre || 'Sucursal Principal';
+      commands.push(...this.textToBytes(sucursalNombre));
+      commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+  
       // Tipo de factura
       commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_DOUBLE_HEIGHT);
+      commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_ON);
       commands.push(...this.textToBytes(`FACTURA ${facturaData.tipoComprobante || 'B'}`));
       commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_NORMAL);
+      commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_OFF);
       commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
   
       // Número de factura
       const numeroFactura = String(facturaData.numeroFactura || '00000001').padStart(8, '0');
+      commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_ON);
       commands.push(...this.textToBytes(`N° ${numeroFactura}`));
+      commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_OFF);
       commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
       commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
   
       // Fecha y cliente (izquierda)
       commands.push(...FukunPrintServiceFixed.COMMANDS.ALIGN_LEFT);
-      commands.push(...this.textToBytes(`Fecha: ${new Date().toLocaleDateString('es-AR')}`));
+      
+      // Fecha
+      const fecha = facturaData.fechaEmision 
+        ? new Date(facturaData.fechaEmision).toLocaleDateString('es-AR')
+        : new Date().toLocaleDateString('es-AR');
+      commands.push(...this.textToBytes(`Fecha: ${fecha}`));
       commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
   
+      // Hora
+      const hora = new Date().toLocaleTimeString('es-AR', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+      });
+      commands.push(...this.textToBytes(`Hora: ${hora}`));
+      commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+  
+      // Cliente (si existe)
       if (facturaData.venta?.clienteNombre) {
         commands.push(...this.textToBytes(`Cliente: ${facturaData.venta.clienteNombre}`));
+        commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+      }
+  
+      if (facturaData.venta?.clienteCuit) {
+        commands.push(...this.textToBytes(`CUIT: ${facturaData.venta.clienteCuit}`));
         commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
       }
   
@@ -234,34 +222,57 @@ export class FukunPrintServiceFixed {
       commands.push(...this.textToBytes('----------------------------------------'));
       commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
   
-      // Items de la venta
-      if (facturaData.venta?.items) {
-        for (const item of facturaData.venta.items) {
+      // 🔧 ITEMS DE LA VENTA CON VALIDACIÓN
+      if (facturaData.venta?.items && Array.isArray(facturaData.venta.items)) {
+        console.log(`📦 [FUKUN] Procesando ${facturaData.venta.items.length} items...`);
+        
+        for (let i = 0; i < facturaData.venta.items.length; i++) {
+          const item = facturaData.venta.items[i];
+          
+          // Validar item
+          if (!item || !item.producto) {
+            console.warn(`⚠️ [FUKUN] Item ${i} inválido, saltando...`);
+            continue;
+          }
+  
           // Nombre del producto (truncado a 32 chars para 80mm)
-          const nombreProducto = this.truncateText(item.producto?.nombre || 'Producto', 32);
+          const nombreProducto = this.truncateText(
+            item.producto.nombre || 'Producto sin nombre', 
+            32
+          );
           commands.push(...this.textToBytes(nombreProducto));
           commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
   
           // Cantidad x precio = subtotal
           const cantidad = item.cantidad || 1;
-          const precio = (item.precioUnitario || 0).toFixed(2);
-          const subtotal = (cantidad * (item.precioUnitario || 0)).toFixed(2);
+          const precio = parseFloat(item.precioUnitario || 0);
+          const subtotal = cantidad * precio;
           
-          const lineaDetalle = `${cantidad} x $${precio} = $${subtotal}`;
+          const lineaDetalle = `${cantidad} x $${precio.toFixed(2)} = $${subtotal.toFixed(2)}`;
           commands.push(...this.textToBytes(lineaDetalle));
           commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+          
+          // Espacio entre items
+          if (i < facturaData.venta.items.length - 1) {
+            commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+          }
         }
+      } else {
+        console.warn('⚠️ [FUKUN] No se encontraron items válidos');
+        commands.push(...this.textToBytes('Sin items'));
+        commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
       }
   
       // Total
+      commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
       commands.push(...this.textToBytes('----------------------------------------'));
       commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
       commands.push(...FukunPrintServiceFixed.COMMANDS.ALIGN_CENTER);
       commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_DOUBLE_HEIGHT);
       commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_ON);
       
-      const total = (facturaData.venta?.total || 0).toFixed(2);
-      commands.push(...this.textToBytes(`TOTAL: $${total}`));
+      const total = parseFloat(facturaData.venta?.total || 0);
+      commands.push(...this.textToBytes(`TOTAL: $${total.toFixed(2)}`));
       
       commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_NORMAL);
       commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_OFF);
@@ -292,11 +303,12 @@ export class FukunPrintServiceFixed {
       commands.push(...[0x1B, 0x64, 0x03]); // Alimentar 3 líneas
       commands.push(...FukunPrintServiceFixed.COMMANDS.CUT);
   
+      console.log(`✅ [FUKUN] Comandos generados: ${commands.length} bytes`);
       return new Uint8Array(commands);
     }
   
     /**
-     * PASO 4: Test de impresión
+     * TEST DE IMPRESIÓN
      */
     async printTest(): Promise<{ success: boolean; message: string }> {
       if (!this.isConnected || !this.device || !this.endpoint) {
@@ -307,6 +319,8 @@ export class FukunPrintServiceFixed {
       }
   
       try {
+        console.log('🧪 [FUKUN] Ejecutando test de impresión...');
+        
         const testCommands: number[] = [];
   
         // Inicializar
@@ -354,13 +368,14 @@ export class FukunPrintServiceFixed {
         const testData = new Uint8Array(testCommands);
         await this.sendDataToDevice(testData);
   
+        console.log('✅ [FUKUN] Test completado');
         return {
           success: true,
           message: 'Test de impresión enviado correctamente'
         };
   
       } catch (error) {
-        console.error('❌ Error en test:', error);
+        console.error('❌ [FUKUN] Error en test:', error);
         return {
           success: false,
           message: `Error en test: ${error instanceof Error ? error.message : 'Error desconocido'}`
@@ -369,32 +384,7 @@ export class FukunPrintServiceFixed {
     }
   
     /**
-     * Enviar datos al dispositivo USB
-     */
-    private async sendDataToDevice(data: Uint8Array): Promise<void> {
-      if (!this.device || !this.endpoint) {
-        throw new Error('Dispositivo no configurado');
-      }
-  
-      try {
-        console.log(`📤 Enviando ${data.length} bytes a la impresora...`);
-        
-        const result = await this.device.transferOut(this.endpoint.endpointNumber, data);
-        
-        if (result.status !== 'ok') {
-          throw new Error(`Error en transferencia: ${result.status}`);
-        }
-  
-        console.log(`✅ ${result.bytesWritten} bytes enviados correctamente`);
-  
-      } catch (error) {
-        console.error('❌ Error enviando datos:', error);
-        throw error;
-      }
-    }
-  
-    /**
-     * Abrir cajón de dinero
+     * ABRIR CAJÓN DE DINERO
      */
     async openCashDrawer(): Promise<{ success: boolean; message: string }> {
       if (!this.isConnected || !this.device || !this.endpoint) {
@@ -405,14 +395,18 @@ export class FukunPrintServiceFixed {
       }
   
       try {
+        console.log('💰 [FUKUN] Abriendo cajón de dinero...');
+        
         const drawerCommand = new Uint8Array(FukunPrintServiceFixed.COMMANDS.OPEN_DRAWER);
         await this.sendDataToDevice(drawerCommand);
   
+        console.log('✅ [FUKUN] Cajón abierto');
         return {
           success: true,
           message: 'Cajón abierto correctamente'
         };
       } catch (error) {
+        console.error('❌ [FUKUN] Error abriendo cajón:', error);
         return {
           success: false,
           message: `Error abriendo cajón: ${error instanceof Error ? error.message : 'Error desconocido'}`
@@ -421,8 +415,84 @@ export class FukunPrintServiceFixed {
     }
   
     /**
-     * Utilidades
+     * UTILIDADES PRIVADAS
      */
+    private async setupDevice(device: USBDevice): Promise<void> {
+      try {
+        console.log('🔧 [FUKUN] Configurando dispositivo...');
+  
+        // Abrir dispositivo
+        if (!device.opened) {
+          await device.open();
+        }
+  
+        // Seleccionar configuración
+        if (device.configuration === null) {
+          await device.selectConfiguration(1);
+        }
+  
+        // Buscar interfaz de impresora
+        let printerInterface: USBInterface | null = null;
+        
+        for (const iface of device.configuration!.interfaces) {
+          for (const alternate of iface.alternates) {
+            if (alternate.interfaceClass === 7 || alternate.interfaceClass === 255) {
+              printerInterface = iface;
+              break;
+            }
+          }
+          if (printerInterface) break;
+        }
+  
+        if (!printerInterface) {
+          throw new Error('No se encontró interfaz de impresora en el dispositivo');
+        }
+  
+        // Reclamar interfaz
+        await device.claimInterface(printerInterface.interfaceNumber);
+  
+        // Buscar endpoint de salida
+        const alternate = printerInterface.alternates[0];
+        this.endpoint = alternate.endpoints.find(ep => ep.direction === 'out') || null;
+  
+        if (!this.endpoint) {
+          throw new Error('No se encontró endpoint de salida');
+        }
+  
+        this.device = device;
+        this.isConnected = true;
+  
+        console.log('✅ [FUKUN] Dispositivo configurado correctamente');
+        console.log(`📋 [FUKUN] Interfaz: ${printerInterface.interfaceNumber}, Endpoint: ${this.endpoint.endpointNumber}`);
+  
+      } catch (error) {
+        console.error('❌ [FUKUN] Error configurando dispositivo:', error);
+        throw error;
+      }
+    }
+  
+    private async sendDataToDevice(data: Uint8Array): Promise<void> {
+      if (!this.device || !this.endpoint) {
+        throw new Error('Dispositivo no configurado');
+      }
+  
+      try {
+        console.log(`📤 [FUKUN] Enviando ${data.length} bytes a la impresora...`);
+        
+        const result = await this.device.transferOut(this.endpoint.endpointNumber, data);
+        
+        if (result.status !== 'ok') {
+          throw new Error(`Error en transferencia: ${result.status}`);
+        }
+  
+        console.log(`✅ [FUKUN] ${result.bytesWritten} bytes enviados correctamente`);
+  
+      } catch (error) {
+        console.error('❌ [FUKUN] Error enviando datos:', error);
+        throw error;
+      }
+    }
+  
     private isFukunPrinter(device: USBDevice): boolean {
       // Verificar por vendor ID
       if (FukunPrintServiceFixed.VENDOR_IDS.includes(device.vendorId)) {
@@ -437,7 +507,6 @@ export class FukunPrintServiceFixed {
     }
   
     private textToBytes(text: string): number[] {
-      // Convertir texto a bytes con soporte para caracteres españoles
       const encoder = new TextEncoder();
       const encoded = encoder.encode(text);
       return Array.from(encoded);
@@ -450,15 +519,12 @@ export class FukunPrintServiceFixed {
       return text.substring(0, maxLength - 3) + '...';
     }
   
-    /**
-     * Desconectar
-     */
     async disconnect(): Promise<void> {
       if (this.device) {
         try {
           await this.device.close();
         } catch (error) {
-          console.warn('Error cerrando dispositivo:', error);
+          console.warn('⚠️ [FUKUN] Error cerrando dispositivo:', error);
         }
       }
   
@@ -467,9 +533,6 @@ export class FukunPrintServiceFixed {
       this.isConnected = false;
     }
   
-    /**
-     * Estado de conexión
-     */
     getConnectionStatus(): {
       connected: boolean;
       deviceName?: string;
@@ -484,3 +547,4 @@ export class FukunPrintServiceFixed {
       };
     }
   }
+  

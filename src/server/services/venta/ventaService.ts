@@ -583,6 +583,202 @@ class VentaService {
       throw new Error(`Error al obtener estadísticas: ${error instanceof Error ? error.message : 'Error desconocido'}`);
     }
   }
+
+  // =================================================================
+// MEJORAS EN VENTASERVICE: src/server/services/venta/ventaService.ts
+// =================================================================
+
+// Agregar esta función al VentaService para mejor debugging:
+
+/**
+ * 🔧 NUEVA FUNCIÓN: Obtener datos completos de venta para impresión
+ */
+async obtenerVentaParaImpresion(ventaId: string) {
+  try {
+    console.log(`📊 [VentaService] Obteniendo venta para impresión: ${ventaId}`);
+    
+    const venta = await prisma.venta.findUnique({
+      where: { id: ventaId },
+      include: {
+        items: {
+          include: {
+            producto: {
+              select: {
+                id: true,
+                nombre: true,
+                precio: true,
+                descripcion: true,
+                codigoBarras: true
+              }
+            }
+          },
+          orderBy: { id: 'asc' }
+        },
+        sucursal: {
+          select: {
+            id: true,
+            nombre: true,
+            direccion: true,
+            telefono: true
+          }
+        },
+        pagos: true,
+        usuario: {
+          select: {
+            id: true,
+            name: true,
+            email: true
+          }
+        },
+        facturaElectronica: {
+          select: {
+            id: true,
+            tipoComprobante: true,
+            numeroFactura: true,
+            cae: true,
+            vencimientoCae: true,
+            estado: true,
+            fechaEmision: true
+          }
+        }
+      }
+    });
+    
+    if (!venta) {
+      throw new Error(`Venta no encontrada: ${ventaId}`);
+    }
+    
+    // Validar datos críticos
+    const validacion = {
+      tieneItems: venta.items.length > 0,
+      tieneTotal: venta.total > 0,
+      tieneSucursal: !!venta.sucursal,
+      tieneFactura: !!venta.facturaElectronica,
+      facturaCompleta: venta.facturaElectronica?.estado === 'completada'
+    };
+    
+    console.log(`✅ [VentaService] Venta obtenida:`, {
+      ventaId: venta.id,
+      itemsCount: venta.items.length,
+      total: venta.total,
+      sucursal: venta.sucursal.nombre,
+      facturaId: venta.facturaElectronica?.id,
+      validacion
+    });
+    
+    return {
+      ...venta,
+      _validacion: validacion
+    };
+    
+  } catch (error) {
+    console.error(`❌ [VentaService] Error obteniendo venta para impresión:`, error);
+    throw error;
+  }
+}
+
+// =================================================================
+// MEJORAS EN FACTURACIONSERVICE: src/server/services/facturacion/facturacionService.ts
+// =================================================================
+
+// Agregar esta función para mejor debugging de facturas:
+
+/**
+ * 🔧 NUEVA FUNCIÓN: Verificar estado de factura
+ */
+async verificarEstadoFactura(facturaId: string): Promise<{
+  exists: boolean;
+  estado: string;
+  datosCompletos: boolean;
+  errores: string[];
+}> {
+  try {
+    console.log(`🔍 [FacturacionService] Verificando factura: ${facturaId}`);
+    
+    const factura = await prisma.facturaElectronica.findUnique({
+      where: { id: facturaId },
+      include: {
+        venta: {
+          include: {
+            items: {
+              include: {
+                producto: {
+                  select: {
+                    id: true,
+                    nombre: true
+                  }
+                }
+              }
+            },
+            sucursal: {
+              select: {
+                id: true,
+                nombre: true
+              }
+            }
+          }
+        }
+      }
+    });
+    
+    if (!factura) {
+      return {
+        exists: false,
+        estado: 'no-encontrada',
+        datosCompletos: false,
+        errores: ['Factura no encontrada']
+      };
+    }
+    
+    const errores: string[] = [];
+    
+    // Verificar datos críticos
+    if (!factura.venta) {
+      errores.push('Sin datos de venta');
+    }
+    
+    if (!factura.venta?.items || factura.venta.items.length === 0) {
+      errores.push('Sin items en la venta');
+    }
+    
+    if (!factura.venta?.total || factura.venta.total <= 0) {
+      errores.push('Total inválido');
+    }
+    
+    if (!factura.venta?.sucursal) {
+      errores.push('Sin datos de sucursal');
+    }
+    
+    if (factura.estado === 'completada' && !factura.cae) {
+      errores.push('Factura completada sin CAE');
+    }
+    
+    const datosCompletos = errores.length === 0;
+    
+    console.log(`📊 [FacturacionService] Estado de factura:`, {
+      id: factura.id,
+      estado: factura.estado,
+      datosCompletos,
+      errores
+    });
+    
+    return {
+      exists: true,
+      estado: factura.estado,
+      datosCompletos,
+      errores
+    };
+    
+  } catch (error) {
+    console.error(`❌ [FacturacionService] Error verificando factura:`, error);
+    return {
+      exists: false,
+      estado: 'error',
+      datosCompletos: false,
+      errores: [`Error de verificación: ${error instanceof Error ? error.message : 'Error desconocido'}`]
+    };
+  }
+}
   
   /**
    * 🆕 OBTENER VENTA POR ID
@@ -641,3 +837,6 @@ class VentaService {
 
 // Singleton para uso en la aplicación
 export const ventaService = new VentaService();
+
+
+

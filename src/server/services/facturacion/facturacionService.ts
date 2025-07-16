@@ -26,6 +26,7 @@ const DEBUG_CONFIG = {
 export class FacturacionService {
   private afipClient: AfipSoapClient;
   private cuit: string;
+    verificarEstadoFactura: any;
 
   constructor(cuit: string) {
     this.cuit = cuit;
