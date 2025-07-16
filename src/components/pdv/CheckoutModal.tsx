@@ -1,4 +1,4 @@
-// src/components/pdv/CheckoutModal.tsx - CON SISTEMA DE IMPRESIÓN INTEGRADO
+// src/components/pdv/CheckoutModal.tsx - VERSIÓN CORREGIDA CON SISTEMA DE IMPRESIÓN ACTUALIZADO
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -42,16 +42,16 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
   const [clienteNombre, setClienteNombre] = useState('');
   const [clienteCuit, setClienteCuit] = useState('');
   
-  // 🆕 ESTADOS PARA SISTEMA DE IMPRESIÓN
+  // 🆕 ESTADOS PARA SISTEMA DE IMPRESIÓN CORREGIDO
   const [printConfig, setPrintConfig] = useState({
-    autoPrint: true, // Por defecto habilitado
+    autoPrint: true,
     selectedPrinter: '',
     copies: 1,
     showPreview: false
   });
   const [showPrinterSettings, setShowPrinterSettings] = useState(false);
   
-  // 🆕 HOOK DE IMPRESIÓN
+  // 🆕 HOOK DE IMPRESIÓN ACTUALIZADO
   const { 
     isInitialized: printInitialized, 
     availablePrinters, 
@@ -149,11 +149,11 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
       setClienteNombre('');
       setClienteCuit('');
       
-      // 🆕 CONFIGURACIÓN INICIAL DE IMPRESIÓN
+      // 🆕 CONFIGURACIÓN INICIAL DE IMPRESIÓN ACTUALIZADA
       const defaultPrinter = availablePrinters.find(p => p.isDefault);
       setPrintConfig(prev => ({
         ...prev,
-        autoPrint: printInitialized && availablePrinters.length > 0, // Auto-habilitar si hay impresoras
+        autoPrint: printInitialized && availablePrinters.length > 0,
         selectedPrinter: defaultPrinter?.name || '',
         copies: 1
       }));
@@ -478,7 +478,7 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
     }
   };
   
-  // 🆕 FUNCIÓN MODIFICADA - Procesar pago CON IMPRESIÓN AUTOMÁTICA
+  // 🆕 FUNCIÓN COMPLETAMENTE ACTUALIZADA - Procesar pago CON IMPRESIÓN AUTOMÁTICA CORREGIDA
   const handleProcessPayment = async () => {
     setIsProcessing(true);
     setValidationErrors({});
@@ -533,6 +533,17 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
         }))
       };
       
+      console.log('🚀 [CHECKOUT] Iniciando proceso de pago:', {
+        facturar,
+        tipoFactura,
+        clienteNombre,
+        clienteCuit,
+        printConfig,
+        printInitialized,
+        availablePrintersCount: availablePrinters.length,
+        total: getTotalWithDiscount()
+      });
+      
       console.log('🔄 Procesando venta...');
       const response = await authenticatedFetch('/api/pdv/ventas', {
         method: 'POST',
@@ -551,13 +562,48 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
       console.log('✅ Venta creada:', result.id);
       
       let finalMessage = '';
-      let printResult = null;
+      let printResult: { success: any; message: any; jobId?: string | undefined; } | null = null;
       
-      // 🆕 LÓGICA DE IMPRESIÓN AUTOMÁTICA
+      // 🔧 LÓGICA DE IMPRESIÓN AUTOMÁTICA COMPLETAMENTE CORREGIDA
       if (facturar && result.facturaId && printConfig.autoPrint && printInitialized) {
         try {
-          console.log('🖨️ Iniciando impresión automática...');
+          console.log('🖨️ [CHECKOUT] Iniciando impresión automática...');
+          console.log('📋 [CHECKOUT] Datos de venta:', {
+            ventaId: result.id,
+            facturaId: result.facturaId,
+            total: getTotalWithDiscount(),
+            impresora: printConfig.selectedPrinter || 'Por defecto'
+          });
           
+          // 🔧 ESPERAR A QUE LA FACTURA ESTÉ COMPLETAMENTE PROCESADA
+          console.log('⏳ [CHECKOUT] Esperando procesamiento de factura...');
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          
+          // 🔧 VERIFICAR QUE LA FACTURA ESTÉ LISTA ANTES DE IMPRIMIR
+          console.log('🔍 [CHECKOUT] Verificando estado de factura...');
+          try {
+            const facturaVerification = await authenticatedFetch(`/api/pdv/facturas/${result.facturaId}`);
+            if (facturaVerification.ok) {
+              const facturaData = await facturaVerification.json();
+              console.log('📊 [CHECKOUT] Estado de factura:', {
+                id: facturaData.id,
+                estado: facturaData.estado,
+                cae: facturaData.cae ? 'Presente' : 'Ausente',
+                tieneVenta: !!facturaData.venta,
+                itemsCount: facturaData.venta?.items?.length || 0
+              });
+              
+              if (facturaData.estado === 'procesando') {
+                console.log('⏳ [CHECKOUT] Factura aún procesando, esperando más...');
+                await new Promise(resolve => setTimeout(resolve, 2000));
+              }
+            }
+          } catch (verificationError) {
+            console.warn('⚠️ [CHECKOUT] Error verificando factura:', verificationError);
+          }
+          
+          // 🔧 PROCEDER CON LA IMPRESIÓN USANDO EL PRINTFACTURA CORREGIDO
+          console.log('🖨️ [CHECKOUT] Enviando a impresora...');
           printResult = await printFactura(result.facturaId, {
             auto: true,
             printerName: printConfig.selectedPrinter || undefined,
@@ -566,20 +612,167 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
           
           if (printResult.success) {
             finalMessage = `✅ Venta completada y factura impresa correctamente`;
-            console.log('✅ Impresión automática exitosa');
+            console.log('✅ [CHECKOUT] Impresión automática exitosa');
+            
+            // 🔧 MOSTRAR NOTIFICACIÓN DE ÉXITO
+            setTimeout(() => {
+              const notification = document.createElement('div');
+              notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #10b981;
+                color: white;
+                padding: 16px 24px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                z-index: 10000;
+                font-size: 16px;
+                font-weight: 600;
+              `;
+              notification.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M20 6L9 17l-5-5"/>
+                  </svg>
+                  Factura impresa correctamente
+                </div>
+              `;
+              document.body.appendChild(notification);
+              
+              setTimeout(() => {
+                if (notification.parentElement) {
+                  notification.remove();
+                }
+              }, 5000);
+            }, 1000);
+            
           } else {
             finalMessage = `⚠️ Venta completada. Impresión falló: ${printResult.message}`;
-            console.warn('⚠️ Impresión automática falló:', printResult.message);
+            console.warn('⚠️ [CHECKOUT] Impresión automática falló:', printResult.message);
+            
+            // 🔧 MOSTRAR NOTIFICACIÓN DE ERROR CON OPCIÓN DE REIMPRESIÓN
+            setTimeout(() => {
+              const notification = document.createElement('div');
+              notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #ef4444;
+                color: white;
+                padding: 16px 24px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                z-index: 10000;
+                font-size: 14px;
+                max-width: 350px;
+              `;
+              notification.innerHTML = `
+                <div style="margin-bottom: 8px;">
+                  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+                    </svg>
+                    Error de impresión
+                  </div>
+                  <div style="font-size: 12px; opacity: 0.9;">
+                    ${printResult?.message ?? 'Error desconocido'}
+                  </div>
+                </div>
+                <button 
+                  onclick="window.open('/api/pdv/facturas/${result.facturaId}/pdf', '_blank')"
+                  style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 6px 12px; border-radius: 4px; font-size: 12px; cursor: pointer;"
+                >
+                  Descargar PDF
+                </button>
+              `;
+              document.body.appendChild(notification);
+              
+              setTimeout(() => {
+                if (notification.parentElement) {
+                  notification.remove();
+                }
+              }, 10000);
+            }, 1000);
           }
         } catch (printError) {
-          console.error('❌ Error en impresión automática:', printError);
+          console.error('❌ [CHECKOUT] Error en impresión automática:', printError);
           finalMessage = `⚠️ Venta completada. Error de impresión: ${printError instanceof Error ? printError.message : 'Error desconocido'}`;
+          
+          // 🔧 MOSTRAR NOTIFICACIÓN DE ERROR CRÍTICO
+          setTimeout(() => {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+              position: fixed;
+              top: 20px;
+              right: 20px;
+              background: #dc2626;
+              color: white;
+              padding: 16px 24px;
+              border-radius: 8px;
+              box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+              z-index: 10000;
+              font-size: 14px;
+              max-width: 350px;
+            `;
+            notification.innerHTML = `
+              <div style="margin-bottom: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="12" y1="8" x2="12" y2="12"/>
+                    <line x1="12" y1="16" x2="12.01" y2="16"/>
+                  </svg>
+                  Error crítico de impresión
+                </div>
+                <div style="font-size: 12px; opacity: 0.9;">
+                  La venta se completó pero no se pudo imprimir
+                </div>
+              </div>
+              <button 
+                onclick="window.open('/api/pdv/facturas/${result.facturaId}/pdf', '_blank')"
+                style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 6px 12px; border-radius: 4px; font-size: 12px; cursor: pointer;"
+              >
+                Descargar PDF
+              </button>
+            `;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+              if (notification.parentElement) {
+                notification.remove();
+              }
+            }, 15000);
+          }, 1000);
         }
-      } else if (facturar) {
-        finalMessage = `✅ Venta completada con factura ${tipoFactura}. ${result.cae ? 'CAE: ' + result.cae : 'Procesando facturación...'}`;
       } else {
-        finalMessage = '✅ Venta completada correctamente';
+        // 🔧 MEJORAR LOGGING CUANDO NO SE IMPRIME
+        console.log('ℹ️ [CHECKOUT] No se imprimirá automáticamente:', {
+          facturar,
+          facturaId: result.facturaId,
+          autoPrint: printConfig.autoPrint,
+          printInitialized,
+          razon: !facturar ? 'No se solicitó factura' :
+                 !result.facturaId ? 'No se generó factura' :
+                 !printConfig.autoPrint ? 'Impresión automática deshabilitada' :
+                 !printInitialized ? 'Sistema de impresión no inicializado' :
+                 'Motivo desconocido'
+        });
+        
+        if (facturar) {
+          finalMessage = `✅ Venta completada con factura ${tipoFactura}. ${result.cae ? 'CAE: ' + result.cae : 'Procesando facturación...'}`;
+        } else {
+          finalMessage = '✅ Venta completada correctamente';
+        }
       }
+      
+      console.log(`✅ [CHECKOUT] Venta completada exitosamente:`, {
+        ventaId: result.id,
+        facturaId: result.facturaId,
+        cae: result.cae,
+        impresionExitosa: printResult?.success,
+        mensajeFinal: finalMessage
+      });
       
       onComplete({
         success: true,
@@ -600,6 +793,17 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
     } finally {
       setIsProcessing(false);
     }
+  };
+  
+  // 🆕 FUNCIÓN PARA DEBUGGING AL FINAL DEL ARCHIVO
+  const debugPrintSystem = () => {
+    console.log('🔍 [DEBUG] Estado del sistema de impresión:', {
+      printInitialized,
+      availablePrinters: availablePrinters.map(p => ({ id: p.id, name: p.name, isDefault: p.isDefault })),
+      printConfig,
+      printError,
+      printLoading
+    });
   };
   
   if (!isOpen) return null;
@@ -803,7 +1007,7 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                       </label>
                     </div>
 
-                    {/* 🆕 SECCIÓN DE CONFIGURACIÓN DE IMPRESIÓN */}
+                    {/* 🆕 SECCIÓN DE CONFIGURACIÓN DE IMPRESIÓN ACTUALIZADA */}
                     {facturar && (
                       <div className="mt-3 p-4 bg-blue-50 rounded-lg border border-blue-200">
                         <div className="flex items-center justify-between mb-3">
@@ -1337,6 +1541,16 @@ export function CheckoutModal({ isOpen, onClose, onComplete }: CheckoutModalProp
                 className="py-3 px-6 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
               >
                 Cancelar
+              </button>
+            )}
+            
+            {/* 🆕 BOTÓN DE DEBUG EN DESARROLLO */}
+            {process.env.NODE_ENV === 'development' && (
+              <button
+                onClick={debugPrintSystem}
+                className="text-xs bg-gray-600 text-white px-2 py-1 rounded hover:bg-gray-700 transition-colors"
+              >
+                Debug Print
               </button>
             )}
             
