@@ -149,12 +149,8 @@ export class FukunPrintServiceFixed {
       }
     }
   
-    /**
-     * 🔧 GENERAR COMANDOS ESC/POS MEJORADOS
-     */
- // src/services/print/fukunPrintServiceFixed.ts - FUNCIÓN generateFacturaCommands MEJORADA
 /**
- * 🔧 GENERAR COMANDOS ESC/POS MEJORADOS CON TODOS LOS DATOS
+ * 🔧 GENERAR COMANDOS ESC/POS MEJORADOS CON DIFERENTES TIPOS DE COMPROBANTES
  */
 private generateFacturaCommands(facturaData: any): Uint8Array {
   const commands: number[] = [];
@@ -163,6 +159,20 @@ private generateFacturaCommands(facturaData: any): Uint8Array {
 
   // Inicializar impresora
   commands.push(...FukunPrintServiceFixed.COMMANDS.INIT);
+
+  // ===== DATOS DE LA EMPRESA =====
+  const empresaData = {
+    nombre: "CUSCO SAS",
+    cuit: "30-71823656-4",
+    razonSocial: "CUSCO SAS"
+  };
+
+  // ===== DETECTAR TIPO DE COMPROBANTE =====
+  const tipoComprobante = facturaData.tipoComprobante || 'TICKET';
+  const esFactura = tipoComprobante === 'A' || tipoComprobante === 'B';
+  const esTicket = !esFactura || tipoComprobante === 'TICKET';
+
+  console.log(`📋 [FUKUN] Tipo de comprobante: ${esTicket ? 'TICKET' : `FACTURA ${tipoComprobante}`}`);
 
   // ===== HEADER EMPRESARIAL =====
   commands.push(...FukunPrintServiceFixed.COMMANDS.ALIGN_CENTER);
@@ -176,6 +186,22 @@ private generateFacturaCommands(facturaData: any): Uint8Array {
   commands.push(...this.textToBytes('ALMACEN DE AROMAS'));
   commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_OFF);
   commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+
+  // ===== DATOS DE LA EMPRESA RESPONSABLE =====
+  if (esFactura) {
+    // Para facturas, mostrar datos fiscales completos
+    commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_ON);
+    commands.push(...this.textToBytes(empresaData.razonSocial));
+    commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_OFF);
+    commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+    
+    commands.push(...this.textToBytes(`CUIT: ${empresaData.cuit}`));
+    commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+    
+    // Condición IVA
+    commands.push(...this.textToBytes('IVA RESPONSABLE INSCRIPTO'));
+    commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+  }
 
   // Información de la sucursal
   const sucursalNombre = facturaData.venta?.sucursal?.nombre || 'Sucursal Principal';
@@ -195,27 +221,37 @@ private generateFacturaCommands(facturaData: any): Uint8Array {
     commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
   }
 
-  // ===== INFORMACIÓN DE FACTURA =====
+  // ===== TIPO DE COMPROBANTE =====
   commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
   commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_DOUBLE_HEIGHT);
   commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_ON);
   
-  const tipoFactura = facturaData.tipoComprobante || 'B';
-  commands.push(...this.textToBytes(`FACTURA ${tipoFactura}`));
+  if (esTicket) {
+    commands.push(...this.textToBytes('TICKET DE VENTA'));
+  } else {
+    commands.push(...this.textToBytes(`FACTURA ${tipoComprobante}`));
+  }
   
   commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_NORMAL);
   commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_OFF);
   commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
 
-  // Número de factura
-  const numeroFactura = String(facturaData.numeroFactura || '00000001').padStart(8, '0');
-  commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_ON);
-  commands.push(...this.textToBytes(`N° ${numeroFactura}`));
-  commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_OFF);
-  commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+  // Número de comprobante/ticket
+  if (esFactura) {
+    const numeroFactura = String(facturaData.numeroFactura || '00000001').padStart(8, '0');
+    commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_ON);
+    commands.push(...this.textToBytes(`N° ${numeroFactura}`));
+    commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_OFF);
+    commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+  } else {
+    // Para tickets, mostrar ID de venta
+    const ventaId = facturaData.venta?.id || 'N/A';
+    commands.push(...this.textToBytes(`Venta: ${ventaId.substring(0, 8)}...`));
+    commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+  }
 
-  // CAE y Vencimiento (si existe)
-  if (facturaData.cae) {
+  // CAE y Vencimiento (solo para facturas)
+  if (esFactura && facturaData.cae) {
     commands.push(...this.textToBytes(`CAE: ${facturaData.cae}`));
     commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
     
@@ -253,19 +289,29 @@ private generateFacturaCommands(facturaData: any): Uint8Array {
   commands.push(...this.textToBytes(`Hora: ${hora}`));
   commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
 
-  // ===== DATOS DEL CLIENTE =====
-  commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
-  
-  // Cliente
-  const clienteNombre = facturaData.venta?.clienteNombre || 'Consumidor Final';
-  commands.push(...this.textToBytes(`Cliente: ${clienteNombre}`));
-  commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+  // ===== DATOS DEL CLIENTE (solo para facturas) =====
+  if (esFactura) {
+    commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+    
+    // Cliente
+    const clienteNombre = facturaData.venta?.clienteNombre || 'Consumidor Final';
+    commands.push(...this.textToBytes(`Cliente: ${clienteNombre}`));
+    commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
 
-  // CUIT/DNI
-  const clienteCuit = facturaData.venta?.clienteCuit || 'No informado';
-  const tipoCuit = facturaData.venta?.clienteCuit && facturaData.venta.clienteCuit.length === 11 ? 'CUIT' : 'DNI';
-  commands.push(...this.textToBytes(`${tipoCuit}: ${clienteCuit}`));
-  commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+    // CUIT/DNI
+    const clienteCuit = facturaData.venta?.clienteCuit || 'No informado';
+    const tipoCuit = facturaData.venta?.clienteCuit && facturaData.venta.clienteCuit.length === 11 ? 'CUIT' : 'DNI';
+    commands.push(...this.textToBytes(`${tipoCuit}: ${clienteCuit}`));
+    commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+
+    // Condición IVA del cliente
+    if (tipoComprobante === 'A') {
+      commands.push(...this.textToBytes('Cond. IVA: IVA Responsable Inscripto'));
+    } else {
+      commands.push(...this.textToBytes('Cond. IVA: Consumidor Final'));
+    }
+    commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+  }
 
   // ===== LÍNEA SEPARADORA =====
   commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
@@ -273,6 +319,8 @@ private generateFacturaCommands(facturaData: any): Uint8Array {
   commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
 
   // ===== PRODUCTOS =====
+  const total = parseFloat(facturaData.venta?.total || 0);
+  
   if (facturaData.venta?.items && Array.isArray(facturaData.venta.items)) {
     console.log(`📦 [FUKUN] Procesando ${facturaData.venta.items.length} items...`);
     
@@ -285,18 +333,17 @@ private generateFacturaCommands(facturaData: any): Uint8Array {
         continue;
       }
 
-      // Nombre del producto (descripción completa)
+      // Nombre del producto
       const nombreProducto = item.producto.nombre || 'Producto sin nombre';
       const descripcion = item.producto.descripcion || '';
       
-      // Si hay descripción, mostrarla también
+      // Mostrar nombre del producto
       if (descripcion && descripcion !== nombreProducto) {
         commands.push(...this.textToBytes(this.truncateText(nombreProducto, 38)));
         commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
         commands.push(...this.textToBytes(`  ${this.truncateText(descripcion, 36)}`));
         commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
       } else {
-        // Permitir nombres más largos sin descripción
         const lineasNombre = this.wrapText(nombreProducto, 38);
         for (const linea of lineasNombre) {
           commands.push(...this.textToBytes(linea));
@@ -304,13 +351,26 @@ private generateFacturaCommands(facturaData: any): Uint8Array {
         }
       }
 
-      // Cantidad x precio = subtotal (en línea separada)
+      // Cálculos de precios según tipo de comprobante
       const cantidad = item.cantidad || 1;
-      const precio = parseFloat(item.precioUnitario || 0);
+      const precioOriginal = parseFloat(item.precioUnitario || 0);
       const descuento = parseFloat(item.descuento || 0);
-      const subtotal = cantidad * precio * (1 - descuento / 100);
       
-      let lineaDetalle = `${cantidad} x $${precio.toFixed(2)}`;
+      let precioMostrar: number;
+      let subtotal: number;
+      
+      if (tipoComprobante === 'A') {
+        // Factura A: mostrar precios sin IVA
+        precioMostrar = precioOriginal / 1.21; // Precio sin IVA
+        subtotal = cantidad * precioMostrar * (1 - descuento / 100);
+      } else {
+        // Factura B y Tickets: mostrar precios con IVA incluido
+        precioMostrar = precioOriginal;
+        subtotal = cantidad * precioMostrar * (1 - descuento / 100);
+      }
+      
+      // Línea de cantidad x precio = subtotal
+      let lineaDetalle = `${cantidad} x $${precioMostrar.toFixed(2)}`;
       if (descuento > 0) {
         lineaDetalle += ` (-${descuento}%)`;
       }
@@ -330,40 +390,110 @@ private generateFacturaCommands(facturaData: any): Uint8Array {
     commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
   }
 
-  // ===== TOTAL =====
+  // ===== TOTALES SEGÚN TIPO DE COMPROBANTE =====
   commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
   commands.push(...this.textToBytes('========================================'));
   commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
   
-  commands.push(...FukunPrintServiceFixed.COMMANDS.ALIGN_CENTER);
-  commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_DOUBLE_HEIGHT);
-  commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_ON);
+  if (tipoComprobante === 'A') {
+    // ===== FACTURA A: IVA DISCRIMINADO =====
+    commands.push(...FukunPrintServiceFixed.COMMANDS.ALIGN_LEFT);
+    
+    const netoGravado = total / 1.21;
+    const ivaCalculado = total - netoGravado;
+    
+    commands.push(...this.textToBytes(`Subtotal (Neto Gravado): $${netoGravado.toFixed(2)}`));
+    commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+    
+    commands.push(...this.textToBytes(`IVA 21%:                 $${ivaCalculado.toFixed(2)}`));
+    commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+    
+    commands.push(...this.textToBytes('----------------------------------------'));
+    commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+    
+    // Total final
+    commands.push(...FukunPrintServiceFixed.COMMANDS.ALIGN_CENTER);
+    commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_DOUBLE_HEIGHT);
+    commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_ON);
+    commands.push(...this.textToBytes(`TOTAL: $${total.toFixed(2)}`));
+    commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_NORMAL);
+    commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_OFF);
+    
+  } else if (tipoComprobante === 'B') {
+    // ===== FACTURA B: IVA INCLUIDO =====
+    commands.push(...FukunPrintServiceFixed.COMMANDS.ALIGN_CENTER);
+    commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_DOUBLE_HEIGHT);
+    commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_ON);
+    commands.push(...this.textToBytes(`TOTAL: $${total.toFixed(2)}`));
+    commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_NORMAL);
+    commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_OFF);
+    commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+    
+    // Nota sobre IVA incluido
+    commands.push(...FukunPrintServiceFixed.COMMANDS.ALIGN_LEFT);
+    commands.push(...this.textToBytes('(IVA incluido en el precio)'));
+    
+  } else {
+    // ===== TICKET: SOLO TOTAL =====
+    commands.push(...FukunPrintServiceFixed.COMMANDS.ALIGN_CENTER);
+    commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_DOUBLE_HEIGHT);
+    commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_ON);
+    commands.push(...this.textToBytes(`TOTAL: $${total.toFixed(2)}`));
+    commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_NORMAL);
+    commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_OFF);
+  }
   
-  const total = parseFloat(facturaData.venta?.total || 0);
-  commands.push(...this.textToBytes(`TOTAL: $${total.toFixed(2)}`));
-  
-  commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_NORMAL);
-  commands.push(...FukunPrintServiceFixed.COMMANDS.FONT_BOLD_OFF);
   commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
   commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
 
-  // ===== INFORMACIÓN FISCAL ADICIONAL (solo para facturas) =====
-  if (facturaData.cae && tipoFactura !== 'TICKET') {
+  // ===== INFORMACIÓN FISCAL ADICIONAL =====
+  if (esFactura && facturaData.cae) {
     commands.push(...FukunPrintServiceFixed.COMMANDS.ALIGN_LEFT);
     
     // Información AFIP
     commands.push(...this.textToBytes('-- DATOS FISCALES --'));
     commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
     
-    commands.push(...this.textToBytes(`Comprobante Autorizado`));
+    commands.push(...this.textToBytes(`Comprobante Autorizado por AFIP`));
     commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
     
-    if (tipoFactura === 'A') {
-      commands.push(...this.textToBytes('IVA Responsable Inscripto'));
+    if (tipoComprobante === 'A') {
+      commands.push(...this.textToBytes('Discriminacion de IVA'));
     } else {
       commands.push(...this.textToBytes('IVA Incluido'));
     }
     commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+    commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+  }
+
+  // ===== IMPUESTOS NACIONALES (SOLO FACTURA B) =====
+  if (tipoComprobante === 'B' && esFactura) {
+    const ivaIncluido = total - (total / 1.21);
+    
+    commands.push(...this.textToBytes('-- IMPUESTOS NACIONALES --'));
+    commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+    
+    commands.push(...this.textToBytes(`IVA 21% (incluido):      $${ivaIncluido.toFixed(2)}`));
+    commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+    commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+  }
+
+  // ===== INFORMACIÓN DE PAGOS =====
+  if (facturaData.venta?.pagos && Array.isArray(facturaData.venta.pagos)) {
+    commands.push(...this.textToBytes('-- FORMA DE PAGO --'));
+    commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+    
+    for (const pago of facturaData.venta.pagos) {
+      const medioPago = this.formatPaymentMethod(pago.medioPago);
+      commands.push(...this.textToBytes(`${medioPago}: $${parseFloat(pago.monto || 0).toFixed(2)}`));
+      commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+      
+      // Si hay cambio en efectivo
+      if (pago.medioPago === 'efectivo' && pago.datosPago?.cambio > 0) {
+        commands.push(...this.textToBytes(`Cambio: $${parseFloat(pago.datosPago.cambio).toFixed(2)}`));
+        commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
+      }
+    }
     commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
   }
 
@@ -378,20 +508,19 @@ private generateFacturaCommands(facturaData: any): Uint8Array {
   // ===== INFORMACIÓN DE CONTACTO =====
   commands.push(...this.textToBytes('Visite nuestras redes sociales'));
   commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
-  commands.push(...this.textToBytes('@tulumaromaterapia'));
+  commands.push(...this.textToBytes('@tulumalmacendearomas'));
   commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
   commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
 
-  // ===== QR CODE PARA CAE (si existe) =====
-  if (facturaData.cae) {
+  // ===== QR CODE PARA CAE (solo facturas) =====
+  if (esFactura && facturaData.cae) {
     commands.push(...this.textToBytes('Escanee el QR para verificar'));
     commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
     commands.push(...this.textToBytes('el comprobante en AFIP:'));
     commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
     commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
     
-    // Aquí iría el QR code (requiere comandos específicos del modelo)
-    // Por ahora, incluimos la URL de verificación
+    // URL de verificación AFIP
     const qrUrl = `https://www.afip.gob.ar/fe/qr/`;
     commands.push(...this.textToBytes(qrUrl));
     commands.push(...FukunPrintServiceFixed.COMMANDS.LINE_FEED);
@@ -403,8 +532,23 @@ private generateFacturaCommands(facturaData: any): Uint8Array {
   commands.push(...[0x1B, 0x64, 0x04]); // Alimentar 4 líneas
   commands.push(...FukunPrintServiceFixed.COMMANDS.CUT);
 
-  console.log(`✅ [FUKUN] Comandos mejorados generados: ${commands.length} bytes`);
+  console.log(`✅ [FUKUN] Comandos ${esTicket ? 'TICKET' : `FACTURA ${tipoComprobante}`} generados: ${commands.length} bytes`);
   return new Uint8Array(commands);
+}
+
+/**
+ * FUNCIÓN AUXILIAR: Formatear método de pago
+ */
+private formatPaymentMethod(medioPago: string): string {
+  const metodos: { [key: string]: string } = {
+    'efectivo': 'Efectivo',
+    'tarjeta_credito': 'Tarjeta de Crédito',
+    'tarjeta_debito': 'Tarjeta de Débito',
+    'transferencia': 'Transferencia',
+    'qr': 'Pago QR'
+  };
+  
+  return metodos[medioPago] || medioPago.charAt(0).toUpperCase() + medioPago.slice(1);
 }
 
 /**
