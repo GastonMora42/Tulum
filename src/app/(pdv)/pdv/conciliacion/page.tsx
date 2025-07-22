@@ -970,8 +970,6 @@ export default function ConciliacionPage() {
                             </h4>
                             
                             <div className="flex items-center space-x-4 text-sm text-gray-600">
-                              <span>Stock teórico: <strong>{producto.stockTeorico}</strong></span>
-                              
                               {estadoProducto.intentos > 0 && (
                                 <span className={`px-2 py-1 rounded text-xs font-medium ${
                                   intentosRestantes > 1 
