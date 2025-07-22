@@ -1,6 +1,12 @@
 {
+  "/api/system/printers/route": "app/api/system/printers/route.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/auth/refresh/route": "app/api/auth/refresh/route.js",
+  "/api/productos/cache/route": "app/api/productos/cache/route.js",
   "/(auth)/login/page": "app/(auth)/login/page.js",
+  "/(admin)/admin/productos/page": "app/(admin)/admin/productos/page.js",
+  "/(admin)/admin/productos/nuevo/page": "app/(admin)/admin/productos/nuevo/page.js",
+  "/(admin)/admin/productos/[id]/page": "app/(admin)/admin/productos/[id]/page.js",
   "/(pdv)/pdv/page": "app/(pdv)/pdv/page.js",
-  "/(pdv)/pdv/conciliacion/page": "app/(pdv)/pdv/conciliacion/page.js",
   "/(admin)/admin/page": "app/(admin)/admin/page.js"
 }
