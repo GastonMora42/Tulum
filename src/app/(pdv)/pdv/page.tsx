@@ -694,12 +694,6 @@ function ProductCard({ product, onSelect, onToggleFavorite, isFavorite }: Produc
         
         {/* Badges */}
         <div className="absolute top-4 left-4 right-4 flex justify-between items-start">
-          <span className={`px-3 py-1 rounded-full text-xs font-bold text-white ${
-            stockValue > 5 ? 'bg-green-500' : stockValue > 0 ? 'bg-amber-500' : 'bg-red-500'
-          }`}>
-            {stockValue} disp.
-          </span>
-          
           <button
             onClick={(e) => {
               e.stopPropagation();
