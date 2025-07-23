@@ -1,7 +1,7 @@
 // src/app/(pdv)/pdv/conciliacion/page.tsx - VERSIÓN CORREGIDA
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { format } from 'date-fns';
 import { 
   BarChart, CheckCircle, AlertTriangle, Save, Loader, Search, 
