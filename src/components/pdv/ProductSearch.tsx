@@ -490,19 +490,6 @@ function ImprovedProductCard({
           </div>
         )}
         
-        {/* Badge de stock mejorado */}
-        <div className="absolute top-3 right-3">
-          <span className={`px-3 py-1 rounded-full text-xs font-bold text-white shadow-lg ${
-            stockValue > 5 
-              ? 'bg-green-500' 
-              : stockValue > 0 
-              ? 'bg-amber-500' 
-              : 'bg-red-500'
-          }`}>
-            {stockValue} disp.
-          </span>
-        </div>
-        
         {/* Overlay de selección */}
         <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-all duration-200 flex items-center justify-center">
           <div className="bg-white text-[#311716] px-4 py-2 rounded-lg font-bold shadow-lg transform scale-95 group-hover:scale-100 transition-transform">

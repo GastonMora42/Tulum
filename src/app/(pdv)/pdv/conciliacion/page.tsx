@@ -1,4 +1,4 @@
-// src/app/(pdv)/pdv/conciliacion/page.tsx - VERSIÓN PROFESIONAL MEJORADA
+// src/app/(pdv)/pdv/conciliacion/page.tsx - VERSIÓN CORREGIDA
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -495,23 +495,27 @@ export default function ConciliacionPage() {
       
       const data = await response.json();
       
-      // 🆕 FORMATEAR DATOS CON NUEVOS ESTADOS
+      // 🆕 FORMATEAR DATOS CON NUEVOS ESTADOS Y VALIDACIONES MEJORADAS
       const conciliacionFormateada: Conciliacion = {
         id: data.id,
         fecha: data.fecha,
         estado: data.estado || 'pendiente',
-        productos: data.productos.map((p: any) => ({
-          id: p.id,
-          nombre: p.nombre,
-          stockTeorico: p.stockTeorico,
-          stockFisico: p.stockFisico,
-          diferencia: p.diferencia || 0,
-          categoriaId: p.categoriaId,
-          categoria: p.categoria,
-          estado: p.stockFisico !== null && p.stockFisico !== undefined ? 'confirmado' : 'pendiente',
-          intentosUsados: 0,
-          valorTemporal: ''
-        }))
+        productos: Array.isArray(data.productos) ? data.productos
+          .map((p: any) => ({
+            id: p.id,
+            nombre: p.nombre,
+            stockTeorico: p.stockTeorico,
+            stockFisico: p.stockFisico,
+            diferencia: p.diferencia || 0,
+            categoriaId: p.categoriaId,
+            categoria: p.categoria,
+            estado: p.stockFisico !== null && p.stockFisico !== undefined ? 'confirmado' : 'pendiente',
+            intentosUsados: 0,
+            valorTemporal: ''
+          }))
+          // 🔧 CORRECCIÓN 1: ORDENAR ALFABÉTICAMENTE POR NOMBRE
+          .sort((a: any, b: any) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }))
+        : [] // 🔧 CORRECCIÓN 2: FALLBACK SEGURO SI NO ES ARRAY
       };
       
       setConciliacion(conciliacionFormateada);
@@ -711,12 +715,20 @@ export default function ConciliacionPage() {
     }
   }, [activeCategoryId, categoriasBloquedas, loadConciliacionCategoria]);
 
-  // Filtrar productos por búsqueda
-  const productosFiltrados = conciliacion?.productos.filter(producto => {
-    const matchesSearch = searchTerm ? 
-      producto.nombre.toLowerCase().includes(searchTerm.toLowerCase()) : true;
-    return matchesSearch;
-  }) || [];
+  // 🔧 CORRECCIÓN 3: FILTRAR PRODUCTOS CON VALIDACIÓN SEGURA
+  const productosFiltrados = useMemo(() => {
+    // Validación segura de que productos es un array
+    const productosArray = Array.isArray(conciliacion?.productos) ? conciliacion.productos : [];
+    
+    return productosArray
+      .filter(producto => {
+        const matchesSearch = searchTerm ? 
+          producto.nombre.toLowerCase().includes(searchTerm.toLowerCase()) : true;
+        return matchesSearch;
+      })
+      // 🔧 CORRECCIÓN 1: REORDENAR ALFABÉTICAMENTE (aplicado también al filtrado)
+      .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
+  }, [conciliacion?.productos, searchTerm]);
 
   // Progreso de la categoría actual
   const progreso = {
@@ -1060,8 +1072,9 @@ export default function ConciliacionPage() {
                                     {producto.stockFisico === producto.stockTeorico ? (
                                       <span className="text-sm font-medium">✓ Correcto</span>
                                     ) : (
+                                      // 🔧 CORRECCIÓN 4: QUITAR MOSTRAR DIFERENCIA EN EL LABEL
                                       <span className="text-sm font-medium text-red-700">
-                                        ⚠ Dif: {(producto.stockFisico || 0) - producto.stockTeorico}
+                                        ⚠ Con diferencia
                                       </span>
                                     )}
                                   </div>
