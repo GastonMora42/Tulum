@@ -559,18 +559,6 @@ function ProductCard({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Badge de stock */}
-      {product.stock !== undefined && (
-        <div className={`absolute top-3 left-3 z-10 px-2 py-1 rounded-full text-xs font-medium ${
-          product.stock > 5 
-            ? 'bg-green-500 text-white' 
-            : product.stock > 0 
-            ? 'bg-amber-500 text-white' 
-            : 'bg-red-500 text-white'
-        }`}>
-          {product.stock > 0 ? `${product.stock} disp.` : 'Agotado'}
-        </div>
-      )}
 
       {/* Badge de favorito */}
       <button
