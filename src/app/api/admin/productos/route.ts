@@ -1,9 +1,21 @@
-// src/app/api/admin/productos/route.ts - VERSIÓN CORREGIDA PARA FÁBRICA
+// src/app/api/admin/productos/route.ts - AGREGAR MÉTODO POST
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/server/db/client';
 import { authMiddleware } from '@/server/api/middlewares/auth';
 import { checkPermission } from '@/server/api/middlewares/authorization';
+import { z } from 'zod';
 
+// Esquema de validación para crear producto
+const createProductoSchema = z.object({
+  nombre: z.string().min(3, { message: 'El nombre debe tener al menos 3 caracteres' }),
+  descripcion: z.string().nullable(),
+  precio: z.number().positive({ message: 'El precio debe ser positivo' }),
+  codigoBarras: z.string().nullable(),
+  imagen: z.string().nullable(),
+  categoriaId: z.string().min(1, { message: 'Debe seleccionar una categoría' }),
+  stockMinimo: z.number().int().nonnegative({ message: 'El stock mínimo debe ser un número positivo o cero' }),
+  activo: z.boolean().default(true)
+});
 export async function GET(req: NextRequest) {
   // Aplicar middleware de autenticación
   const authError = await authMiddleware(req);
@@ -142,93 +154,87 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// 🆕 NUEVA API ESPECÍFICA PARA FÁBRICA
-// src/app/api/fabrica/productos/route.ts
-export async function getFabricaProductos(req: NextRequest) {
+// 🆕 MÉTODO POST PARA CREAR PRODUCTOS
+export async function POST(req: NextRequest) {
+  console.log('🆕 [API] Iniciando creación de producto...');
+  
+  // Aplicar middleware de autenticación
   const authError = await authMiddleware(req);
   if (authError) return authError;
   
+  // Verificar permiso
+  const permissionError = await checkPermission('producto:crear')(req);
+  if (permissionError) return permissionError;
+  
   try {
-    const { searchParams } = new URL(req.url);
-    const search = searchParams.get('search');
-    const categoriaId = searchParams.get('categoriaId');
-    const limit = parseInt(searchParams.get('limit') || '1000');
+    const body = await req.json();
+    console.log('📝 [API] Datos recibidos:', body);
     
-    const user = (req as any).user;
+    // Validar datos de entrada
+    const validation = createProductoSchema.safeParse(body);
+    if (!validation.success) {
+      console.error('❌ [API] Datos inválidos:', validation.error.errors);
+      return NextResponse.json(
+        { error: 'Datos de entrada inválidos', details: validation.error.errors },
+        { status: 400 }
+      );
+    }
     
-    // 🔧 DETERMINAR ID DE FÁBRICA
-    let fabricaId = 'ubicacion-fabrica'; // ID por defecto
-    
-    // Si el usuario tiene una sucursal asignada y es de tipo fábrica, usarla
-    if (user.sucursalId) {
-      const sucursalUsuario = await prisma.ubicacion.findUnique({
-        where: { id: user.sucursalId }
+    // Verificar si ya existe un producto con el mismo código de barras
+    if (validation.data.codigoBarras) {
+      const existingProducto = await prisma.producto.findFirst({
+        where: { codigoBarras: validation.data.codigoBarras }
       });
       
-      if (sucursalUsuario && sucursalUsuario.tipo === 'fabrica') {
-        fabricaId = user.sucursalId;
+      if (existingProducto) {
+        return NextResponse.json(
+          { error: 'Ya existe un producto con este código de barras' },
+          { status: 400 }
+        );
       }
     }
     
-    console.log(`[API Fábrica Productos] Obteniendo productos para fábrica: ${fabricaId}`);
-    
-    // Construir filtros
-    const whereCondition: any = {
-      activo: true // Solo productos activos por defecto
-    };
-    
-    if (categoriaId) {
-      whereCondition.categoriaId = categoriaId;
-    }
-    
-    if (search) {
-      whereCondition.OR = [
-        { nombre: { contains: search, mode: 'insensitive' } },
-        { descripcion: { contains: search, mode: 'insensitive' } },
-        { codigoBarras: { contains: search, mode: 'insensitive' } }
-      ];
-    }
-    
-    // 🔧 OBTENER TODOS LOS PRODUCTOS CON SU STOCK EN FÁBRICA
-    const productos = await prisma.producto.findMany({
-      where: whereCondition,
-      include: {
-        categoria: true,
-        stocks: {
-          where: { ubicacionId: fabricaId },
-          select: { cantidad: true }
-        }
-      },
-      take: limit,
-      orderBy: [
-        { categoria: { nombre: 'asc' } },
-        { nombre: 'asc' }
-      ]
+    // Verificar que la categoría existe
+    const categoria = await prisma.categoria.findUnique({
+      where: { id: validation.data.categoriaId }
     });
     
-    // Transformar datos para incluir stock
-    const productosConStock = productos.map(producto => ({
-      id: producto.id,
-      nombre: producto.nombre,
-      descripcion: producto.descripcion,
-      precio: producto.precio,
-      codigoBarras: producto.codigoBarras,
-      imagen: producto.imagen,
-      categoriaId: producto.categoriaId,
-      categoria: producto.categoria,
-      stockMinimo: producto.stockMinimo,
-      activo: producto.activo,
-      stock: producto.stocks && producto.stocks.length > 0 ? producto.stocks[0].cantidad : 0
-    }));
+    if (!categoria) {
+      return NextResponse.json(
+        { error: 'La categoría seleccionada no existe' },
+        { status: 400 }
+      );
+    }
     
-    console.log(`[API Fábrica Productos] Encontrados ${productosConStock.length} productos`);
+    // Crear producto
+    const producto = await prisma.producto.create({
+      data: {
+        nombre: validation.data.nombre,
+        descripcion: validation.data.descripcion,
+        precio: validation.data.precio,
+        codigoBarras: validation.data.codigoBarras,
+        imagen: validation.data.imagen,
+        categoriaId: validation.data.categoriaId,
+        stockMinimo: validation.data.stockMinimo,
+        activo: validation.data.activo
+      },
+      include: {
+        categoria: {
+          select: {
+            id: true,
+            nombre: true
+          }
+        }
+      }
+    });
     
-    return NextResponse.json(productosConStock);
+    console.log('✅ [API] Producto creado exitosamente:', producto.id);
     
+    return NextResponse.json(producto, { status: 201 });
   } catch (error: any) {
-    console.error('Error al obtener productos de fábrica:', error);
+    console.error('❌ [API] Error al crear producto:', error);
     return NextResponse.json(
-      { error: error.message || 'Error al obtener productos de fábrica' },
+      { error: error.message || 'Error al crear producto' },
       { status: 500 }
     );
   }

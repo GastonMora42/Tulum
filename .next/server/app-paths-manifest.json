@@ -1,12 +1,9 @@
 {
-  "/api/auth/me/route": "app/api/auth/me/route.js",
-  "/_not-found/page": "app/_not-found/page.js",
-  "/api/productos/cache/route": "app/api/productos/cache/route.js",
-  "/api/system/printers/route": "app/api/system/printers/route.js",
-  "/api/auth/refresh/route": "app/api/auth/refresh/route.js",
-  "/page": "app/page.js",
-  "/(auth)/login/page": "app/(auth)/login/page.js",
+  "/api/admin/categorias/route": "app/api/admin/categorias/route.js",
+  "/api/admin/productos/route": "app/api/admin/productos/route.js",
+  "/(admin)/admin/productos/[id]/page": "app/(admin)/admin/productos/[id]/page.js",
   "/(admin)/admin/page": "app/(admin)/admin/page.js",
-  "/(pdv)/pdv/page": "app/(pdv)/pdv/page.js",
-  "/(pdv)/pdv/conciliacion/page": "app/(pdv)/pdv/conciliacion/page.js"
+  "/(admin)/admin/productos/page": "app/(admin)/admin/productos/page.js",
+  "/(admin)/admin/categorias/page": "app/(admin)/admin/categorias/page.js",
+  "/(admin)/admin/productos/nuevo/page": "app/(admin)/admin/productos/nuevo/page.js"
 }
