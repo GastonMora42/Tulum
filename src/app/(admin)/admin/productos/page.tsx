@@ -1,9 +1,10 @@
+// src/app/(admin)/admin/productos/page.tsx - VERSIÓN CORREGIDA CON PAGINACIÓN MEJORADA
 'use client';
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Package, Plus, Search, Filter, RefreshCw, AlertCircle, Printer } from 'lucide-react';
+import { Package, Plus, Search, Filter, RefreshCw, AlertCircle, Printer, ChevronLeft, ChevronRight } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
 import { ContrastEnhancer } from '@/components/ui/ContrastEnhancer';
 import { HCTable, HCTh, HCTd } from '@/components/ui/HighContrastComponents';
@@ -34,6 +35,15 @@ interface PaginationInfo {
   limit: number;
   total: number;
   totalPages: number;
+  hasNextPage: boolean;
+  hasPrevPage: boolean;
+  startIndex?: number;
+  endIndex?: number;
+}
+
+interface ApiResponse {
+  data: Producto[];
+  pagination: PaginationInfo;
 }
 
 export default function ProductosPage() {
@@ -46,129 +56,79 @@ export default function ProductosPage() {
   const [categoriaId, setCategoriaId] = useState('');
   const [soloActivos, setSoloActivos] = useState(true);
   const [imagenError, setImagenError] = useState<Record<string, boolean>>({});
+  
+  // 🔧 CORRECCIÓN: Estado de paginación mejorado
   const [paginationInfo, setPaginationInfo] = useState<PaginationInfo>({
     page: 1,
-    limit: 10,
+    limit: 20, // Aumentar límite por defecto
     total: 0,
-    totalPages: 0
+    totalPages: 0,
+    hasNextPage: false,
+    hasPrevPage: false
   });
+  
   const router = useRouter();
 
-  // 🔧 CORRECCIÓN DEFINITIVA: Función para normalizar respuesta de API
-  const normalizeApiResponse = (data: any) => {
-    console.log('🔍 Estructura de respuesta recibida:', data);
-    console.log('🔍 Tipo de data:', typeof data);
-    console.log('🔍 Es array data:', Array.isArray(data));
-    console.log('🔍 Keys de data:', data ? Object.keys(data) : 'data es null/undefined');
-
-    // Caso 1: Respuesta directa es un array (API simple)
-    if (Array.isArray(data)) {
-      console.log('✅ Caso 1: Respuesta directa es array');
+  // 🔧 CORRECCIÓN: Función para manejar respuesta de API simplificada
+  const handleApiResponse = (response: any): ApiResponse => {
+    console.log('🔍 [Productos] Respuesta API recibida:', response);
+    
+    // Verificar si ya tiene la estructura correcta
+    if (response && response.data && Array.isArray(response.data) && response.pagination) {
+      console.log('✅ [Productos] Estructura API correcta');
+      return response as ApiResponse;
+    }
+    
+    // Si es un array directo (compatibilidad hacia atrás)
+    if (Array.isArray(response)) {
+      console.log('⚡ [Productos] Convirtiendo array directo a estructura paginada');
       return {
-        productos: data,
+        data: response,
         pagination: {
           page: 1,
-          limit: data.length,
-          total: data.length,
-          totalPages: 1
+          limit: response.length,
+          total: response.length,
+          totalPages: 1,
+          hasNextPage: false,
+          hasPrevPage: false
         }
       };
     }
-
-    // Caso 2: Respuesta tiene estructura { data: [], pagination: {} }
-    if (data && typeof data === 'object' && Array.isArray(data.data)) {
-      console.log('✅ Caso 2: Estructura con data.data');
-      return {
-        productos: data.data,
-        pagination: data.pagination || {
-          page: 1,
-          limit: data.data.length,
-          total: data.data.length,
-          totalPages: 1
-        }
-      };
-    }
-
-    // Caso 3: Respuesta tiene estructura { productos: [], pagination: {} }
-    if (data && typeof data === 'object' && Array.isArray(data.productos)) {
-      console.log('✅ Caso 3: Estructura con productos');
-      return {
-        productos: data.productos,
-        pagination: data.pagination || {
-          page: 1,
-          limit: data.productos.length,
-          total: data.productos.length,
-          totalPages: 1
-        }
-      };
-    }
-
-    // Caso 4: Respuesta tiene productos directamente en el nivel superior
-    if (data && typeof data === 'object') {
-      // Buscar si hay claves que contengan arrays
-      for (const key of Object.keys(data)) {
-        if (Array.isArray(data[key]) && data[key].length > 0) {
-          // Verificar si el primer elemento parece un producto
-          const firstItem = data[key][0];
-          if (firstItem && typeof firstItem === 'object' && firstItem.id && firstItem.nombre) {
-            console.log(`✅ Caso 4: Encontrado array de productos en key '${key}'`);
-            return {
-              productos: data[key],
-              pagination: data.pagination || {
-                page: 1,
-                limit: data[key].length,
-                total: data[key].length,
-                totalPages: 1
-              }
-            };
-          }
-        }
-      }
-    }
-
-    // Caso 5: Respuesta vacía válida
-    if (data && typeof data === 'object' && (data.total === 0 || data.count === 0)) {
-      console.log('✅ Caso 5: Respuesta vacía válida');
-      return {
-        productos: [],
-        pagination: data.pagination || {
-          page: 1,
-          limit: 10,
-          total: 0,
-          totalPages: 0
-        }
-      };
-    }
-
-    // Caso 6: Error o formato no reconocido
-    console.error('❌ Formato de respuesta no reconocido:', data);
+    
+    console.error('❌ [Productos] Formato de respuesta no reconocido:', response);
     return {
-      productos: [],
+      data: [],
       pagination: {
         page: 1,
-        limit: 10,
+        limit: 20,
         total: 0,
-        totalPages: 0
+        totalPages: 0,
+        hasNextPage: false,
+        hasPrevPage: false
       }
     };
   };
 
-  // Cargar productos con manejo robusto de respuesta
-  const fetchProductos = async (page = 1) => {
+  // 🔧 CORRECCIÓN: Función de carga de productos mejorada
+  const fetchProductos = async (page = 1, resetPagination = false) => {
     try {
       setIsLoading(true);
       setError(null);
       
+      // Si estamos reseteando la paginación (nueva búsqueda), ir a página 1
+      const targetPage = resetPagination ? 1 : page;
+      
       const params = new URLSearchParams();
-      params.append('page', page.toString());
-      params.append('limit', '10');
-      if (search) params.append('search', search);
+      params.append('page', targetPage.toString());
+      params.append('limit', paginationInfo.limit.toString());
+      if (search.trim()) params.append('search', search.trim());
       if (categoriaId) params.append('categoriaId', categoriaId);
       params.append('soloActivos', soloActivos.toString());
       
-      console.log('🚀 Fetching productos:', `/api/admin/productos?${params.toString()}`);
+      const url = `/api/admin/productos?${params.toString()}`;
+      console.log('🚀 [Productos] Fetching:', url);
       
-      const response = await authenticatedFetch(`/api/admin/productos?${params.toString()}`);
+      const response = await authenticatedFetch(url);
       
       if (!response.ok) {
         let errorMessage;
@@ -182,18 +142,18 @@ export default function ProductosPage() {
       }
       
       const rawData = await response.json();
-      const normalizedData = normalizeApiResponse(rawData);
+      const { data: productos, pagination } = handleApiResponse(rawData);
       
-      console.log('📊 Datos normalizados:', {
-        productosCount: normalizedData.productos.length,
-        pagination: normalizedData.pagination
+      console.log('📊 [Productos] Datos procesados:', {
+        productosCount: productos.length,
+        pagination: pagination
       });
       
-      setProductos(normalizedData.productos);
-      setPaginationInfo(normalizedData.pagination);
+      setProductos(productos);
+      setPaginationInfo(pagination);
       
     } catch (err) {
-      console.error('❌ Error completo:', err);
+      console.error('❌ [Productos] Error completo:', err);
       
       const errorMessage = err instanceof Error 
         ? err.message 
@@ -203,9 +163,11 @@ export default function ProductosPage() {
       setProductos([]);
       setPaginationInfo({
         page: 1,
-        limit: 10,
+        limit: 20,
         total: 0,
-        totalPages: 0
+        totalPages: 0,
+        hasNextPage: false,
+        hasPrevPage: false
       });
     } finally {
       setIsLoading(false);
@@ -215,7 +177,7 @@ export default function ProductosPage() {
   // Cargar categorías
   const fetchCategorias = async () => {
     try {
-      console.log('🏷️ Cargando categorías...');
+      console.log('🏷️ [Productos] Cargando categorías...');
       
       const response = await authenticatedFetch('/api/admin/categorias');
       
@@ -224,9 +186,9 @@ export default function ProductosPage() {
       }
       
       const data = await response.json();
-      console.log('📊 Categorías recibidas:', data);
+      console.log('📊 [Productos] Categorías recibidas:', data);
       
-      // Normalizar respuesta de categorías también
+      // Normalizar respuesta de categorías
       if (Array.isArray(data)) {
         setCategorias(data);
       } else if (data && Array.isArray(data.data)) {
@@ -234,25 +196,53 @@ export default function ProductosPage() {
       } else if (data && Array.isArray(data.categorias)) {
         setCategorias(data.categorias);
       } else {
-        console.warn('⚠️ Formato de categorías no reconocido:', data);
+        console.warn('⚠️ [Productos] Formato de categorías no reconocido:', data);
         setCategorias([]);
       }
     } catch (err) {
-      console.error('❌ Error al cargar categorías:', err);
+      console.error('❌ [Productos] Error al cargar categorías:', err);
       setCategorias([]);
     }
   };
 
-  // Cargar datos iniciales
+  // 🔧 CORRECCIÓN: useEffect mejorado para carga inicial
   useEffect(() => {
-    fetchProductos();
+    console.log('🔄 [Productos] Carga inicial...');
+    fetchProductos(1, true); // Resetear paginación en carga inicial
     fetchCategorias();
+  }, []); // Solo ejecutar una vez al montar
+
+  // 🔧 CORRECCIÓN: useEffect separado para cambios de filtros
+  useEffect(() => {
+    console.log('🔄 [Productos] Filtros cambiaron:', { soloActivos });
+    // Solo recargar si no es la primera carga
+    if (productos.length > 0 || paginationInfo.total > 0) {
+      fetchProductos(1, true); // Resetear paginación cuando cambian filtros
+    }
   }, [soloActivos]);
 
   // Manejar búsqueda
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    fetchProductos(1);
+    console.log('🔍 [Productos] Ejecutando búsqueda:', search);
+    fetchProductos(1, true); // Resetear paginación en nueva búsqueda
+  };
+
+  // 🔧 CORRECCIÓN: Función de cambio de página mejorada
+  const handlePageChange = (newPage: number) => {
+    console.log(`📄 [Productos] Cambiando a página ${newPage}`);
+    
+    if (newPage < 1 || newPage > paginationInfo.totalPages) {
+      console.warn(`⚠️ [Productos] Página ${newPage} fuera de rango (1-${paginationInfo.totalPages})`);
+      return;
+    }
+    
+    if (newPage === paginationInfo.page) {
+      console.log(`ℹ️ [Productos] Ya estamos en la página ${newPage}`);
+      return;
+    }
+    
+    fetchProductos(newPage, false); // No resetear paginación
   };
 
   // Cambiar estado activo/inactivo
@@ -273,10 +263,12 @@ export default function ProductosPage() {
         throw new Error(errorData.error || 'Error al actualizar estado del producto');
       }
       
-      console.log(`✅ Producto ${id} ${!currentActive ? 'activado' : 'desactivado'}`);
-      fetchProductos(paginationInfo.page);
+      console.log(`✅ [Productos] Producto ${id} ${!currentActive ? 'activado' : 'desactivado'}`);
+      
+      // Recargar página actual sin resetear paginación
+      fetchProductos(paginationInfo.page, false);
     } catch (err) {
-      console.error('❌ Error al actualizar producto:', err);
+      console.error('❌ [Productos] Error al actualizar producto:', err);
       const errorMessage = err instanceof Error ? err.message : 'Error al actualizar estado del producto';
       setError(errorMessage);
     } finally {
@@ -284,15 +276,160 @@ export default function ProductosPage() {
     }
   };
 
-  // Cambiar página
-  const handlePageChange = (newPage: number) => {
-    if (newPage > 0 && newPage <= paginationInfo.totalPages) {
-      fetchProductos(newPage);
-    }
+  // 🔧 CORRECCIÓN: Limpiar filtros mejorado
+  const handleClearFilters = () => {
+    console.log('🧹 [Productos] Limpiando filtros...');
+    setSearch('');
+    setCategoriaId('');
+    setSoloActivos(true);
+    // Resetear paginación y recargar
+    fetchProductos(1, true);
   };
 
   const tieneProductos = productos.length > 0;
   const noHayProductos = !isLoading && productos.length === 0;
+
+  // 🔧 CORRECCIÓN: Componente de paginación mejorado
+  const PaginationControls = () => {
+    if (paginationInfo.totalPages <= 1) return null;
+
+    const { page, totalPages, hasNextPage, hasPrevPage, startIndex, endIndex, total } = paginationInfo;
+
+    // Generar números de página para mostrar
+    const getPageNumbers = () => {
+      const delta = 2; // Mostrar 2 páginas a cada lado de la actual
+      const range = [];
+      const rangeWithDots = [];
+
+      for (let i = Math.max(2, page - delta); i <= Math.min(totalPages - 1, page + delta); i++) {
+        range.push(i);
+      }
+
+      if (page - delta > 2) {
+        rangeWithDots.push(1, '...');
+      } else {
+        rangeWithDots.push(1);
+      }
+
+      rangeWithDots.push(...range);
+
+      if (page + delta < totalPages - 1) {
+        rangeWithDots.push('...', totalPages);
+      } else {
+        rangeWithDots.push(totalPages);
+      }
+
+      return rangeWithDots;
+    };
+
+    return (
+      <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+        <div className="flex-1 flex justify-between sm:hidden">
+          {/* Controles móviles */}
+          <button
+            onClick={() => handlePageChange(page - 1)}
+            disabled={!hasPrevPage || isLoading}
+            className={`relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md ${
+              !hasPrevPage || isLoading
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                : 'bg-white text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            <ChevronLeft className="h-4 w-4 mr-1" />
+            Anterior
+          </button>
+          <button
+            onClick={() => handlePageChange(page + 1)}
+            disabled={!hasNextPage || isLoading}
+            className={`ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md ${
+              !hasNextPage || isLoading
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                : 'bg-white text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            Siguiente
+            <ChevronRight className="h-4 w-4 ml-1" />
+          </button>
+        </div>
+
+        <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm text-gray-700">
+              Mostrando{' '}
+              <span className="font-medium">{startIndex || ((page - 1) * paginationInfo.limit + 1)}</span>{' '}
+              a{' '}
+              <span className="font-medium">
+                {endIndex || Math.min(page * paginationInfo.limit, total)}
+              </span>{' '}
+              de{' '}
+              <span className="font-medium">{total}</span>{' '}
+              productos
+            </p>
+          </div>
+          <div>
+            <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+              {/* Botón Anterior */}
+              <button
+                onClick={() => handlePageChange(page - 1)}
+                disabled={!hasPrevPage || isLoading}
+                className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 text-sm font-medium ${
+                  !hasPrevPage || isLoading
+                    ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                    : 'bg-white text-gray-500 hover:bg-gray-50'
+                }`}
+              >
+                <span className="sr-only">Anterior</span>
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+
+              {/* Números de página */}
+              {getPageNumbers().map((pageNum, index) => {
+                if (pageNum === '...') {
+                  return (
+                    <span
+                      key={`dots-${index}`}
+                      className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700"
+                    >
+                      ...
+                    </span>
+                  );
+                }
+
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => handlePageChange(pageNum as number)}
+                    disabled={isLoading}
+                    className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                      page === pageNum
+                        ? 'z-10 bg-indigo-50 border-indigo-500 text-indigo-600'
+                        : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                    } ${isLoading ? 'cursor-not-allowed opacity-50' : ''}`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+
+              {/* Botón Siguiente */}
+              <button
+                onClick={() => handlePageChange(page + 1)}
+                disabled={!hasNextPage || isLoading}
+                className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 text-sm font-medium ${
+                  !hasNextPage || isLoading
+                    ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                    : 'bg-white text-gray-500 hover:bg-gray-50'
+                }`}
+              >
+                <span className="sr-only">Siguiente</span>
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            </nav>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <ContrastEnhancer>
@@ -387,12 +524,7 @@ export default function ProductosPage() {
               
               <button
                 type="button"
-                onClick={() => {
-                  setSearch('');
-                  setCategoriaId('');
-                  setSoloActivos(true);
-                  fetchProductos(1);
-                }}
+                onClick={handleClearFilters}
                 disabled={isLoading}
                 className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -414,7 +546,7 @@ export default function ProductosPage() {
                 <p className="text-sm text-red-700 mt-1">{error}</p>
                 <div className="mt-3">
                   <button
-                    onClick={() => fetchProductos(paginationInfo.page)}
+                    onClick={() => fetchProductos(paginationInfo.page, false)}
                     className="bg-red-100 px-3 py-2 text-sm text-red-800 rounded-md hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-red-600"
                   >
                     Reintentar
@@ -433,6 +565,9 @@ export default function ProductosPage() {
               <p>Productos cargados: {productos.length}</p>
               <p>Página actual: {paginationInfo.page} de {paginationInfo.totalPages}</p>
               <p>Total registros: {paginationInfo.total}</p>
+              <p>Límite por página: {paginationInfo.limit}</p>
+              <p>Tiene página siguiente: {paginationInfo.hasNextPage ? 'Sí' : 'No'}</p>
+              <p>Tiene página anterior: {paginationInfo.hasPrevPage ? 'Sí' : 'No'}</p>
               <p>Estado loading: {isLoading ? 'Sí' : 'No'}</p>
               {error && <p className="text-red-600">Error: {error}</p>}
             </div>
@@ -573,80 +708,8 @@ export default function ProductosPage() {
                 </HCTable>
               </div>
 
-              {/* Paginación */}
-              {paginationInfo.totalPages > 1 && (
-                <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-                  <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                    <div>
-                      <p className="text-sm text-gray-700">
-                        Mostrando <span className="font-medium">{(paginationInfo.page - 1) * paginationInfo.limit + 1}</span> a{' '}
-                        <span className="font-medium">
-                          {Math.min(paginationInfo.page * paginationInfo.limit, paginationInfo.total)}
-                        </span>{' '}
-                        de <span className="font-medium">{paginationInfo.total}</span> resultados
-                      </p>
-                    </div>
-                    <div>
-                      <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                        <button
-                          onClick={() => handlePageChange(paginationInfo.page - 1)}
-                          disabled={paginationInfo.page === 1 || isLoading}
-                          className={`relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium ${
-                            paginationInfo.page === 1 || isLoading
-                              ? 'text-gray-300 cursor-not-allowed'
-                              : 'text-gray-500 hover:bg-gray-50'
-                          }`}
-                        >
-                          <span className="sr-only">Anterior</span>
-                          &lt;
-                        </button>
-                        
-                        {Array.from({ length: Math.min(5, paginationInfo.totalPages) }, (_, i) => {
-                          let pageNum = paginationInfo.page;
-                          if (paginationInfo.page <= 3) {
-                            pageNum = i + 1;
-                          } else if (paginationInfo.page >= paginationInfo.totalPages - 2) {
-                            pageNum = paginationInfo.totalPages - 4 + i;
-                          } else {
-                            pageNum = paginationInfo.page - 2 + i;
-                          }
-                          
-                          if (pageNum > 0 && pageNum <= paginationInfo.totalPages) {
-                            return (
-                              <button
-                                key={pageNum}
-                                onClick={() => handlePageChange(pageNum)}
-                                disabled={isLoading}
-                                className={`relative inline-flex items-center px-4 py-2 border ${
-                                  paginationInfo.page === pageNum
-                                    ? 'z-10 bg-indigo-50 border-indigo-500 text-indigo-600'
-                                    : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-                                } text-sm font-medium ${isLoading ? 'cursor-not-allowed opacity-50' : ''}`}
-                              >
-                                {pageNum}
-                              </button>
-                            );
-                          }
-                          return null;
-                        })}
-                        
-                        <button
-                          onClick={() => handlePageChange(paginationInfo.page + 1)}
-                          disabled={paginationInfo.page === paginationInfo.totalPages || isLoading}
-                          className={`relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium ${
-                            paginationInfo.page === paginationInfo.totalPages || isLoading
-                              ? 'text-gray-300 cursor-not-allowed'
-                              : 'text-gray-500 hover:bg-gray-50'
-                          }`}
-                        >
-                          <span className="sr-only">Siguiente</span>
-                          &gt;
-                        </button>
-                      </nav>
-                    </div>
-                  </div>
-                </div>
-              )}
+              {/* 🔧 CORRECCIÓN: Controles de paginación mejorados */}
+              <PaginationControls />
             </>
           )}
         </div>

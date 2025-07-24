@@ -1,4 +1,4 @@
-// src/app/api/admin/productos/route.ts - AGREGAR MÉTODO POST
+// src/app/api/admin/productos/route.ts - VERSIÓN CORREGIDA CON PAGINACIÓN
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/server/db/client';
 import { authMiddleware } from '@/server/api/middlewares/auth';
@@ -16,6 +16,7 @@ const createProductoSchema = z.object({
   stockMinimo: z.number().int().nonnegative({ message: 'El stock mínimo debe ser un número positivo o cero' }),
   activo: z.boolean().default(true)
 });
+
 export async function GET(req: NextRequest) {
   // Aplicar middleware de autenticación
   const authError = await authMiddleware(req);
@@ -23,20 +24,33 @@ export async function GET(req: NextRequest) {
   
   try {
     const { searchParams } = new URL(req.url);
+    
+    // 🔧 CORRECCIÓN: Parámetros de paginación corregidos
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20'); // Aumentar límite por defecto
     const conStock = searchParams.get('conStock') === 'true';
     const categoriaId = searchParams.get('categoriaId');
     const ubicacionId = searchParams.get('ubicacionId');
-    const incluirInactivos = searchParams.get('incluirInactivos') === 'true';
-    const limit = parseInt(searchParams.get('limit') || '1000'); // 🔧 AUMENTAR LÍMITE
+    const soloActivos = searchParams.get('soloActivos') !== 'false'; // Por defecto true
     const search = searchParams.get('search');
     
     const user = (req as any).user;
     
-    // 🔧 CORRECCIÓN: Construir where condition más flexible
+    console.log(`[API Productos] Consultando página ${page}, límite ${limit}`);
+    console.log(`[API Productos] Filtros:`, {
+      conStock,
+      categoriaId,
+      ubicacionId,
+      soloActivos,
+      search,
+      userRole: user.roleId
+    });
+    
+    // 🔧 CORRECCIÓN: Construir condición WHERE más robusta
     const whereCondition: any = {};
     
-    // Solo filtrar por activo si no se especifica incluirInactivos
-    if (!incluirInactivos) {
+    // Filtro por estado activo
+    if (soloActivos) {
       whereCondition.activo = true;
     }
     
@@ -54,23 +68,28 @@ export async function GET(req: NextRequest) {
       ];
     }
     
-    console.log(`[API Productos] Buscando productos con filtros:`, {
-      conStock,
-      categoriaId,
-      ubicacionId,
-      incluirInactivos,
-      limit,
-      search,
-      userRole: user.roleId
-    });
+    // 🔧 CORRECCIÓN: Calcular offset para paginación
+    const offset = (page - 1) * limit;
     
     if (conStock && ubicacionId) {
-      // 🔧 CORRECCIÓN: Consulta optimizada para productos con stock
+      // Consulta para productos con stock específico
+      console.log(`[API Productos] Consultando productos con stock en ubicación ${ubicacionId}`);
+      
+      // Primero contar el total
+      const totalStockQuery = await prisma.stock.count({
+        where: {
+          ubicacionId,
+          productoId: { not: null },
+          producto: whereCondition
+        }
+      });
+      
+      // Luego obtener los productos paginados
       const productosConStock = await prisma.stock.findMany({
         where: {
           ubicacionId,
           productoId: { not: null },
-          producto: whereCondition // 🔧 Aplicar filtros a productos
+          producto: whereCondition
         },
         include: {
           producto: {
@@ -79,6 +98,7 @@ export async function GET(req: NextRequest) {
             }
           }
         },
+        skip: offset,
         take: limit,
         orderBy: [
           { producto: { nombre: 'asc' } }
@@ -87,7 +107,7 @@ export async function GET(req: NextRequest) {
       
       // Transformar datos
       const productos = productosConStock
-        .filter(stock => stock.producto) // 🔧 Asegurar que el producto existe
+        .filter(stock => stock.producto)
         .map(stock => ({
           id: stock.producto!.id,
           nombre: stock.producto!.nombre,
@@ -99,31 +119,53 @@ export async function GET(req: NextRequest) {
           categoria: stock.producto!.categoria,
           stockMinimo: stock.producto!.stockMinimo,
           activo: stock.producto!.activo,
-          stock: stock.cantidad // Stock actual en la ubicación
+          stock: stock.cantidad
         }));
       
-      console.log(`[API Productos] Encontrados ${productos.length} productos con stock`);
-      return NextResponse.json(productos);
+      console.log(`[API Productos] Devolviendo ${productos.length} productos con stock de ${totalStockQuery} total`);
+      
+      return NextResponse.json({
+        data: productos,
+        pagination: {
+          page,
+          limit,
+          total: totalStockQuery,
+          totalPages: Math.ceil(totalStockQuery / limit),
+          hasNextPage: page * limit < totalStockQuery,
+          hasPrevPage: page > 1
+        }
+      });
       
     } else {
-      // 🔧 CORRECCIÓN: Consulta para todos los productos sin filtro de stock
+      // 🔧 CORRECCIÓN: Consulta normal con paginación real
+      console.log(`[API Productos] Consultando todos los productos con paginación`);
+      
+      // Contar total
+      const total = await prisma.producto.count({
+        where: whereCondition
+      });
+      
+      // Obtener productos paginados
       const productos = await prisma.producto.findMany({
         where: whereCondition,
         include: {
           categoria: true,
-          // 🆕 INCLUIR STOCK PARA REFERENCIA (opcional)
-          stocks: ubicacionId ? {
-            where: { ubicacionId },
-            select: { cantidad: true }
-          } : false
+          // Incluir stock si se especifica ubicación
+          ...(ubicacionId ? {
+            stocks: {
+              where: { ubicacionId },
+              select: { cantidad: true }
+            }
+          } : {})
         },
+        skip: offset,
         take: limit,
         orderBy: [
           { nombre: 'asc' }
         ]
       });
       
-      // 🔧 TRANSFORMAR DATOS INCLUYENDO STOCK SI ESTÁ DISPONIBLE
+      // Transformar datos incluyendo stock si está disponible
       const productosTransformados = productos.map(producto => ({
         id: producto.id,
         nombre: producto.nombre,
@@ -135,26 +177,52 @@ export async function GET(req: NextRequest) {
         categoria: producto.categoria,
         stockMinimo: producto.stockMinimo,
         activo: producto.activo,
-        // 🆕 INCLUIR STOCK SI ESTÁ DISPONIBLE
+        // Incluir stock si está disponible
         stock: ubicacionId && producto.stocks && producto.stocks.length > 0 
           ? producto.stocks[0].cantidad 
           : undefined
       }));
       
-      console.log(`[API Productos] Encontrados ${productosTransformados.length} productos totales`);
-      return NextResponse.json(productosTransformados);
+      const totalPages = Math.ceil(total / limit);
+      
+      console.log(`[API Productos] Devolviendo ${productosTransformados.length} productos de ${total} total, página ${page}/${totalPages}`);
+      
+      return NextResponse.json({
+        data: productosTransformados,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages,
+          hasNextPage: page < totalPages,
+          hasPrevPage: page > 1,
+          startIndex: offset + 1,
+          endIndex: Math.min(offset + limit, total)
+        }
+      });
     }
     
   } catch (error: any) {
-    console.error('Error al obtener productos:', error);
+    console.error('❌ [API Productos] Error al obtener productos:', error);
     return NextResponse.json(
-      { error: error.message || 'Error al obtener productos' },
+      { 
+        error: error.message || 'Error al obtener productos',
+        data: [],
+        pagination: {
+          page: 1,
+          limit: 20,
+          total: 0,
+          totalPages: 0,
+          hasNextPage: false,
+          hasPrevPage: false
+        }
+      },
       { status: 500 }
     );
   }
 }
 
-// 🆕 MÉTODO POST PARA CREAR PRODUCTOS
+// 🆕 MÉTODO POST PARA CREAR PRODUCTOS (mantener igual)
 export async function POST(req: NextRequest) {
   console.log('🆕 [API] Iniciando creación de producto...');
   

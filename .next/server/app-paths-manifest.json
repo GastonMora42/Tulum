@@ -1,9 +1,9 @@
 {
-  "/api/admin/categorias/route": "app/api/admin/categorias/route.js",
-  "/api/admin/productos/route": "app/api/admin/productos/route.js",
-  "/(admin)/admin/productos/[id]/page": "app/(admin)/admin/productos/[id]/page.js",
+  "/api/productos/route": "app/api/productos/route.js",
+  "/api/admin/stock-config/bulk-load/route": "app/api/admin/stock-config/bulk-load/route.js",
+  "/api/admin/stock-config/dashboard/route": "app/api/admin/stock-config/dashboard/route.js",
+  "/page": "app/page.js",
+  "/(auth)/login/page": "app/(auth)/login/page.js",
   "/(admin)/admin/page": "app/(admin)/admin/page.js",
-  "/(admin)/admin/productos/page": "app/(admin)/admin/productos/page.js",
-  "/(admin)/admin/categorias/page": "app/(admin)/admin/categorias/page.js",
-  "/(admin)/admin/productos/nuevo/page": "app/(admin)/admin/productos/nuevo/page.js"
+  "/(admin)/admin/stock-sucursales/page": "app/(admin)/admin/stock-sucursales/page.js"
 }

@@ -1,4 +1,4 @@
-// src/server/services/stock/stockSucursalService.ts
+// src/server/services/stock/stockSucursalService.ts - VERSIÓN CORREGIDA
 import prisma from '@/server/db/client';
 import { stockService } from './stockService';
 
@@ -73,6 +73,64 @@ class StockSucursalService {
     
     return config;
   }
+
+  // 🆕 NUEVO: Crear configuración automática básica
+  async crearConfiguracionAutomatica(productoId: string, sucursalId: string, usuarioId: string, stockActual: number = 0) {
+    console.log(`[StockSucursal] Creando configuración automática para producto ${productoId} en sucursal ${sucursalId}`);
+    
+    try {
+      // Verificar que no existe ya
+      const existeConfig = await prisma.stockConfigSucursal.findUnique({
+        where: {
+          productoId_sucursalId: { productoId, sucursalId }
+        }
+      });
+      
+      if (existeConfig) {
+        console.log(`[StockSucursal] Ya existe configuración para producto ${productoId}`);
+        return existeConfig;
+      }
+      
+      // Obtener información del producto para calcular valores por defecto
+      const producto = await prisma.producto.findUnique({
+        where: { id: productoId }
+      });
+      
+      if (!producto) {
+        throw new Error('Producto no encontrado');
+      }
+      
+      // Calcular valores por defecto inteligentes
+      const stockMinimo = Math.max(producto.stockMinimo, 1);
+      const stockMaximo = Math.max(stockActual * 3, stockMinimo * 5, 10); // Al menos 3x el stock actual o 5x el mínimo
+      const puntoReposicion = Math.ceil(stockMinimo * 1.5);
+      
+      const config = await prisma.stockConfigSucursal.create({
+        data: {
+          productoId,
+          sucursalId,
+          stockMaximo,
+          stockMinimo,
+          puntoReposicion,
+          creadoPor: usuarioId,
+          activo: true
+        },
+        include: {
+          producto: true,
+          sucursal: true,
+          usuario: {
+            select: { name: true, email: true }
+          }
+        }
+      });
+      
+      console.log(`[StockSucursal] ✅ Configuración automática creada: Min=${stockMinimo}, Max=${stockMaximo}, Repo=${puntoReposicion}`);
+      return config;
+    } catch (error) {
+      console.error(`[StockSucursal] Error creando configuración automática:`, error);
+      throw error;
+    }
+  }
   
   async obtenerConfiguraciones(filtros?: {
     sucursalId?: string;
@@ -145,14 +203,16 @@ class StockSucursalService {
     }
   }
   
-  // =================== ANÁLISIS Y DASHBOARD ===================
+  // =================== ANÁLISIS Y DASHBOARD MEJORADO ===================
   
+  // 🔧 CORRECCIÓN: Dashboard mejorado que incluye productos sin configuración
   async generarDashboard(sucursalId?: string) {
-    console.log(`[StockSucursal] Generando dashboard para sucursal: ${sucursalId || 'todas'}`);
+    console.log(`[StockSucursal] Generando dashboard mejorado para sucursal: ${sucursalId || 'todas'}`);
     
     const where: any = { activo: true };
     if (sucursalId) where.sucursalId = sucursalId;
     
+    // 1. Obtener productos con configuración explícita
     const configs = await prisma.stockConfigSucursal.findMany({
       where,
       include: {
@@ -161,8 +221,31 @@ class StockSucursalService {
       }
     });
     
-    // Obtener stocks actuales
-    const analisisCompleto = await Promise.all(configs.map(async (config) => {
+    console.log(`[StockSucursal] Encontradas ${configs.length} configuraciones explícitas`);
+    
+    // 2. 🆕 NUEVO: Obtener productos con stock pero sin configuración
+    const stocksSinConfig = await prisma.stock.findMany({
+      where: {
+        ...(sucursalId ? { ubicacionId: sucursalId } : {}),
+        productoId: { not: null },
+        cantidad: { gt: 0 }, // Solo mostrar productos con stock > 0
+        // Excluir productos que ya tienen configuración
+        NOT: {
+          productoId: {
+            in: configs.map(c => c.productoId)
+          }
+        }
+      },
+      include: {
+        producto: true,
+        ubicacion: true
+      }
+    });
+    
+    console.log(`[StockSucursal] Encontrados ${stocksSinConfig.length} productos con stock sin configuración`);
+    
+    // 3. Analizar productos con configuración
+    const analisisConConfig = await Promise.all(configs.map(async (config) => {
       const stats = await this.calcularEstadisticasStock(config.productoId, config.sucursalId, config);
       
       return {
@@ -182,13 +265,61 @@ class StockSucursalService {
           stockMinimo: config.stockMinimo,
           puntoReposicion: config.puntoReposicion
         },
+        tieneConfiguracion: true,
         ...stats
       };
     }));
     
-    // Calcular estadísticas generales
+    // 4. 🆕 NUEVO: Analizar productos sin configuración con valores por defecto
+    const analisisSinConfig = stocksSinConfig.map((stock) => {
+      const stockActual = stock.cantidad;
+      const producto = stock.producto!;
+      
+      // Usar valores por defecto basados en el stockMinimo del producto
+      const stockMinimo = Math.max(producto.stockMinimo, 1);
+      const stockMaximo = stockMinimo * 5; // Por defecto 5x el mínimo
+      const puntoReposicion = Math.ceil(stockMinimo * 1.5);
+      
+      const configuracionPorDefecto = {
+        stockMaximo,
+        stockMinimo,
+        puntoReposicion
+      };
+      
+      // Calcular estadísticas usando la configuración por defecto
+      const stats = this.calcularEstadisticasStockDirecto(stockActual, configuracionPorDefecto);
+      
+      return {
+        id: `sin-config-${stock.id}`, // ID temporal
+        producto: {
+          id: producto.id,
+          nombre: producto.nombre,
+          codigoBarras: producto.codigoBarras
+        },
+        sucursal: {
+          id: stock.ubicacion.id,
+          nombre: stock.ubicacion.nombre,
+          tipo: stock.ubicacion.tipo
+        },
+        configuracion: configuracionPorDefecto,
+        tieneConfiguracion: false, // Marcar como sin configuración
+        ...stats,
+        // Agregar flag para identificar que necesita configuración
+        requiereConfiguracion: true
+      };
+    });
+    
+    // 5. Combinar ambos análisis
+    const analisisCompleto = [...analisisConConfig, ...analisisSinConfig]
+      .sort((a, b) => b.prioridad - a.prioridad);
+    
+    console.log(`[StockSucursal] Dashboard generado: ${analisisConConfig.length} con config + ${analisisSinConfig.length} sin config = ${analisisCompleto.length} total`);
+    
+    // 6. Calcular estadísticas generales
     const estadisticas = {
       total: analisisCompleto.length,
+      conConfiguracion: analisisConConfig.length,
+      sinConfiguracion: analisisSinConfig.length,
       criticos: analisisCompleto.filter(a => a.estado === 'critico').length,
       bajos: analisisCompleto.filter(a => a.estado === 'bajo').length,
       normales: analisisCompleto.filter(a => a.estado === 'normal').length,
@@ -197,10 +328,10 @@ class StockSucursalService {
       conExceso: analisisCompleto.filter(a => a.acciones.tieneExceso).length
     };
     
-    // Resumen por sucursal
+    // 7. Resumen por sucursal
     const resumenSucursales = this.agruparPorSucursal(analisisCompleto);
     
-    // Top productos
+    // 8. Top productos
     const topDeficit = analisisCompleto
       .filter(a => a.diferencia > 0)
       .sort((a, b) => b.diferencia - a.diferencia)
@@ -214,7 +345,7 @@ class StockSucursalService {
     return {
       estadisticas,
       resumenSucursales,
-      analisisCompleto: analisisCompleto.sort((a, b) => b.prioridad - a.prioridad),
+      analisisCompleto,
       topDeficit,
       topExceso,
       ultimaActualizacion: new Date()
@@ -230,6 +361,11 @@ class StockSucursalService {
     });
     
     const cantidadActual = stock?.cantidad || 0;
+    return this.calcularEstadisticasStockDirecto(cantidadActual, config);
+  }
+  
+  // 🆕 NUEVO: Función auxiliar para calcular estadísticas sin consulta a BD
+  private calcularEstadisticasStockDirecto(cantidadActual: number, config: any) {
     const diferencia = config.stockMaximo - cantidadActual;
     const porcentajeUso = config.stockMaximo > 0 ? (cantidadActual / config.stockMaximo) * 100 : 0;
     
@@ -276,19 +412,28 @@ class StockSucursalService {
           criticos: 0,
           bajos: 0,
           normales: 0,
-          excesos: 0
+          excesos: 0,
+          conConfiguracion: 0,
+          sinConfiguracion: 0
         };
       }
       
       acc[sucursalId].total++;
       acc[sucursalId][item.estado + 's']++;
       
+      if (item.tieneConfiguracion) {
+        acc[sucursalId].conConfiguracion++;
+      } else {
+        acc[sucursalId].sinConfiguracion++;
+      }
+      
       return acc;
     }, {});
   }
   
-  // =================== CARGA MASIVA ===================
+  // =================== CARGA MASIVA MEJORADA ===================
   
+  // 🔧 CORRECCIÓN: Procesar carga masiva con creación automática de configuración
   async procesarCargaMasiva(data: BulkLoadData, usuarioId: string) {
     console.log(`[StockSucursal] Iniciando carga masiva: ${data.nombre} con ${data.items.length} items`);
     
@@ -310,11 +455,26 @@ class StockSucursalService {
     
     for (const item of data.items) {
       try {
+        console.log(`[StockSucursal] Procesando item: ${item.nombreProducto || item.productoId}`);
+        
         const resultado = await this.procesarItemCarga(carga.id, item, data.modo, data.sucursalId, usuarioId);
         resultados.push(resultado);
         
         if (resultado.estado === 'procesado') {
           itemsProcesados++;
+          
+          // 🆕 NUEVO: Crear configuración automática si no existe
+          try {
+            await this.crearConfiguracionAutomatica(
+              resultado.producto.id, 
+              data.sucursalId, 
+              usuarioId, 
+              resultado.cantidadFinal
+            );
+          } catch (configError) {
+            console.warn(`[StockSucursal] No se pudo crear configuración automática para ${resultado.producto.nombre}:`, configError);
+            // No fallar la carga por esto
+          }
         } else {
           itemsErrores++;
         }
@@ -355,6 +515,8 @@ class StockSucursalService {
     // Generar alertas para productos afectados
     await this.verificarAlertasParaSucursal(data.sucursalId);
     
+    console.log(`[StockSucursal] ✅ Carga masiva completada: ${itemsProcesados} procesados, ${itemsErrores} errores`);
+    
     return {
       carga: cargaFinalizada,
       resumen: {
@@ -374,27 +536,57 @@ class StockSucursalService {
     sucursalId: string, 
     usuarioId: string
   ) {
-    // Buscar producto
+    // Buscar producto (lógica existente mejorada)
     let producto = null;
     
     if (item.productoId) {
-      producto = await prisma.producto.findUnique({ where: { id: item.productoId } });
+      producto = await prisma.producto.findUnique({ 
+        where: { id: item.productoId, activo: true } 
+      });
     } else if (item.codigoBarras) {
       producto = await prisma.producto.findFirst({
         where: { codigoBarras: item.codigoBarras, activo: true }
       });
     } else if (item.nombreProducto) {
+      // Búsqueda más inteligente por nombre
+      const searchTerms = item.nombreProducto.toLowerCase().split(' ').filter((term: string) => term.length > 2);
+      
+      // Primero búsqueda exacta
       producto = await prisma.producto.findFirst({
         where: { 
-          nombre: { contains: item.nombreProducto, mode: 'insensitive' },
+          nombre: { equals: item.nombreProducto, mode: 'insensitive' },
           activo: true 
         }
       });
+      
+      // Si no encuentra, búsqueda por términos
+      if (!producto && searchTerms.length > 0) {
+        producto = await prisma.producto.findFirst({
+          where: { 
+            AND: searchTerms.map((term: any) => ({
+              nombre: { contains: term, mode: 'insensitive' }
+            })),
+            activo: true 
+          }
+        });
+      }
+      
+      // Último intento: búsqueda parcial
+      if (!producto) {
+        producto = await prisma.producto.findFirst({
+          where: { 
+            nombre: { contains: item.nombreProducto, mode: 'insensitive' },
+            activo: true 
+          }
+        });
+      }
     }
     
     if (!producto) {
-      throw new Error('Producto no encontrado');
+      throw new Error(`Producto no encontrado: ${item.productoId || item.codigoBarras || item.nombreProducto}`);
     }
+    
+    console.log(`[StockSucursal] ✅ Producto encontrado: ${producto.nombre}`);
     
     // Obtener stock actual
     const stockActual = await prisma.stock.findFirst({
@@ -426,9 +618,11 @@ class StockSucursalService {
         throw new Error('Modo de carga inválido');
     }
     
+    console.log(`[StockSucursal] Ajuste calculado: ${cantidadAnterior} -> ${cantidadFinal} (${cantidadAjuste > 0 ? '+' : ''}${cantidadAjuste})`);
+    
     // Realizar ajuste si es necesario
     if (cantidadAjuste !== 0) {
-      await stockService.ajustarStock({
+      const resultado = await stockService.ajustarStock({
         productoId: producto.id,
         ubicacionId: sucursalId,
         cantidad: cantidadAjuste,
@@ -436,7 +630,19 @@ class StockSucursalService {
         usuarioId,
         allowNegative: true
       });
+      
+      console.log(`[StockSucursal] ✅ Stock ajustado para ${producto.nombre}`);
     }
+    
+    // Obtener stock final real
+    const stockFinal = await prisma.stock.findFirst({
+      where: {
+        productoId: producto.id,
+        ubicacionId: sucursalId
+      }
+    });
+    
+    const cantidadFinalReal = stockFinal?.cantidad || 0;
     
     // Crear registro del item
     await prisma.cargaMasivaStockItem.create({
@@ -444,14 +650,16 @@ class StockSucursalService {
         cargaId,
         productoId: producto.id,
         codigoBarras: item.codigoBarras,
-        nombreProducto: item.nombreProducto,
+        nombreProducto: item.nombreProducto || producto.nombre,
         cantidadCargar: item.cantidad,
         cantidadAnterior,
-        cantidadFinal,
+        cantidadFinal: cantidadFinalReal,
         estado: 'procesado',
         procesadoEn: new Date()
       }
     });
+    
+    console.log(`[StockSucursal] ✅ Item registrado: ${producto.nombre} (${cantidadAnterior} -> ${cantidadFinalReal})`);
     
     return {
       producto: {
@@ -461,12 +669,12 @@ class StockSucursalService {
       },
       cantidadAnterior,
       cantidadAjuste,
-      cantidadFinal,
+      cantidadFinal: cantidadFinalReal,
       estado: 'procesado'
     };
   }
   
-  // =================== SISTEMA DE ALERTAS ===================
+  // =================== SISTEMA DE ALERTAS (mantener igual) ===================
   
   async generarAlerta(data: AlertaStockData) {
     const alertaExistente = await prisma.alertaStock.findFirst({
@@ -479,20 +687,18 @@ class StockSucursalService {
     });
     
     if (alertaExistente) {
-      // Actualizar alerta existente
       return await prisma.alertaStock.update({
         where: { id: alertaExistente.id },
         data: {
           mensaje: data.mensaje,
           stockActual: data.stockActual,
           stockReferencia: data.stockReferencia,
-          createdAt: new Date(), // Actualizar timestamp
-          vistaPor: null, // Resetear vista
+          createdAt: new Date(),
+          vistaPor: null,
           fechaVista: null
         }
       });
     } else {
-      // Crear nueva alerta
       return await prisma.alertaStock.create({
         data
       });
@@ -515,7 +721,7 @@ class StockSucursalService {
     
     const cantidadActual = stock?.cantidad || 0;
     
-    // Limpiar alertas existentes para este producto/sucursal
+    // Limpiar alertas existentes
     await prisma.alertaStock.updateMany({
       where: {
         productoId,
@@ -525,7 +731,7 @@ class StockSucursalService {
       data: { activa: false }
     });
     
-    // Generar nuevas alertas según corresponda
+    // Generar nuevas alertas
     if (cantidadActual <= config.stockMinimo) {
       await this.generarAlerta({
         productoId,
