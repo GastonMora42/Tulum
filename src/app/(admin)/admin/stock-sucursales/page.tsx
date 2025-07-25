@@ -13,10 +13,21 @@ import {
   TrendingUp, 
   Settings,
   Package,
-  RefreshCw
+  RefreshCw,
+  Plus,
+  Save,
+  X,
+  Upload,
+  Download,
+  FileText,
+  BarChart3,
+  Minus,
+  Equal
 } from 'lucide-react';
+import { useStockSucursales } from '@/hooks/useStockSucursal';
+import { authenticatedFetch } from '@/hooks/useAuth';
 
-// Tipos
+// ====================== INTERFACES ======================
 interface Producto {
   id: string;
   nombre: string;
@@ -26,86 +37,121 @@ interface Producto {
     nombre: string;
   };
   stockMinimo?: number;
+  precio?: number;
 }
 
 interface Sucursal {
   id: string;
   nombre: string;
-}
-
-interface ConfiguracionStock {
-  stockMaximo: number;
-  stockMinimo: number;
-  puntoReposicion: number;
+  tipo: string;
 }
 
 interface AnalisisItem {
-  producto: Producto;
-  sucursal: Sucursal;
-  stockActual: number;
-  configuracion: ConfiguracionStock;
-  estado: 'critico' | 'bajo' | 'normal' | 'exceso';
-  porcentajeUso: string;
-  tieneConfiguracion: boolean;
-}
-
-interface DashboardData {
-  estadisticas: {
-    criticos: number;
-    bajos: number;
-    normales: number;
-    excesos: number;
-    sinConfiguracion: number;
+  id: string;
+  producto: {
+    id: string;
+    nombre: string;
+    codigoBarras?: string;
   };
-  analisisCompleto: AnalisisItem[];
+  sucursal: {
+    id: string;
+    nombre: string;
+    tipo: string;
+  };
+  configuracion: {
+    stockMaximo: number;
+    stockMinimo: number;
+    puntoReposicion: number;
+  };
+  stockActual: number;
+  diferencia: number;
+  porcentajeUso: number;
+  estado: 'critico' | 'bajo' | 'normal' | 'exceso';
+  prioridad: number;
+  tieneConfiguracion: boolean;
+  requiereConfiguracion?: boolean;
+  acciones: {
+    necesitaReposicion: boolean;
+    puedeCargar: boolean;
+    cantidadSugerida: number;
+    tieneExceso: boolean;
+    excesoActual: number;
+  };
 }
 
-// Configuración de estados
+interface CargaManualItem {
+  productoId: string;
+  codigoBarras: string;
+  nombreProducto: string;
+  cantidad: number;
+}
+
+// Configuración de estados simplificada
 const getStatusConfig = (estado: string) => {
   const configs = {
     critico: {
       icon: AlertTriangle,
       label: 'Crítico',
-      bgColor: 'bg-red-50 border-red-200',
-      textColor: 'text-red-700'
+      color: 'text-red-600',
+      bgColor: 'bg-red-50',
+      borderColor: 'border-red-200'
     },
     bajo: {
       icon: TrendingDown,
       label: 'Bajo',
-      bgColor: 'bg-yellow-50 border-yellow-200',
-      textColor: 'text-yellow-700'
+      color: 'text-yellow-600',
+      bgColor: 'bg-yellow-50',
+      borderColor: 'border-yellow-200'
     },
     normal: {
       icon: CheckCircle,
       label: 'Normal',
-      bgColor: 'bg-green-50 border-green-200',
-      textColor: 'text-green-700'
+      color: 'text-green-600',
+      bgColor: 'bg-green-50',
+      borderColor: 'border-green-200'
     },
     exceso: {
       icon: TrendingUp,
       label: 'Exceso',
-      bgColor: 'bg-purple-50 border-purple-200',
-      textColor: 'text-purple-700'
+      color: 'text-purple-600',
+      bgColor: 'bg-purple-50',
+      borderColor: 'border-purple-200'
     }
   };
   return configs[estado as keyof typeof configs] || configs.normal;
 };
 
-export default function StockSucursalesPage() {
-  // Estados
-  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
+export default function StockSucursalesMinimalista() {
+  // ====================== HOOKS Y ESTADOS ======================
+  const {
+    loading,
+    error,
+    dashboardData,
+    loadDashboard,
+    saveConfig,
+    bulkLoad,
+    cargaManual,
+    cargarStockRapido,
+    loadHistorialCargaManual,
+    refreshData,
+    clearError,
+    lastUpdate
+  } = useStockSucursales();
+
   const [productos, setProductos] = useState<Producto[]>([]);
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [sucursalSeleccionada, setSucursalSeleccionada] = useState<string>('');
   
   // Estados de filtros
   const [statusFilter, setStatusFilter] = useState('todos');
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategoria, setSelectedCategoria] = useState('');
   
   // Estados de modales
   const [showConfigModal, setShowConfigModal] = useState(false);
-  const [showQuickLoadModal, setShowQuickLoadModal] = useState(false);
+  const [showCargaModal, setShowCargaModal] = useState(false);
+  const [showHistorialModal, setShowHistorialModal] = useState(false);
+  
+  // Estados de formularios
   const [configData, setConfigData] = useState({
     productoId: '',
     sucursalId: '',
@@ -114,289 +160,178 @@ export default function StockSucursalesPage() {
     puntoReposicion: 0
   });
 
-  // Cargar datos iniciales
+  const [cargaData, setCargaData] = useState({
+    productoId: '',
+    sucursalId: '',
+    cantidad: 0,
+    observaciones: '',
+    modo: 'incrementar' as 'incrementar' | 'establecer' | 'decrementar'
+  });
+
+  // Estados de UI
+  const [loadingAction, setLoadingAction] = useState(false);
+  const [showAlert, setShowAlert] = useState({ show: false, message: '', type: 'success' as 'success' | 'error' });
+  const [historialData, setHistorialData] = useState<any[]>([]);
+
+  // ====================== EFECTOS ======================
   useEffect(() => {
-    loadData();
+    loadInitialData();
   }, []);
 
-  const loadData = async () => {
+  useEffect(() => {
+    if (sucursalSeleccionada) {
+      loadDashboard(sucursalSeleccionada);
+    } else {
+      loadDashboard();
+    }
+  }, [sucursalSeleccionada]);
+
+  // ====================== FUNCIONES DE CARGA ======================
+  const loadInitialData = async () => {
     try {
-      setLoading(true);
-      
-      // Simular carga de datos - reemplazar con llamadas reales a la API
-      const mockDashboardData: DashboardData = {
-        estadisticas: {
-          criticos: 15,
-          bajos: 28,
-          normales: 156,
-          excesos: 12,
-          sinConfiguracion: 8
-        },
-        analisisCompleto: [
-          // Datos de ejemplo - reemplazar con datos reales
-          {
-            producto: { id: '1', nombre: 'Producto A', codigoBarras: '1234567890' },
-            sucursal: { id: '1', nombre: 'Sucursal Centro' },
-            stockActual: 5,
-            configuracion: { stockMaximo: 100, stockMinimo: 20, puntoReposicion: 30 },
-            estado: 'critico',
-            porcentajeUso: '25',
-            tieneConfiguracion: true
-          },
-          {
-            producto: { id: '2', nombre: 'Producto B', codigoBarras: '0987654321' },
-            sucursal: { id: '1', nombre: 'Sucursal Centro' },
-            stockActual: 45,
-            configuracion: { stockMaximo: 150, stockMinimo: 15, puntoReposicion: 25 },
-            estado: 'normal',
-            porcentajeUso: '70',
-            tieneConfiguracion: false
-          }
-        ]
-      };
+      // Cargar sucursales
+      const sucursalesResponse = await authenticatedFetch('/api/admin/ubicaciones');
+      if (sucursalesResponse.ok) {
+        const sucursalesData = await sucursalesResponse.json();
+        setSucursales(sucursalesData.filter((s: any) => s.tipo === 'sucursal'));
+        
+        if (sucursalesData.length > 0) {
+          setSucursalSeleccionada(sucursalesData.find((s: any) => s.tipo === 'sucursal')?.id || '');
+        }
+      }
 
-      const mockProductos: Producto[] = [
-        { id: '1', nombre: 'Producto A', codigoBarras: '1234567890', stockMinimo: 20 },
-        { id: '2', nombre: 'Producto B', codigoBarras: '0987654321', stockMinimo: 15 }
-      ];
+      // Cargar productos
+      const productosResponse = await authenticatedFetch('/api/admin/productos?limit=1000');
+      if (productosResponse.ok) {
+        const productosData = await productosResponse.json();
+        setProductos(productosData.data || []);
+      }
 
-      const mockSucursales: Sucursal[] = [
-        { id: '1', nombre: 'Sucursal Centro' },
-        { id: '2', nombre: 'Sucursal Norte' }
-      ];
-
-      setDashboardData(mockDashboardData);
-      setProductos(mockProductos);
-      setSucursales(mockSucursales);
-      
+      loadDashboard();
     } catch (error) {
-      console.error('❌ [Stock] Error al cargar datos:', error);
-    } finally {
-      setLoading(false);
+      console.error('Error cargando datos iniciales:', error);
+      showAlertMessage('Error al cargar datos iniciales', 'error');
     }
   };
 
-  // Componente de indicador de sistema mejorado
-  const SystemStatusIndicator = () => (
-    <div className="bg-green-50 border-l-4 border-green-400 p-4 rounded-md mb-6">
-      <div className="flex">
-        <div className="flex-shrink-0">
-          <CheckCircle className="h-5 w-5 text-green-400" />
-        </div>
-        <div className="ml-3">
-          <h3 className="text-sm font-medium text-green-800">Sistema Mejorado Activo</h3>
-          <div className="mt-2 text-sm text-green-700">
-            <ul className="list-disc list-inside space-y-1">
-              <li>✅ Productos con stock sin configuración ahora son visibles</li>
-              <li>✅ Configuración automática creada para nuevas cargas</li>
-              <li>✅ Filtro por estado de configuración disponible</li>
-              <li>✅ Botones de configuración manual añadidos</li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  const handleRefreshData = async () => {
+    try {
+      await refreshData(sucursalSeleccionada);
+      showAlertMessage('Datos actualizados', 'success');
+    } catch (error) {
+      console.error('Error actualizando datos:', error);
+      showAlertMessage('Error al actualizar', 'error');
+    }
+  };
 
-  // Componente de estadísticas mejorado
-  const StatsCardWithConfiguration = () => (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-6">
-      {/* Críticos */}
-      <div className="group relative overflow-hidden bg-white rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-        <div className="absolute inset-0 bg-gradient-to-br from-red-500/5 to-pink-500/5"></div>
-        <div className="relative p-6">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-gray-600 uppercase tracking-wider">Críticos</p>
-              <p className="text-3xl font-black text-red-700">{dashboardData?.estadisticas?.criticos || 0}</p>
-              <div className="flex items-center space-x-2 text-red-600">
-                <AlertTriangle className="w-4 h-4" />
-                <span className="text-sm font-medium">Requieren atención</span>
-              </div>
-            </div>
-            <div className="p-4 bg-gradient-to-br from-red-500 to-pink-500 rounded-2xl shadow-lg">
-              <AlertTriangle className="w-8 h-8 text-white" />
-            </div>
-          </div>
-        </div>
-      </div>
+  // ====================== FUNCIONES DE UTILIDAD ======================
+  const showAlertMessage = (message: string, type: 'success' | 'error' = 'success') => {
+    setShowAlert({ show: true, message, type });
+    setTimeout(() => setShowAlert({ show: false, message: '', type: 'success' }), 3000);
+  };
 
-      {/* Bajos */}
-      <div className="group relative overflow-hidden bg-white rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-        <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/5 to-orange-500/5"></div>
-        <div className="relative p-6">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-gray-600 uppercase tracking-wider">Bajos</p>
-              <p className="text-3xl font-black text-yellow-700">{dashboardData?.estadisticas?.bajos || 0}</p>
-              <div className="flex items-center space-x-2 text-yellow-600">
-                <TrendingDown className="w-4 h-4" />
-                <span className="text-sm font-medium">Por debajo del mínimo</span>
-              </div>
-            </div>
-            <div className="p-4 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-2xl shadow-lg">
-              <TrendingDown className="w-8 h-8 text-white" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Normales */}
-      <div className="group relative overflow-hidden bg-white rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-        <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-emerald-500/5"></div>
-        <div className="relative p-6">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-gray-600 uppercase tracking-wider">Normales</p>
-              <p className="text-3xl font-black text-green-700">{dashboardData?.estadisticas?.normales || 0}</p>
-              <div className="flex items-center space-x-2 text-green-600">
-                <CheckCircle className="w-4 h-4" />
-                <span className="text-sm font-medium">Stock óptimo</span>
-              </div>
-            </div>
-            <div className="p-4 bg-gradient-to-br from-green-500 to-emerald-500 rounded-2xl shadow-lg">
-              <CheckCircle className="w-8 h-8 text-white" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Excesos */}
-      <div className="group relative overflow-hidden bg-white rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-indigo-500/5"></div>
-        <div className="relative p-6">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-gray-600 uppercase tracking-wider">Excesos</p>
-              <p className="text-3xl font-black text-purple-700">{dashboardData?.estadisticas?.excesos || 0}</p>
-              <div className="flex items-center space-x-2 text-purple-600">
-                <TrendingUp className="w-4 h-4" />
-                <span className="text-sm font-medium">Sobre el máximo</span>
-              </div>
-            </div>
-            <div className="p-4 bg-gradient-to-br from-purple-500 to-indigo-500 rounded-2xl shadow-lg">
-              <TrendingUp className="w-8 h-8 text-white" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Sin Configuración */}
-      <div className="group relative overflow-hidden bg-white rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-        <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/5 to-orange-500/5"></div>
-        <div className="relative p-6">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-gray-600 uppercase tracking-wider">Sin Configuración</p>
-              <p className="text-3xl font-black text-yellow-700">{dashboardData?.estadisticas?.sinConfiguracion || 0}</p>
-              <div className="flex items-center space-x-2 text-yellow-600">
-                <Settings className="w-4 h-4" />
-                <span className="text-sm font-medium">Configuración automática</span>
-              </div>
-            </div>
-            <div className="p-4 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-2xl shadow-lg">
-              <AlertCircle className="w-8 h-8 text-white" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Total de productos */}
-      <div className="group relative overflow-hidden bg-white rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-300 hover:-translate-y-1">
-        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/5 to-cyan-500/5"></div>
-        <div className="relative p-6">
-          <div className="flex items-center justify-between">
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-gray-600 uppercase tracking-wider">Total</p>
-              <p className="text-3xl font-black text-blue-700">{dashboardData?.analisisCompleto?.length || 0}</p>
-              <div className="flex items-center space-x-2 text-blue-600">
-                <Package className="w-4 h-4" />
-                <span className="text-sm font-medium">Productos monitoreados</span>
-              </div>
-            </div>
-            <div className="p-4 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-2xl shadow-lg">
-              <Package className="w-8 h-8 text-white" />
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  // Componente de filtro de estado mejorado
-  const StatusFilterImproved = () => (
-    <div className="space-y-2">
-      <label className="block text-sm font-semibold text-gray-700">Estado</label>
-      <div className="relative">
-        <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-2xl focus:ring-2 focus:ring-[#eeb077] focus:border-transparent transition-all duration-200"
-        >
-          <option value="todos">Todos los estados</option>
-          <option value="critico">🔴 Críticos ({dashboardData?.estadisticas?.criticos || 0})</option>
-          <option value="bajo">🟡 Bajos ({dashboardData?.estadisticas?.bajos || 0})</option>
-          <option value="normal">🟢 Normales ({dashboardData?.estadisticas?.normales || 0})</option>
-          <option value="exceso">🟣 Con exceso ({dashboardData?.estadisticas?.excesos || 0})</option>
-          <option value="sin_configuracion">⚙️ Sin configuración ({dashboardData?.estadisticas?.sinConfiguracion || 0})</option>
-        </select>
-      </div>
-    </div>
-  );
-
-  // Función de filtrado mejorada
   const filteredAnalysis = dashboardData?.analisisCompleto?.filter((item) => {
-    // Filtro por estado
     if (statusFilter === 'sin_configuracion') {
       if (item.tieneConfiguracion !== false) return false;
     } else if (statusFilter !== 'todos') {
       if (item.estado !== statusFilter) return false;
     }
     
-    // Filtro por búsqueda
     if (searchTerm && !item.producto.nombre.toLowerCase().includes(searchTerm.toLowerCase())) {
       return false;
     }
     
-    // Filtro por categoría
-    if (selectedCategoria) {
-      const producto = productos.find(p => p.id === item.producto.id);
-      if (!producto?.categoria || producto.categoria.id !== selectedCategoria) {
-        return false;
-      }
+    if (sucursalSeleccionada && item.sucursal.id !== sucursalSeleccionada) {
+      return false;
     }
     
     return true;
   }) || [];
 
-  // Función para crear configuración manual
-  const crearConfiguracionManual = async (productoId: string, sucursalId: string) => {
+  // ====================== FUNCIONES DE ACCIONES ======================
+  const handleSaveConfig = async () => {
+    if (!configData.productoId || !configData.sucursalId) {
+      showAlertMessage('Seleccione producto y sucursal', 'error');
+      return;
+    }
+
     try {
-      console.log('🔧 [Stock] Abriendo modal de configuración manual...');
+      setLoadingAction(true);
+      await saveConfig(configData);
+      setShowConfigModal(false);
+      setConfigData({
+        productoId: '',
+        sucursalId: '',
+        stockMaximo: 0,
+        stockMinimo: 0,
+        puntoReposicion: 0
+      });
+      await refreshData(sucursalSeleccionada);
+      showAlertMessage('Configuración guardada', 'success');
+    } catch (error) {
+      console.error('Error guardando configuración:', error);
+      showAlertMessage('Error al guardar', 'error');
+    } finally {
+      setLoadingAction(false);
+    }
+  };
+
+  const handleCarga = async () => {
+    if (!cargaData.productoId || !cargaData.sucursalId || cargaData.cantidad <= 0) {
+      showAlertMessage('Complete todos los campos', 'error');
+      return;
+    }
+
+    try {
+      setLoadingAction(true);
       
-      // Buscar producto y sucursal para prellenar datos
+      const result = await cargaManual({
+        productoId: cargaData.productoId,
+        sucursalId: cargaData.sucursalId,
+        cantidad: cargaData.cantidad,
+        observaciones: cargaData.observaciones,
+        modo: cargaData.modo
+      });
+      
+      setShowCargaModal(false);
+      setCargaData({
+        productoId: '',
+        sucursalId: '',
+        cantidad: 0,
+        observaciones: '',
+        modo: 'incrementar'
+      });
+      
+      await refreshData(sucursalSeleccionada);
+      showAlertMessage(`${result.mensaje}`, 'success');
+    } catch (error) {
+      console.error('Error en carga:', error);
+      showAlertMessage(error instanceof Error ? error.message : 'Error al cargar', 'error');
+    } finally {
+      setLoadingAction(false);
+    }
+  };
+
+  const openConfigModal = (productoId: string, sucursalId: string) => {
+    const item = filteredAnalysis.find(item => 
+      item.producto.id === productoId && item.sucursal.id === sucursalId
+    );
+    
+    if (item?.tieneConfiguracion) {
+      setConfigData({
+        productoId,
+        sucursalId,
+        stockMaximo: item.configuracion.stockMaximo,
+        stockMinimo: item.configuracion.stockMinimo,
+        puntoReposicion: item.configuracion.puntoReposicion
+      });
+    } else {
       const producto = productos.find(p => p.id === productoId);
-      const sucursal = sucursales.find(s => s.id === sucursalId);
-      
-      if (!producto || !sucursal) {
-        alert('Error: No se encontró el producto o sucursal');
-        return;
-      }
-      
-      // Obtener stock actual para calcular valores sugeridos
-      const itemAnalisis = filteredAnalysis.find(
-        item => item.producto.id === productoId && item.sucursal.id === sucursalId
-      );
-      
-      const stockActual = itemAnalisis?.stockActual || 0;
-      
-      // Calcular valores sugeridos más inteligentes
-      const stockMinimo = Math.max(producto.stockMinimo || 1, Math.ceil(stockActual * 0.2));
+      const stockActual = item?.stockActual || 0;
+      const stockMinimo = Math.max(producto?.stockMinimo || 1, Math.ceil(stockActual * 0.2));
       const stockMaximo = Math.max(stockActual * 3, stockMinimo * 5, 50);
       const puntoReposicion = Math.ceil(stockMinimo * 1.5);
       
-      // Prellenar el modal de configuración
       setConfigData({
         productoId,
         sucursalId,
@@ -404,407 +339,625 @@ export default function StockSucursalesPage() {
         stockMinimo,
         puntoReposicion
       });
-      
-      setShowConfigModal(true);
-      
-      console.log(`🔧 [Stock] Modal abierto para ${producto.nombre} en ${sucursal.nombre}`);
-      console.log(`📊 [Stock] Valores sugeridos: Min=${stockMinimo}, Max=${stockMaximo}, Repo=${puntoReposicion}`);
-      
+    }
+    
+    setShowConfigModal(true);
+  };
+
+  const openCargaModal = (productoId?: string, sucursalId?: string, modo: 'incrementar' | 'decrementar' | 'establecer' = 'incrementar') => {
+    setCargaData({
+      productoId: productoId || '',
+      sucursalId: sucursalId || sucursalSeleccionada || '',
+      cantidad: 0,
+      observaciones: '',
+      modo
+    });
+    setShowCargaModal(true);
+  };
+
+  const openHistorialModal = async () => {
+    try {
+      setLoadingAction(true);
+      const historial = await loadHistorialCargaManual({
+        sucursalId: sucursalSeleccionada || undefined,
+        limit: 50
+      });
+      setHistorialData(historial.historial || []);
+      setShowHistorialModal(true);
     } catch (error) {
-      console.error('❌ [Stock] Error al abrir configuración manual:', error);
-      alert('Error al abrir configuración manual');
+      console.error('Error cargando historial:', error);
+      showAlertMessage('Error al cargar historial', 'error');
+    } finally {
+      setLoadingAction(false);
     }
   };
 
-  // Función para abrir modal de configuración con datos prellenados
-  const openConfigModal = (productoId: string, sucursalId: string) => {
-    crearConfiguracionManual(productoId, sucursalId);
+  // ====================== COMPONENTES ======================
+  
+  // Alert minimalista
+  const Alert = () => {
+    if (!showAlert.show) return null;
+    
+    return (
+      <div className={`fixed top-4 right-4 z-50 p-3 rounded-lg shadow-lg max-w-sm ${
+        showAlert.type === 'success' ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-red-100 text-red-800 border border-red-200'
+      }`}>
+        <div className="flex items-center justify-between">
+          <span className="text-sm">{showAlert.message}</span>
+          <button onClick={() => setShowAlert({ show: false, message: '', type: 'success' })}>
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    );
   };
 
-  // Función para abrir modal de carga rápida
-  const openQuickLoadModal = (productoId: string, sucursalId: string) => {
-    setConfigData(prev => ({ ...prev, productoId, sucursalId }));
-    setShowQuickLoadModal(true);
-  };
+  // Estadísticas minimalistas
+  const StatsCards = () => (
+    <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
+      {[
+        { label: 'Críticos', value: dashboardData?.estadisticas?.criticos || 0, color: 'text-red-600', bg: 'bg-red-50' },
+        { label: 'Bajos', value: dashboardData?.estadisticas?.bajos || 0, color: 'text-yellow-600', bg: 'bg-yellow-50' },
+        { label: 'Normales', value: dashboardData?.estadisticas?.normales || 0, color: 'text-green-600', bg: 'bg-green-50' },
+        { label: 'Excesos', value: dashboardData?.estadisticas?.excesos || 0, color: 'text-purple-600', bg: 'bg-purple-50' },
+        { label: 'Sin Config', value: dashboardData?.estadisticas?.sinConfiguracion || 0, color: 'text-blue-600', bg: 'bg-blue-50' },
+        { label: 'Total', value: dashboardData?.estadisticas?.total || 0, color: 'text-gray-600', bg: 'bg-gray-50' }
+      ].map((stat, index) => (
+        <div key={index} className={`${stat.bg} p-3 rounded-lg border`}>
+          <div className={`text-2xl font-bold ${stat.color}`}>{stat.value}</div>
+          <div className="text-xs text-gray-600">{stat.label}</div>
+        </div>
+      ))}
+    </div>
+  );
 
-  // Componente de fila de tabla mejorado
-  const ImprovedTableRow = ({ item, index }: { item: AnalisisItem, index: number }) => {
+  // Fila de tabla minimalista
+  const TableRow = ({ item, index }: { item: AnalisisItem, index: number }) => {
     const statusConfig = getStatusConfig(item.estado);
     const IconComponent = statusConfig.icon;
-    
-    // Determinar si el producto necesita configuración
     const needsConfiguration = !item.tieneConfiguracion;
     
     return (
-      <tr key={`${item.producto.id}-${item.sucursal.id}`} 
-          className={`hover:bg-gradient-to-r hover:from-gray-50 hover:to-white transition-all duration-200 group ${
-            needsConfiguration ? 'bg-yellow-50 border-l-4 border-l-yellow-400' : ''
-          }`}>
-        
-        {/* Columna Producto con indicador de configuración */}
-        <td className="px-8 py-6">
-          <div className="flex items-center space-x-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-[#311716] to-[#462625] rounded-2xl flex items-center justify-center text-white font-bold text-lg shadow-lg relative">
+      <tr className={`border-b hover:bg-gray-50 ${needsConfiguration ? 'bg-yellow-50' : ''}`}>
+        {/* Producto */}
+        <td className="p-3">
+          <div className="flex items-center space-x-2">
+            <div className={`w-8 h-8 bg-gradient-to-br from-[#311716] to-[#462625] rounded-lg flex items-center justify-center text-white text-sm font-bold ${needsConfiguration ? 'ring-2 ring-yellow-400' : ''}`}>
               {item.producto.nombre.charAt(0)}
-              {needsConfiguration && (
-                <div className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-500 rounded-full flex items-center justify-center">
-                  <span className="text-xs text-white">!</span>
-                </div>
-              )}
             </div>
-            <div>
-              <div className="font-bold text-gray-900 text-lg group-hover:text-[#311716] transition-colors">
-                {item.producto.nombre}
-                {needsConfiguration && (
-                  <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                    ⚙️ Necesita configuración
-                  </span>
-                )}
-              </div>
+            <div className="min-w-0 flex-1">
+              <div className="font-medium text-sm text-gray-900 truncate">{item.producto.nombre}</div>
               {item.producto.codigoBarras && (
-                <div className="text-sm text-gray-500 font-mono bg-gray-100 px-2 py-1 rounded-lg mt-1">
-                  {item.producto.codigoBarras}
-                </div>
+                <div className="text-xs text-gray-500 font-mono">{item.producto.codigoBarras}</div>
+              )}
+              {needsConfiguration && (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+                  Sin config
+                </span>
               )}
             </div>
           </div>
         </td>
         
-        {/* Columna Sucursal */}
-        <td className="px-8 py-6">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-blue-100 rounded-xl">
-              <Store className="w-5 h-5 text-blue-600" />
-            </div>
-            <span className="font-semibold text-gray-900">{item.sucursal.nombre}</span>
+        {/* Sucursal (solo en móvil oculto) */}
+        <td className="p-3 hidden md:table-cell">
+          <div className="flex items-center space-x-2">
+            <Store className="w-4 h-4 text-blue-600" />
+            <span className="text-sm font-medium">{item.sucursal.nombre}</span>
           </div>
         </td>
         
-        {/* Columna Stock Actual con mejor visualización */}
-        <td className="px-8 py-6">
-          <div className="text-3xl font-black text-gray-900">
-            {item.stockActual}
-          </div>
-          {needsConfiguration && (
-            <div className="text-xs text-yellow-600 mt-1">
-              Stock actual sin límites definidos
-            </div>
-          )}
+        {/* Stock Actual */}
+        <td className="p-3 text-center">
+          <div className="text-lg font-bold text-gray-900">{item.stockActual}</div>
         </td>
         
-        {/* Columna Configuración con indicador de automática */}
-        <td className="px-8 py-6">
-          <div className="space-y-2">
-            <div className="flex items-center space-x-2 text-sm">
-              <span className="text-gray-600">Máx:</span>
-              <span className={`font-bold ${needsConfiguration ? 'text-yellow-600' : 'text-gray-900'}`}>
-                {item.configuracion.stockMaximo}
-                {needsConfiguration && <span className="text-xs ml-1">(auto)</span>}
-              </span>
-            </div>
-            <div className="flex items-center space-x-2 text-sm">
-              <span className="text-gray-600">Mín:</span>
-              <span className={`font-bold ${needsConfiguration ? 'text-yellow-600' : 'text-orange-600'}`}>
-                {item.configuracion.stockMinimo}
-                {needsConfiguration && <span className="text-xs ml-1">(auto)</span>}
-              </span>
-            </div>
-            {needsConfiguration && (
+        {/* Configuración (oculto en móvil) */}
+        <td className="p-3 hidden lg:table-cell">
+          <div className="text-xs space-y-1">
+            <div>Máx: <span className="font-semibold">{item.configuracion.stockMaximo}</span></div>
+            <div>Mín: <span className="font-semibold text-orange-600">{item.configuracion.stockMinimo}</span></div>
+          </div>
+        </td>
+        
+        {/* Estado */}
+        <td className="p-3">
+          <div className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${statusConfig.bgColor} ${statusConfig.color} border ${statusConfig.borderColor}`}>
+            <IconComponent className="w-3 h-3 mr-1" />
+            {statusConfig.label}
+          </div>
+        </td>
+        
+        {/* Utilización (oculto en móvil) */}
+        <td className="p-3 hidden md:table-cell">
+          <div className="w-16 bg-gray-200 rounded-full h-2">
+            <div 
+              className={`h-full rounded-full ${
+                item.porcentajeUso <= 30 ? 'bg-red-500' :
+                item.porcentajeUso <= 70 ? 'bg-yellow-500' :
+                item.porcentajeUso <= 100 ? 'bg-green-500' : 'bg-purple-500'
+              }`}
+              style={{ width: `${Math.min(100, item.porcentajeUso)}%` }}
+            ></div>
+          </div>
+          <div className="text-xs text-gray-500 mt-1">{item.porcentajeUso}%</div>
+        </td>
+        
+        {/* Acciones */}
+        <td className="p-3">
+          <div className="flex flex-col space-y-1">
+            {/* Botones de carga */}
+            <div className="flex space-x-1">
               <button
-                onClick={() => crearConfiguracionManual(item.producto.id, item.sucursal.id)}
-                className="text-xs bg-yellow-100 hover:bg-yellow-200 text-yellow-800 px-2 py-1 rounded-md transition-colors"
+                onClick={() => openCargaModal(item.producto.id, item.sucursal.id, 'incrementar')}
+                className="inline-flex items-center px-2 py-1 bg-green-500 text-white rounded text-xs font-medium hover:bg-green-600 transition-colors"
+                title="Incrementar stock"
               >
-                🔧 Configurar manualmente
+                <Plus className="w-3 h-3" />
               </button>
-            )}
-          </div>
-        </td>
-        
-        {/* Columna Estado */}
-        <td className="px-8 py-6">
-          <div className={`inline-flex items-center px-4 py-2 rounded-2xl border-2 ${statusConfig.bgColor} ${statusConfig.textColor}`}>
-            <IconComponent className="w-5 h-5 mr-2" />
-            <span className="font-bold text-sm">{statusConfig.label}</span>
-            {needsConfiguration && <span className="ml-1 text-xs">(temp)</span>}
-          </div>
-        </td>
-        
-        {/* Columna Porcentaje de Uso */}
-        <td className="px-8 py-6">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-gray-600 font-medium">Utilización</span>
-              <span className="text-sm font-bold text-gray-900">{item.porcentajeUso}%</span>
+              <button
+                onClick={() => openCargaModal(item.producto.id, item.sucursal.id, 'decrementar')}
+                className="inline-flex items-center px-2 py-1 bg-red-500 text-white rounded text-xs font-medium hover:bg-red-600 transition-colors"
+                title="Decrementar stock"
+              >
+                <Minus className="w-3 h-3" />
+              </button>
+              <button
+                onClick={() => openCargaModal(item.producto.id, item.sucursal.id, 'establecer')}
+                className="inline-flex items-center px-2 py-1 bg-blue-500 text-white rounded text-xs font-medium hover:bg-blue-600 transition-colors"
+                title="Establecer stock"
+              >
+                <Equal className="w-3 h-3" />
+              </button>
             </div>
-            <div className="w-32 bg-gray-200 rounded-full h-3 overflow-hidden">
-              <div 
-                className={`h-full rounded-full transition-all duration-500 ${
-                  Number(item.porcentajeUso) <= 30 ? 'bg-gradient-to-r from-red-500 to-red-600' :
-                  Number(item.porcentajeUso) <= 70 ? 'bg-gradient-to-r from-yellow-500 to-orange-500' :
-                  Number(item.porcentajeUso) <= 100 ? 'bg-gradient-to-r from-green-500 to-emerald-500' : 
-                  'bg-gradient-to-r from-purple-500 to-indigo-500'
-                }`}
-                style={{ width: `${Math.min(100, Number(item.porcentajeUso))}%` }}
-              ></div>
-            </div>
-          </div>
-        </td>
-        
-        {/* Columna Acciones con opciones adicionales */}
-        <td className="px-8 py-6 text-center">
-          <div className="flex flex-col space-y-2">
-            <button
-              onClick={() => openQuickLoadModal(item.producto.id, item.sucursal.id)}
-              className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-emerald-500 to-green-500 text-white rounded-2xl font-semibold text-sm transition-all duration-300 hover:shadow-lg hover:scale-105 active:scale-95"
-            >
-              <ShoppingCart className="w-4 h-4 mr-2" />
-              Cargar Stock
-            </button>
             
-            {needsConfiguration && (
-              <button
-                onClick={() => openConfigModal(item.producto.id, item.sucursal.id)}
-                className="inline-flex items-center px-3 py-1 bg-yellow-100 hover:bg-yellow-200 text-yellow-800 rounded-xl font-medium text-xs transition-all duration-200"
-              >
-                ⚙️ Configurar
-              </button>
-            )}
+            {/* Configuración */}
+            <button
+              onClick={() => openConfigModal(item.producto.id, item.sucursal.id)}
+              className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium transition-colors ${
+                needsConfiguration 
+                  ? 'bg-yellow-100 hover:bg-yellow-200 text-yellow-800' 
+                  : 'bg-gray-100 hover:bg-gray-200 text-gray-800'
+              }`}
+            >
+              <Settings className="w-3 h-3 mr-1" />
+              Config
+            </button>
           </div>
         </td>
       </tr>
     );
   };
 
-  if (loading) {
+  // ====================== RENDER PRINCIPAL ======================
+  if (loading && !dashboardData) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white flex items-center justify-center">
-        <div className="flex items-center space-x-3">
-          <RefreshCw className="w-8 h-8 text-[#eeb077] animate-spin" />
-          <span className="text-xl font-semibold text-gray-700">Cargando análisis de stock...</span>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex items-center space-x-2">
+          <RefreshCw className="w-6 h-6 text-[#eeb077] animate-spin" />
+          <span className="text-lg font-medium text-gray-700">Cargando...</span>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white p-6">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="min-h-screen bg-gray-50 p-2 md:p-4">
+      <Alert />
+      
+      <div className="max-w-7xl mx-auto space-y-4">
         
-        {/* Header */}
-        <div className="text-center">
-          <h1 className="text-4xl font-black text-gray-900 mb-4">
-            📊 Stock por Sucursales
-          </h1>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Monitorea y gestiona el inventario de todos tus productos across all sucursales en tiempo real
-          </p>
+        {/* Header minimalista */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Stock por Sucursales</h1>
+            <p className="text-sm text-gray-600">Gestiona el inventario en tiempo real</p>
+          </div>
+          
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={openHistorialModal}
+              className="inline-flex items-center px-3 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors"
+            >
+              <FileText className="w-4 h-4 mr-1" />
+              Historial
+            </button>
+            
+            <button
+              onClick={() => openCargaModal()}
+              className="inline-flex items-center px-3 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors"
+            >
+              <Plus className="w-4 h-4 mr-1" />
+              Carga Manual
+            </button>
+            
+            <button
+              onClick={handleRefreshData}
+              disabled={loading}
+              className="inline-flex items-center px-3 py-2 bg-[#311716] text-white rounded-lg text-sm font-medium hover:bg-[#462625] transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
+              Actualizar
+            </button>
+          </div>
         </div>
 
-        {/* Indicador de sistema mejorado (solo en desarrollo) */}
-        {process.env.NODE_ENV === 'development' && <SystemStatusIndicator />}
+        {/* Estadísticas */}
+        <StatsCards />
 
-        {/* Estadísticas mejoradas */}
-        <StatsCardWithConfiguration />
+        {/* Filtros minimalistas */}
+        <div className="bg-white rounded-lg shadow-sm p-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Sucursal */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Sucursal</label>
+              <select
+                value={sucursalSeleccionada}
+                onChange={(e) => setSucursalSeleccionada(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#eeb077] focus:border-transparent text-sm"
+              >
+                <option value="">Todas</option>
+                {sucursales.map((sucursal) => (
+                  <option key={sucursal.id} value={sucursal.id}>
+                    {sucursal.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-        {/* Filtros */}
-        <div className="bg-white rounded-3xl shadow-lg p-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">🔍 Filtros y Búsqueda</h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Búsqueda */}
-            <div className="space-y-2">
-              <label className="block text-sm font-semibold text-gray-700">Buscar Producto</label>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <input
                   type="text"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Nombre del producto..."
-                  className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-2xl focus:ring-2 focus:ring-[#eeb077] focus:border-transparent transition-all duration-200"
+                  className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#eeb077] focus:border-transparent text-sm"
                 />
               </div>
             </div>
 
-            {/* Filtro de Estado Mejorado */}
-            <StatusFilterImproved />
+            {/* Estado */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#eeb077] focus:border-transparent text-sm"
+              >
+                <option value="todos">Todos</option>
+                <option value="critico">Críticos ({dashboardData?.estadisticas?.criticos || 0})</option>
+                <option value="bajo">Bajos ({dashboardData?.estadisticas?.bajos || 0})</option>
+                <option value="normal">Normales ({dashboardData?.estadisticas?.normales || 0})</option>
+                <option value="exceso">Excesos ({dashboardData?.estadisticas?.excesos || 0})</option>
+                <option value="sin_configuracion">Sin configuración ({dashboardData?.estadisticas?.sinConfiguracion || 0})</option>
+              </select>
+            </div>
 
-            {/* Categoría */}
-            <div className="space-y-2">
-              <label className="block text-sm font-semibold text-gray-700">Categoría</label>
-              <div className="relative">
-                <Package className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <select
-                  value={selectedCategoria}
-                  onChange={(e) => setSelectedCategoria(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-2xl focus:ring-2 focus:ring-[#eeb077] focus:border-transparent transition-all duration-200"
-                >
-                  <option value="">Todas las categorías</option>
-                  {/* Agregar opciones de categorías dinámicamente */}
-                </select>
-              </div>
+            {/* Limpiar */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">&nbsp;</label>
+              <button
+                onClick={() => {
+                  setSearchTerm('');
+                  setStatusFilter('todos');
+                  setSucursalSeleccionada('');
+                }}
+                className="w-full px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors"
+              >
+                Limpiar
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Tabla de Análisis */}
-        <div className="bg-white rounded-3xl shadow-lg overflow-hidden">
-          <div className="px-8 py-6 border-b border-gray-200">
-            <div className="flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-gray-900">
-                📋 Análisis Detallado ({filteredAnalysis.length} productos)
+        {/* Tabla minimalista */}
+        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-gray-200">
+            <div className="flex justify-between items-center">
+              <h2 className="text-lg font-semibold text-gray-900">
+                Análisis ({filteredAnalysis.length} productos)
               </h2>
-              <button
-                onClick={loadData}
-                className="inline-flex items-center px-4 py-2 bg-gradient-to-r from-[#311716] to-[#462625] text-white rounded-2xl font-semibold transition-all duration-300 hover:shadow-lg hover:scale-105"
-              >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Actualizar
-              </button>
+              {lastUpdate && (
+                <div className="text-xs text-gray-500">
+                  Actualizado: {lastUpdate.toLocaleTimeString()}
+                </div>
+              )}
             </div>
           </div>
           
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gradient-to-r from-gray-50 to-gray-100">
+              <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-8 py-6 text-left text-sm font-bold text-gray-900 uppercase tracking-wider">
-                    Producto
-                  </th>
-                  <th className="px-8 py-6 text-left text-sm font-bold text-gray-900 uppercase tracking-wider">
-                    Sucursal
-                  </th>
-                  <th className="px-8 py-6 text-left text-sm font-bold text-gray-900 uppercase tracking-wider">
-                    Stock Actual
-                  </th>
-                  <th className="px-8 py-6 text-left text-sm font-bold text-gray-900 uppercase tracking-wider">
-                    Configuración
-                  </th>
-                  <th className="px-8 py-6 text-left text-sm font-bold text-gray-900 uppercase tracking-wider">
-                    Estado
-                  </th>
-                  <th className="px-8 py-6 text-left text-sm font-bold text-gray-900 uppercase tracking-wider">
-                    Utilización
-                  </th>
-                  <th className="px-8 py-6 text-center text-sm font-bold text-gray-900 uppercase tracking-wider">
-                    Acciones
-                  </th>
+                  <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
+                  <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">Sucursal</th>
+                  <th className="p-3 text-center text-xs font-medium text-gray-500 uppercase">Stock</th>
+                  <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">Config</th>
+                  <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
+                  <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">Uso</th>
+                  <th className="p-3 text-center text-xs font-medium text-gray-500 uppercase">Acciones</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
-                {filteredAnalysis.slice(0, 50).map((item, index) => (
-                  <ImprovedTableRow key={`${item.producto.id}-${item.sucursal.id}`} item={item} index={index} />
+              <tbody>
+                {filteredAnalysis.slice(0, 100).map((item, index) => (
+                  <TableRow
+                    key={`${item.producto.id}-${item.sucursal.id}`}
+                    item={{
+                      ...item,
+                      // Forzamos el tipo correcto para 'estado'
+                      estado: (
+                        item.estado === "critico" ||
+                        item.estado === "bajo" ||
+                        item.estado === "normal" ||
+                        item.estado === "exceso"
+                      )
+                        ? item.estado
+                        : "normal"
+                    }}
+                    index={index}
+                  />
                 ))}
               </tbody>
-            </table>
+              </table>
+            {filteredAnalysis.length === 0 && (
+              <div className="text-center py-8">
+                <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-gray-500">No hay productos que coincidan con los filtros</p>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Modal de Configuración */}
         {showConfigModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-3xl p-8 max-w-lg w-full mx-4">
-              <h3 className="text-2xl font-bold text-gray-900 mb-6">⚙️ Configurar Stock</h3>
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Configurar Stock</h3>
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Stock Mínimo</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Stock Mínimo</label>
                   <input
                     type="number"
                     value={configData.stockMinimo}
                     onChange={(e) => setConfigData(prev => ({ ...prev, stockMinimo: Number(e.target.value) }))}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-[#eeb077] focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#eeb077] focus:border-transparent"
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Stock Máximo</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Stock Máximo</label>
                   <input
                     type="number"
                     value={configData.stockMaximo}
                     onChange={(e) => setConfigData(prev => ({ ...prev, stockMaximo: Number(e.target.value) }))}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-[#eeb077] focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#eeb077] focus:border-transparent"
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Punto de Reposición</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Punto de Reposición</label>
                   <input
                     type="number"
                     value={configData.puntoReposicion}
                     onChange={(e) => setConfigData(prev => ({ ...prev, puntoReposicion: Number(e.target.value) }))}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-[#eeb077] focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#eeb077] focus:border-transparent"
                   />
                 </div>
               </div>
               
-              <div className="flex space-x-4 mt-8">
+              <div className="flex space-x-3 mt-6">
                 <button
                   onClick={() => setShowConfigModal(false)}
-                  className="flex-1 px-6 py-3 bg-gray-200 text-gray-800 rounded-2xl font-semibold hover:bg-gray-300 transition-colors"
+                  className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg font-medium hover:bg-gray-300 transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
-                  onClick={() => {
-                    // Aquí iría la lógica para guardar la configuración
-                    console.log('Guardando configuración:', configData);
-                    setShowConfigModal(false);
-                    loadData(); // Recargar datos
-                  }}
-                  className="flex-1 px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-500 text-white rounded-2xl font-semibold hover:shadow-lg transition-all"
+                  onClick={handleSaveConfig}
+                  disabled={loadingAction}
+                  className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg font-medium hover:bg-green-600 transition-colors disabled:opacity-50"
                 >
-                  Guardar
+                  {loadingAction ? 'Guardando...' : 'Guardar'}
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Modal de Carga Rápida */}
-        {showQuickLoadModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-3xl p-8 max-w-lg w-full mx-4">
-              <h3 className="text-2xl font-bold text-gray-900 mb-6">📦 Carga Rápida de Stock</h3>
+        {/* Modal de Carga */}
+        {showCargaModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                {cargaData.modo === 'incrementar' ? '➕ Incrementar Stock' : 
+                 cargaData.modo === 'decrementar' ? '➖ Decrementar Stock' : 
+                 '📝 Establecer Stock'}
+              </h3>
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Cantidad a Cargar</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Producto</label>
+                  <select
+                    value={cargaData.productoId}
+                    onChange={(e) => setCargaData(prev => ({ ...prev, productoId: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#eeb077] focus:border-transparent"
+                  >
+                    <option value="">Seleccionar producto...</option>
+                    {productos.map((producto) => (
+                      <option key={producto.id} value={producto.id}>
+                        {producto.nombre} {producto.codigoBarras ? `(${producto.codigoBarras})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Sucursal</label>
+                  <select
+                    value={cargaData.sucursalId}
+                    onChange={(e) => setCargaData(prev => ({ ...prev, sucursalId: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#eeb077] focus:border-transparent"
+                  >
+                    <option value="">Seleccionar sucursal...</option>
+                    {sucursales.map((sucursal) => (
+                      <option key={sucursal.id} value={sucursal.id}>
+                        {sucursal.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Selector de modo */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Modo</label>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => setCargaData(prev => ({ ...prev, modo: 'incrementar' }))}
+                      className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        cargaData.modo === 'incrementar' 
+                          ? 'bg-green-500 text-white' 
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      <Plus className="w-4 h-4 mx-auto" />
+                    </button>
+                    <button
+                      onClick={() => setCargaData(prev => ({ ...prev, modo: 'decrementar' }))}
+                      className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        cargaData.modo === 'decrementar' 
+                          ? 'bg-red-500 text-white' 
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      <Minus className="w-4 h-4 mx-auto" />
+                    </button>
+                    <button
+                      onClick={() => setCargaData(prev => ({ ...prev, modo: 'establecer' }))}
+                      className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        cargaData.modo === 'establecer' 
+                          ? 'bg-blue-500 text-white' 
+                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
+                    >
+                      <Equal className="w-4 h-4 mx-auto" />
+                    </button>
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Cantidad {cargaData.modo === 'establecer' ? '(valor final)' : '(a ajustar)'}
+                  </label>
                   <input
                     type="number"
-                    placeholder="Ingrese la cantidad..."
-                    className="w-full px-4 py-3 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-[#eeb077] focus:border-transparent"
+                    value={cargaData.cantidad}
+                    onChange={(e) => setCargaData(prev => ({ ...prev, cantidad: Number(e.target.value) }))}
+                    min="1"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#eeb077] focus:border-transparent text-center text-xl font-bold"
+                    autoFocus
                   />
                 </div>
                 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-2">Observaciones</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Observaciones</label>
                   <textarea
+                    value={cargaData.observaciones}
+                    onChange={(e) => setCargaData(prev => ({ ...prev, observaciones: e.target.value }))}
                     placeholder="Comentarios opcionales..."
-                    rows={3}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-[#eeb077] focus:border-transparent"
+                    rows={2}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#eeb077] focus:border-transparent"
                   ></textarea>
                 </div>
               </div>
               
-              <div className="flex space-x-4 mt-8">
+              <div className="flex space-x-3 mt-6">
                 <button
-                  onClick={() => setShowQuickLoadModal(false)}
-                  className="flex-1 px-6 py-3 bg-gray-200 text-gray-800 rounded-2xl font-semibold hover:bg-gray-300 transition-colors"
+                  onClick={() => setShowCargaModal(false)}
+                  className="flex-1 px-4 py-2 bg-gray-200 text-gray-800 rounded-lg font-medium hover:bg-gray-300 transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
-                  onClick={() => {
-                    // Aquí iría la lógica para cargar stock
-                    console.log('Cargando stock...');
-                    setShowQuickLoadModal(false);
-                    loadData(); // Recargar datos
-                  }}
-                  className="flex-1 px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-500 text-white rounded-2xl font-semibold hover:shadow-lg transition-all"
+                  onClick={handleCarga}
+                  disabled={loadingAction || !cargaData.productoId || !cargaData.sucursalId || cargaData.cantidad <= 0}
+                  className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 ${
+                    cargaData.modo === 'incrementar' ? 'bg-green-500 hover:bg-green-600' :
+                    cargaData.modo === 'decrementar' ? 'bg-red-500 hover:bg-red-600' :
+                    'bg-blue-500 hover:bg-blue-600'
+                  } text-white`}
                 >
-                  Cargar Stock
+                  {loadingAction ? 'Procesando...' : 
+                   cargaData.modo === 'incrementar' ? 'Incrementar' :
+                   cargaData.modo === 'decrementar' ? 'Decrementar' : 'Establecer'}
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Historial */}
+        {showHistorialModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[80vh] overflow-hidden">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Historial de Cargas</h3>
+                <button
+                  onClick={() => setShowHistorialModal(false)}
+                  className="p-1 hover:bg-gray-100 rounded"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="overflow-auto max-h-96">
+                {historialData.length > 0 ? (
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="p-2 text-left text-xs font-medium text-gray-500">Fecha</th>
+                        <th className="p-2 text-left text-xs font-medium text-gray-500">Producto</th>
+                        <th className="p-2 text-left text-xs font-medium text-gray-500">Sucursal</th>
+                        <th className="p-2 text-left text-xs font-medium text-gray-500">Cantidad</th>
+                        <th className="p-2 text-left text-xs font-medium text-gray-500">Usuario</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {historialData.map((movimiento, index) => (
+                        <tr key={movimiento.id} className="hover:bg-gray-50">
+                          <td className="p-2 text-xs">
+                            {new Date(movimiento.fecha).toLocaleString()}
+                          </td>
+                          <td className="p-2">
+                            <div className="font-medium text-sm">{movimiento.producto?.nombre || 'N/A'}</div>
+                            {movimiento.producto?.codigoBarras && (
+                              <div className="text-xs text-gray-500">{movimiento.producto.codigoBarras}</div>
+                            )}
+                          </td>
+                          <td className="p-2 text-sm">{movimiento.sucursal.nombre}</td>
+                          <td className="p-2">
+                            <span className={`font-medium ${
+                              movimiento.tipoMovimiento === 'entrada' ? 'text-green-600' : 'text-red-600'
+                            }`}>
+                              {movimiento.tipoMovimiento === 'entrada' ? '+' : '-'}{movimiento.cantidad}
+                            </span>
+                            <div className="text-xs text-gray-500">Final: {movimiento.stockResultante}</div>
+                          </td>
+                          <td className="p-2 text-sm">{movimiento.usuario?.nombre || 'Sistema'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="text-center py-8">
+                    <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-500">No hay historial disponible</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>

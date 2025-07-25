@@ -1,8 +1,8 @@
-// src/hooks/useStockSucursales.ts - HOOK CORREGIDO
+// src/hooks/useStockSucursales.ts - VERSIÓN MEJORADA CON CARGA MANUAL
 import { useState, useEffect, useCallback } from 'react';
 import { authenticatedFetch } from '@/hooks/useAuth';
 
-// ✅ INTERFACES CORREGIDAS
+// ✅ INTERFACES CORREGIDAS Y AMPLIADAS
 export interface StockConfig {
   id: string;
   productoId: string;
@@ -39,6 +39,8 @@ export interface StockConfig {
 export interface DashboardData {
   estadisticas: {
     total: number;
+    conConfiguracion: number;
+    sinConfiguracion: number;
     criticos: number;
     bajos: number;
     normales: number;
@@ -68,6 +70,8 @@ export interface DashboardData {
     porcentajeUso: number;
     estado: string;
     prioridad: number;
+    tieneConfiguracion: boolean;
+    requiereConfiguracion?: boolean;
     acciones: {
       necesitaReposicion: boolean;
       puedeCargar: boolean;
@@ -117,6 +121,47 @@ export interface BulkLoadRequest {
   items: BulkLoadItem[];
 }
 
+// 🆕 NUEVA INTERFAZ PARA CARGA MANUAL
+export interface CargaManualRequest {
+  productoId: string;
+  sucursalId: string;
+  cantidad: number;
+  observaciones?: string;
+  modo?: 'incrementar' | 'establecer' | 'decrementar';
+}
+
+export interface CargaManualResponse {
+  success: boolean;
+  mensaje: string;
+  detalles: {
+    producto: {
+      id: string;
+      nombre: string;
+      codigoBarras?: string;
+      categoria?: string;
+    };
+    sucursal: {
+      id: string;
+      nombre: string;
+      tipo: string;
+    };
+    ajuste: {
+      modo: string;
+      cantidadAnterior: number;
+      cantidadAjuste: number;
+      cantidadFinal: number;
+      observaciones?: string;
+    };
+    movimiento?: {
+      id: string;
+      tipo: string;
+      cantidad: number;
+      fecha: string;
+    };
+  };
+  timestamp: string;
+}
+
 export interface AlertasResponse {
   alertas: AlertaStock[];
   estadisticas: {
@@ -129,12 +174,37 @@ export interface AlertasResponse {
   };
 }
 
+// 🆕 NUEVA INTERFAZ PARA HISTORIAL DE CARGAS MANUALES
+export interface HistorialCargaManual {
+  id: string;
+  fecha: string;
+  tipoMovimiento: string;
+  cantidad: number;
+  motivo: string;
+  producto?: {
+    id: string;
+    nombre: string;
+    codigoBarras?: string;
+  };
+  sucursal: {
+    id: string;
+    nombre: string;
+    tipo: string;
+  };
+  usuario?: {
+    nombre: string;
+    email: string;
+  };
+  stockResultante: number;
+}
+
 export function useStockSucursales() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [configs, setConfigs] = useState<StockConfig[]>([]);
   const [alertas, setAlertas] = useState<AlertaStock[]>([]);
+  const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
   // ============= CONFIGURACIONES =============
   
@@ -152,6 +222,8 @@ export function useStockSucursales() {
       if (filtros?.productoId) params.append('productoId', filtros.productoId);
       if (filtros?.includeStats) params.append('includeStats', 'true');
 
+      console.log(`[Hook] Cargando configuraciones con filtros:`, filtros);
+
       const response = await authenticatedFetch(`/api/admin/stock-config?${params}`);
       
       if (!response.ok) {
@@ -161,9 +233,13 @@ export function useStockSucursales() {
       
       const data = await response.json();
       setConfigs(data);
+      setLastUpdate(new Date());
+      
+      console.log(`[Hook] ✅ Configuraciones cargadas: ${data.length} items`);
       return data;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error al cargar configuraciones';
+      console.error(`[Hook] ❌ Error cargando configuraciones:`, err);
       setError(errorMessage);
       throw err;
     } finally {
@@ -181,6 +257,8 @@ export function useStockSucursales() {
     try {
       setLoading(true);
       setError(null);
+
+      console.log(`[Hook] Guardando configuración:`, configData);
 
       const response = await authenticatedFetch('/api/admin/stock-config', {
         method: 'POST',
@@ -213,9 +291,13 @@ export function useStockSucursales() {
         }
       });
 
+      setLastUpdate(new Date());
+      console.log(`[Hook] ✅ Configuración guardada para producto ${savedConfig.producto?.nombre}`);
+
       return savedConfig;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error al guardar configuración';
+      console.error(`[Hook] ❌ Error guardando configuración:`, err);
       setError(errorMessage);
       throw err;
     } finally {
@@ -233,6 +315,8 @@ export function useStockSucursales() {
       const params = new URLSearchParams();
       if (sucursalId) params.append('sucursalId', sucursalId);
 
+      console.log(`[Hook] Cargando dashboard para sucursal: ${sucursalId || 'todas'}`);
+
       const response = await authenticatedFetch(`/api/admin/stock-config/dashboard?${params}`);
       
       if (!response.ok) {
@@ -242,9 +326,15 @@ export function useStockSucursales() {
       
       const data = await response.json();
       setDashboardData(data);
+      setLastUpdate(new Date());
+
+      console.log(`[Hook] ✅ Dashboard cargado: ${data.estadisticas?.total || 0} productos`);
+      console.log(`[Hook] Estadísticas:`, data.estadisticas);
+
       return data;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error al cargar dashboard';
+      console.error(`[Hook] ❌ Error cargando dashboard:`, err);
       setError(errorMessage);
       throw err;
     } finally {
@@ -258,6 +348,8 @@ export function useStockSucursales() {
     try {
       setLoading(true);
       setError(null);
+
+      console.log(`[Hook] Iniciando carga masiva: ${bulkData.nombre} con ${bulkData.items.length} items`);
 
       const response = await authenticatedFetch('/api/admin/stock-config/bulk-load', {
         method: 'POST',
@@ -273,13 +365,91 @@ export function useStockSucursales() {
       }
 
       const result = await response.json();
+      setLastUpdate(new Date());
+
+      console.log(`[Hook] ✅ Carga masiva completada: ${result.resumen?.itemsProcesados || 0} procesados`);
+
       return result;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error en carga masiva';
+      console.error(`[Hook] ❌ Error en carga masiva:`, err);
       setError(errorMessage);
       throw err;
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  // 🆕 ============= CARGA MANUAL =============
+  
+  const cargaManual = useCallback(async (cargaData: CargaManualRequest): Promise<CargaManualResponse> => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      console.log(`[Hook] Iniciando carga manual:`, cargaData);
+
+      const response = await authenticatedFetch('/api/admin/stock-config/carga-manual', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(cargaData)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error en carga manual');
+      }
+
+      const result: CargaManualResponse = await response.json();
+      setLastUpdate(new Date());
+
+      console.log(`[Hook] ✅ Carga manual completada:`, result.mensaje);
+
+      return result;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Error en carga manual';
+      console.error(`[Hook] ❌ Error en carga manual:`, err);
+      setError(errorMessage);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // 🆕 Obtener historial de cargas manuales
+  const loadHistorialCargaManual = useCallback(async (filtros?: {
+    sucursalId?: string;
+    productoId?: string;
+    limit?: number;
+    offset?: number;
+  }) => {
+    try {
+      const params = new URLSearchParams();
+      if (filtros?.sucursalId) params.append('sucursalId', filtros.sucursalId);
+      if (filtros?.productoId) params.append('productoId', filtros.productoId);
+      if (filtros?.limit) params.append('limit', filtros.limit.toString());
+      if (filtros?.offset) params.append('offset', filtros.offset.toString());
+
+      console.log(`[Hook] Cargando historial de cargas manuales:`, filtros);
+
+      const response = await authenticatedFetch(`/api/admin/stock-config/carga-manual?${params}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al cargar historial');
+      }
+      
+      const data = await response.json();
+      console.log(`[Hook] ✅ Historial cargado: ${data.historial?.length || 0} movimientos`);
+
+      return data;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Error al cargar historial';
+      console.error(`[Hook] ❌ Error cargando historial:`, err);
+      setError(errorMessage);
+      throw err;
     }
   }, []);
 
@@ -324,6 +494,8 @@ export function useStockSucursales() {
       if (filtros?.tipoAlerta) params.append('tipoAlerta', filtros.tipoAlerta);
       if (filtros?.activa !== undefined) params.append('activa', filtros.activa.toString());
 
+      console.log(`[Hook] Cargando alertas con filtros:`, filtros);
+
       const response = await authenticatedFetch(`/api/admin/stock-config/alertas?${params}`);
       
       if (!response.ok) {
@@ -333,9 +505,13 @@ export function useStockSucursales() {
       
       const data: AlertasResponse = await response.json();
       setAlertas(data.alertas);
+
+      console.log(`[Hook] ✅ Alertas cargadas: ${data.alertas.length} alertas`);
+
       return data;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Error al cargar alertas';
+      console.error(`[Hook] ❌ Error cargando alertas:`, err);
       setError(errorMessage);
       throw err;
     }
@@ -403,7 +579,7 @@ export function useStockSucursales() {
     }
   }, []);
 
-  // ============= UTILIDADES =============
+  // ============= UTILIDADES Y FUNCIONES DE CONVENIENCIA =============
   
   const getConfigForProduct = useCallback((productoId: string, sucursalId: string) => {
     return configs.find(c => c.productoId === productoId && c.sucursalId === sucursalId);
@@ -421,8 +597,43 @@ export function useStockSucursales() {
     setError(null);
   }, []);
 
+  const refreshData = useCallback(async (sucursalId?: string) => {
+    try {
+      setError(null);
+      console.log(`[Hook] 🔄 Refrescando todos los datos...`);
+      
+      // Recargar dashboard y alertas en paralelo
+      await Promise.all([
+        loadDashboard(sucursalId),
+        loadAlertas({ activa: true })
+      ]);
+      
+      console.log(`[Hook] ✅ Datos refrescados exitosamente`);
+    } catch (err) {
+      console.error(`[Hook] ❌ Error refrescando datos:`, err);
+      setError('Error al refrescar datos');
+    }
+  }, [loadDashboard, loadAlertas]);
+
+  // 🆕 Función utilitaria para hacer carga manual más simple
+  const cargarStockRapido = useCallback(async (
+    productoId: string, 
+    sucursalId: string, 
+    cantidad: number, 
+    observaciones?: string
+  ) => {
+    return await cargaManual({
+      productoId,
+      sucursalId,
+      cantidad,
+      observaciones,
+      modo: 'incrementar'
+    });
+  }, [cargaManual]);
+
   // Auto-cargar datos iniciales
   useEffect(() => {
+    console.log(`[Hook] 🚀 Inicializando hook useStockSucursales`);
     loadDashboard();
     loadAlertas({ activa: true });
   }, [loadDashboard, loadAlertas]);
@@ -434,6 +645,7 @@ export function useStockSucursales() {
     dashboardData,
     configs,
     alertas,
+    lastUpdate,
     
     // Configuraciones
     loadConfigs,
@@ -446,6 +658,11 @@ export function useStockSucursales() {
     bulkLoad,
     loadBulkHistory,
     
+    // 🆕 Carga manual
+    cargaManual,
+    cargarStockRapido,
+    loadHistorialCargaManual,
+    
     // Alertas
     loadAlertas,
     marcarAlertaVista,
@@ -456,6 +673,7 @@ export function useStockSucursales() {
     getAlertasActivas,
     getAlertasCriticas,
     clearError,
+    refreshData,
     
     // Acciones de estado
     setError,
