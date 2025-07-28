@@ -1,0 +1,487 @@
+{
+  "success": true,
+  "mensaje": "Procesamiento completado: 17 exitosos, 0 errores",
+  "estadisticas": {
+    "total": 17,
+    "sinCodigoBarras": 17,
+    "sinDescripcion": 16,
+    "sinAmbos": 16,
+    "porCategoria": {
+      "HUMIS CON FILTRO": [
+        {
+          "id": "5ef8a133-97c1-4c73-9d83-401ef2046d71",
+          "nombre": "HUMI HUMIDIFIER",
+          "descripcion": null,
+          "precio": 42500,
+          "codigoBarras": null,
+          "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/874203a3-b5ad-4221-a414-832620cc65da.webp",
+          "categoriaId": "11dbdcb3-8a21-476d-8615-eb54f7f9b0dd",
+          "stockMinimo": 1,
+          "activo": true,
+          "categoria": {
+            "id": "11dbdcb3-8a21-476d-8615-eb54f7f9b0dd",
+            "nombre": "HUMIS CON FILTRO",
+            "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/00d4d249-5d94-4346-a403-d8ea82a29eae.webp"
+          }
+        }
+      ],
+      "HUMIS GRANDES": [
+        {
+          "id": "70991def-d72c-4bad-8866-85ab632bf831",
+          "nombre": "HUMI BASE MADERA BLANCA PUNTA BLANCA - WM020MB",
+          "descripcion": null,
+          "precio": 98500,
+          "codigoBarras": null,
+          "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/cf9af6f0-9ce5-477a-90d2-6086d0dd3ed5.webp",
+          "categoriaId": "9a6e26fe-f839-41ac-8e70-e8f609118c17",
+          "stockMinimo": 1,
+          "activo": true,
+          "categoria": {
+            "id": "9a6e26fe-f839-41ac-8e70-e8f609118c17",
+            "nombre": "HUMIS GRANDES",
+            "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/0b1d05da-3092-4ca7-a74f-ab70026e6779.webp"
+          }
+        },
+        {
+          "id": "842b1a6b-6eed-4887-9cbc-977992da6346",
+          "nombre": "HUMI REDONDO CALADO",
+          "descripcion": null,
+          "precio": 98500,
+          "codigoBarras": null,
+          "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/71b1005c-fa3c-4bf6-a2e2-53bf82d81bf5.webp",
+          "categoriaId": "9a6e26fe-f839-41ac-8e70-e8f609118c17",
+          "stockMinimo": 1,
+          "activo": true,
+          "categoria": {
+            "id": "9a6e26fe-f839-41ac-8e70-e8f609118c17",
+            "nombre": "HUMIS GRANDES",
+            "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/0b1d05da-3092-4ca7-a74f-ab70026e6779.webp"
+          }
+        },
+        {
+          "id": "a0b5930c-cb89-4a59-8eed-0140ebf25104",
+          "nombre": "HUMI SIMIL MADERA GRANDE",
+          "descripcion": null,
+          "precio": 98500,
+          "codigoBarras": null,
+          "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/338c720c-ed8c-4ed7-9083-f9824d3301e2.webp",
+          "categoriaId": "9a6e26fe-f839-41ac-8e70-e8f609118c17",
+          "stockMinimo": 0,
+          "activo": true,
+          "categoria": {
+            "id": "9a6e26fe-f839-41ac-8e70-e8f609118c17",
+            "nombre": "HUMIS GRANDES",
+            "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/0b1d05da-3092-4ca7-a74f-ab70026e6779.webp"
+          }
+        }
+      ],
+      "HUMIS MEDIANOS": [
+        {
+          "id": "9238cadc-25ce-4685-b434-be07a1898142",
+          "nombre": "HUMI 300 ML PRO - J01",
+          "descripcion": null,
+          "precio": 75900,
+          "codigoBarras": null,
+          "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/d130ca21-3a67-4d8e-b9ed-a02a418330bf.webp",
+          "categoriaId": "cd1dda1b-6a52-4a8c-aa33-87302e2c6ff2",
+          "stockMinimo": 1,
+          "activo": true,
+          "categoria": {
+            "id": "cd1dda1b-6a52-4a8c-aa33-87302e2c6ff2",
+            "nombre": "HUMIS MEDIANOS",
+            "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/f2562ee8-c367-490a-a922-cd1f7902cb69.webp"
+          }
+        },
+        {
+          "id": "bff12954-6077-4c48-9d25-461a7f86d0b1",
+          "nombre": "HUMI GOTA LARGA - K14",
+          "descripcion": null,
+          "precio": 79900,
+          "codigoBarras": null,
+          "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/6cf15262-15af-4dc2-80ec-23a866bd9b5b.webp",
+          "categoriaId": "cd1dda1b-6a52-4a8c-aa33-87302e2c6ff2",
+          "stockMinimo": 1,
+          "activo": true,
+          "categoria": {
+            "id": "cd1dda1b-6a52-4a8c-aa33-87302e2c6ff2",
+            "nombre": "HUMIS MEDIANOS",
+            "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/f2562ee8-c367-490a-a922-cd1f7902cb69.webp"
+          }
+        },
+        {
+          "id": "63a77248-05ff-4165-9160-362f31b99539",
+          "nombre": "HUMI HUEVO GRANDE - K13",
+          "descripcion": null,
+          "precio": 74500,
+          "codigoBarras": null,
+          "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/fb65cb7d-dadf-43a0-aa13-b0e5cb78ba29.webp",
+          "categoriaId": "cd1dda1b-6a52-4a8c-aa33-87302e2c6ff2",
+          "stockMinimo": 1,
+          "activo": true,
+          "categoria": {
+            "id": "cd1dda1b-6a52-4a8c-aa33-87302e2c6ff2",
+            "nombre": "HUMIS MEDIANOS",
+            "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/f2562ee8-c367-490a-a922-cd1f7902cb69.webp"
+          }
+        },
+        {
+          "id": "75110cbd-0b4e-4221-823b-b13a7300430b",
+          "nombre": "HUMI MANCHADO",
+          "descripcion": null,
+          "precio": 74500,
+          "codigoBarras": null,
+          "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/3a645556-e4c9-4ccf-b79c-923c7cc53592.webp",
+          "categoriaId": "cd1dda1b-6a52-4a8c-aa33-87302e2c6ff2",
+          "stockMinimo": 1,
+          "activo": true,
+          "categoria": {
+            "id": "cd1dda1b-6a52-4a8c-aa33-87302e2c6ff2",
+            "nombre": "HUMIS MEDIANOS",
+            "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/f2562ee8-c367-490a-a922-cd1f7902cb69.webp"
+          }
+        },
+        {
+          "id": "67a1f6a0-1b51-42ca-883b-b6f688959d7c",
+          "nombre": "HUMI QUIMICO - K12",
+          "descripcion": null,
+          "precio": 79500,
+          "codigoBarras": null,
+          "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/c8d0097b-3e5b-44bd-9f94-e359c297e696.webp",
+          "categoriaId": "cd1dda1b-6a52-4a8c-aa33-87302e2c6ff2",
+          "stockMinimo": 1,
+          "activo": true,
+          "categoria": {
+            "id": "cd1dda1b-6a52-4a8c-aa33-87302e2c6ff2",
+            "nombre": "HUMIS MEDIANOS",
+            "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/f2562ee8-c367-490a-a922-cd1f7902cb69.webp"
+          }
+        }
+      ],
+      "VELAS DE SOJA": [
+        {
+          "id": "d75ae572-1767-4442-a256-f8a9f140e8ff",
+          "nombre": " VELA URSULA SIN TAPA",
+          "descripcion": "VELA - Codigo: 255",
+          "precio": 25500,
+          "codigoBarras": null,
+          "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/bba094d0-eed6-4189-987b-11c3ca621070.webp",
+          "categoriaId": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+          "stockMinimo": 1,
+          "activo": true,
+          "categoria": {
+            "id": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+            "nombre": "VELAS DE SOJA",
+            "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/a5b13dfe-63d8-4591-877e-371961f68e1f.webp"
+          }
+        },
+        {
+          "id": "c7fca46f-4662-40a0-90d8-d6cc35c385ee",
+          "nombre": "Redonda grande",
+          "descripcion": null,
+          "precio": 39000,
+          "codigoBarras": null,
+          "imagen": null,
+          "categoriaId": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+          "stockMinimo": 1,
+          "activo": true,
+          "categoria": {
+            "id": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+            "nombre": "VELAS DE SOJA",
+            "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/a5b13dfe-63d8-4591-877e-371961f68e1f.webp"
+          }
+        },
+        {
+          "id": "0f35df11-db3b-46be-8e33-22d62f1a86ae",
+          "nombre": "Relieve",
+          "descripcion": null,
+          "precio": 39000,
+          "codigoBarras": null,
+          "imagen": null,
+          "categoriaId": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+          "stockMinimo": 1,
+          "activo": true,
+          "categoria": {
+            "id": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+            "nombre": "VELAS DE SOJA",
+            "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/a5b13dfe-63d8-4591-877e-371961f68e1f.webp"
+          }
+        },
+        {
+          "id": "49d50064-dffa-4b07-94be-244f291a8ffa",
+          "nombre": "VELA BOMBE CON FRASE",
+          "descripcion": null,
+          "precio": 27500,
+          "codigoBarras": null,
+          "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/0b3b75ef-6793-4a07-8eab-7f93cb578b87.webp",
+          "categoriaId": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+          "stockMinimo": 1,
+          "activo": true,
+          "categoria": {
+            "id": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+            "nombre": "VELAS DE SOJA",
+            "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/a5b13dfe-63d8-4591-877e-371961f68e1f.webp"
+          }
+        },
+        {
+          "id": "b073c110-6d40-4219-ba31-bb75dc24bf21",
+          "nombre": "VELA ECO CON TAPA",
+          "descripcion": null,
+          "precio": 24500,
+          "codigoBarras": null,
+          "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/929c48ee-8b87-4228-a383-b43232c5d9ae.webp",
+          "categoriaId": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+          "stockMinimo": 1,
+          "activo": true,
+          "categoria": {
+            "id": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+            "nombre": "VELAS DE SOJA",
+            "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/a5b13dfe-63d8-4591-877e-371961f68e1f.webp"
+          }
+        },
+        {
+          "id": "7bc863bd-3560-4253-ab0f-44d4e681d0d8",
+          "nombre": "VELA ECO SIN TAPA",
+          "descripcion": null,
+          "precio": 22500,
+          "codigoBarras": null,
+          "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/c2167884-6733-4a00-bcd5-cd880e330943.webp",
+          "categoriaId": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+          "stockMinimo": 1,
+          "activo": true,
+          "categoria": {
+            "id": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+            "nombre": "VELAS DE SOJA",
+            "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/a5b13dfe-63d8-4591-877e-371961f68e1f.webp"
+          }
+        },
+        {
+          "id": "1c3b8d4d-f1fb-4e2b-8ffc-2ea6c8bc351c",
+          "nombre": "VELA TRIANGULO GRANDE",
+          "descripcion": null,
+          "precio": 79000,
+          "codigoBarras": null,
+          "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/151ab2cb-e50c-4baa-bf13-84e5817f1bc8.webp",
+          "categoriaId": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+          "stockMinimo": 1,
+          "activo": true,
+          "categoria": {
+            "id": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+            "nombre": "VELAS DE SOJA",
+            "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/a5b13dfe-63d8-4591-877e-371961f68e1f.webp"
+          }
+        },
+        {
+          "id": "d5bcb2d5-27c7-473c-b08d-1797b4b50b5b",
+          "nombre": "VELA URSULA CON TAPA",
+          "descripcion": null,
+          "precio": 27500,
+          "codigoBarras": null,
+          "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/2c7ab111-61a3-4af4-abe9-af8010a78321.webp",
+          "categoriaId": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+          "stockMinimo": 1,
+          "activo": true,
+          "categoria": {
+            "id": "98cc439d-166b-4363-b262-d1ad0f27fec2",
+            "nombre": "VELAS DE SOJA",
+            "imagen": "https://tulum-bucket.s3.us-east-2.amazonaws.com/productos/a5b13dfe-63d8-4591-877e-371961f68e1f.webp"
+          }
+        }
+      ]
+    },
+    "procesados": {
+      "total": 17,
+      "exitosos": 17,
+      "conErrores": 0,
+      "codigosGenerados": 17,
+      "descripcionesGeneradas": 16
+    }
+  },
+  "resultados": [
+    {
+      "id": "5ef8a133-97c1-4c73-9d83-401ef2046d71",
+      "nombre": "HUMI HUMIDIFIER",
+      "categoria": "HUMIS CON FILTRO",
+      "cambios": {
+        "codigoBarras": "7791000000017",
+        "descripcion": "Producto de HUMIS CON FILTRO para uso personal y del hogar. Modelo: HUMI HUMIDIFIER"
+      },
+      "exito": true,
+      "error": null
+    },
+    {
+      "id": "70991def-d72c-4bad-8866-85ab632bf831",
+      "nombre": "HUMI BASE MADERA BLANCA PUNTA BLANCA - WM020MB",
+      "categoria": "HUMIS GRANDES",
+      "cambios": {
+        "codigoBarras": "7791000000024",
+        "descripcion": "Producto de HUMIS GRANDES para uso personal y del hogar. Presenta acabado en madera. Modelo: HUMI BASE MADERA BLANCA PUNTA BLANCA - WM020MB"
+      },
+      "exito": true,
+      "error": null
+    },
+    {
+      "id": "842b1a6b-6eed-4887-9cbc-977992da6346",
+      "nombre": "HUMI REDONDO CALADO",
+      "categoria": "HUMIS GRANDES",
+      "cambios": {
+        "codigoBarras": "7791000000031",
+        "descripcion": "Producto de HUMIS GRANDES para uso personal y del hogar. Modelo: HUMI REDONDO CALADO"
+      },
+      "exito": true,
+      "error": null
+    },
+    {
+      "id": "a0b5930c-cb89-4a59-8eed-0140ebf25104",
+      "nombre": "HUMI SIMIL MADERA GRANDE",
+      "categoria": "HUMIS GRANDES",
+      "cambios": {
+        "codigoBarras": "7791000000048",
+        "descripcion": "Producto de HUMIS GRANDES para uso personal y del hogar. Presenta tamaño grande, acabado en madera. Modelo: HUMI SIMIL MADERA GRANDE"
+      },
+      "exito": true,
+      "error": null
+    },
+    {
+      "id": "9238cadc-25ce-4685-b434-be07a1898142",
+      "nombre": "HUMI 300 ML PRO - J01",
+      "categoria": "HUMIS MEDIANOS",
+      "cambios": {
+        "codigoBarras": "7791000000055",
+        "descripcion": "Producto de HUMIS MEDIANOS para uso personal y del hogar. Modelo: HUMI 300 ML PRO - J01"
+      },
+      "exito": true,
+      "error": null
+    },
+    {
+      "id": "bff12954-6077-4c48-9d25-461a7f86d0b1",
+      "nombre": "HUMI GOTA LARGA - K14",
+      "categoria": "HUMIS MEDIANOS",
+      "cambios": {
+        "codigoBarras": "7791000000062",
+        "descripcion": "Producto de HUMIS MEDIANOS para uso personal y del hogar. Modelo: HUMI GOTA LARGA - K14"
+      },
+      "exito": true,
+      "error": null
+    },
+    {
+      "id": "63a77248-05ff-4165-9160-362f31b99539",
+      "nombre": "HUMI HUEVO GRANDE - K13",
+      "categoria": "HUMIS MEDIANOS",
+      "cambios": {
+        "codigoBarras": "7791000000079",
+        "descripcion": "Producto de HUMIS MEDIANOS para uso personal y del hogar. Presenta tamaño grande. Modelo: HUMI HUEVO GRANDE - K13"
+      },
+      "exito": true,
+      "error": null
+    },
+    {
+      "id": "75110cbd-0b4e-4221-823b-b13a7300430b",
+      "nombre": "HUMI MANCHADO",
+      "categoria": "HUMIS MEDIANOS",
+      "cambios": {
+        "codigoBarras": "7791000000086",
+        "descripcion": "Producto de HUMIS MEDIANOS para uso personal y del hogar. Modelo: HUMI MANCHADO"
+      },
+      "exito": true,
+      "error": null
+    },
+    {
+      "id": "67a1f6a0-1b51-42ca-883b-b6f688959d7c",
+      "nombre": "HUMI QUIMICO - K12",
+      "categoria": "HUMIS MEDIANOS",
+      "cambios": {
+        "codigoBarras": "7791000000093",
+        "descripcion": "Producto de HUMIS MEDIANOS para uso personal y del hogar. Modelo: HUMI QUIMICO - K12"
+      },
+      "exito": true,
+      "error": null
+    },
+    {
+      "id": "d75ae572-1767-4442-a256-f8a9f140e8ff",
+      "nombre": " VELA URSULA SIN TAPA",
+      "categoria": "VELAS DE SOJA",
+      "cambios": {
+        "codigoBarras": "7791000000109"
+      },
+      "exito": true,
+      "error": null
+    },
+    {
+      "id": "c7fca46f-4662-40a0-90d8-d6cc35c385ee",
+      "nombre": "Redonda grande",
+      "categoria": "VELAS DE SOJA",
+      "cambios": {
+        "codigoBarras": "7791000000116",
+        "descripcion": "Vela aromática decorativa de cera natural. Presenta tamaño grande. Modelo: Redonda grande"
+      },
+      "exito": true,
+      "error": null
+    },
+    {
+      "id": "0f35df11-db3b-46be-8e33-22d62f1a86ae",
+      "nombre": "Relieve",
+      "categoria": "VELAS DE SOJA",
+      "cambios": {
+        "codigoBarras": "7791000000123",
+        "descripcion": "Vela aromática decorativa de cera natural. Modelo: Relieve"
+      },
+      "exito": true,
+      "error": null
+    },
+    {
+      "id": "49d50064-dffa-4b07-94be-244f291a8ffa",
+      "nombre": "VELA BOMBE CON FRASE",
+      "categoria": "VELAS DE SOJA",
+      "cambios": {
+        "codigoBarras": "7791000000130",
+        "descripcion": "Vela aromática decorativa de cera natural. Modelo: VELA BOMBE CON FRASE"
+      },
+      "exito": true,
+      "error": null
+    },
+    {
+      "id": "b073c110-6d40-4219-ba31-bb75dc24bf21",
+      "nombre": "VELA ECO CON TAPA",
+      "categoria": "VELAS DE SOJA",
+      "cambios": {
+        "codigoBarras": "7791000000147",
+        "descripcion": "Vela aromática decorativa de cera natural. Modelo: VELA ECO CON TAPA"
+      },
+      "exito": true,
+      "error": null
+    },
+    {
+      "id": "7bc863bd-3560-4253-ab0f-44d4e681d0d8",
+      "nombre": "VELA ECO SIN TAPA",
+      "categoria": "VELAS DE SOJA",
+      "cambios": {
+        "codigoBarras": "7791000000154",
+        "descripcion": "Vela aromática decorativa de cera natural. Modelo: VELA ECO SIN TAPA"
+      },
+      "exito": true,
+      "error": null
+    },
+    {
+      "id": "1c3b8d4d-f1fb-4e2b-8ffc-2ea6c8bc351c",
+      "nombre": "VELA TRIANGULO GRANDE",
+      "categoria": "VELAS DE SOJA",
+      "cambios": {
+        "codigoBarras": "7791000000161",
+        "descripcion": "Vela aromática decorativa de cera natural. Presenta tamaño grande. Modelo: VELA TRIANGULO GRANDE"
+      },
+      "exito": true,
+      "error": null
+    },
+    {
+      "id": "d5bcb2d5-27c7-473c-b08d-1797b4b50b5b",
+      "nombre": "VELA URSULA CON TAPA",
+      "categoria": "VELAS DE SOJA",
+      "cambios": {
+        "codigoBarras": "7791000000178",
+        "descripcion": "Vela aromática decorativa de cera natural. Modelo: VELA URSULA CON TAPA"
+      },
+      "exito": true,
+      "error": null
+    }
+  ]
+}
