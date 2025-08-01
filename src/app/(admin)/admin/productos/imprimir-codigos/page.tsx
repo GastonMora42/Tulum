@@ -2,16 +2,16 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { authenticatedFetch } from '@/hooks/useAuth'; // Asegúrate de que esta ruta sea correcta
-import { ContrastEnhancer } from '@/components/ui/ContrastEnhancer'; // Asegúrate de que esta ruta sea correcta
+import { authenticatedFetch } from '@/hooks/useAuth'; 
+import { ContrastEnhancer } from '@/components/ui/ContrastEnhancer'; 
 import { Loader, Package, Printer, RefreshCw, ChevronLeft, Check, AlertTriangle } from 'lucide-react';
 
-// Definición de la interfaz del producto
 interface Producto {
   id: string;
   nombre: string;
   codigoBarras: string;
-  precio?: number; // El precio es opcional
+  precio?: number;
+  categoria?: string; // ¡Nuevo campo para la categoría!
 }
 
 export default function ImprimirCodigosPage() {
@@ -21,81 +21,89 @@ export default function ImprimirCodigosPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isPrinting, setIsPrinting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
-  // --- Estados para la paginación y el filtro ---
-  const [searchTerm, setSearchTerm] = useState(''); // Término de búsqueda
-  const [currentPage, setCurrentPage] = useState(1); // Página actual
-  const [productsPerPage, setProductsPerPage] = useState(10); // Cantidad de productos por página
-  const [totalPages, setTotalPages] = useState(0); // Total de páginas disponibles
-
   const router = useRouter();
 
-  // --- Efecto para cargar los productos con paginación y filtro ---
+  // --- Estados para la paginación y el filtro ---
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState(''); // Nuevo estado para el filtro de categoría
+  const [currentPage, setCurrentPage] = useState(1);
+  const [productsPerPage, setProductsPerPage] = useState(10);
+  const [totalPages, setTotalPages] = useState(0);
+  const [availableCategories, setAvailableCategories] = useState<string[]>([]); // Para poblar el dropdown de categorías
+
+  // --- Efecto para cargar los productos y las categorías disponibles ---
   useEffect(() => {
     const fetchProductos = async () => {
       try {
         setIsLoading(true);
         setError(null);
 
-        // Construye la URL de la API incluyendo los parámetros de paginación y búsqueda
-        const response = await authenticatedFetch(
-          `/api/admin/productos?limit=${productsPerPage}&page=${currentPage}&search=${encodeURIComponent(searchTerm)}`
-        );
+        // Construye la URL de la API incluyendo todos los parámetros de paginación y filtros
+        const queryParams = new URLSearchParams({
+          limit: productsPerPage.toString(),
+          page: currentPage.toString(),
+          search: searchTerm,
+        });
+
+        if (selectedCategory) {
+          queryParams.append('category', selectedCategory);
+        }
+
+        const response = await authenticatedFetch(`/api/admin/productos?${queryParams.toString()}`);
 
         if (response.ok) {
           const data = await response.json();
-          // La API ya debería haber filtrado y paginado los productos
           setProductos(data.data);
           setTotalPages(data.totalPages);
           setCurrentPage(data.currentPage);
           
-          // Mensajes de error específicos basados en la respuesta de la API
+          // También obtenemos las categorías disponibles si la API las devuelve
+          if (data.categories && Array.isArray(data.categories)) {
+            setAvailableCategories(['', ...data.categories]); // Añade una opción vacía para "Todas"
+          }
+
           if (data.totalProducts > 0 && data.data.length === 0) {
-            setError("No hay productos con códigos de barras que coincidan con su búsqueda en esta página.");
+            setError("No hay productos con códigos de barras que coincidan con su búsqueda o categoría en esta página.");
           } else if (data.totalProducts === 0) {
             setError("No hay productos con códigos de barras disponibles. Asigne códigos de barras a sus productos primero.");
           }
         } else {
-          // Si la respuesta no es OK, lanza un error
-          throw new Error('Error al cargar productos');
+          // Captura el mensaje de error del backend si está disponible
+          const errorText = await response.text();
+          throw new Error(`Error al cargar productos: ${errorText}`);
         }
       } catch (error: any) {
         console.error('Error al cargar productos:', error);
-        setError('No se pudieron cargar los productos. Por favor, inténtelo de nuevo.');
+        // Muestra el mensaje de error al usuario
+        setError(`No se pudieron cargar los productos: ${error.message || 'Inténtelo de nuevo.'}`);
       } finally {
         setIsLoading(false);
       }
     };
     
-    // Implementación de debounce para el campo de búsqueda:
-    // Retrasa la llamada a la API hasta que el usuario deja de escribir por 300ms,
-    // mejorando el rendimiento y reduciendo llamadas innecesarias al servidor.
+    // Debounce para searchTerm y selectedCategory
     const handler = setTimeout(() => {
       fetchProductos();
     }, 300); 
 
-    // Función de limpieza para cancelar el timeout si el componente se desmonta
-    // o las dependencias cambian antes de que se ejecute el timeout.
     return () => {
       clearTimeout(handler);
     };
 
-  }, [searchTerm, currentPage, productsPerPage]); // Las dependencias que disparan el useEffect
+  }, [searchTerm, selectedCategory, currentPage, productsPerPage]); // Dependencias del useEffect
 
-  // --- Lógica para la selección de productos ---
+  // --- Lógica para la selección de productos (sin cambios) ---
   const toggleProductSelection = (productId: string) => {
     setSelectedProducts(prevSelected => {
       if (prevSelected.includes(productId)) {
-        // Si ya está seleccionado, lo quita
         return prevSelected.filter(id => id !== productId);
       } else {
-        // Si no está seleccionado, lo añade
         return [...prevSelected, productId];
       }
     });
   };
 
-  // --- Lógica para imprimir los productos seleccionados ---
+  // --- Lógica para imprimir los productos seleccionados (sin cambios mayores) ---
   const handlePrintSelected = async () => {
     if (selectedProducts.length === 0) {
       setError("Seleccione al menos un producto para imprimir");
@@ -104,28 +112,23 @@ export default function ImprimirCodigosPage() {
     
     try {
       setIsPrinting(true);
-      setError(null); // Limpia cualquier error previo
-
-      // Realiza la solicitud POST a tu API de impresión de códigos de barras
+      setError(null);
+      
       const response = await authenticatedFetch('/api/admin/productos/print-barcodes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ productIds: selectedProducts }) // Envía los IDs de los productos seleccionados
+        body: JSON.stringify({ productIds: selectedProducts })
       });
       
       if (response.ok) {
-        const blob = await response.blob(); // Obtiene el PDF como un Blob
-        const url = URL.createObjectURL(blob); // Crea una URL para el Blob
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
         
-        // Abre el PDF en una nueva ventana/pestaña del navegador
         const newWindow = window.open(url, '_blank');
         if (!newWindow) {
           setError("El navegador bloqueó la apertura del PDF. Por favor, permita ventanas emergentes.");
         }
-        // Opcional: Puedes limpiar la selección después de la impresión si lo deseas
-        // setSelectedProducts([]);
       } else {
-        // Manejo de errores si la generación del PDF falla en el backend
         const errorData = await response.text();
         throw new Error(`Error al generar PDF: ${errorData}`);
       }
@@ -133,31 +136,26 @@ export default function ImprimirCodigosPage() {
       console.error('Error al imprimir códigos:', error);
       setError(`Error al imprimir códigos: ${error.message}`);
     } finally {
-      setIsPrinting(false); // Siempre desactiva el estado de impresión al finalizar
+      setIsPrinting(false);
     }
   };
 
-  // --- Lógica para seleccionar/deseleccionar todos los productos en la página actual ---
+  // --- Lógica para seleccionar/deseleccionar todos en la página actual (sin cambios) ---
   const handleSelectAll = () => {
-    const currentProductIds = productos.map(p => p.id); // IDs de los productos en la página actual
-    // Verifica si todos los productos en la página actual ya están seleccionados
+    const currentProductIds = productos.map(p => p.id);
     const allSelectedOnPage = currentProductIds.every(id => selectedProducts.includes(id));
 
     if (allSelectedOnPage) {
-      // Si todos ya están seleccionados, los deselecciona de la lista global
       setSelectedProducts(prevSelected => prevSelected.filter(id => !currentProductIds.includes(id)));
     } else {
-      // Si no todos están seleccionados, añade los de la página actual a la selección global
       const newSelected = new Set([...selectedProducts, ...currentProductIds]);
       setSelectedProducts(Array.from(newSelected));
     }
   };
 
-  // --- Renderizado del componente ---
   return (
     <ContrastEnhancer>
       <div className="space-y-6">
-        {/* Encabezado de la página */}
         <div className="flex justify-between items-center">
           <div className="flex items-center">
             <Printer className="h-6 w-6 text-indigo-600 mr-2" />
@@ -172,7 +170,6 @@ export default function ImprimirCodigosPage() {
           </button>
         </div>
         
-        {/* Área de visualización de errores */}
         {error && (
           <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded-md flex items-start">
             <AlertTriangle className="h-5 w-5 mr-2 mt-0.5 flex-shrink-0" />
@@ -180,7 +177,6 @@ export default function ImprimirCodigosPage() {
           </div>
         )}
         
-        {/* Indicador de carga */}
         {isLoading ? (
           <div className="text-center py-20 bg-white rounded-lg shadow">
             <Loader className="inline-block animate-spin h-8 w-8 text-indigo-500 mb-4" />
@@ -197,10 +193,31 @@ export default function ImprimirCodigosPage() {
                   value={searchTerm}
                   onChange={(e) => {
                     setSearchTerm(e.target.value);
-                    setCurrentPage(1); // Reinicia a la primera página con cada nueva búsqueda
+                    setCurrentPage(1); 
                   }}
                   className="block w-full sm:w-auto rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2"
                 />
+                
+                {/* Selector de Categoría */}
+                <div className="flex items-center gap-2">
+                  <label htmlFor="categoryFilter" className="text-sm text-gray-700">Categoría:</label>
+                  <select
+                    id="categoryFilter"
+                    value={selectedCategory}
+                    onChange={(e) => {
+                      setSelectedCategory(e.target.value);
+                      setCurrentPage(1); // Reinicia a la primera página al cambiar la categoría
+                    }}
+                    className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2"
+                  >
+                    <option value="">Todas</option>
+                    {availableCategories.map(cat => (
+                      cat && <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Selector de Productos por Página */}
                 <div className="flex items-center gap-2">
                   <label htmlFor="productsPerPage" className="text-sm text-gray-700">Productos por página:</label>
                   <select
@@ -208,7 +225,7 @@ export default function ImprimirCodigosPage() {
                     value={productsPerPage}
                     onChange={(e) => {
                       setProductsPerPage(Number(e.target.value));
-                      setCurrentPage(1); // Reinicia a la primera página al cambiar el límite
+                      setCurrentPage(1); 
                     }}
                     className="rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2"
                   >
@@ -236,7 +253,6 @@ export default function ImprimirCodigosPage() {
                     className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
                   >
                     <Check className="h-4 w-4 mr-1" />
-                    {/* Texto del botón "Seleccionar todos" dinámico */}
                     {productos.length > 0 && productos.every(p => selectedProducts.includes(p.id)) ? 'Deseleccionar todos en esta página' : 'Seleccionar todos en esta página'}
                   </button>
                   <button
@@ -263,8 +279,8 @@ export default function ImprimirCodigosPage() {
               {productos.length === 0 ? (
                 <div className="text-center py-10 bg-gray-50 rounded-lg border border-gray-200">
                   <Package className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-                  <p className="text-gray-600 mb-2">No hay productos con códigos de barras disponibles que coincidan con su búsqueda.</p>
-                  <p className="text-gray-500 text-sm">Intente ajustar su filtro de búsqueda o asigne códigos de barras a sus productos.</p>
+                  <p className="text-gray-600 mb-2">No hay productos con códigos de barras disponibles que coincidan con su búsqueda o filtro.</p>
+                  <p className="text-gray-500 text-sm">Intente ajustar su filtro de búsqueda/categoría o asigne códigos de barras a sus productos.</p>
                 </div>
               ) : (
                 <>
@@ -284,7 +300,7 @@ export default function ImprimirCodigosPage() {
                           <input
                             type="checkbox"
                             checked={selectedProducts.includes(producto.id)}
-                            onChange={() => {}} // El onChange vacío evita que el checkbox sea manipulado directamente
+                            onChange={() => {}} 
                             className="h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
                           />
                           <div className="flex-1 min-w-0">
@@ -292,6 +308,9 @@ export default function ImprimirCodigosPage() {
                             <p className="text-sm text-gray-500 truncate">Código: {producto.codigoBarras}</p>
                             {producto.precio && (
                               <p className="text-sm text-indigo-600 font-semibold">${producto.precio.toFixed(2)}</p>
+                            )}
+                            {producto.categoria && (
+                              <p className="text-xs text-gray-400 truncate">Categoría: {producto.categoria}</p>
                             )}
                           </div>
                         </div>
@@ -325,7 +344,6 @@ export default function ImprimirCodigosPage() {
               )}
             </div>
             
-            {/* Botón para administrar productos (enlace externo) */}
             <div className="flex justify-end mt-6">
               <button
                 onClick={() => router.push('/admin/productos')}
