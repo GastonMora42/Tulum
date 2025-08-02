@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { authenticatedFetch } from '@/hooks/useAuth'; 
 import { ContrastEnhancer } from '@/components/ui/ContrastEnhancer'; 
@@ -19,10 +19,7 @@ import {
   List,
   ChevronRight,
   ChevronDown,
-  Settings,
-  Download,
-  Eye,
-  MoreHorizontal
+  Settings
 } from 'lucide-react';
 
 interface Producto {
@@ -30,59 +27,24 @@ interface Producto {
   nombre: string;
   codigoBarras: string;
   precio?: number;
-  categoria?: string;
+  categoria?: {
+    nombre: string;
+  };
   imagen?: string;
   activo?: boolean;
-}
-
-interface FilterPreset {
-  id: string;
-  name: string;
-  filters: FilterState;
 }
 
 interface FilterState {
   searchTerm: string;
   selectedCategory: string;
-  priceRange: { min: number; max: number };
   activeOnly: boolean;
-  hasBarcode: boolean;
-  sortBy: string;
-  sortOrder: 'asc' | 'desc';
 }
 
 const INITIAL_FILTERS: FilterState = {
   searchTerm: '',
   selectedCategory: '',
-  priceRange: { min: 0, max: 10000 },
-  activeOnly: true,
-  hasBarcode: true,
-  sortBy: 'nombre',
-  sortOrder: 'asc'
+  activeOnly: true
 };
-
-const FILTER_PRESETS: FilterPreset[] = [
-  {
-    id: 'todos',
-    name: 'Todos los productos',
-    filters: { ...INITIAL_FILTERS, activeOnly: false, hasBarcode: false }
-  },
-  {
-    id: 'activos-con-codigo',
-    name: 'Activos con código',
-    filters: INITIAL_FILTERS
-  },
-  {
-    id: 'sin-codigo',
-    name: 'Sin código de barras',
-    filters: { ...INITIAL_FILTERS, hasBarcode: false }
-  },
-  {
-    id: 'precios-altos',
-    name: 'Precios > $5000',
-    filters: { ...INITIAL_FILTERS, priceRange: { min: 5000, max: 50000 } }
-  }
-];
 
 export default function ImprimirCodigosPage() {
   // --- Estados principales del componente ---
@@ -93,88 +55,102 @@ export default function ImprimirCodigosPage() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
-  // --- Estados para filtros avanzados ---
+  // --- Estados para filtros simplificados ---
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
   const [availableCategories, setAvailableCategories] = useState<string[]>([]);
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [activePreset, setActivePreset] = useState<string>('activos-con-codigo');
 
-  // --- Estados para paginación y vista ---
+  // --- Estados para paginación ---
   const [currentPage, setCurrentPage] = useState(1);
   const [productsPerPage, setProductsPerPage] = useState(12);
   const [totalPages, setTotalPages] = useState(0);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [totalProducts, setTotalProducts] = useState(0);
 
   // --- Estados para UI ---
-  const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+
+  // --- Función para cargar categorías ---
+  const fetchCategorias = useCallback(async () => {
+    try {
+      const response = await authenticatedFetch('/api/admin/categorias');
+      if (response.ok) {
+        const data = await response.json();
+        if (Array.isArray(data)) {
+          setAvailableCategories(['', ...data.map(cat => cat.nombre || cat.id)]);
+        }
+      }
+    } catch (error) {
+      console.error('Error al cargar categorías:', error);
+    }
+  }, []);
+
+  // --- Efecto para cargar categorías ---
+  useEffect(() => {
+    fetchCategorias();
+  }, [fetchCategorias]);
+  const fetchProductos = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Construye la URL de la API incluyendo todos los parámetros
+      const queryParams = new URLSearchParams({
+        limit: productsPerPage.toString(),
+        page: currentPage.toString(),
+      });
+
+      // Solo agregar parámetros no vacíos
+      if (filters.searchTerm && filters.searchTerm.trim()) {
+        queryParams.append('search', filters.searchTerm.trim());
+      }
+
+      if (filters.selectedCategory) {
+        queryParams.append('categoriaId', filters.selectedCategory);
+      }
+
+      if (filters.activeOnly) {
+        queryParams.append('soloActivos', 'true');
+      }
+
+      const response = await authenticatedFetch(`/api/admin/productos?${queryParams.toString()}`);
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Manejar diferentes estructuras de respuesta de la API
+        if (data.data && Array.isArray(data.data)) {
+          // Nueva estructura con paginación
+          setProductos(data.data.filter((p: { codigoBarras: any; }) => p.codigoBarras)); // Solo productos con código
+          setTotalPages(data.pagination?.totalPages || Math.ceil((data.pagination?.total || 0) / productsPerPage));
+          setTotalProducts(data.pagination?.total || 0);
+        } else if (Array.isArray(data)) {
+          // Estructura antigua (array directo)
+          const productosConCodigo = data.filter(p => p.codigoBarras);
+          setProductos(productosConCodigo);
+          setTotalPages(Math.ceil(productosConCodigo.length / productsPerPage));
+          setTotalProducts(productosConCodigo.length);
+        } else {
+          setProductos([]);
+          setTotalPages(1);
+          setTotalProducts(0);
+        }
+
+      } else {
+        const errorText = await response.text();
+        throw new Error(`Error al cargar productos: ${errorText}`);
+      }
+    } catch (error: any) {
+      console.error('Error al cargar productos:', error);
+      setError(`No se pudieron cargar los productos: ${error.message || 'Inténtelo de nuevo.'}`);
+      setProductos([]);
+      setTotalPages(1);
+      setTotalProducts(0);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [filters, currentPage, productsPerPage]);
 
   // --- Efecto para cargar los productos ---
   useEffect(() => {
-    const fetchProductos = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-
-        // Construye la URL de la API incluyendo todos los parámetros
-        const queryParams = new URLSearchParams({
-          limit: productsPerPage.toString(),
-          page: currentPage.toString(),
-          search: filters.searchTerm,
-          sortBy: filters.sortBy,
-          sortOrder: filters.sortOrder,
-        });
-
-        if (filters.selectedCategory) {
-          queryParams.append('category', filters.selectedCategory);
-        }
-
-        if (filters.activeOnly) {
-          queryParams.append('soloActivos', 'true');
-        }
-
-        if (filters.hasBarcode) {
-          queryParams.append('conCodigoBarras', 'true');
-        }
-
-        if (filters.priceRange.min > 0) {
-          queryParams.append('precioMin', filters.priceRange.min.toString());
-        }
-
-        if (filters.priceRange.max < 10000) {
-          queryParams.append('precioMax', filters.priceRange.max.toString());
-        }
-
-        const response = await authenticatedFetch(`/api/admin/productos?${queryParams.toString()}`);
-
-        if (response.ok) {
-          const data = await response.json();
-          setProductos(data.data || []);
-          setTotalPages(data.totalPages || 1);
-          setCurrentPage(data.currentPage || 1);
-          setTotalProducts(data.totalProducts || 0);
-          
-          if (data.categories && Array.isArray(data.categories)) {
-            setAvailableCategories(['', ...data.categories]);
-          }
-
-          if (data.totalProducts > 0 && data.data.length === 0) {
-            setError("No hay productos que coincidan con los filtros aplicados.");
-          } else if (data.totalProducts === 0) {
-            setError("No hay productos disponibles.");
-          }
-        } else {
-          const errorText = await response.text();
-          throw new Error(`Error al cargar productos: ${errorText}`);
-        }
-      } catch (error: any) {
-        console.error('Error al cargar productos:', error);
-        setError(`No se pudieron cargar los productos: ${error.message || 'Inténtelo de nuevo.'}`);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
     const handler = setTimeout(() => {
       fetchProductos();
     }, 300); 
@@ -182,22 +158,11 @@ export default function ImprimirCodigosPage() {
     return () => {
       clearTimeout(handler);
     };
+  }, [fetchProductos]);
 
-  }, [filters, currentPage, productsPerPage]);
-
-  // --- Funciones para manejo de filtros ---
-  const applyPreset = (presetId: string) => {
-    const preset = FILTER_PRESETS.find(p => p.id === presetId);
-    if (preset) {
-      setFilters(preset.filters);
-      setActivePreset(presetId);
-      setCurrentPage(1);
-    }
-  };
-
+  // --- Funciones para manejo de filtros simplificadas ---
   const clearAllFilters = () => {
     setFilters(INITIAL_FILTERS);
-    setActivePreset('activos-con-codigo');
     setCurrentPage(1);
     setSelectedProducts([]);
   };
@@ -205,7 +170,6 @@ export default function ImprimirCodigosPage() {
   const updateFilter = (key: keyof FilterState, value: any) => {
     setFilters(prev => ({ ...prev, [key]: value }));
     setCurrentPage(1);
-    setActivePreset(''); // Limpiar preset activo cuando se modifica manualmente
   };
 
   // --- Lógica para la selección de productos (sin cambios) ---
@@ -268,58 +232,20 @@ export default function ImprimirCodigosPage() {
     }
   };
 
-  // --- Componente de paginación avanzada ---
+  // --- Componente de paginación simplificada ---
   const PaginationControls = () => {
     if (totalPages <= 1) return null;
 
-    const getPageNumbers = () => {
-      const delta = 2;
-      const range = [];
-      const rangeWithDots = [];
-
-      for (let i = Math.max(2, currentPage - delta); i <= Math.min(totalPages - 1, currentPage + delta); i++) {
-        range.push(i);
-      }
-
-      if (currentPage - delta > 2) {
-        rangeWithDots.push(1, '...');
-      } else {
-        rangeWithDots.push(1);
-      }
-
-      rangeWithDots.push(...range);
-
-      if (currentPage + delta < totalPages - 1) {
-        rangeWithDots.push('...', totalPages);
-      } else if (totalPages > 1) {
-        rangeWithDots.push(totalPages);
-      }
-
-      return rangeWithDots;
-    };
+    const startItem = (currentPage - 1) * productsPerPage + 1;
+    const endItem = Math.min(currentPage * productsPerPage, totalProducts);
 
     return (
       <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-6 p-4 bg-white rounded-lg border">
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <span>Mostrando</span>
-          <span className="font-medium">{((currentPage - 1) * productsPerPage) + 1}</span>
-          <span>-</span>
-          <span className="font-medium">{Math.min(currentPage * productsPerPage, totalProducts)}</span>
-          <span>de</span>
-          <span className="font-medium">{totalProducts}</span>
-          <span>productos</span>
+        <div className="text-sm text-gray-600">
+          Mostrando <span className="font-medium">{startItem}</span> - <span className="font-medium">{endItem}</span> de <span className="font-medium">{totalProducts}</span> productos
         </div>
 
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => setCurrentPage(1)}
-            disabled={currentPage === 1 || isLoading}
-            className="px-3 py-2 text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Primera página"
-          >
-            ««
-          </button>
-          
+        <div className="flex items-center gap-2">
           <button
             onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
             disabled={currentPage === 1 || isLoading}
@@ -329,32 +255,9 @@ export default function ImprimirCodigosPage() {
             Anterior
           </button>
 
-          <div className="flex items-center gap-1">
-            {getPageNumbers().map((pageNum, index) => {
-              if (pageNum === '...') {
-                return (
-                  <span key={`dots-${index}`} className="px-3 py-2 text-gray-400">
-                    ...
-                  </span>
-                );
-              }
-
-              return (
-                <button
-                  key={pageNum}
-                  onClick={() => setCurrentPage(pageNum as number)}
-                  disabled={isLoading}
-                  className={`px-3 py-2 text-sm border rounded-lg ${
-                    currentPage === pageNum
-                      ? 'bg-indigo-600 text-white border-indigo-600'
-                      : 'hover:bg-gray-50 disabled:opacity-50'
-                  }`}
-                >
-                  {pageNum}
-                </button>
-              );
-            })}
-          </div>
+          <span className="px-3 py-2 text-sm text-gray-700">
+            Página {currentPage} de {totalPages}
+          </span>
 
           <button
             onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
@@ -363,15 +266,6 @@ export default function ImprimirCodigosPage() {
           >
             Siguiente
             <ChevronRight className="h-4 w-4" />
-          </button>
-
-          <button
-            onClick={() => setCurrentPage(totalPages)}
-            disabled={currentPage === totalPages || isLoading}
-            className="px-3 py-2 text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            title="Última página"
-          >
-            »»
           </button>
         </div>
 
@@ -389,7 +283,6 @@ export default function ImprimirCodigosPage() {
             <option value={12}>12</option>
             <option value={24}>24</option>
             <option value={48}>48</option>
-            <option value={96}>96</option>
           </select>
         </div>
       </div>
@@ -414,202 +307,69 @@ export default function ImprimirCodigosPage() {
           </button>
         </div>
 
-        {/* Panel de Filtros Avanzados */}
-        <div className="bg-white rounded-lg shadow-sm border">
-          <div className="p-4 border-b">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={() => setIsFilterPanelOpen(!isFilterPanelOpen)}
-                  className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-                >
-                  <Filter className="h-4 w-4 mr-2" />
-                  Filtros Avanzados
-                  <ChevronDown className={`h-4 w-4 ml-1 transition-transform ${isFilterPanelOpen ? 'rotate-180' : ''}`} />
-                </button>
-
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-gray-600">Presets:</span>
-                  {FILTER_PRESETS.map(preset => (
-                    <button
-                      key={preset.id}
-                      onClick={() => applyPreset(preset.id)}
-                      className={`px-3 py-1 text-sm rounded-full border ${
-                        activePreset === preset.id
-                          ? 'bg-indigo-100 border-indigo-300 text-indigo-700'
-                          : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'
-                      }`}
-                    >
-                      {preset.name}
-                    </button>
-                  ))}
-                </div>
+        {/* Panel de Filtros Simplificado */}
+        <div className="bg-white rounded-lg shadow-sm border p-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={filters.searchTerm}
+                  onChange={(e) => updateFilter('searchTerm', e.target.value)}
+                  placeholder="Buscar por nombre o código..."
+                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                />
               </div>
 
-              <div className="flex items-center gap-2">
-                <div className="flex items-center border rounded-lg">
-                  <button
-                    onClick={() => setViewMode('grid')}
-                    className={`p-2 ${viewMode === 'grid' ? 'bg-indigo-100 text-indigo-600' : 'text-gray-400'}`}
-                  >
-                    <Grid className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => setViewMode('list')}
-                    className={`p-2 ${viewMode === 'list' ? 'bg-indigo-100 text-indigo-600' : 'text-gray-400'}`}
-                  >
-                    <List className="h-4 w-4" />
-                  </button>
-                </div>
+              <select
+                value={filters.selectedCategory}
+                onChange={(e) => updateFilter('selectedCategory', e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                <option value="">Todas las categorías</option>
+                {availableCategories.map(cat => (
+                  cat && <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
 
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={filters.activeOnly}
+                  onChange={(e) => updateFilter('activeOnly', e.target.checked)}
+                  className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                />
+                <span className="text-sm text-gray-700">Solo activos</span>
+              </label>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="flex items-center border rounded-lg">
                 <button
-                  onClick={clearAllFilters}
-                  className="inline-flex items-center px-3 py-2 text-sm text-gray-600 hover:text-gray-800"
+                  onClick={() => setViewMode('grid')}
+                  className={`p-2 ${viewMode === 'grid' ? 'bg-indigo-100 text-indigo-600' : 'text-gray-400'}`}
                 >
-                  <RefreshCw className="h-4 w-4 mr-1" />
-                  Limpiar
+                  <Grid className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`p-2 ${viewMode === 'list' ? 'bg-indigo-100 text-indigo-600' : 'text-gray-400'}`}
+                >
+                  <List className="h-4 w-4" />
                 </button>
               </div>
+
+              <button
+                onClick={clearAllFilters}
+                className="inline-flex items-center px-3 py-2 text-sm text-gray-600 hover:text-gray-800"
+              >
+                <RefreshCw className="h-4 w-4 mr-1" />
+                Limpiar
+              </button>
             </div>
           </div>
-
-          {/* Panel expandible de filtros */}
-          {isFilterPanelOpen && (
-            <div className="p-4 bg-gray-50 border-t">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* Búsqueda */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Búsqueda
-                  </label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <input
-                      type="text"
-                      value={filters.searchTerm}
-                      onChange={(e) => updateFilter('searchTerm', e.target.value)}
-                      placeholder="Nombre, código..."
-                      className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                    />
-                  </div>
-                </div>
-
-                {/* Categoría */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Categoría
-                  </label>
-                  <select
-                    value={filters.selectedCategory}
-                    onChange={(e) => updateFilter('selectedCategory', e.target.value)}
-                    className="block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                  >
-                    <option value="">Todas</option>
-                    {availableCategories.map(cat => (
-                      cat && <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Rango de Precios */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Precio Min - Max
-                  </label>
-                  <div className="flex gap-2">
-                    <input
-                      type="number"
-                      value={filters.priceRange.min}
-                      onChange={(e) => updateFilter('priceRange', { ...filters.priceRange, min: Number(e.target.value) })}
-                      placeholder="Min"
-                      className="block w-full px-2 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                    />
-                    <input
-                      type="number"
-                      value={filters.priceRange.max}
-                      onChange={(e) => updateFilter('priceRange', { ...filters.priceRange, max: Number(e.target.value) })}
-                      placeholder="Max"
-                      className="block w-full px-2 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                    />
-                  </div>
-                </div>
-
-                {/* Ordenamiento */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Ordenar por
-                  </label>
-                  <div className="flex gap-2">
-                    <select
-                      value={filters.sortBy}
-                      onChange={(e) => updateFilter('sortBy', e.target.value)}
-                      className="block w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                    >
-                      <option value="nombre">Nombre</option>
-                      <option value="precio">Precio</option>
-                      <option value="categoria">Categoría</option>
-                      <option value="codigoBarras">Código</option>
-                    </select>
-                    <button
-                      onClick={() => updateFilter('sortOrder', filters.sortOrder === 'asc' ? 'desc' : 'asc')}
-                      className="px-3 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
-                      title={filters.sortOrder === 'asc' ? 'Ascendente' : 'Descendente'}
-                    >
-                      {filters.sortOrder === 'asc' ? '↑' : '↓'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Checkboxes de filtros */}
-              <div className="flex flex-wrap gap-4 mt-4 pt-4 border-t">
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={filters.activeOnly}
-                    onChange={(e) => updateFilter('activeOnly', e.target.checked)}
-                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                  />
-                  <span className="text-sm text-gray-700">Solo productos activos</span>
-                </label>
-
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={filters.hasBarcode}
-                    onChange={(e) => updateFilter('hasBarcode', e.target.checked)}
-                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                  />
-                  <span className="text-sm text-gray-700">Solo con código de barras</span>
-                </label>
-              </div>
-            </div>
-          )}
         </div>
-
-        {/* Indicadores de filtros activos */}
-        {(filters.searchTerm || filters.selectedCategory || filters.priceRange.min > 0 || filters.priceRange.max < 10000 || !filters.activeOnly || !filters.hasBarcode) && (
-          <div className="flex flex-wrap gap-2 p-3 bg-blue-50 rounded-lg border border-blue-200">
-            <span className="text-sm text-blue-700 font-medium">Filtros activos:</span>
-            {filters.searchTerm && (
-              <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">
-                Búsqueda: "{filters.searchTerm}"
-                <button onClick={() => updateFilter('searchTerm', '')}>
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            )}
-            {filters.selectedCategory && (
-              <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">
-                Categoría: {filters.selectedCategory}
-                <button onClick={() => updateFilter('selectedCategory', '')}>
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            )}
-            {/* Agregar más indicadores según sea necesario */}
-          </div>
-        )}
 
         {/* Error Display */}
         {error && (
@@ -711,9 +471,9 @@ export default function ImprimirCodigosPage() {
                               {producto.precio && (
                                 <p className="text-sm text-indigo-600 font-semibold">${producto.precio.toFixed(2)}</p>
                               )}
-                              {producto.categoria && (
+                              {producto.categoria?.nombre && (
                                 <p className="text-xs text-gray-400 truncate mt-1">
-                                  <span className="px-2 py-1 bg-gray-100 rounded-full">{producto.categoria}</span>
+                                  <span className="px-2 py-1 bg-gray-100 rounded-full">{producto.categoria.nombre}</span>
                                 </p>
                               )}
                             </div>
@@ -756,9 +516,9 @@ export default function ImprimirCodigosPage() {
                               {producto.precio && (
                                 <p className="text-lg text-indigo-600 font-semibold">${producto.precio.toFixed(2)}</p>
                               )}
-                              {producto.categoria && (
+                              {producto.categoria?.nombre && (
                                 <p className="text-xs text-gray-400">
-                                  <span className="px-2 py-1 bg-gray-100 rounded-full">{producto.categoria}</span>
+                                  <span className="px-2 py-1 bg-gray-100 rounded-full">{producto.categoria.nombre}</span>
                                 </p>
                               )}
                             </div>
