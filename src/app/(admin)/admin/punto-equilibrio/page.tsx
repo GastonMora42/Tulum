@@ -1,4 +1,4 @@
-// src/app/(admin)/admin/punto-equilibrio/page.tsx - VERSIÓN MEJORADA
+// src/app/(admin)/admin/punto-equilibrio/page.tsx - VERSIÓN CORREGIDA
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -19,7 +19,8 @@ import {
   XCircle,
   Clock,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  X
 } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
 import { ContrastEnhancer } from '@/components/ui/ContrastEnhancer';
@@ -50,7 +51,7 @@ interface MetaConfig {
   costosFijos: number;
   costosVariables: number;
   metaMensual: number;
-  mes: string;
+  mes: number;
   año: number;
 }
 
@@ -62,7 +63,7 @@ interface ResumenGeneral {
   sucursalesEnMeta: number;
 }
 
-export default function PuntoEquilibrioPage() {
+export default function PuntoEquilibrioCorregido() {
   const [sucursales, setSucursales] = useState<SucursalData[]>([]);
   const [resumen, setResumen] = useState<ResumenGeneral | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -70,6 +71,10 @@ export default function PuntoEquilibrioPage() {
   const [editingConfig, setEditingConfig] = useState<string | null>(null);
   const [configuraciones, setConfiguraciones] = useState<Record<string, MetaConfig>>({});
   const [showOnlyNeedConfig, setShowOnlyNeedConfig] = useState(false);
+  
+  // 🆕 NUEVOS ESTADOS PARA MANEJO DE FORMULARIO
+  const [isSaving, setIsSaving] = useState(false);
+  const [showAlert, setShowAlert] = useState({ show: false, message: '', type: 'success' as 'success' | 'error' });
 
   useEffect(() => {
     fetchPuntoEquilibrio();
@@ -86,28 +91,62 @@ export default function PuntoEquilibrioPage() {
       setSucursales(data.sucursales);
       setResumen(data.resumen);
       setConfiguraciones(data.configuraciones);
+      
+      console.log('[PUNTO-EQUILIBRIO] Datos cargados:', {
+        sucursales: data.sucursales.length,
+        configuraciones: Object.keys(data.configuraciones).length
+      });
     } catch (error) {
       console.error('Error:', error);
+      showAlertMessage('Error al cargar datos', 'error');
     } finally {
       setIsLoading(false);
     }
   };
 
+  // 🔧 FUNCIÓN CORREGIDA PARA GUARDAR CONFIGURACIÓN
   const saveConfiguration = async (sucursalId: string, config: MetaConfig) => {
     try {
+      setIsSaving(true);
+      console.log('[PUNTO-EQUILIBRIO] Guardando configuración:', config);
+      
       const response = await authenticatedFetch(`/api/admin/punto-equilibrio/configuracion/${sucursalId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(config)
       });
       
-      if (response.ok) {
-        await fetchPuntoEquilibrio();
-        setEditingConfig(null);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al guardar configuración');
       }
+      
+      const savedConfig = await response.json();
+      console.log('[PUNTO-EQUILIBRIO] Configuración guardada:', savedConfig);
+      
+      // Actualizar configuraciones locales
+      setConfiguraciones(prev => ({
+        ...prev,
+        [sucursalId]: savedConfig
+      }));
+      
+      // Recargar datos para reflejar cambios
+      await fetchPuntoEquilibrio();
+      setEditingConfig(null);
+      showAlertMessage('Configuración guardada exitosamente', 'success');
+      
     } catch (error) {
       console.error('Error al guardar configuración:', error);
+      showAlertMessage(error instanceof Error ? error.message : 'Error al guardar configuración', 'error');
+    } finally {
+      setIsSaving(false);
     }
+  };
+
+  // 🆕 FUNCIÓN PARA MOSTRAR ALERTAS
+  const showAlertMessage = (message: string, type: 'success' | 'error' = 'success') => {
+    setShowAlert({ show: true, message, type });
+    setTimeout(() => setShowAlert({ show: false, message: '', type: 'success' }), 4000);
   };
 
   const getEstadoColor = (estado: string) => {
@@ -137,6 +176,32 @@ export default function PuntoEquilibrioPage() {
   return (
     <ContrastEnhancer>
       <div className="space-y-8">
+        {/* 🆕 COMPONENTE DE ALERTA */}
+        {showAlert.show && (
+          <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg max-w-md ${
+            showAlert.type === 'success' 
+              ? 'bg-green-100 text-green-800 border border-green-200' 
+              : 'bg-red-100 text-red-800 border border-red-200'
+          }`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                {showAlert.type === 'success' ? (
+                  <CheckCircle className="w-5 h-5 mr-2" />
+                ) : (
+                  <XCircle className="w-5 h-5 mr-2" />
+                )}
+                <span className="text-sm font-medium">{showAlert.message}</span>
+              </div>
+              <button 
+                onClick={() => setShowAlert({ show: false, message: '', type: 'success' })}
+                className="ml-4 text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="bg-gradient-to-r from-[#311716] to-[#462625] rounded-lg p-6 text-white">
           <div className="flex justify-between items-center">
@@ -271,9 +336,14 @@ export default function PuntoEquilibrioPage() {
                     </div>
                     <button
                       onClick={() => setEditingConfig(isEditing ? null : sucursal.id)}
-                      className="text-[#9c7561] hover:text-[#311716] p-1"
+                      disabled={isSaving}
+                      className="text-[#9c7561] hover:text-[#311716] p-1 disabled:opacity-50"
                     >
-                      <Edit className="h-4 w-4" />
+                      {isSaving && editingConfig === sucursal.id ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#9c7561]"></div>
+                      ) : (
+                        <Edit className="h-4 w-4" />
+                      )}
                     </button>
                   </div>
                   {sucursal.direccion && (
@@ -342,6 +412,7 @@ export default function PuntoEquilibrioPage() {
                       initialConfig={config}
                       onSave={(newConfig) => saveConfiguration(sucursal.id, newConfig)}
                       onCancel={() => setEditingConfig(null)}
+                      isSaving={isSaving}
                     />
                   ) : (
                     <div className="space-y-4">
@@ -417,17 +488,20 @@ export default function PuntoEquilibrioPage() {
   );
 }
 
-// Componente Editor de Configuración Mejorado
+// 🔧 COMPONENTE EDITOR DE CONFIGURACIÓN CORREGIDO
 interface ConfigEditorProps {
   sucursalId: string;
   mesSeleccionado: string;
   initialConfig?: any;
   onSave: (config: MetaConfig) => void;
   onCancel: () => void;
+  isSaving?: boolean;
 }
 
-function ConfigEditor({ sucursalId, mesSeleccionado, initialConfig, onSave, onCancel }: ConfigEditorProps) {
-  const [año, mes] = mesSeleccionado.split('-');
+function ConfigEditor({ sucursalId, mesSeleccionado, initialConfig, onSave, onCancel, isSaving = false }: ConfigEditorProps) {
+  // 🔧 PARSEO CORREGIDO DE FECHA
+  const [añoNum, mesNum] = mesSeleccionado.split('-').map(Number);
+  
   const [formData, setFormData] = useState({
     costosFijos: initialConfig?.costosFijos || 50000,
     costosVariables: initialConfig?.costosVariables || 30,
@@ -435,6 +509,17 @@ function ConfigEditor({ sucursalId, mesSeleccionado, initialConfig, onSave, onCa
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // 🆕 ACTUALIZAR FORM DATA CUANDO CAMBIA LA CONFIGURACIÓN INICIAL
+  useEffect(() => {
+    if (initialConfig) {
+      setFormData({
+        costosFijos: initialConfig.costosFijos || 50000,
+        costosVariables: initialConfig.costosVariables || 30,
+        metaMensual: initialConfig.metaMensual || 200000
+      });
+    }
+  }, [initialConfig]);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -460,12 +545,18 @@ function ConfigEditor({ sucursalId, mesSeleccionado, initialConfig, onSave, onCa
     
     if (!validateForm()) return;
     
-    onSave({
+    // 🔧 ESTRUCTURA CORREGIDA DE CONFIG
+    const config: MetaConfig = {
       sucursalId,
-      ...formData,
-      mes,
-      año: parseInt(año)
-    });
+      costosFijos: formData.costosFijos,
+      costosVariables: formData.costosVariables,
+      metaMensual: formData.metaMensual,
+      mes: mesNum,
+      año: añoNum
+    };
+    
+    console.log('[CONFIG-EDITOR] Enviando configuración:', config);
+    onSave(config);
   };
 
   // Cálculos en tiempo real
@@ -475,7 +566,9 @@ function ConfigEditor({ sucursalId, mesSeleccionado, initialConfig, onSave, onCa
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="bg-yellow-50 p-3 rounded-md border border-yellow-200">
-        <h4 className="text-sm font-medium text-yellow-800 mb-1">Configuración para {mes}/{año}</h4>
+        <h4 className="text-sm font-medium text-yellow-800 mb-1">
+          Configuración para {String(mesNum).padStart(2, '0')}/{añoNum}
+        </h4>
         <p className="text-xs text-yellow-700">
           Esta configuración se aplicará específicamente para este mes.
         </p>
@@ -493,6 +586,7 @@ function ConfigEditor({ sucursalId, mesSeleccionado, initialConfig, onSave, onCa
             errors.costosFijos ? 'border-red-300' : 'border-gray-300'
           }`}
           placeholder="Ej: 50000"
+          disabled={isSaving}
         />
         {errors.costosFijos && (
           <p className="text-xs text-red-600 mt-1">{errors.costosFijos}</p>
@@ -514,6 +608,7 @@ function ConfigEditor({ sucursalId, mesSeleccionado, initialConfig, onSave, onCa
             errors.costosVariables ? 'border-red-300' : 'border-gray-300'
           }`}
           placeholder="Ej: 30"
+          disabled={isSaving}
         />
         {errors.costosVariables && (
           <p className="text-xs text-red-600 mt-1">{errors.costosVariables}</p>
@@ -532,6 +627,7 @@ function ConfigEditor({ sucursalId, mesSeleccionado, initialConfig, onSave, onCa
             errors.metaMensual ? 'border-red-300' : 'border-gray-300'
           }`}
           placeholder="Ej: 200000"
+          disabled={isSaving}
         />
         {errors.metaMensual && (
           <p className="text-xs text-red-600 mt-1">{errors.metaMensual}</p>
@@ -556,15 +652,26 @@ function ConfigEditor({ sucursalId, mesSeleccionado, initialConfig, onSave, onCa
       <div className="flex space-x-3 pt-2">
         <button
           type="submit"
-          className="flex-1 inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-[#311716] hover:bg-[#462625]"
+          disabled={isSaving}
+          className="flex-1 inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-[#311716] hover:bg-[#462625] disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <Save className="h-4 w-4 mr-2" />
-          Guardar
+          {isSaving ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+              Guardando...
+            </>
+          ) : (
+            <>
+              <Save className="h-4 w-4 mr-2" />
+              Guardar
+            </>
+          )}
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="flex-1 inline-flex justify-center items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+          disabled={isSaving}
+          className="flex-1 inline-flex justify-center items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
         >
           Cancelar
         </button>

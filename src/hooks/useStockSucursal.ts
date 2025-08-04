@@ -1,4 +1,4 @@
-// src/hooks/useStockSucursales.ts - VERSIÓN MEJORADA CON CARGA MANUAL
+// src/hooks/useStockSucursales.ts - VERSIÓN MEJORADA CON EXCEL
 import { useState, useEffect, useCallback } from 'react';
 import { authenticatedFetch } from '@/hooks/useAuth';
 
@@ -121,7 +121,6 @@ export interface BulkLoadRequest {
   items: BulkLoadItem[];
 }
 
-// 🆕 NUEVA INTERFAZ PARA CARGA MANUAL
 export interface CargaManualRequest {
   productoId: string;
   sucursalId: string;
@@ -174,7 +173,6 @@ export interface AlertasResponse {
   };
 }
 
-// 🆕 NUEVA INTERFAZ PARA HISTORIAL DE CARGAS MANUALES
 export interface HistorialCargaManual {
   id: string;
   fecha: string;
@@ -196,6 +194,32 @@ export interface HistorialCargaManual {
     email: string;
   };
   stockResultante: number;
+}
+
+// 🆕 NUEVAS INTERFACES PARA EXCEL
+export interface ExcelPlantillaResponse {
+  success: boolean;
+  downloadUrl?: string;
+  fileName?: string;
+}
+
+export interface ExcelProcesoResponse {
+  success: boolean;
+  mensaje: string;
+  carga: any;
+  resumen: {
+    totalItems: number;
+    itemsProcesados: number;
+    itemsErrores: number;
+    porcentajeExito: number;
+  };
+  resultados: any[];
+  detalles: {
+    archivo: string;
+    sucursal: string;
+    fechaProcesamiento: Date;
+    usuario: string;
+  };
 }
 
 export function useStockSucursales() {
@@ -380,7 +404,7 @@ export function useStockSucursales() {
     }
   }, []);
 
-  // 🆕 ============= CARGA MANUAL =============
+  // ============= CARGA MANUAL =============
   
   const cargaManual = useCallback(async (cargaData: CargaManualRequest): Promise<CargaManualResponse> => {
     try {
@@ -418,7 +442,6 @@ export function useStockSucursales() {
     }
   }, []);
 
-  // 🆕 Obtener historial de cargas manuales
   const loadHistorialCargaManual = useCallback(async (filtros?: {
     sucursalId?: string;
     productoId?: string;
@@ -476,6 +499,107 @@ export function useStockSucursales() {
       const errorMessage = err instanceof Error ? err.message : 'Error al cargar historial';
       setError(errorMessage);
       throw err;
+    }
+  }, []);
+
+  // 🆕 ============= FUNCIONALIDADES DE EXCEL =============
+  
+  const descargarPlantillaExcel = useCallback(async (sucursalId: string): Promise<void> => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log(`[Hook] Descargando plantilla Excel para sucursal: ${sucursalId}`);
+      
+      const params = new URLSearchParams();
+      params.append('sucursalId', sucursalId);
+      
+      const response = await authenticatedFetch(`/api/admin/stock-config/excel/plantilla?${params}`);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al generar plantilla');
+      }
+      
+      // Descargar archivo
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      
+      // Extraer nombre del archivo de los headers si está disponible
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let fileName = `plantilla_stock_${sucursalId}_${new Date().toISOString().split('T')[0]}.xlsx`;
+      
+      if (contentDisposition) {
+        const fileNameMatch = contentDisposition.match(/filename="?(.+)"?/);
+        if (fileNameMatch) {
+          fileName = fileNameMatch[1];
+        }
+      }
+      
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      console.log(`[Hook] ✅ Plantilla Excel descargada: ${fileName}`);
+      
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Error al descargar plantilla';
+      console.error(`[Hook] ❌ Error descargando plantilla Excel:`, err);
+      setError(errorMessage);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const procesarArchivoExcel = useCallback(async (
+    file: File, 
+    sucursalId: string, 
+    modo: 'incrementar' | 'establecer' | 'decrementar' = 'establecer'
+  ): Promise<ExcelProcesoResponse> => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log(`[Hook] Procesando archivo Excel: ${file.name} para sucursal: ${sucursalId}`);
+      
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('sucursalId', sucursalId);
+      formData.append('modo', modo);
+      
+      const response = await authenticatedFetch('/api/admin/stock-config/excel/procesar', {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al procesar archivo');
+      }
+      
+      const result: ExcelProcesoResponse = await response.json();
+      setLastUpdate(new Date());
+      
+      console.log(`[Hook] ✅ Archivo Excel procesado:`, {
+        archivo: file.name,
+        procesados: result.resumen.itemsProcesados,
+        errores: result.resumen.itemsErrores
+      });
+      
+      return result;
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Error al procesar archivo Excel';
+      console.error(`[Hook] ❌ Error procesando archivo Excel:`, err);
+      setError(errorMessage);
+      throw err;
+    } finally {
+      setLoading(false);
     }
   }, []);
 
@@ -615,7 +739,7 @@ export function useStockSucursales() {
     }
   }, [loadDashboard, loadAlertas]);
 
-  // 🆕 Función utilitaria para hacer carga manual más simple
+  // Función utilitaria para hacer carga manual más simple
   const cargarStockRapido = useCallback(async (
     productoId: string, 
     sucursalId: string, 
@@ -658,10 +782,14 @@ export function useStockSucursales() {
     bulkLoad,
     loadBulkHistory,
     
-    // 🆕 Carga manual
+    // Carga manual
     cargaManual,
     cargarStockRapido,
     loadHistorialCargaManual,
+    
+    // 🆕 Funcionalidades Excel
+    descargarPlantillaExcel,
+    procesarArchivoExcel,
     
     // Alertas
     loadAlertas,

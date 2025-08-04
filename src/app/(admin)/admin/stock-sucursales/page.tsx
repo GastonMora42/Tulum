@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   Store, 
   Filter, 
@@ -22,7 +22,9 @@ import {
   FileText,
   BarChart3,
   Minus,
-  Equal
+  Equal,
+  FileSpreadsheet,
+  Grid3X3
 } from 'lucide-react';
 import { useStockSucursales } from '@/hooks/useStockSucursal';
 import { authenticatedFetch } from '@/hooks/useAuth';
@@ -38,6 +40,12 @@ interface Producto {
   };
   stockMinimo?: number;
   precio?: number;
+}
+
+interface Categoria {
+  id: string;
+  nombre: string;
+  imagen?: string;
 }
 
 interface Sucursal {
@@ -121,7 +129,7 @@ const getStatusConfig = (estado: string) => {
   return configs[estado as keyof typeof configs] || configs.normal;
 };
 
-export default function StockSucursalesMinimalista() {
+export default function StockSucursalesMejorado() {
   // ====================== HOOKS Y ESTADOS ======================
   const {
     loading,
@@ -140,16 +148,19 @@ export default function StockSucursalesMinimalista() {
 
   const [productos, setProductos] = useState<Producto[]>([]);
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [sucursalSeleccionada, setSucursalSeleccionada] = useState<string>('');
   
   // Estados de filtros
   const [statusFilter, setStatusFilter] = useState('todos');
   const [searchTerm, setSearchTerm] = useState('');
+  const [categoriaFilter, setCategoriaFilter] = useState('todas'); // 🆕 NUEVO FILTRO
   
   // Estados de modales
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [showCargaModal, setShowCargaModal] = useState(false);
   const [showHistorialModal, setShowHistorialModal] = useState(false);
+  const [showExcelModal, setShowExcelModal] = useState(false); // 🆕 NUEVO MODAL
   
   // Estados de formularios
   const [configData, setConfigData] = useState({
@@ -172,6 +183,11 @@ export default function StockSucursalesMinimalista() {
   const [loadingAction, setLoadingAction] = useState(false);
   const [showAlert, setShowAlert] = useState({ show: false, message: '', type: 'success' as 'success' | 'error' });
   const [historialData, setHistorialData] = useState<any[]>([]);
+  
+  // 🆕 NUEVOS ESTADOS PARA EXCEL
+  const [excelFile, setExcelFile] = useState<File | null>(null);
+  const [isProcessingExcel, setIsProcessingExcel] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ====================== EFECTOS ======================
   useEffect(() => {
@@ -207,6 +223,13 @@ export default function StockSucursalesMinimalista() {
         setProductos(productosData.data || []);
       }
 
+      // 🆕 CARGAR CATEGORÍAS
+      const categoriasResponse = await authenticatedFetch('/api/admin/categorias');
+      if (categoriasResponse.ok) {
+        const categoriasData = await categoriasResponse.json();
+        setCategorias(categoriasData || []);
+      }
+
       loadDashboard();
     } catch (error) {
       console.error('Error cargando datos iniciales:', error);
@@ -230,6 +253,7 @@ export default function StockSucursalesMinimalista() {
     setTimeout(() => setShowAlert({ show: false, message: '', type: 'success' }), 3000);
   };
 
+  // 🔧 FILTRADO MEJORADO CON CATEGORÍAS
   const filteredAnalysis = dashboardData?.analisisCompleto?.filter((item) => {
     if (statusFilter === 'sin_configuracion') {
       if (item.tieneConfiguracion !== false) return false;
@@ -243,6 +267,14 @@ export default function StockSucursalesMinimalista() {
     
     if (sucursalSeleccionada && item.sucursal.id !== sucursalSeleccionada) {
       return false;
+    }
+
+    // 🆕 FILTRO POR CATEGORÍA
+    if (categoriaFilter !== 'todas') {
+      const producto = productos.find(p => p.id === item.producto.id);
+      if (!producto || producto.categoria?.id !== categoriaFilter) {
+        return false;
+      }
     }
     
     return true;
@@ -309,6 +341,95 @@ export default function StockSucursalesMinimalista() {
       showAlertMessage(error instanceof Error ? error.message : 'Error al cargar', 'error');
     } finally {
       setLoadingAction(false);
+    }
+  };
+
+  // 🆕 FUNCIONES PARA EXCEL
+  const descargarPlantillaExcel = async () => {
+    try {
+      setLoadingAction(true);
+      const params = new URLSearchParams();
+      if (sucursalSeleccionada) params.append('sucursalId', sucursalSeleccionada);
+      
+      const response = await authenticatedFetch(`/api/admin/stock-config/excel/plantilla?${params}`);
+      
+      if (!response.ok) {
+        throw new Error('Error al generar plantilla');
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = `plantilla_stock_${sucursalSeleccionada ? sucursales.find(s => s.id === sucursalSeleccionada)?.nombre : 'todas'}_${new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      showAlertMessage('Plantilla descargada exitosamente', 'success');
+    } catch (error) {
+      console.error('Error descargando plantilla:', error);
+      showAlertMessage('Error al descargar plantilla', 'error');
+    } finally {
+      setLoadingAction(false);
+    }
+  };
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+        showAlertMessage('Solo se permiten archivos Excel (.xlsx, .xls)', 'error');
+        return;
+      }
+      setExcelFile(file);
+    }
+  };
+
+  const procesarArchivoExcel = async () => {
+    if (!excelFile || !sucursalSeleccionada) {
+      showAlertMessage('Seleccione un archivo y una sucursal', 'error');
+      return;
+    }
+
+    try {
+      setIsProcessingExcel(true);
+      const formData = new FormData();
+      formData.append('file', excelFile);
+      formData.append('sucursalId', sucursalSeleccionada);
+      formData.append('modo', 'establecer'); // Por defecto establecer el stock
+
+      const response = await authenticatedFetch('/api/admin/stock-config/excel/procesar', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al procesar archivo');
+      }
+
+      const result = await response.json();
+      
+      setShowExcelModal(false);
+      setExcelFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      
+      await refreshData(sucursalSeleccionada);
+      
+      showAlertMessage(
+        `Archivo procesado: ${result.resumen.itemsProcesados} productos actualizados${result.resumen.itemsErrores > 0 ? `, ${result.resumen.itemsErrores} errores` : ''}`,
+        result.resumen.itemsErrores === 0 ? 'success' : 'error'
+      );
+    } catch (error) {
+      console.error('Error procesando archivo:', error);
+      showAlertMessage(error instanceof Error ? error.message : 'Error al procesar archivo', 'error');
+    } finally {
+      setIsProcessingExcel(false);
     }
   };
 
@@ -555,6 +676,15 @@ export default function StockSucursalesMinimalista() {
           </div>
           
           <div className="flex flex-wrap gap-2">
+            {/* 🆕 BOTÓN EXCEL */}
+            <button
+              onClick={() => setShowExcelModal(true)}
+              className="inline-flex items-center px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+            >
+              <FileSpreadsheet className="w-4 h-4 mr-1" />
+              Excel
+            </button>
+            
             <button
               onClick={openHistorialModal}
               className="inline-flex items-center px-3 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors"
@@ -585,9 +715,9 @@ export default function StockSucursalesMinimalista() {
         {/* Estadísticas */}
         <StatsCards />
 
-        {/* Filtros minimalistas */}
+        {/* Filtros minimalistas mejorados */}
         <div className="bg-white rounded-lg shadow-sm p-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             {/* Sucursal */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Sucursal</label>
@@ -600,6 +730,23 @@ export default function StockSucursalesMinimalista() {
                 {sucursales.map((sucursal) => (
                   <option key={sucursal.id} value={sucursal.id}>
                     {sucursal.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* 🆕 FILTRO POR CATEGORÍA */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
+              <select
+                value={categoriaFilter}
+                onChange={(e) => setCategoriaFilter(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#eeb077] focus:border-transparent text-sm"
+              >
+                <option value="todas">Todas las categorías</option>
+                {categorias.map((categoria) => (
+                  <option key={categoria.id} value={categoria.id}>
+                    {categoria.nombre}
                   </option>
                 ))}
               </select>
@@ -644,6 +791,7 @@ export default function StockSucursalesMinimalista() {
                 onClick={() => {
                   setSearchTerm('');
                   setStatusFilter('todos');
+                  setCategoriaFilter('todas');
                   setSucursalSeleccionada('');
                 }}
                 className="w-full px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors"
@@ -658,7 +806,8 @@ export default function StockSucursalesMinimalista() {
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
           <div className="p-4 border-b border-gray-200">
             <div className="flex justify-between items-center">
-              <h2 className="text-lg font-semibold text-gray-900">
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+                <Grid3X3 className="w-5 h-5 mr-2" />
                 Análisis ({filteredAnalysis.length} productos)
               </h2>
               {lastUpdate && (
@@ -688,7 +837,6 @@ export default function StockSucursalesMinimalista() {
                     key={`${item.producto.id}-${item.sucursal.id}`}
                     item={{
                       ...item,
-                      // Forzamos el tipo correcto para 'estado'
                       estado: (
                         item.estado === "critico" ||
                         item.estado === "bajo" ||
@@ -702,7 +850,7 @@ export default function StockSucursalesMinimalista() {
                   />
                 ))}
               </tbody>
-              </table>
+            </table>
             {filteredAnalysis.length === 0 && (
               <div className="text-center py-8">
                 <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
@@ -712,7 +860,89 @@ export default function StockSucursalesMinimalista() {
           </div>
         </div>
 
-        {/* Modal de Configuración */}
+        {/* 🆕 MODAL DE EXCEL */}
+        {showExcelModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <FileSpreadsheet className="w-5 h-5 mr-2" />
+                Gestión por Excel
+              </h3>
+              
+              <div className="space-y-4">
+                <div className="p-4 bg-blue-50 rounded-lg">
+                  <h4 className="font-medium text-blue-900 mb-2">Paso 1: Descargar Plantilla</h4>
+                  <p className="text-sm text-blue-700 mb-3">
+                    Descarga la plantilla con todos los productos y su stock actual
+                  </p>
+                  <button
+                    onClick={descargarPlantillaExcel}
+                    disabled={loadingAction || !sucursalSeleccionada}
+                    className="w-full inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    {loadingAction ? 'Generando...' : 'Descargar Plantilla'}
+                  </button>
+                  {!sucursalSeleccionada && (
+                    <p className="text-xs text-red-600 mt-1">Selecciona una sucursal primero</p>
+                  )}
+                </div>
+
+                <div className="p-4 bg-green-50 rounded-lg">
+                  <h4 className="font-medium text-green-900 mb-2">Paso 2: Subir Archivo Modificado</h4>
+                  <p className="text-sm text-green-700 mb-3">
+                    Modifica los valores de stock y sube el archivo
+                  </p>
+                  
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    accept=".xlsx,.xls"
+                    onChange={handleFileSelect}
+                    className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
+                  />
+                  
+                  {excelFile && (
+                    <div className="mt-2 p-2 bg-white rounded border">
+                      <p className="text-sm text-gray-700">
+                        <strong>Archivo seleccionado:</strong> {excelFile.name}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Tamaño: {(excelFile.size / 1024).toFixed(1)} KB
+                      </p>
+                    </div>
+                  )}
+                  
+                  <button
+                    onClick={procesarArchivoExcel}
+                    disabled={!excelFile || isProcessingExcel || !sucursalSeleccionada}
+                    className="w-full mt-3 inline-flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    {isProcessingExcel ? 'Procesando...' : 'Procesar Archivo'}
+                  </button>
+                </div>
+              </div>
+              
+              <div className="flex justify-end mt-6">
+                <button
+                  onClick={() => {
+                    setShowExcelModal(false);
+                    setExcelFile(null);
+                    if (fileInputRef.current) {
+                      fileInputRef.current.value = '';
+                    }
+                  }}
+                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg font-medium hover:bg-gray-300 transition-colors"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Configuración (mantener igual) */}
         {showConfigModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg p-6 max-w-md w-full">
