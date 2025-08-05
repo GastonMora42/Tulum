@@ -208,6 +208,7 @@ export interface ExcelProcesoResponse {
   mensaje: string;
   carga: any;
   resumen: {
+    tiempoProcesamiento: string;
     totalItems: number;
     itemsProcesados: number;
     itemsErrores: number;

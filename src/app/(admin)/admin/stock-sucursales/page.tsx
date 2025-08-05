@@ -24,7 +24,11 @@ import {
   Minus,
   Equal,
   FileSpreadsheet,
-  Grid3X3
+  Grid3X3,
+  Clock,
+  Loader2,
+  Info,
+  Zap
 } from 'lucide-react';
 import { useStockSucursales } from '@/hooks/useStockSucursal';
 import { authenticatedFetch } from '@/hooks/useAuth';
@@ -143,7 +147,11 @@ export default function StockSucursalesMejorado() {
     loadHistorialCargaManual,
     refreshData,
     clearError,
-    lastUpdate
+    lastUpdate,
+    descargarPlantillaExcel,
+    procesarArchivoExcel,
+    validarArchivoPrevio,
+    config
   } = useStockSucursales();
 
   const [productos, setProductos] = useState<Producto[]>([]);
@@ -154,13 +162,13 @@ export default function StockSucursalesMejorado() {
   // Estados de filtros
   const [statusFilter, setStatusFilter] = useState('todos');
   const [searchTerm, setSearchTerm] = useState('');
-  const [categoriaFilter, setCategoriaFilter] = useState('todas'); // 🆕 NUEVO FILTRO
+  const [categoriaFilter, setCategoriaFilter] = useState('todas');
   
   // Estados de modales
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [showCargaModal, setShowCargaModal] = useState(false);
   const [showHistorialModal, setShowHistorialModal] = useState(false);
-  const [showExcelModal, setShowExcelModal] = useState(false); // 🆕 NUEVO MODAL
+  const [showExcelModal, setShowExcelModal] = useState(false);
   
   // Estados de formularios
   const [configData, setConfigData] = useState({
@@ -179,14 +187,16 @@ export default function StockSucursalesMejorado() {
     modo: 'incrementar' as 'incrementar' | 'establecer' | 'decrementar'
   });
 
-  // Estados de UI
+  // Estados de UI y Excel
   const [loadingAction, setLoadingAction] = useState(false);
   const [showAlert, setShowAlert] = useState({ show: false, message: '', type: 'success' as 'success' | 'error' });
   const [historialData, setHistorialData] = useState<any[]>([]);
   
-  // 🆕 NUEVOS ESTADOS PARA EXCEL
+  // 🆕 ESTADOS PARA EXCEL MEJORADOS
   const [excelFile, setExcelFile] = useState<File | null>(null);
   const [isProcessingExcel, setIsProcessingExcel] = useState(false);
+  const [modoExcel, setModoExcel] = useState<'incrementar' | 'establecer' | 'decrementar'>('establecer');
+  const [excelValidation, setExcelValidation] = useState<{valido: boolean; errores: string[]; advertencias: string[]} | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // ====================== EFECTOS ======================
@@ -209,10 +219,11 @@ export default function StockSucursalesMejorado() {
       const sucursalesResponse = await authenticatedFetch('/api/admin/ubicaciones');
       if (sucursalesResponse.ok) {
         const sucursalesData = await sucursalesResponse.json();
-        setSucursales(sucursalesData.filter((s: any) => s.tipo === 'sucursal'));
+        const sucursalesFiltradas = sucursalesData.filter((s: any) => s.tipo === 'sucursal');
+        setSucursales(sucursalesFiltradas);
         
-        if (sucursalesData.length > 0) {
-          setSucursalSeleccionada(sucursalesData.find((s: any) => s.tipo === 'sucursal')?.id || '');
+        if (sucursalesFiltradas.length > 0) {
+          setSucursalSeleccionada(sucursalesFiltradas[0].id);
         }
       }
 
@@ -223,7 +234,7 @@ export default function StockSucursalesMejorado() {
         setProductos(productosData.data || []);
       }
 
-      // 🆕 CARGAR CATEGORÍAS
+      // Cargar categorías
       const categoriasResponse = await authenticatedFetch('/api/admin/categorias');
       if (categoriasResponse.ok) {
         const categoriasData = await categoriasResponse.json();
@@ -250,10 +261,10 @@ export default function StockSucursalesMejorado() {
   // ====================== FUNCIONES DE UTILIDAD ======================
   const showAlertMessage = (message: string, type: 'success' | 'error' = 'success') => {
     setShowAlert({ show: true, message, type });
-    setTimeout(() => setShowAlert({ show: false, message: '', type: 'success' }), 3000);
+    setTimeout(() => setShowAlert({ show: false, message: '', type: 'success' }), 5000);
   };
 
-  // 🔧 FILTRADO MEJORADO CON CATEGORÍAS
+  // Filtrado mejorado con categorías
   const filteredAnalysis = dashboardData?.analisisCompleto?.filter((item) => {
     if (statusFilter === 'sin_configuracion') {
       if (item.tieneConfiguracion !== false) return false;
@@ -269,7 +280,6 @@ export default function StockSucursalesMejorado() {
       return false;
     }
 
-    // 🆕 FILTRO POR CATEGORÍA
     if (categoriaFilter !== 'todas') {
       const producto = productos.find(p => p.id === item.producto.id);
       if (!producto || producto.categoria?.id !== categoriaFilter) {
@@ -299,10 +309,10 @@ export default function StockSucursalesMejorado() {
         puntoReposicion: 0
       });
       await refreshData(sucursalSeleccionada);
-      showAlertMessage('Configuración guardada', 'success');
+      showAlertMessage('Configuración guardada exitosamente', 'success');
     } catch (error) {
       console.error('Error guardando configuración:', error);
-      showAlertMessage('Error al guardar', 'error');
+      showAlertMessage('Error al guardar configuración', 'error');
     } finally {
       setLoadingAction(false);
     }
@@ -310,7 +320,7 @@ export default function StockSucursalesMejorado() {
 
   const handleCarga = async () => {
     if (!cargaData.productoId || !cargaData.sucursalId || cargaData.cantidad <= 0) {
-      showAlertMessage('Complete todos los campos', 'error');
+      showAlertMessage('Complete todos los campos correctamente', 'error');
       return;
     }
 
@@ -335,60 +345,53 @@ export default function StockSucursalesMejorado() {
       });
       
       await refreshData(sucursalSeleccionada);
-      showAlertMessage(`${result.mensaje}`, 'success');
+      showAlertMessage(result.mensaje, 'success');
     } catch (error) {
       console.error('Error en carga:', error);
-      showAlertMessage(error instanceof Error ? error.message : 'Error al cargar', 'error');
+      showAlertMessage(error instanceof Error ? error.message : 'Error al cargar stock', 'error');
     } finally {
       setLoadingAction(false);
     }
   };
 
-  // 🆕 FUNCIONES PARA EXCEL
-  const descargarPlantillaExcel = async () => {
-    try {
-      setLoadingAction(true);
-      const params = new URLSearchParams();
-      if (sucursalSeleccionada) params.append('sucursalId', sucursalSeleccionada);
-      
-      const response = await authenticatedFetch(`/api/admin/stock-config/excel/plantilla?${params}`);
-      
-      if (!response.ok) {
-        throw new Error('Error al generar plantilla');
-      }
-      
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = url;
-      a.download = `plantilla_stock_${sucursalSeleccionada ? sucursales.find(s => s.id === sucursalSeleccionada)?.nombre : 'todas'}_${new Date().toISOString().split('T')[0]}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      
-      showAlertMessage('Plantilla descargada exitosamente', 'success');
-    } catch (error) {
-      console.error('Error descargando plantilla:', error);
-      showAlertMessage('Error al descargar plantilla', 'error');
-    } finally {
-      setLoadingAction(false);
-    }
-  };
-
+  // 🆕 FUNCIONES PARA EXCEL MEJORADAS
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
-        showAlertMessage('Solo se permiten archivos Excel (.xlsx, .xls)', 'error');
-        return;
+      console.log(`[UI] Archivo seleccionado: ${file.name} (${(file.size / 1024).toFixed(1)}KB)`);
+      
+      // Validar archivo antes de establecerlo
+      const validation = validarArchivoPrevio(file);
+      setExcelValidation(validation);
+      
+      if (validation.valido) {
+        setExcelFile(file);
+      } else {
+        setExcelFile(null);
+        showAlertMessage(validation.errores[0], 'error');
       }
-      setExcelFile(file);
     }
   };
 
-  const procesarArchivoExcel = async () => {
+  const handleDescargarPlantilla = async () => {
+    if (!sucursalSeleccionada) {
+      showAlertMessage('Seleccione una sucursal primero', 'error');
+      return;
+    }
+
+    try {
+      setLoadingAction(true);
+      await descargarPlantillaExcel(sucursalSeleccionada);
+      showAlertMessage('Plantilla descargada exitosamente', 'success');
+    } catch (error) {
+      console.error('Error descargando plantilla:', error);
+      showAlertMessage(error instanceof Error ? error.message : 'Error al descargar plantilla', 'error');
+    } finally {
+      setLoadingAction(false);
+    }
+  };
+
+  const handleProcesarExcel = async () => {
     if (!excelFile || !sucursalSeleccionada) {
       showAlertMessage('Seleccione un archivo y una sucursal', 'error');
       return;
@@ -396,35 +399,27 @@ export default function StockSucursalesMejorado() {
 
     try {
       setIsProcessingExcel(true);
-      const formData = new FormData();
-      formData.append('file', excelFile);
-      formData.append('sucursalId', sucursalSeleccionada);
-      formData.append('modo', 'establecer'); // Por defecto establecer el stock
-
-      const response = await authenticatedFetch('/api/admin/stock-config/excel/procesar', {
-        method: 'POST',
-        body: formData
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al procesar archivo');
-      }
-
-      const result = await response.json();
       
+      const result = await procesarArchivoExcel(excelFile, sucursalSeleccionada, modoExcel);
+      
+      // Cerrar modal y limpiar
       setShowExcelModal(false);
       setExcelFile(null);
+      setExcelValidation(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
       
       await refreshData(sucursalSeleccionada);
       
-      showAlertMessage(
-        `Archivo procesado: ${result.resumen.itemsProcesados} productos actualizados${result.resumen.itemsErrores > 0 ? `, ${result.resumen.itemsErrores} errores` : ''}`,
-        result.resumen.itemsErrores === 0 ? 'success' : 'error'
-      );
+      // Mensaje de éxito más detallado
+      const tiempoProcesamiento = result.resumen.tiempoProcesamiento || 'N/A';
+      const mensaje = result.resumen.itemsErrores === 0 
+        ? `✅ ¡Éxito! ${result.resumen.itemsProcesados} productos actualizados en ${tiempoProcesamiento}s`
+        : `⚠️ Procesado: ${result.resumen.itemsProcesados} exitosos, ${result.resumen.itemsErrores} errores (${result.resumen.porcentajeExito}% éxito)`;
+      
+      showAlertMessage(mensaje, result.resumen.itemsErrores === 0 ? 'success' : 'error');
+      
     } catch (error) {
       console.error('Error procesando archivo:', error);
       showAlertMessage(error instanceof Error ? error.message : 'Error al procesar archivo', 'error');
@@ -495,17 +490,27 @@ export default function StockSucursalesMejorado() {
 
   // ====================== COMPONENTES ======================
   
-  // Alert minimalista
+  // Alert mejorado con más información
   const Alert = () => {
     if (!showAlert.show) return null;
     
     return (
-      <div className={`fixed top-4 right-4 z-50 p-3 rounded-lg shadow-lg max-w-sm ${
+      <div className={`fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg max-w-md ${
         showAlert.type === 'success' ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-red-100 text-red-800 border border-red-200'
       }`}>
-        <div className="flex items-center justify-between">
-          <span className="text-sm">{showAlert.message}</span>
-          <button onClick={() => setShowAlert({ show: false, message: '', type: 'success' })}>
+        <div className="flex items-start justify-between">
+          <div className="flex items-start space-x-2">
+            {showAlert.type === 'success' ? (
+              <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
+            ) : (
+              <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5" />
+            )}
+            <span className="text-sm leading-5">{showAlert.message}</span>
+          </div>
+          <button 
+            onClick={() => setShowAlert({ show: false, message: '', type: 'success' })}
+            className="ml-2 text-gray-400 hover:text-gray-600"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -513,37 +518,85 @@ export default function StockSucursalesMejorado() {
     );
   };
 
-  // Estadísticas minimalistas
+  // Estadísticas mejoradas con más información
   const StatsCards = () => (
     <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
       {[
-        { label: 'Críticos', value: dashboardData?.estadisticas?.criticos || 0, color: 'text-red-600', bg: 'bg-red-50' },
-        { label: 'Bajos', value: dashboardData?.estadisticas?.bajos || 0, color: 'text-yellow-600', bg: 'bg-yellow-50' },
-        { label: 'Normales', value: dashboardData?.estadisticas?.normales || 0, color: 'text-green-600', bg: 'bg-green-50' },
-        { label: 'Excesos', value: dashboardData?.estadisticas?.excesos || 0, color: 'text-purple-600', bg: 'bg-purple-50' },
-        { label: 'Sin Config', value: dashboardData?.estadisticas?.sinConfiguracion || 0, color: 'text-blue-600', bg: 'bg-blue-50' },
-        { label: 'Total', value: dashboardData?.estadisticas?.total || 0, color: 'text-gray-600', bg: 'bg-gray-50' }
-      ].map((stat, index) => (
-        <div key={index} className={`${stat.bg} p-3 rounded-lg border`}>
-          <div className={`text-2xl font-bold ${stat.color}`}>{stat.value}</div>
-          <div className="text-xs text-gray-600">{stat.label}</div>
-        </div>
-      ))}
+        { 
+          label: 'Críticos', 
+          value: dashboardData?.estadisticas?.criticos || 0, 
+          color: 'text-red-600', 
+          bg: 'bg-red-50',
+          border: 'border-red-200',
+          icon: AlertTriangle
+        },
+        { 
+          label: 'Bajos', 
+          value: dashboardData?.estadisticas?.bajos || 0, 
+          color: 'text-yellow-600', 
+          bg: 'bg-yellow-50',
+          border: 'border-yellow-200',
+          icon: TrendingDown
+        },
+        { 
+          label: 'Normales', 
+          value: dashboardData?.estadisticas?.normales || 0, 
+          color: 'text-green-600', 
+          bg: 'bg-green-50',
+          border: 'border-green-200',
+          icon: CheckCircle
+        },
+        { 
+          label: 'Excesos', 
+          value: dashboardData?.estadisticas?.excesos || 0, 
+          color: 'text-purple-600', 
+          bg: 'bg-purple-50',
+          border: 'border-purple-200',
+          icon: TrendingUp
+        },
+        { 
+          label: 'Sin Config', 
+          value: dashboardData?.estadisticas?.sinConfiguracion || 0, 
+          color: 'text-blue-600', 
+          bg: 'bg-blue-50',
+          border: 'border-blue-200',
+          icon: Settings
+        },
+        { 
+          label: 'Total', 
+          value: dashboardData?.estadisticas?.total || 0, 
+          color: 'text-gray-600', 
+          bg: 'bg-gray-50',
+          border: 'border-gray-200',
+          icon: Package
+        }
+      ].map((stat, index) => {
+        const IconComponent = stat.icon;
+        return (
+          <div key={index} className={`${stat.bg} ${stat.border} p-3 rounded-lg border transition-all hover:shadow-sm`}>
+            <div className="flex items-center justify-between mb-1">
+              <div className={`text-2xl font-bold ${stat.color}`}>{stat.value}</div>
+              <IconComponent className={`w-4 h-4 ${stat.color}`} />
+            </div>
+            <div className="text-xs text-gray-600">{stat.label}</div>
+          </div>
+        );
+      })}
     </div>
   );
 
-  // Fila de tabla minimalista
+  // Fila de tabla mejorada
   const TableRow = ({ item, index }: { item: AnalisisItem, index: number }) => {
     const statusConfig = getStatusConfig(item.estado);
     const IconComponent = statusConfig.icon;
     const needsConfiguration = !item.tieneConfiguracion;
     
     return (
-      <tr className={`border-b hover:bg-gray-50 ${needsConfiguration ? 'bg-yellow-50' : ''}`}>
+      <tr className={`border-b hover:bg-gray-50 transition-colors ${needsConfiguration ? 'bg-yellow-50' : ''}`}>
         {/* Producto */}
         <td className="p-3">
-          <div className="flex items-center space-x-2">
-            <div className={`w-8 h-8 bg-gradient-to-br from-[#311716] to-[#462625] rounded-lg flex items-center justify-center text-white text-sm font-bold ${needsConfiguration ? 'ring-2 ring-yellow-400' : ''}`}>
+          <div className="flex items-center space-x-3">
+            <div className={`w-10 h-10 bg-gradient-to-br from-[#311716] to-[#462625] rounded-lg flex items-center justify-center text-white text-sm font-bold shadow-sm ${needsConfiguration ? 'ring-2 ring-yellow-400' : ''}`}>
               {item.producto.nombre.charAt(0)}
             </div>
             <div className="min-w-0 flex-1">
@@ -552,15 +605,16 @@ export default function StockSucursalesMejorado() {
                 <div className="text-xs text-gray-500 font-mono">{item.producto.codigoBarras}</div>
               )}
               {needsConfiguration && (
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
-                  Sin config
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 mt-1">
+                  <Settings className="w-3 h-3 mr-1" />
+                  Requiere configuración
                 </span>
               )}
             </div>
           </div>
         </td>
         
-        {/* Sucursal (solo en móvil oculto) */}
+        {/* Sucursal */}
         <td className="p-3 hidden md:table-cell">
           <div className="flex items-center space-x-2">
             <Store className="w-4 h-4 text-blue-600" />
@@ -571,61 +625,81 @@ export default function StockSucursalesMejorado() {
         {/* Stock Actual */}
         <td className="p-3 text-center">
           <div className="text-lg font-bold text-gray-900">{item.stockActual}</div>
+          {item.diferencia !== 0 && (
+            <div className={`text-xs ${item.diferencia > 0 ? 'text-red-600' : 'text-green-600'}`}>
+              {item.diferencia > 0 ? `Faltan ${item.diferencia}` : `Sobran ${Math.abs(item.diferencia)}`}
+            </div>
+          )}
         </td>
         
-        {/* Configuración (oculto en móvil) */}
+        {/* Configuración */}
         <td className="p-3 hidden lg:table-cell">
           <div className="text-xs space-y-1">
-            <div>Máx: <span className="font-semibold">{item.configuracion.stockMaximo}</span></div>
-            <div>Mín: <span className="font-semibold text-orange-600">{item.configuracion.stockMinimo}</span></div>
+            <div className="flex justify-between">
+              <span>Máx:</span> 
+              <span className="font-semibold text-blue-600">{item.configuracion.stockMaximo}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Mín:</span> 
+              <span className="font-semibold text-orange-600">{item.configuracion.stockMinimo}</span>
+            </div>
+            <div className="flex justify-between">
+              <span>Repo:</span> 
+              <span className="font-semibold text-purple-600">{item.configuracion.puntoReposicion}</span>
+            </div>
           </div>
         </td>
         
         {/* Estado */}
         <td className="p-3">
-          <div className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${statusConfig.bgColor} ${statusConfig.color} border ${statusConfig.borderColor}`}>
+          <div className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${statusConfig.bgColor} ${statusConfig.color} border ${statusConfig.borderColor}`}>
             <IconComponent className="w-3 h-3 mr-1" />
             {statusConfig.label}
           </div>
         </td>
         
-        {/* Utilización (oculto en móvil) */}
+        {/* Utilización */}
         <td className="p-3 hidden md:table-cell">
-          <div className="w-16 bg-gray-200 rounded-full h-2">
-            <div 
-              className={`h-full rounded-full ${
-                item.porcentajeUso <= 30 ? 'bg-red-500' :
-                item.porcentajeUso <= 70 ? 'bg-yellow-500' :
-                item.porcentajeUso <= 100 ? 'bg-green-500' : 'bg-purple-500'
-              }`}
-              style={{ width: `${Math.min(100, item.porcentajeUso)}%` }}
-            ></div>
+          <div className="w-20">
+            <div className="flex justify-between items-center mb-1">
+              <span className="text-xs text-gray-500">{item.porcentajeUso}%</span>
+              <span className="text-xs text-gray-400">{item.configuracion.stockMaximo}</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className={`h-full rounded-full transition-all ${
+                  item.porcentajeUso <= 30 ? 'bg-red-500' :
+                  item.porcentajeUso <= 70 ? 'bg-yellow-500' :
+                  item.porcentajeUso <= 100 ? 'bg-green-500' : 'bg-purple-500'
+                }`}
+                style={{ width: `${Math.min(100, Math.max(5, item.porcentajeUso))}%` }}
+              ></div>
+            </div>
           </div>
-          <div className="text-xs text-gray-500 mt-1">{item.porcentajeUso}%</div>
         </td>
         
         {/* Acciones */}
         <td className="p-3">
-          <div className="flex flex-col space-y-1">
+          <div className="flex flex-col space-y-2">
             {/* Botones de carga */}
             <div className="flex space-x-1">
               <button
                 onClick={() => openCargaModal(item.producto.id, item.sucursal.id, 'incrementar')}
-                className="inline-flex items-center px-2 py-1 bg-green-500 text-white rounded text-xs font-medium hover:bg-green-600 transition-colors"
+                className="inline-flex items-center px-2 py-1 bg-green-500 text-white rounded text-xs font-medium hover:bg-green-600 transition-colors shadow-sm"
                 title="Incrementar stock"
               >
                 <Plus className="w-3 h-3" />
               </button>
               <button
                 onClick={() => openCargaModal(item.producto.id, item.sucursal.id, 'decrementar')}
-                className="inline-flex items-center px-2 py-1 bg-red-500 text-white rounded text-xs font-medium hover:bg-red-600 transition-colors"
+                className="inline-flex items-center px-2 py-1 bg-red-500 text-white rounded text-xs font-medium hover:bg-red-600 transition-colors shadow-sm"
                 title="Decrementar stock"
               >
                 <Minus className="w-3 h-3" />
               </button>
               <button
                 onClick={() => openCargaModal(item.producto.id, item.sucursal.id, 'establecer')}
-                className="inline-flex items-center px-2 py-1 bg-blue-500 text-white rounded text-xs font-medium hover:bg-blue-600 transition-colors"
+                className="inline-flex items-center px-2 py-1 bg-blue-500 text-white rounded text-xs font-medium hover:bg-blue-600 transition-colors shadow-sm"
                 title="Establecer stock"
               >
                 <Equal className="w-3 h-3" />
@@ -635,14 +709,14 @@ export default function StockSucursalesMejorado() {
             {/* Configuración */}
             <button
               onClick={() => openConfigModal(item.producto.id, item.sucursal.id)}
-              className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium transition-colors ${
+              className={`inline-flex items-center px-3 py-1 rounded text-xs font-medium transition-colors shadow-sm ${
                 needsConfiguration 
-                  ? 'bg-yellow-100 hover:bg-yellow-200 text-yellow-800' 
-                  : 'bg-gray-100 hover:bg-gray-200 text-gray-800'
+                  ? 'bg-yellow-100 hover:bg-yellow-200 text-yellow-800 border border-yellow-300' 
+                  : 'bg-gray-100 hover:bg-gray-200 text-gray-800 border border-gray-300'
               }`}
             >
               <Settings className="w-3 h-3 mr-1" />
-              Config
+              {needsConfiguration ? 'Configurar' : 'Editar'}
             </button>
           </div>
         </td>
@@ -653,10 +727,11 @@ export default function StockSucursalesMejorado() {
   // ====================== RENDER PRINCIPAL ======================
   if (loading && !dashboardData) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="flex items-center space-x-2">
-          <RefreshCw className="w-6 h-6 text-[#eeb077] animate-spin" />
-          <span className="text-lg font-medium text-gray-700">Cargando...</span>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="flex flex-col items-center space-y-4">
+          <Loader2 className="w-8 h-8 text-[#eeb077] animate-spin" />
+          <span className="text-lg font-medium text-gray-700">Cargando datos de stock...</span>
+          <div className="text-sm text-gray-500">Esto puede tardar unos segundos</div>
         </div>
       </div>
     );
@@ -666,47 +741,57 @@ export default function StockSucursalesMejorado() {
     <div className="min-h-screen bg-gray-50 p-2 md:p-4">
       <Alert />
       
-      <div className="max-w-7xl mx-auto space-y-4">
+      <div className="max-w-7xl mx-auto space-y-6">
         
-        {/* Header minimalista */}
+        {/* Header mejorado */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Stock por Sucursales</h1>
-            <p className="text-sm text-gray-600">Gestiona el inventario en tiempo real</p>
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 flex items-center">
+              <Zap className="w-8 h-8 mr-3 text-[#eeb077]" />
+              Stock por Sucursales
+            </h1>
+            <p className="text-gray-600 mt-1">Gestiona el inventario en tiempo real con herramientas avanzadas</p>
+            {lastUpdate && (
+              <div className="flex items-center mt-2 text-sm text-gray-500">
+                <Clock className="w-4 h-4 mr-1" />
+                Última actualización: {lastUpdate.toLocaleTimeString()}
+              </div>
+            )}
           </div>
           
           <div className="flex flex-wrap gap-2">
-            {/* 🆕 BOTÓN EXCEL */}
+            {/* Botón Excel mejorado */}
             <button
               onClick={() => setShowExcelModal(true)}
-              className="inline-flex items-center px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors"
+              className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-all shadow-sm hover:shadow-md"
             >
-              <FileSpreadsheet className="w-4 h-4 mr-1" />
-              Excel
+              <FileSpreadsheet className="w-4 h-4 mr-2" />
+              Gestión Excel
             </button>
             
             <button
               onClick={openHistorialModal}
-              className="inline-flex items-center px-3 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-colors"
+              disabled={loadingAction}
+              className="inline-flex items-center px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium hover:bg-blue-600 transition-all shadow-sm hover:shadow-md disabled:opacity-50"
             >
-              <FileText className="w-4 h-4 mr-1" />
+              <FileText className="w-4 h-4 mr-2" />
               Historial
             </button>
             
             <button
               onClick={() => openCargaModal()}
-              className="inline-flex items-center px-3 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-colors"
+              className="inline-flex items-center px-4 py-2 bg-green-500 text-white rounded-lg text-sm font-medium hover:bg-green-600 transition-all shadow-sm hover:shadow-md"
             >
-              <Plus className="w-4 h-4 mr-1" />
+              <Plus className="w-4 h-4 mr-2" />
               Carga Manual
             </button>
             
             <button
               onClick={handleRefreshData}
               disabled={loading}
-              className="inline-flex items-center px-3 py-2 bg-[#311716] text-white rounded-lg text-sm font-medium hover:bg-[#462625] transition-colors disabled:opacity-50"
+              className="inline-flex items-center px-4 py-2 bg-[#311716] text-white rounded-lg text-sm font-medium hover:bg-[#462625] transition-all shadow-sm hover:shadow-md disabled:opacity-50"
             >
-              <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
               Actualizar
             </button>
           </div>
@@ -715,18 +800,23 @@ export default function StockSucursalesMejorado() {
         {/* Estadísticas */}
         <StatsCards />
 
-        {/* Filtros minimalistas mejorados */}
-        <div className="bg-white rounded-lg shadow-sm p-4">
+        {/* Filtros mejorados */}
+        <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+          <div className="flex items-center mb-4">
+            <Filter className="w-5 h-5 text-gray-600 mr-2" />
+            <h2 className="text-lg font-semibold text-gray-900">Filtros</h2>
+          </div>
+          
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             {/* Sucursal */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Sucursal</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Sucursal</label>
               <select
                 value={sucursalSeleccionada}
                 onChange={(e) => setSucursalSeleccionada(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#eeb077] focus:border-transparent text-sm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#eeb077] focus:border-transparent text-sm shadow-sm"
               >
-                <option value="">Todas</option>
+                <option value="">Todas las sucursales</option>
                 {sucursales.map((sucursal) => (
                   <option key={sucursal.id} value={sucursal.id}>
                     {sucursal.nombre}
@@ -735,13 +825,13 @@ export default function StockSucursalesMejorado() {
               </select>
             </div>
 
-            {/* 🆕 FILTRO POR CATEGORÍA */}
+            {/* Categoría */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Categoría</label>
               <select
                 value={categoriaFilter}
                 onChange={(e) => setCategoriaFilter(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#eeb077] focus:border-transparent text-sm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#eeb077] focus:border-transparent text-sm shadow-sm"
               >
                 <option value="todas">Todas las categorías</option>
                 {categorias.map((categoria) => (
@@ -754,7 +844,7 @@ export default function StockSucursalesMejorado() {
 
             {/* Búsqueda */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Buscar producto</label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <input
@@ -762,31 +852,31 @@ export default function StockSucursalesMejorado() {
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   placeholder="Nombre del producto..."
-                  className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#eeb077] focus:border-transparent text-sm"
+                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#eeb077] focus:border-transparent text-sm shadow-sm"
                 />
               </div>
             </div>
 
             {/* Estado */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Estado</label>
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#eeb077] focus:border-transparent text-sm"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#eeb077] focus:border-transparent text-sm shadow-sm"
               >
-                <option value="todos">Todos</option>
-                <option value="critico">Críticos ({dashboardData?.estadisticas?.criticos || 0})</option>
-                <option value="bajo">Bajos ({dashboardData?.estadisticas?.bajos || 0})</option>
-                <option value="normal">Normales ({dashboardData?.estadisticas?.normales || 0})</option>
-                <option value="exceso">Excesos ({dashboardData?.estadisticas?.excesos || 0})</option>
-                <option value="sin_configuracion">Sin configuración ({dashboardData?.estadisticas?.sinConfiguracion || 0})</option>
+                <option value="todos">Todos los estados</option>
+                <option value="critico">🔴 Críticos ({dashboardData?.estadisticas?.criticos || 0})</option>
+                <option value="bajo">🟡 Bajos ({dashboardData?.estadisticas?.bajos || 0})</option>
+                <option value="normal">🟢 Normales ({dashboardData?.estadisticas?.normales || 0})</option>
+                <option value="exceso">🟣 Excesos ({dashboardData?.estadisticas?.excesos || 0})</option>
+                <option value="sin_configuracion">⚙️ Sin configuración ({dashboardData?.estadisticas?.sinConfiguracion || 0})</option>
               </select>
             </div>
 
-            {/* Limpiar */}
+            {/* Limpiar filtros */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">&nbsp;</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">&nbsp;</label>
               <button
                 onClick={() => {
                   setSearchTerm('');
@@ -794,25 +884,29 @@ export default function StockSucursalesMejorado() {
                   setCategoriaFilter('todas');
                   setSucursalSeleccionada('');
                 }}
-                className="w-full px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors"
+                className="w-full px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors border border-gray-300"
               >
-                Limpiar
+                Limpiar filtros
               </button>
             </div>
           </div>
         </div>
 
-        {/* Tabla minimalista */}
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-gray-200">
+        {/* Tabla mejorada */}
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200">
+          <div className="p-6 border-b border-gray-200 bg-gray-50">
             <div className="flex justify-between items-center">
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-                <Grid3X3 className="w-5 h-5 mr-2" />
-                Análisis ({filteredAnalysis.length} productos)
+              <h2 className="text-xl font-semibold text-gray-900 flex items-center">
+                <Grid3X3 className="w-6 h-6 mr-2" />
+                Análisis de Stock
+                <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium">
+                  {filteredAnalysis.length} productos
+                </span>
               </h2>
-              {lastUpdate && (
-                <div className="text-xs text-gray-500">
-                  Actualizado: {lastUpdate.toLocaleTimeString()}
+              {error && (
+                <div className="flex items-center text-red-600 text-sm">
+                  <AlertTriangle className="w-4 h-4 mr-1" />
+                  {error}
                 </div>
               )}
             </div>
@@ -820,18 +914,18 @@ export default function StockSucursalesMejorado() {
           
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50">
+              <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
-                  <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">Sucursal</th>
-                  <th className="p-3 text-center text-xs font-medium text-gray-500 uppercase">Stock</th>
-                  <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase hidden lg:table-cell">Config</th>
-                  <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase">Estado</th>
-                  <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase hidden md:table-cell">Uso</th>
-                  <th className="p-3 text-center text-xs font-medium text-gray-500 uppercase">Acciones</th>
+                  <th className="p-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
+                  <th className="p-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">Sucursal</th>
+                  <th className="p-4 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Stock Actual</th>
+                  <th className="p-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden lg:table-cell">Configuración</th>
+                  <th className="p-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
+                  <th className="p-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">Utilización</th>
+                  <th className="p-4 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Acciones</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="bg-white divide-y divide-gray-200">
                 {filteredAnalysis.slice(0, 100).map((item, index) => (
                   <TableRow
                     key={`${item.producto.id}-${item.sucursal.id}`}
@@ -851,102 +945,327 @@ export default function StockSucursalesMejorado() {
                 ))}
               </tbody>
             </table>
+            
             {filteredAnalysis.length === 0 && (
-              <div className="text-center py-8">
-                <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500">No hay productos que coincidan con los filtros</p>
+              <div className="text-center py-12">
+                <Package className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No se encontraron productos</h3>
+                <p className="text-gray-500">Ajusta los filtros para ver más resultados</p>
+              </div>
+            )}
+            
+            {filteredAnalysis.length >= 100 && (
+              <div className="p-4 bg-yellow-50 border-t border-yellow-200">
+                <div className="flex items-center justify-center text-yellow-800 text-sm">
+                  <Info className="w-4 h-4 mr-2" />
+                  Mostrando los primeros 100 resultados. Use filtros para refinar la búsqueda.
+                </div>
               </div>
             )}
           </div>
         </div>
 
-        {/* 🆕 MODAL DE EXCEL */}
+        {/* 🆕 MODAL DE EXCEL MEJORADO */}
         {showExcelModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                <FileSpreadsheet className="w-5 h-5 mr-2" />
-                Gestión por Excel
-              </h3>
+            <div className="bg-white rounded-xl p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-semibold text-gray-900 flex items-center">
+                  <FileSpreadsheet className="w-6 h-6 mr-2 text-green-600" />
+                  Gestión Masiva por Excel
+                  {isProcessingExcel && <span className="ml-2 text-blue-600 text-sm">(Procesando...)</span>}
+                </h3>
+                <button 
+                  onClick={() => {
+                    if (!isProcessingExcel) {
+                      setShowExcelModal(false);
+                      setExcelFile(null);
+                      setExcelValidation(null);
+                      if (fileInputRef.current) fileInputRef.current.value = '';
+                    }
+                  }}
+                  disabled={isProcessingExcel}
+                  className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
               
-              <div className="space-y-4">
-                <div className="p-4 bg-blue-50 rounded-lg">
-                  <h4 className="font-medium text-blue-900 mb-2">Paso 1: Descargar Plantilla</h4>
-                  <p className="text-sm text-blue-700 mb-3">
-                    Descarga la plantilla con todos los productos y su stock actual
-                  </p>
+              {/* Indicador de progreso */}
+              {isProcessingExcel && (
+                <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="flex items-center mb-3">
+                    <Loader2 className="w-5 h-5 text-blue-600 animate-spin mr-2" />
+                    <span className="text-sm font-medium text-blue-800">Procesando archivo Excel...</span>
+                  </div>
+                  <div className="w-full bg-blue-200 rounded-full h-3">
+                    <div className="bg-blue-600 h-3 rounded-full animate-pulse" style={{ width: '65%' }}></div>
+                  </div>
+                  <div className="mt-2 text-xs text-blue-600 space-y-1">
+                    <p>• Validando estructura del archivo</p>
+                    <p>• Procesando productos en lotes</p>
+                    <p>• Actualizando stock en base de datos</p>
+                    <p className="font-medium">Esto puede tardar hasta {config?.timeouts?.excel ? Math.round(config.timeouts.excel / 1000) : 45} segundos</p>
+                  </div>
+                </div>
+              )}
+              
+              <div className="space-y-6">
+                {/* PASO 1: DESCARGAR PLANTILLA */}
+                <div className="p-5 bg-blue-50 rounded-xl border border-blue-200">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h4 className="font-semibold text-blue-900 mb-2 flex items-center">
+                        <Download className="w-5 h-5 mr-2" />
+                        Paso 1: Descargar Plantilla
+                      </h4>
+                      <p className="text-sm text-blue-700 mb-2">
+                        Descarga la plantilla con todos los productos y su stock actual
+                      </p>
+                      <div className="text-xs text-blue-600 space-y-1">
+                        <p>• Incluye hasta {config?.limits?.maxRows || 200} productos más utilizados</p>
+                        <p>• Stock actual de la sucursal seleccionada</p>
+                        <p>• Plantilla pre-configurada para editar fácilmente</p>
+                      </div>
+                    </div>
+                    {!sucursalSeleccionada && (
+                      <span className="text-xs bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full">
+                        Seleccione sucursal
+                      </span>
+                    )}
+                  </div>
+                  
                   <button
-                    onClick={descargarPlantillaExcel}
-                    disabled={loadingAction || !sucursalSeleccionada}
-                    className="w-full inline-flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50"
+                    onClick={handleDescargarPlantilla}
+                    disabled={loadingAction || !sucursalSeleccionada || isProcessingExcel}
+                    className="w-full inline-flex items-center justify-center px-4 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                   >
-                    <Download className="w-4 h-4 mr-2" />
-                    {loadingAction ? 'Generando...' : 'Descargar Plantilla'}
+                    {loadingAction ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Generando plantilla...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-4 h-4 mr-2" />
+                        Descargar Plantilla Excel
+                      </>
+                    )}
                   </button>
+                  
                   {!sucursalSeleccionada && (
-                    <p className="text-xs text-red-600 mt-1">Selecciona una sucursal primero</p>
+                    <p className="text-xs text-red-600 mt-2 flex items-center">
+                      <AlertTriangle className="w-3 h-3 mr-1" />
+                      Primero seleccione una sucursal en los filtros de arriba
+                    </p>
                   )}
                 </div>
 
-                <div className="p-4 bg-green-50 rounded-lg">
-                  <h4 className="font-medium text-green-900 mb-2">Paso 2: Subir Archivo Modificado</h4>
-                  <p className="text-sm text-green-700 mb-3">
-                    Modifica los valores de stock y sube el archivo
-                  </p>
+                {/* PASO 2: SUBIR ARCHIVO */}
+                <div className="p-5 bg-green-50 rounded-xl border border-green-200">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h4 className="font-semibold text-green-900 mb-2 flex items-center">
+                        <Upload className="w-5 h-5 mr-2" />
+                        Paso 2: Subir Archivo Modificado
+                      </h4>
+                      <p className="text-sm text-green-700 mb-2">
+                        Modifica los valores de "Nuevo Stock" y sube el archivo
+                      </p>
+                      <div className="text-xs text-green-600 space-y-1">
+                        <p>• Solo modifique la columna "Nuevo Stock"</p>
+                        <p>• Use números enteros positivos (ej: 0, 10, 25)</p>
+                        <p>• Máximo {config?.limits?.maxFileSize ? Math.round(config.limits.maxFileSize / 1024 / 1024) : 5}MB y {config?.limits?.maxRows || 200} filas</p>
+                      </div>
+                    </div>
+                    <div className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded">
+                      Límites: {config?.limits?.maxFileSize ? Math.round(config.limits.maxFileSize / 1024 / 1024) : 5}MB, {config?.limits?.maxRows || 200} filas
+                    </div>
+                  </div>
                   
                   <input
                     type="file"
                     ref={fileInputRef}
                     accept=".xlsx,.xls"
                     onChange={handleFileSelect}
-                    className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-green-50 file:text-green-700 hover:file:bg-green-100"
+                    disabled={isProcessingExcel}
+                    className="w-full text-sm text-gray-500 file:mr-4 file:py-3 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-green-100 file:text-green-700 hover:file:bg-green-200 disabled:opacity-50 transition-all"
                   />
                   
-                  {excelFile && (
-                    <div className="mt-2 p-2 bg-white rounded border">
-                      <p className="text-sm text-gray-700">
-                        <strong>Archivo seleccionado:</strong> {excelFile.name}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        Tamaño: {(excelFile.size / 1024).toFixed(1)} KB
-                      </p>
+                  {/* Validación del archivo */}
+                  {excelValidation && (
+                    <div className="mt-3 p-3 rounded-lg border">
+                      {excelValidation.valido ? (
+                        <div className="bg-green-50 border-green-200">
+                          <div className="flex items-center text-green-800 mb-2">
+                            <CheckCircle className="w-4 h-4 mr-2" />
+                            <span className="font-medium">Archivo válido</span>
+                          </div>
+                          {excelValidation.advertencias.length > 0 && (
+                            <div className="text-xs text-green-700 space-y-1">
+                              {excelValidation.advertencias.map((adv, i) => (
+                                <p key={i}>⚠️ {adv}</p>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="bg-red-50 border-red-200">
+                          <div className="flex items-center text-red-800 mb-2">
+                            <AlertTriangle className="w-4 h-4 mr-2" />
+                            <span className="font-medium">Archivo inválido</span>
+                          </div>
+                          <div className="text-xs text-red-700 space-y-1">
+                            {excelValidation.errores.map((error, i) => (
+                              <p key={i}>❌ {error}</p>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                   
-                  <button
-                    onClick={procesarArchivoExcel}
-                    disabled={!excelFile || isProcessingExcel || !sucursalSeleccionada}
-                    className="w-full mt-3 inline-flex items-center justify-center px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    {isProcessingExcel ? 'Procesando...' : 'Procesar Archivo'}
-                  </button>
+                  {excelFile && excelValidation?.valido && (
+                    <div className="mt-4 p-4 bg-white rounded-lg border border-green-200">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <p className="text-sm font-medium text-gray-700 flex items-center">
+                            <FileSpreadsheet className="w-4 h-4 mr-2 text-green-600" />
+                            {excelFile.name}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            Tamaño: {(excelFile.size / 1024).toFixed(1)} KB
+                          </p>
+                        </div>
+                        {!isProcessingExcel && (
+                          <button
+                            onClick={() => {
+                              setExcelFile(null);
+                              setExcelValidation(null);
+                              if (fileInputRef.current) fileInputRef.current.value = '';
+                            }}
+                            className="text-red-500 hover:text-red-700 p-1 rounded"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                      
+                      {/* Modo de procesamiento */}
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Modo de actualización:</label>
+                        <select 
+                          value={modoExcel} 
+                          onChange={(e) => setModoExcel(e.target.value as any)}
+                          disabled={isProcessingExcel}
+                          className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 disabled:opacity-50 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        >
+                          <option value="establecer">📝 Establecer stock (reemplazar valores actuales)</option>
+                          <option value="incrementar">➕ Incrementar stock (sumar a valores actuales)</option>
+                          <option value="decrementar">➖ Decrementar stock (restar de valores actuales)</option>
+                        </select>
+                      </div>
+                      
+                      <button
+                        onClick={handleProcesarExcel}
+                        disabled={isProcessingExcel || !sucursalSeleccionada}
+                        className="w-full inline-flex items-center justify-center px-4 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                      >
+                        {isProcessingExcel ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Procesando... (puede tardar hasta {config?.timeouts?.excel ? Math.round(config.timeouts.excel / 1000) : 45}s)
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-4 h-4 mr-2" />
+                            Procesar Archivo Excel
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* INSTRUCCIONES DETALLADAS */}
+                <div className="p-5 bg-yellow-50 rounded-xl border border-yellow-200">
+                  <h4 className="font-semibold text-yellow-900 mb-3 flex items-center">
+                    <Info className="w-5 h-5 mr-2" />
+                    Instrucciones Detalladas
+                  </h4>
+                  <div className="grid md:grid-cols-2 gap-4 text-sm text-yellow-800">
+                    <div>
+                      <h5 className="font-medium mb-2">✅ Lo que SÍ debe hacer:</h5>
+                      <ul className="space-y-1 list-disc list-inside">
+                        <li>Modificar solo la columna "Nuevo Stock"</li>
+                        <li>Usar números enteros positivos</li>
+                        <li>Guardar como archivo Excel (.xlsx)</li>
+                        <li>Verificar los datos antes de subir</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <h5 className="font-medium mb-2">❌ Lo que NO debe hacer:</h5>
+                      <ul className="space-y-1 list-disc list-inside">
+                        <li>Modificar ID, Código de Barras, Nombre</li>
+                        <li>Dejar celdas vacías en "Nuevo Stock"</li>
+                        <li>Usar números negativos o decimales</li>
+                        <li>Cambiar el formato del archivo</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                {/* LIMITACIONES TÉCNICAS */}
+                <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
+                  <h4 className="font-medium text-gray-700 mb-3 text-sm flex items-center">
+                    <AlertCircle className="w-4 h-4 mr-2" />
+                    Limitaciones Técnicas
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-gray-600">
+                    <div className="bg-white p-3 rounded-lg">
+                      <div className="font-medium text-gray-700 mb-1">Tamaño máximo:</div>
+                      <div>{config?.limits?.maxFileSize ? Math.round(config.limits.maxFileSize / 1024 / 1024) : 5}MB por archivo</div>
+                    </div>
+                    <div className="bg-white p-3 rounded-lg">
+                      <div className="font-medium text-gray-700 mb-1">Filas recomendadas:</div>
+                      <div>Máximo {config?.limits?.maxRows || 200} productos</div>
+                    </div>
+                    <div className="bg-white p-3 rounded-lg">
+                      <div className="font-medium text-gray-700 mb-1">Tiempo límite:</div>
+                      <div>{config?.timeouts?.excel ? Math.round(config.timeouts.excel / 1000) : 45} segundos máximo</div>
+                    </div>
+                  </div>
                 </div>
               </div>
               
-              <div className="flex justify-end mt-6">
+              <div className="flex justify-end mt-6 pt-4 border-t border-gray-200">
                 <button
                   onClick={() => {
-                    setShowExcelModal(false);
-                    setExcelFile(null);
-                    if (fileInputRef.current) {
-                      fileInputRef.current.value = '';
+                    if (!isProcessingExcel) {
+                      setShowExcelModal(false);
+                      setExcelFile(null);
+                      setExcelValidation(null);
+                      if (fileInputRef.current) fileInputRef.current.value = '';
                     }
                   }}
-                  className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg font-medium hover:bg-gray-300 transition-colors"
+                  disabled={isProcessingExcel}
+                  className="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg font-medium hover:bg-gray-300 transition-colors disabled:opacity-50"
                 >
-                  Cerrar
+                  {isProcessingExcel ? 'Procesando...' : 'Cerrar'}
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Modal de Configuración (mantener igual) */}
+        {/* Modal de Configuración */}
         {showConfigModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Configurar Stock</h3>
+            <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <Settings className="w-5 h-5 mr-2" />
+                Configurar Stock
+              </h3>
               
               <div className="space-y-4">
                 <div>
@@ -956,6 +1275,7 @@ export default function StockSucursalesMejorado() {
                     value={configData.stockMinimo}
                     onChange={(e) => setConfigData(prev => ({ ...prev, stockMinimo: Number(e.target.value) }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#eeb077] focus:border-transparent"
+                    min="0"
                   />
                 </div>
                 
@@ -966,6 +1286,7 @@ export default function StockSucursalesMejorado() {
                     value={configData.stockMaximo}
                     onChange={(e) => setConfigData(prev => ({ ...prev, stockMaximo: Number(e.target.value) }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#eeb077] focus:border-transparent"
+                    min="0"
                   />
                 </div>
                 
@@ -976,6 +1297,7 @@ export default function StockSucursalesMejorado() {
                     value={configData.puntoReposicion}
                     onChange={(e) => setConfigData(prev => ({ ...prev, puntoReposicion: Number(e.target.value) }))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#eeb077] focus:border-transparent"
+                    min="0"
                   />
                 </div>
               </div>
@@ -999,14 +1321,17 @@ export default function StockSucursalesMejorado() {
           </div>
         )}
 
-        {/* Modal de Carga */}
+        {/* Modal de Carga Manual */}
         {showCargaModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg p-6 max-w-md w-full">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                {cargaData.modo === 'incrementar' ? '➕ Incrementar Stock' : 
-                 cargaData.modo === 'decrementar' ? '➖ Decrementar Stock' : 
-                 '📝 Establecer Stock'}
+            <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-2xl">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                {cargaData.modo === 'incrementar' ? <Plus className="w-5 h-5 mr-2 text-green-600" /> : 
+                 cargaData.modo === 'decrementar' ? <Minus className="w-5 h-5 mr-2 text-red-600" /> : 
+                 <Equal className="w-5 h-5 mr-2 text-blue-600" />}
+                {cargaData.modo === 'incrementar' ? 'Incrementar Stock' : 
+                 cargaData.modo === 'decrementar' ? 'Decrementar Stock' : 
+                 'Establecer Stock'}
               </h3>
               
               <div className="space-y-4">
@@ -1044,37 +1369,40 @@ export default function StockSucursalesMejorado() {
 
                 {/* Selector de modo */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Modo</label>
-                  <div className="flex space-x-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Modo de operación</label>
+                  <div className="grid grid-cols-3 gap-2">
                     <button
                       onClick={() => setCargaData(prev => ({ ...prev, modo: 'incrementar' }))}
-                      className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      className={`flex items-center justify-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                         cargaData.modo === 'incrementar' 
                           ? 'bg-green-500 text-white' 
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
-                      <Plus className="w-4 h-4 mx-auto" />
+                      <Plus className="w-4 h-4 mr-1" />
+                      Sumar
                     </button>
                     <button
                       onClick={() => setCargaData(prev => ({ ...prev, modo: 'decrementar' }))}
-                      className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      className={`flex items-center justify-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                         cargaData.modo === 'decrementar' 
                           ? 'bg-red-500 text-white' 
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
-                      <Minus className="w-4 h-4 mx-auto" />
+                      <Minus className="w-4 h-4 mr-1" />
+                      Restar
                     </button>
                     <button
                       onClick={() => setCargaData(prev => ({ ...prev, modo: 'establecer' }))}
-                      className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      className={`flex items-center justify-center px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                         cargaData.modo === 'establecer' 
                           ? 'bg-blue-500 text-white' 
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
                     >
-                      <Equal className="w-4 h-4 mx-auto" />
+                      <Equal className="w-4 h-4 mr-1" />
+                      Fijar
                     </button>
                   </div>
                 </div>
@@ -1087,7 +1415,7 @@ export default function StockSucursalesMejorado() {
                     type="number"
                     value={cargaData.cantidad}
                     onChange={(e) => setCargaData(prev => ({ ...prev, cantidad: Number(e.target.value) }))}
-                    min="1"
+                    min="0"
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#eeb077] focus:border-transparent text-center text-xl font-bold"
                     autoFocus
                   />
@@ -1100,7 +1428,7 @@ export default function StockSucursalesMejorado() {
                     onChange={(e) => setCargaData(prev => ({ ...prev, observaciones: e.target.value }))}
                     placeholder="Comentarios opcionales..."
                     rows={2}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#eeb077] focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#eeb077] focus:border-transparent resize-none"
                   ></textarea>
                 </div>
               </div>
@@ -1114,7 +1442,7 @@ export default function StockSucursalesMejorado() {
                 </button>
                 <button
                   onClick={handleCarga}
-                  disabled={loadingAction || !cargaData.productoId || !cargaData.sucursalId || cargaData.cantidad <= 0}
+                  disabled={loadingAction || !cargaData.productoId || !cargaData.sucursalId || cargaData.cantidad < 0}
                   className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 ${
                     cargaData.modo === 'incrementar' ? 'bg-green-500 hover:bg-green-600' :
                     cargaData.modo === 'decrementar' ? 'bg-red-500 hover:bg-red-600' :
@@ -1133,9 +1461,12 @@ export default function StockSucursalesMejorado() {
         {/* Modal de Historial */}
         {showHistorialModal && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[80vh] overflow-hidden">
+            <div className="bg-white rounded-xl p-6 max-w-6xl w-full max-h-[80vh] overflow-hidden shadow-2xl">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold text-gray-900">Historial de Cargas</h3>
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                  <FileText className="w-5 h-5 mr-2" />
+                  Historial de Movimientos de Stock
+                </h3>
                 <button
                   onClick={() => setShowHistorialModal(false)}
                   className="p-1 hover:bg-gray-100 rounded"
@@ -1147,45 +1478,55 @@ export default function StockSucursalesMejorado() {
               <div className="overflow-auto max-h-96">
                 {historialData.length > 0 ? (
                   <table className="w-full text-sm">
-                    <thead className="bg-gray-50">
+                    <thead className="bg-gray-50 sticky top-0">
                       <tr>
-                        <th className="p-2 text-left text-xs font-medium text-gray-500">Fecha</th>
-                        <th className="p-2 text-left text-xs font-medium text-gray-500">Producto</th>
-                        <th className="p-2 text-left text-xs font-medium text-gray-500">Sucursal</th>
-                        <th className="p-2 text-left text-xs font-medium text-gray-500">Cantidad</th>
-                        <th className="p-2 text-left text-xs font-medium text-gray-500">Usuario</th>
+                        <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                        <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
+                        <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase">Sucursal</th>
+                        <th className="p-3 text-center text-xs font-medium text-gray-500 uppercase">Movimiento</th>
+                        <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase">Usuario</th>
+                        <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase">Motivo</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
                       {historialData.map((movimiento, index) => (
                         <tr key={movimiento.id} className="hover:bg-gray-50">
-                          <td className="p-2 text-xs">
+                          <td className="p-3 text-xs">
                             {new Date(movimiento.fecha).toLocaleString()}
                           </td>
-                          <td className="p-2">
+                          <td className="p-3">
                             <div className="font-medium text-sm">{movimiento.producto?.nombre || 'N/A'}</div>
                             {movimiento.producto?.codigoBarras && (
-                              <div className="text-xs text-gray-500">{movimiento.producto.codigoBarras}</div>
+                              <div className="text-xs text-gray-500 font-mono">{movimiento.producto.codigoBarras}</div>
                             )}
                           </td>
-                          <td className="p-2 text-sm">{movimiento.sucursal.nombre}</td>
-                          <td className="p-2">
-                            <span className={`font-medium ${
-                              movimiento.tipoMovimiento === 'entrada' ? 'text-green-600' : 'text-red-600'
+                          <td className="p-3 text-sm">{movimiento.sucursal.nombre}</td>
+                          <td className="p-3 text-center">
+                            <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                              movimiento.tipoMovimiento === 'entrada' 
+                                ? 'bg-green-100 text-green-800' 
+                                : 'bg-red-100 text-red-800'
                             }`}>
+                              {movimiento.tipoMovimiento === 'entrada' ? (
+                                <Plus className="w-3 h-3 mr-1" />
+                              ) : (
+                                <Minus className="w-3 h-3 mr-1" />
+                              )}
                               {movimiento.tipoMovimiento === 'entrada' ? '+' : '-'}{movimiento.cantidad}
-                            </span>
-                            <div className="text-xs text-gray-500">Final: {movimiento.stockResultante}</div>
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1">Final: {movimiento.stockResultante}</div>
                           </td>
-                          <td className="p-2 text-sm">{movimiento.usuario?.nombre || 'Sistema'}</td>
+                          <td className="p-3 text-sm">{movimiento.usuario?.nombre || 'Sistema'}</td>
+                          <td className="p-3 text-xs text-gray-600">{movimiento.motivo}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 ) : (
-                  <div className="text-center py-8">
-                    <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <p className="text-gray-500">No hay historial disponible</p>
+                  <div className="text-center py-12">
+                    <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Sin historial</h3>
+                    <p className="text-gray-500">No hay movimientos registrados para esta sucursal</p>
                   </div>
                 )}
               </div>
