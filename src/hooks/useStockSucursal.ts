@@ -1,4 +1,4 @@
-// src/hooks/useStockSucursales.ts - VERSIÓN MEJORADA CON EXCEL
+// src/hooks/useStockSucursales.ts - VERSIÓN CORREGIDA
 import { useState, useEffect, useCallback } from 'react';
 import { authenticatedFetch } from '@/hooks/useAuth';
 
@@ -196,19 +196,20 @@ export interface HistorialCargaManual {
   stockResultante: number;
 }
 
-// 🆕 NUEVAS INTERFACES PARA EXCEL
+// 🆕 INTERFACES PARA EXCEL CORREGIDAS
 export interface ExcelPlantillaResponse {
   success: boolean;
   downloadUrl?: string;
   fileName?: string;
 }
 
+// ✅ INTERFAZ CORREGIDA - AGREGADA tiempoProcesamiento
 export interface ExcelProcesoResponse {
   success: boolean;
   mensaje: string;
   carga: any;
   resumen: {
-    tiempoProcesamiento: string;
+    tiempoProcesamiento: string; // ✅ AGREGADA ESTA PROPIEDAD
     totalItems: number;
     itemsProcesados: number;
     itemsErrores: number;
@@ -223,6 +224,29 @@ export interface ExcelProcesoResponse {
   };
 }
 
+// ✅ NUEVA INTERFAZ PARA VALIDACIÓN DE ARCHIVOS
+export interface ValidacionArchivoExcel {
+  valido: boolean;
+  errores: string[];
+  advertencias: string[];
+  detalles?: {
+    tamaño: string;
+    extension: string;
+    nombre: string;
+  };
+}
+
+// ✅ NUEVA INTERFAZ PARA CONFIGURACIÓN
+export interface ConfiguracionHook {
+  limits: {
+    maxFileSize: number;
+    maxRows: number;
+  };
+  timeouts: {
+    excel: number;
+  };
+}
+
 export function useStockSucursales() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -230,6 +254,17 @@ export function useStockSucursales() {
   const [configs, setConfigs] = useState<StockConfig[]>([]);
   const [alertas, setAlertas] = useState<AlertaStock[]>([]);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
+
+  // ✅ CONFIGURACIÓN POR DEFECTO
+  const [config] = useState<ConfiguracionHook>({
+    limits: {
+      maxFileSize: 5 * 1024 * 1024, // 5MB
+      maxRows: 200
+    },
+    timeouts: {
+      excel: 45000 // 45 segundos
+    }
+  });
 
   // ============= CONFIGURACIONES =============
   
@@ -503,7 +538,56 @@ export function useStockSucursales() {
     }
   }, []);
 
-  // 🆕 ============= FUNCIONALIDADES DE EXCEL =============
+  // 🆕 ============= FUNCIONALIDADES DE EXCEL CORREGIDAS =============
+  
+  // ✅ NUEVA FUNCIÓN: Validar archivo Excel antes de procesarlo
+  const validarArchivoPrevio = useCallback((file: File): ValidacionArchivoExcel => {
+    console.log(`[Hook] Validando archivo: ${file.name}`);
+    
+    const errores: string[] = [];
+    const advertencias: string[] = [];
+    
+    // Validar extensión
+    const extensionesValidas = ['.xlsx', '.xls'];
+    const extension = file.name.toLowerCase().slice(file.name.lastIndexOf('.'));
+    
+    if (!extensionesValidas.includes(extension)) {
+      errores.push(`Extensión no válida. Use ${extensionesValidas.join(' o ')}`);
+    }
+    
+    // Validar tamaño
+    if (file.size > config.limits.maxFileSize) {
+      errores.push(`Archivo muy grande. Máximo ${Math.round(config.limits.maxFileSize / 1024 / 1024)}MB`);
+    }
+    
+    if (file.size === 0) {
+      errores.push('El archivo está vacío');
+    }
+    
+    // Advertencias
+    if (file.size > 1024 * 1024) { // > 1MB
+      advertencias.push('Archivo grande, el procesamiento puede tomar más tiempo');
+    }
+    
+    if (extension === '.xls') {
+      advertencias.push('Formato .xls es compatible pero se recomienda .xlsx');
+    }
+    
+    const valido = errores.length === 0;
+    
+    console.log(`[Hook] Validación archivo - Válido: ${valido}, Errores: ${errores.length}, Advertencias: ${advertencias.length}`);
+    
+    return {
+      valido,
+      errores,
+      advertencias,
+      detalles: {
+        tamaño: `${(file.size / 1024).toFixed(1)} KB`,
+        extension,
+        nombre: file.name
+      }
+    };
+  }, [config.limits.maxFileSize]);
   
   const descargarPlantillaExcel = useCallback(async (sucursalId: string): Promise<void> => {
     try {
@@ -590,7 +674,8 @@ export function useStockSucursales() {
       console.log(`[Hook] ✅ Archivo Excel procesado:`, {
         archivo: file.name,
         procesados: result.resumen.itemsProcesados,
-        errores: result.resumen.itemsErrores
+        errores: result.resumen.itemsErrores,
+        tiempoProcesamiento: result.resumen.tiempoProcesamiento
       });
       
       return result;
@@ -771,6 +856,7 @@ export function useStockSucursales() {
     configs,
     alertas,
     lastUpdate,
+    config, // ✅ EXPORTAR CONFIGURACIÓN
     
     // Configuraciones
     loadConfigs,
@@ -788,7 +874,8 @@ export function useStockSucursales() {
     cargarStockRapido,
     loadHistorialCargaManual,
     
-    // 🆕 Funcionalidades Excel
+    // 🆕 Funcionalidades Excel CORREGIDAS
+    validarArchivoPrevio, // ✅ FUNCIÓN AGREGADA
     descargarPlantillaExcel,
     procesarArchivoExcel,
     

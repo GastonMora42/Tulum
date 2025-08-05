@@ -133,6 +133,7 @@ const getStatusConfig = (estado: string) => {
   return configs[estado as keyof typeof configs] || configs.normal;
 };
 
+
 export default function StockSucursalesMejorado() {
   // ====================== HOOKS Y ESTADOS ======================
   const {
