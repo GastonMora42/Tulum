@@ -1,4 +1,4 @@
-// src/app/api/admin/stock-config/excel/procesar/route.ts - VERSIÓN CORREGIDA CON TRANSACCIONES OPTIMIZADAS
+// src/app/api/admin/stock-config/excel/procesar/route.ts - VERSIÓN CORREGIDA CON STOCK SERVICE
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/server/db/client';
 import { authMiddleware } from '@/server/api/middlewares/auth';
@@ -9,10 +9,8 @@ import * as XLSX from 'xlsx';
 
 // ⏱️ CONFIGURACIÓN OPTIMIZADA
 const MAX_PROCESSING_TIME = 25000; // 25 segundos
-const BATCH_SIZE = 20; // Procesar 20 items por lote
-const TRANSACTION_BATCH_SIZE = 10; // Máximo 10 items por transacción
+const BATCH_SIZE = 15; // Reducido para mejor manejo
 const MAX_ROWS = 1000;
-const TRANSACTION_TIMEOUT = 5000; // 5 segundos máximo por transacción
 
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
@@ -38,7 +36,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log(`[EXCEL-PROCESS] ⚡ Iniciando procesamiento optimizado: ${file.name}`);
+    console.log(`[EXCEL-PROCESS] ⚡ Iniciando procesamiento: ${file.name}, modo: ${modo}`);
 
     // ✅ VALIDACIONES RÁPIDAS
     if (file.size > 5 * 1024 * 1024) {
@@ -152,18 +150,7 @@ export async function POST(req: NextRequest) {
     productos.forEach(p => productosMap.set(p.id, p));
     console.log(`[EXCEL-PROCESS] 📦 Productos cargados: ${productos.length}/${productIds.length}`);
 
-    const stocksMap = new Map();
-    const stocks = await prisma.stock.findMany({
-      where: {
-        ubicacionId: sucursalId,
-        productoId: { in: productIds }
-      }
-    });
-    
-    stocks.forEach(s => stocksMap.set(s.productoId, s));
-    console.log(`[EXCEL-PROCESS] 📊 Stocks cargados: ${stocks.length}`);
-
-    // ✅ 🚀 PROCESAMIENTO OPTIMIZADO CON TRANSACCIONES DIVIDIDAS
+    // ✅ 🚀 PROCESAMIENTO SECUENCIAL CON STOCK SERVICE
     let itemsProcesados = 0;
     let itemsErrores = 0;
     const resultados = [];
@@ -176,7 +163,7 @@ export async function POST(req: NextRequest) {
 
     console.log(`[EXCEL-PROCESS] 🔀 Procesando en ${batches.length} lotes de ${BATCH_SIZE} items`);
 
-    // Procesar cada lote
+    // Procesar cada lote SECUENCIALMENTE para evitar problemas de concurrencia
     for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
       const batch = batches[batchIndex];
       
@@ -188,42 +175,75 @@ export async function POST(req: NextRequest) {
 
       console.log(`[EXCEL-PROCESS] 🔄 Procesando lote ${batchIndex + 1}/${batches.length}`);
 
-      // 🔧 PROCESAR LOTE CON TRANSACCIONES DIVIDIDAS
-      const batchResults = await procesarLoteConTransaccionesDivididas(
-        batch,
-        batchIndex * BATCH_SIZE,
-        columnIndices,
-        productosMap,
-        stocksMap,
-        sucursalId,
-        modo,
-        user.id,
-        cargaMasiva.id,
-        file.name
-      );
+      // 🔧 PROCESAR CADA ITEM DEL LOTE SECUENCIALMENTE
+      for (let itemIndex = 0; itemIndex < batch.length; itemIndex++) {
+        const row = batch[itemIndex];
+        const globalRowIndex = batchIndex * BATCH_SIZE + itemIndex;
+        const filaNumero = globalRowIndex + 2; // +2 porque empezamos en fila 2 del Excel
 
-      // Procesar resultados del lote
-      for (let i = 0; i < batchResults.length; i++) {
-        const result = batchResults[i];
-        const globalRowIndex = batchIndex * BATCH_SIZE + i;
-        
-        if (result.success) {
-          itemsProcesados++;
-          resultados.push({
-            fila: globalRowIndex + 2,
-            producto: result.data.producto,
-            stockAnterior: result.data.cantidadAnterior,
-            stockNuevo: result.data.cantidadNueva,
-            diferencia: result.data.cantidadNueva - result.data.cantidadAnterior,
-            estado: 'procesado'
-          });
-        } else {
+        try {
+          const resultado = await procesarItemConStockService(
+            row,
+            filaNumero,
+            columnIndices,
+            productosMap,
+            sucursalId,
+            modo,
+            user.id,
+            cargaMasiva.id,
+            file.name
+          );
+
+          if (resultado.success) {
+            itemsProcesados++;
+            resultados.push({
+              fila: filaNumero,
+              producto: resultado.data.producto,
+              stockAnterior: resultado.data.stockAnterior,
+              stockNuevo: resultado.data.stockFinal,
+              diferencia: resultado.data.diferencia,
+              estado: 'procesado'
+            });
+
+            console.log(`[EXCEL-PROCESS] ✅ Item ${itemsProcesados}/${dataRows.length}: ${resultado.data.producto.nombre} (${resultado.data.stockAnterior} → ${resultado.data.stockFinal})`);
+          } else {
+            itemsErrores++;
+            resultados.push({
+              fila: filaNumero,
+              estado: 'error',
+              error: resultado.error
+            });
+
+            console.log(`[EXCEL-PROCESS] ❌ Error fila ${filaNumero}: ${resultado.error}`);
+          }
+
+        } catch (error) {
           itemsErrores++;
+          const errorMsg = error instanceof Error ? error.message : 'Error desconocido';
+          
+          console.error(`[EXCEL-PROCESS] ❌ Error inesperado fila ${filaNumero}:`, error);
+          
           resultados.push({
-            fila: globalRowIndex + 2,
+            fila: filaNumero,
             estado: 'error',
-            error: result.error
+            error: errorMsg
           });
+
+          // Crear item de error en la base de datos
+          try {
+            await prisma.cargaMasivaStockItem.create({
+              data: {
+                cargaId: cargaMasiva.id,
+                codigoBarras: row[columnIndices.id] || '',
+                nombreProducto: `Fila ${filaNumero}`,
+                cantidadCargar: 0,
+                estado: 'error',
+                error: errorMsg.substring(0, 500)
+              }
+            });
+          } catch (dbError) {
+            console.error(`[EXCEL-PROCESS] Error guardando item de error:`, dbError);
+          }
         }
       }
     }
@@ -271,9 +291,8 @@ export async function POST(req: NextRequest) {
         optimizaciones: {
           usoBatches: true,
           batchSize: BATCH_SIZE,
-          transactionBatchSize: TRANSACTION_BATCH_SIZE,
-          precargaDatos: true,
-          transaccionesDivididas: true
+          procesamientoSecuencial: true,
+          usoStockService: true
         }
       }
     });
@@ -290,220 +309,21 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// 🚀 NUEVA FUNCIÓN: PROCESAR LOTE CON TRANSACCIONES DIVIDIDAS
-async function procesarLoteConTransaccionesDivididas(
-  batch: any[],
-  startIndex: number,
-  columnIndices: any,
-  productosMap: Map<string, any>,
-  stocksMap: Map<string, any>,
-  sucursalId: string,
-  modo: string,
-  usuarioId: string,
-  cargaId: string,
-  fileName: string
-): Promise<Array<{ success: boolean; data?: any; error?: string }>> {
-  
-  const resultados = [];
-  
-  // 🔄 DIVIDIR EL LOTE EN SUB-LOTES PARA TRANSACCIONES
-  const transactionBatches = [];
-  for (let i = 0; i < batch.length; i += TRANSACTION_BATCH_SIZE) {
-    transactionBatches.push(batch.slice(i, i + TRANSACTION_BATCH_SIZE));
-  }
-  
-  console.log(`[EXCEL-PROCESS] 🔀 Dividiendo lote en ${transactionBatches.length} transacciones de máximo ${TRANSACTION_BATCH_SIZE} items`);
-  
-  // Procesar cada sub-lote en su propia transacción
-  for (let txIndex = 0; txIndex < transactionBatches.length; txIndex++) {
-    const txBatch = transactionBatches[txIndex];
-    
-    try {
-      // 🎯 TRANSACCIÓN OPTIMIZADA CON TIMEOUT
-      const txResults = await Promise.race([
-        procesarTransaccionOptimizada(
-          txBatch, 
-          startIndex + txIndex * TRANSACTION_BATCH_SIZE,
-          columnIndices,
-          productosMap,
-          stocksMap,
-          sucursalId,
-          modo,
-          usuarioId,
-          cargaId,
-          fileName
-        ),
-        // Timeout de seguridad
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Timeout en transacción')), TRANSACTION_TIMEOUT)
-        )
-      ]) as Array<{ success: boolean; data?: any; error?: string }>;
-      
-      resultados.push(...txResults);
-      
-    } catch (txError) {
-      console.error(`[EXCEL-PROCESS] ❌ Error en transacción ${txIndex + 1}:`, txError);
-      
-      // Marcar todos los items de esta transacción como error
-      for (let i = 0; i < txBatch.length; i++) {
-        resultados.push({
-          success: false,
-          error: `Error en transacción: ${txError instanceof Error ? txError.message : 'Error desconocido'}`
-        });
-      }
-    }
-  }
-  
-  return resultados;
-}
-
-// 🎯 FUNCIÓN DE TRANSACCIÓN OPTIMIZADA
-async function procesarTransaccionOptimizada(
-  items: any[],
-  startIndex: number,
-  columnIndices: any,
-  productosMap: Map<string, any>,
-  stocksMap: Map<string, any>,
-  sucursalId: string,
-  modo: string,
-  usuarioId: string,
-  cargaId: string,
-  fileName: string
-): Promise<Array<{ success: boolean; data?: any; error?: string }>> {
-  
-  return await prisma.$transaction(async (tx) => {
-    const resultados = [];
-    
-    for (let i = 0; i < items.length; i++) {
-      const row = items[i];
-      const filaNumero = startIndex + i + 2; // +2 porque empezamos en fila 2 del Excel
-      
-      try {
-        // Procesar fila individual
-        const resultado = await procesarFilaOptimizada(
-          row,
-          filaNumero,
-          columnIndices,
-          productosMap,
-          stocksMap,
-          sucursalId,
-          modo,
-          usuarioId
-        );
-        
-        if (!resultado.success) {
-          throw new Error(resultado.error);
-        }
-        
-        const data = resultado.data!;
-        
-        // 🔧 APLICAR CAMBIOS EN LA BASE DE DATOS DENTRO DE LA TRANSACCIÓN
-        
-        // 1. Crear o actualizar stock
-        if (data.stockUpdate.shouldCreate) {
-          await tx.stock.create({
-            data: {
-              productoId: data.stockUpdate.productoId,
-              ubicacionId: sucursalId,
-              cantidad: data.stockUpdate.cantidadNueva,
-              ultimaActualizacion: new Date()
-            }
-          });
-        } else if (data.stockUpdate.diferencia !== 0) {
-          await tx.stock.update({
-            where: { id: data.stockUpdate.stockId },
-            data: {
-              cantidad: data.stockUpdate.cantidadNueva,
-              ultimaActualizacion: new Date(),
-              version: { increment: 1 }
-            }
-          });
-        }
-        
-        // 2. Crear movimiento de stock si hay cambio
-        if (data.stockUpdate.diferencia !== 0) {
-          const stockRecord = await tx.stock.findFirst({
-            where: {
-              productoId: data.stockUpdate.productoId,
-              ubicacionId: sucursalId
-            }
-          });
-
-          if (stockRecord) {
-            await tx.movimientoStock.create({
-              data: {
-                stockId: stockRecord.id,
-                tipoMovimiento: data.stockUpdate.diferencia > 0 ? 'entrada' : 'salida',
-                cantidad: Math.abs(data.stockUpdate.diferencia),
-                motivo: `Carga Excel: ${fileName}`,
-                usuarioId: usuarioId,
-                fecha: new Date()
-              }
-            });
-          }
-        }
-        
-        // 3. Crear item de carga masiva
-        await tx.cargaMasivaStockItem.create({
-          data: {
-            cargaId: cargaId,
-            productoId: data.producto.id,
-            codigoBarras: data.producto.codigoBarras,
-            nombreProducto: data.producto.nombre,
-            cantidadCargar: row[columnIndices.nuevoStock],
-            cantidadAnterior: data.cantidadAnterior,
-            cantidadFinal: data.cantidadNueva,
-            estado: 'procesado',
-            procesadoEn: new Date()
-          }
-        });
-        
-        resultados.push({
-          success: true,
-          data
-        });
-        
-      } catch (error) {
-        console.error(`[EXCEL-PROCESS] ❌ Error procesando fila ${filaNumero}:`, error);
-        
-        // Crear item con error dentro de la transacción
-        await tx.cargaMasivaStockItem.create({
-          data: {
-            cargaId: cargaId,
-            codigoBarras: row[columnIndices.id] || '',
-            nombreProducto: `Fila ${filaNumero}`,
-            cantidadCargar: 0,
-            estado: 'error',
-            error: error instanceof Error ? error.message.substring(0, 500) : 'Error desconocido'
-          }
-        });
-        
-        resultados.push({
-          success: false,
-          error: error instanceof Error ? error.message : 'Error desconocido'
-        });
-      }
-    }
-    
-    return resultados;
-  }, {
-    timeout: TRANSACTION_TIMEOUT // Timeout específico para la transacción
-  });
-}
-
-// 🚀 FUNCIÓN OPTIMIZADA PARA PROCESAR CADA FILA (sin cambios, mantener la misma)
-async function procesarFilaOptimizada(
+// 🎯 NUEVA FUNCIÓN: PROCESAR ITEM USANDO STOCK SERVICE
+async function procesarItemConStockService(
   row: any[],
   filaNumero: number,
   columnIndices: any,
   productosMap: Map<string, any>,
-  stocksMap: Map<string, any>,
   sucursalId: string,
   modo: string,
-  usuarioId: string
+  usuarioId: string,
+  cargaId: string,
+  fileName: string
 ): Promise<{ success: boolean; data?: any; error?: string }> {
   
   try {
+    // 1. VALIDAR Y EXTRAER DATOS
     const productoId = row[columnIndices.id]?.toString().trim();
     const nuevoStockStr = row[columnIndices.nuevoStock]?.toString().trim();
 
@@ -513,58 +333,131 @@ async function procesarFilaOptimizada(
 
     const nuevoStock = parseFloat(nuevoStockStr);
     if (isNaN(nuevoStock) || nuevoStock < 0) {
-      throw new Error(`Fila ${filaNumero}: Stock debe ser un número positivo`);
+      throw new Error(`Fila ${filaNumero}: Stock debe ser un número positivo (recibido: ${nuevoStockStr})`);
     }
 
+    // 2. VERIFICAR PRODUCTO
     const producto = productosMap.get(productoId);
     if (!producto) {
       throw new Error(`Fila ${filaNumero}: Producto no encontrado - ${productoId}`);
     }
 
-    const stockActual = stocksMap.get(productoId);
-    const cantidadAnterior = stockActual?.cantidad || 0;
+    console.log(`[EXCEL-PROCESS] 🔍 Procesando: ${producto.nombre} (${productoId}) → ${nuevoStock}`);
 
+    // 3. OBTENER STOCK ACTUAL (SIEMPRE FRESCO DE LA BD)
+    const stockActual = await prisma.stock.findFirst({
+      where: {
+        productoId: producto.id,
+        ubicacionId: sucursalId
+      }
+    });
+
+    const cantidadAnterior = stockActual?.cantidad || 0;
+    console.log(`[EXCEL-PROCESS] 📊 Stock actual de ${producto.nombre}: ${cantidadAnterior}`);
+
+    // 4. CALCULAR AJUSTE SEGÚN MODO
+    let cantidadAjuste = 0;
     let cantidadFinal = 0;
-    let diferencia = 0;
 
     switch (modo) {
       case 'incrementar':
+        cantidadAjuste = nuevoStock;
         cantidadFinal = cantidadAnterior + nuevoStock;
-        diferencia = nuevoStock;
         break;
       case 'establecer':
+        cantidadAjuste = nuevoStock - cantidadAnterior;
         cantidadFinal = nuevoStock;
-        diferencia = nuevoStock - cantidadAnterior;
         break;
       case 'decrementar':
+        cantidadAjuste = -nuevoStock;
         cantidadFinal = Math.max(0, cantidadAnterior - nuevoStock);
-        diferencia = -(Math.min(cantidadAnterior, nuevoStock));
         break;
       default:
-        throw new Error('Modo inválido');
+        throw new Error(`Modo inválido: ${modo}`);
     }
 
-    const stockUpdate = {
-      productoId: producto.id,
-      stockId: stockActual?.id,
-      shouldCreate: !stockActual,
-      cantidadAnterior,
-      cantidadNueva: cantidadFinal,
-      diferencia
-    };
+    console.log(`[EXCEL-PROCESS] 🧮 Cálculo: ${cantidadAnterior} ${modo === 'incrementar' ? '+' : modo === 'decrementar' ? '-' : '→'} ${nuevoStock} = ${cantidadFinal} (ajuste: ${cantidadAjuste})`);
+
+    // 5. APLICAR AJUSTE USANDO STOCK SERVICE (SOLO SI HAY CAMBIO)
+    let resultadoStock = null;
+    if (cantidadAjuste !== 0) {
+      console.log(`[EXCEL-PROCESS] 🔄 Aplicando ajuste de ${cantidadAjuste} para ${producto.nombre}`);
+      
+      resultadoStock = await stockService.ajustarStock({
+        productoId: producto.id,
+        ubicacionId: sucursalId,
+        cantidad: cantidadAjuste,
+        motivo: `Carga Excel: ${fileName} - Fila ${filaNumero}`,
+        usuarioId: usuarioId,
+        allowNegative: true // Admin puede hacer ajustes negativos
+      });
+
+      console.log(`[EXCEL-PROCESS] ✅ Stock ajustado para ${producto.nombre}. Nuevo stock: ${resultadoStock.stock.cantidad}`);
+    } else {
+      console.log(`[EXCEL-PROCESS] ⏸️ Sin cambios para ${producto.nombre} (ajuste = 0)`);
+    }
+
+    // 6. VERIFICAR STOCK FINAL REAL
+    const stockFinalVerificacion = await prisma.stock.findFirst({
+      where: {
+        productoId: producto.id,
+        ubicacionId: sucursalId
+      }
+    });
+
+    const stockFinalReal = stockFinalVerificacion?.cantidad || 0;
+    console.log(`[EXCEL-PROCESS] 🔍 Stock final verificado para ${producto.nombre}: ${stockFinalReal}`);
+
+    // 7. CREAR REGISTRO EN CARGA MASIVA
+    await prisma.cargaMasivaStockItem.create({
+      data: {
+        cargaId: cargaId,
+        productoId: producto.id,
+        codigoBarras: producto.codigoBarras,
+        nombreProducto: producto.nombre,
+        cantidadCargar: nuevoStock,
+        cantidadAnterior: cantidadAnterior,
+        cantidadFinal: stockFinalReal,
+        estado: 'procesado',
+        procesadoEn: new Date()
+      }
+    });
+
+    console.log(`[EXCEL-PROCESS] 📝 Registro creado para ${producto.nombre}: ${cantidadAnterior} → ${stockFinalReal}`);
+
+    // 8. GENERAR/ACTUALIZAR CONFIGURACIÓN Y ALERTAS
+    try {
+      await stockSucursalService.crearConfiguracionAutomatica(
+        producto.id, 
+        sucursalId, 
+        usuarioId, 
+        stockFinalReal
+      );
+      
+      await stockSucursalService.verificarYGenerarAlertas(producto.id, sucursalId);
+    } catch (configError) {
+      console.warn(`[EXCEL-PROCESS] ⚠️ No se pudo crear configuración/alertas para ${producto.nombre}:`, configError);
+      // No fallar la operación por esto
+    }
 
     return {
       success: true,
       data: {
-        producto,
-        cantidadAnterior,
-        cantidadNueva: cantidadFinal,
-        diferencia,
-        stockUpdate
+        producto: {
+          id: producto.id,
+          nombre: producto.nombre,
+          codigoBarras: producto.codigoBarras
+        },
+        stockAnterior: cantidadAnterior,
+        stockFinal: stockFinalReal,
+        diferencia: stockFinalReal - cantidadAnterior,
+        ajusteAplicado: cantidadAjuste,
+        movimiento: resultadoStock?.movimiento || null
       }
     };
 
   } catch (error) {
+    console.error(`[EXCEL-PROCESS] ❌ Error procesando fila ${filaNumero}:`, error);
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Error desconocido'
