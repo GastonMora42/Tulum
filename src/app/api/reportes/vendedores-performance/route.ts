@@ -1,4 +1,4 @@
-// src/app/api/reportes/vendedores-performance/route.ts
+// src/app/api/reportes/vendedores-performance/route.ts - VERSIÓN CORREGIDA
 import { NextRequest, NextResponse } from 'next/server';
 import { authMiddleware } from '@/server/api/middlewares/auth';
 import { checkPermission } from '@/server/api/middlewares/authorization';
@@ -27,8 +27,10 @@ export async function GET(req: NextRequest) {
     const inicio = startOfDay(new Date(fechaInicio));
     const fin = endOfDay(new Date(fechaFin));
     
-    // Performance por vendedor
-    const performanceSQL = `
+    console.log(`[REPORTES] Generando reporte vendedores: ${fechaInicio} a ${fechaFin}`);
+    
+    // Performance por vendedor - CONSULTA CORREGIDA
+    const performanceSQL = Prisma.sql`
       SELECT 
         u.id,
         u.name,
@@ -47,16 +49,30 @@ export async function GET(req: NextRequest) {
       LEFT JOIN "Ubicacion" ub ON u."sucursalId" = ub.id
       JOIN "Venta" v ON u.id = v."usuarioId"
       WHERE v.fecha >= ${inicio} AND v.fecha <= ${fin}
-      ${sucursalId ? `AND v."sucursalId" = '${sucursalId}'` : ''}
-      ${vendedorId ? `AND u.id = '${vendedorId}'` : ''}
+      ${sucursalId ? Prisma.sql`AND v."sucursalId" = ${sucursalId}` : Prisma.empty}
+      ${vendedorId ? Prisma.sql`AND u.id = ${vendedorId}` : Prisma.empty}
       GROUP BY u.id, u.name, u.email, ub.nombre
       ORDER BY ingresos_totales DESC
     `;
     
-    const performance = await prisma.$queryRaw`${Prisma.raw(performanceSQL)}` as any[];
+    const performance = await prisma.$queryRaw<Array<{
+      id: string;
+      name: string;
+      email: string;
+      sucursal_principal: string;
+      total_ventas: bigint;
+      ingresos_totales: number;
+      ticket_promedio: number;
+      ventas_facturadas: bigint;
+      ventas_con_descuento: bigint;
+      descuentos_aplicados: number;
+      dias_activos: bigint;
+      primera_venta: Date;
+      ultima_venta: Date;
+    }>>`${performanceSQL}`;
     
-    // Productos más vendidos por vendedor (top 3 de cada uno)
-    const productosVendedorSQL = `
+    // Productos más vendidos por vendedor (top 3 de cada uno) - CONSULTA CORREGIDA
+    const productosVendedorSQL = Prisma.sql`
       SELECT 
         u.id as vendedor_id,
         u.name as vendedor,
@@ -69,40 +85,64 @@ export async function GET(req: NextRequest) {
       JOIN "ItemVenta" iv ON v.id = iv."ventaId"
       JOIN "Producto" p ON iv."productoId" = p.id
       WHERE v.fecha >= ${inicio} AND v.fecha <= ${fin}
-      ${sucursalId ? `AND v."sucursalId" = '${sucursalId}'` : ''}
-      ${vendedorId ? `AND u.id = '${vendedorId}'` : ''}
+      ${sucursalId ? Prisma.sql`AND v."sucursalId" = ${sucursalId}` : Prisma.empty}
+      ${vendedorId ? Prisma.sql`AND u.id = ${vendedorId}` : Prisma.empty}
       GROUP BY u.id, u.name, p.nombre
       ORDER BY u.id, ingresos_producto DESC
     `;
     
-    const productosVendedor = await prisma.$queryRaw`${Prisma.raw(productosVendedorSQL)}` as any[];
+    const productosVendedor = await prisma.$queryRaw<Array<{
+      vendedor_id: string;
+      vendedor: string;
+      producto: string;
+      cantidad_vendida: bigint;
+      ingresos_producto: number;
+      rank: bigint;
+    }>>`${productosVendedorSQL}`;
     
-    // Tendencia diaria por vendedor (top 5 vendedores)
-    const top5Vendedores = performance.slice(0, 5).map(v => `'${v.id}'`).join(',');
+    // Tendencia diaria por vendedor (top 5 vendedores) - CONSULTA CORREGIDA
+    const top5Vendedores = performance.slice(0, 5).map(v => v.id);
     
-    const tendenciaSQL = top5Vendedores ? `
-      SELECT 
-        u.id as vendedor_id,
-        u.name as vendedor,
-        DATE(v.fecha) as fecha,
-        COUNT(v.id) as ventas_dia,
-        SUM(v.total) as ingresos_dia,
-        AVG(v.total) as ticket_promedio_dia
-      FROM "User" u
-      JOIN "Venta" v ON u.id = v."usuarioId"
-      WHERE u.id IN (${top5Vendedores})
-        AND v.fecha >= ${inicio} 
-        AND v.fecha <= ${fin}
-        ${sucursalId ? `AND v."sucursalId" = '${sucursalId}'` : ''}
-      GROUP BY u.id, u.name, DATE(v.fecha)
-      ORDER BY u.name, fecha
-    ` : '';
+    let tendenciaVendedores: Array<{
+      vendedor_id: string;
+      vendedor: string;
+      fecha: Date;
+      ventas_dia: bigint;
+      ingresos_dia: number;
+      ticket_promedio_dia: number;
+    }> = [];
     
-    const tendenciaVendedores = tendenciaSQL ? 
-      await prisma.$queryRaw`${Prisma.raw(tendenciaSQL)}` as any[] : [];
+    if (top5Vendedores.length > 0) {
+      const tendenciaSQL = Prisma.sql`
+        SELECT 
+          u.id as vendedor_id,
+          u.name as vendedor,
+          DATE(v.fecha) as fecha,
+          COUNT(v.id) as ventas_dia,
+          SUM(v.total) as ingresos_dia,
+          AVG(v.total) as ticket_promedio_dia
+        FROM "User" u
+        JOIN "Venta" v ON u.id = v."usuarioId"
+        WHERE u.id = ANY(${top5Vendedores})
+          AND v.fecha >= ${inicio} 
+          AND v.fecha <= ${fin}
+          ${sucursalId ? Prisma.sql`AND v."sucursalId" = ${sucursalId}` : Prisma.empty}
+        GROUP BY u.id, u.name, DATE(v.fecha)
+        ORDER BY u.name, fecha
+      `;
+      
+      tendenciaVendedores = await prisma.$queryRaw<Array<{
+        vendedor_id: string;
+        vendedor: string;
+        fecha: Date;
+        ventas_dia: bigint;
+        ingresos_dia: number;
+        ticket_promedio_dia: number;
+      }>>`${tendenciaSQL}`;
+    }
     
-    // Análisis de horarios por vendedor
-    const horariosSQL = `
+    // Análisis de horarios por vendedor - CONSULTA CORREGIDA
+    const horariosSQL = Prisma.sql`
       SELECT 
         u.id as vendedor_id,
         u.name as vendedor,
@@ -112,16 +152,22 @@ export async function GET(req: NextRequest) {
       FROM "User" u
       JOIN "Venta" v ON u.id = v."usuarioId"
       WHERE v.fecha >= ${inicio} AND v.fecha <= ${fin}
-      ${sucursalId ? `AND v."sucursalId" = '${sucursalId}'` : ''}
-      ${vendedorId ? `AND u.id = '${vendedorId}'` : ''}
+      ${sucursalId ? Prisma.sql`AND v."sucursalId" = ${sucursalId}` : Prisma.empty}
+      ${vendedorId ? Prisma.sql`AND u.id = ${vendedorId}` : Prisma.empty}
       GROUP BY u.id, u.name, EXTRACT(HOUR FROM v.fecha)
       ORDER BY u.name, hora
     `;
     
-    const analisisHorarios = await prisma.$queryRaw`${Prisma.raw(horariosSQL)}` as any[];
+    const analisisHorarios = await prisma.$queryRaw<Array<{
+      vendedor_id: string;
+      vendedor: string;
+      hora: number;
+      ventas_hora: bigint;
+      ingresos_hora: number;
+    }>>`${horariosSQL}`;
     
-    // Medios de pago por vendedor
-    const mediosPagoSQL = `
+    // Medios de pago por vendedor - CONSULTA CORREGIDA
+    const mediosPagoSQL = Prisma.sql`
       SELECT 
         u.id as vendedor_id,
         u.name as vendedor,
@@ -132,13 +178,19 @@ export async function GET(req: NextRequest) {
       JOIN "Venta" v ON u.id = v."usuarioId"
       JOIN "Pago" p ON v.id = p."ventaId"
       WHERE v.fecha >= ${inicio} AND v.fecha <= ${fin}
-      ${sucursalId ? `AND v."sucursalId" = '${sucursalId}'` : ''}
-      ${vendedorId ? `AND u.id = '${vendedorId}'` : ''}
+      ${sucursalId ? Prisma.sql`AND v."sucursalId" = ${sucursalId}` : Prisma.empty}
+      ${vendedorId ? Prisma.sql`AND u.id = ${vendedorId}` : Prisma.empty}
       GROUP BY u.id, u.name, p."medioPago"
       ORDER BY u.name, monto_total DESC
     `;
     
-    const mediosPagoVendedor = await prisma.$queryRaw`${Prisma.raw(mediosPagoSQL)}` as any[];
+    const mediosPagoVendedor = await prisma.$queryRaw<Array<{
+      vendedor_id: string;
+      vendedor: string;
+      medioPago: string;
+      transacciones: bigint;
+      monto_total: number;
+    }>>`${mediosPagoSQL}`;
     
     // Estadísticas generales
     const estadisticas = {
@@ -154,7 +206,7 @@ export async function GET(req: NextRequest) {
       } : null
     };
     
-    return NextResponse.json({
+    const responseData = {
       periodo: { inicio, fin },
       estadisticas,
       performance: performance.map(v => ({
@@ -194,10 +246,18 @@ export async function GET(req: NextRequest) {
         transacciones: Number(m.transacciones),
         monto_total: Number(m.monto_total)
       }))
-    });
+    };
+
+    console.log(`[REPORTES] ✅ Reporte vendedores generado - ${estadisticas.totalVendedores} vendedores, $${estadisticas.ingresosTotales}`);
+    
+    return NextResponse.json(responseData);
 
   } catch (error) {
     console.error('Error en reporte de vendedores:', error);
-    return NextResponse.json({ error: 'Error al generar reporte' }, { status: 500 });
+    
+    return NextResponse.json({ 
+      error: 'Error al generar reporte',
+      details: error instanceof Error ? error.message : 'Error desconocido'
+    }, { status: 500 });
   }
 }

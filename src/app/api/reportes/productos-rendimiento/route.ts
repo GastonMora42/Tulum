@@ -1,6 +1,4 @@
-
-
-// src/app/api/reportes/productos-rendimiento/route.ts
+// src/app/api/reportes/productos-rendimiento/route.ts - VERSIÓN CORREGIDA
 import { NextRequest, NextResponse } from 'next/server';
 import { authMiddleware } from '@/server/api/middlewares/auth';
 import { checkPermission } from '@/server/api/middlewares/authorization';
@@ -30,17 +28,10 @@ export async function GET(req: NextRequest) {
     const inicio = startOfDay(new Date(fechaInicio));
     const fin = endOfDay(new Date(fechaFin));
     
-    // Filtros base
-    const whereVenta: any = {
-      fecha: { gte: inicio, lte: fin }
-    };
+    console.log(`[REPORTES] Generando reporte productos: ${fechaInicio} a ${fechaFin}`);
     
-    if (sucursalId) {
-      whereVenta.sucursalId = sucursalId;
-    }
-    
-    // 1. Top productos por ventas
-    const topProductosSQL = `
+    // 1. Top productos por ventas - CONSULTA CORREGIDA
+    const topProductosSQL = Prisma.sql`
       SELECT 
         p.id,
         p.nombre,
@@ -57,18 +48,29 @@ export async function GET(req: NextRequest) {
       JOIN "Categoria" c ON p."categoriaId" = c.id
       JOIN "Venta" v ON iv."ventaId" = v.id
       WHERE v.fecha >= ${inicio} AND v.fecha <= ${fin}
-      ${sucursalId ? `AND v."sucursalId" = '${sucursalId}'` : ''}
-      ${categoriaId ? `AND p."categoriaId" = '${categoriaId}'` : ''}
-      ${productoId ? `AND p.id = '${productoId}'` : ''}
+      ${sucursalId ? Prisma.sql`AND v."sucursalId" = ${sucursalId}` : Prisma.empty}
+      ${categoriaId ? Prisma.sql`AND p."categoriaId" = ${categoriaId}` : Prisma.empty}
+      ${productoId ? Prisma.sql`AND p.id = ${productoId}` : Prisma.empty}
       GROUP BY p.id, p.nombre, p.precio, p."stockMinimo", c.nombre
       ORDER BY ingresos_totales DESC
       LIMIT 20
     `;
     
-    const topProductos = await prisma.$queryRaw`${Prisma.raw(topProductosSQL)}` as any[];
+    const topProductos = await prisma.$queryRaw<Array<{
+      id: string;
+      nombre: string;
+      precio: number;
+      stockMinimo: number;
+      categoria: string;
+      cantidad_vendida: bigint;
+      transacciones: bigint;
+      ingresos_totales: number;
+      precio_promedio: number;
+      ultima_venta: Date;
+    }>>`${topProductosSQL}`;
     
-    // 2. Productos con más rotación
-    const rotacionSQL = `
+    // 2. Productos con más rotación - CONSULTA CORREGIDA
+    const rotacionSQL = Prisma.sql`
       SELECT 
         p.id,
         p.nombre,
@@ -82,19 +84,25 @@ export async function GET(req: NextRequest) {
       FROM "Producto" p
       LEFT JOIN "ItemVenta" iv ON p.id = iv."productoId"
       LEFT JOIN "Venta" v ON iv."ventaId" = v.id AND v.fecha >= ${inicio} AND v.fecha <= ${fin}
-      LEFT JOIN "Stock" s ON p.id = s."productoId" ${sucursalId ? `AND s."ubicacionId" = '${sucursalId}'` : ''}
+      LEFT JOIN "Stock" s ON p.id = s."productoId" ${sucursalId ? Prisma.sql`AND s."ubicacionId" = ${sucursalId}` : Prisma.empty}
       WHERE p.activo = true
-      ${categoriaId ? `AND p."categoriaId" = '${categoriaId}'` : ''}
+      ${categoriaId ? Prisma.sql`AND p."categoriaId" = ${categoriaId}` : Prisma.empty}
       GROUP BY p.id, p.nombre
       HAVING SUM(iv.cantidad) > 0
       ORDER BY indice_rotacion DESC
       LIMIT 20
     `;
     
-    const productosRotacion = await prisma.$queryRaw`${Prisma.raw(rotacionSQL)}` as any[];
+    const productosRotacion = await prisma.$queryRaw<Array<{
+      id: string;
+      nombre: string;
+      vendidos: bigint;
+      stock_promedio: number;
+      indice_rotacion: number;
+    }>>`${rotacionSQL}`;
     
-    // 3. Análisis de stock
-    const stockCriticoSQL = `
+    // 3. Análisis de stock - CONSULTA CORREGIDA
+    const stockCriticoSQL = Prisma.sql`
       SELECT 
         p.id,
         p.nombre,
@@ -107,9 +115,9 @@ export async function GET(req: NextRequest) {
           ELSE 'normal'
         END as estado_stock
       FROM "Producto" p
-      LEFT JOIN "Stock" s ON p.id = s."productoId" ${sucursalId ? `AND s."ubicacionId" = '${sucursalId}'` : ''}
+      LEFT JOIN "Stock" s ON p.id = s."productoId" ${sucursalId ? Prisma.sql`AND s."ubicacionId" = ${sucursalId}` : Prisma.empty}
       WHERE p.activo = true
-      ${categoriaId ? `AND p."categoriaId" = '${categoriaId}'` : ''}
+      ${categoriaId ? Prisma.sql`AND p."categoriaId" = ${categoriaId}` : Prisma.empty}
       ORDER BY 
         CASE 
           WHEN s.cantidad <= 0 THEN 1
@@ -117,34 +125,55 @@ export async function GET(req: NextRequest) {
           WHEN s.cantidad < p."stockMinimo" * 2 THEN 3
           ELSE 4
         END,
-        s.cantidad ASC
+        s.cantidad ASC NULLS LAST
     `;
     
-    const analisisStock = await prisma.$queryRaw`${Prisma.raw(stockCriticoSQL)}` as any[];
+    const analisisStock = await prisma.$queryRaw<Array<{
+      id: string;
+      nombre: string;
+      stockMinimo: number;
+      stock_actual: number | null;
+      estado_stock: string;
+    }>>`${stockCriticoSQL}`;
     
-    // 4. Tendencia de ventas por producto (top 5)
-    const top5Ids = topProductos.slice(0, 5).map(p => `'${p.id}'`).join(',');
+    // 4. Tendencia de ventas por producto (top 5) - CONSULTA CORREGIDA
+    const top5Ids = topProductos.slice(0, 5).map(p => p.id);
     
-    const tendenciaSQL = top5Ids ? `
-      SELECT 
-        p.id,
-        p.nombre,
-        DATE(v.fecha) as fecha,
-        SUM(iv.cantidad) as cantidad,
-        SUM(iv.cantidad * iv."precioUnitario") as ingresos
-      FROM "ItemVenta" iv
-      JOIN "Producto" p ON iv."productoId" = p.id
-      JOIN "Venta" v ON iv."ventaId" = v.id
-      WHERE p.id IN (${top5Ids})
-        AND v.fecha >= ${inicio} 
-        AND v.fecha <= ${fin}
-        ${sucursalId ? `AND v."sucursalId" = '${sucursalId}'` : ''}
-      GROUP BY p.id, p.nombre, DATE(v.fecha)
-      ORDER BY p.nombre, fecha
-    ` : '';
+    let tendenciaProductos: Array<{
+      id: string;
+      nombre: string;
+      fecha: Date;
+      cantidad: bigint;
+      ingresos: number;
+    }> = [];
     
-    const tendenciaProductos = tendenciaSQL ? 
-      await prisma.$queryRaw`${Prisma.raw(tendenciaSQL)}` as any[] : [];
+    if (top5Ids.length > 0) {
+      const tendenciaSQL = Prisma.sql`
+        SELECT 
+          p.id,
+          p.nombre,
+          DATE(v.fecha) as fecha,
+          SUM(iv.cantidad) as cantidad,
+          SUM(iv.cantidad * iv."precioUnitario") as ingresos
+        FROM "ItemVenta" iv
+        JOIN "Producto" p ON iv."productoId" = p.id
+        JOIN "Venta" v ON iv."ventaId" = v.id
+        WHERE p.id = ANY(${top5Ids})
+          AND v.fecha >= ${inicio} 
+          AND v.fecha <= ${fin}
+          ${sucursalId ? Prisma.sql`AND v."sucursalId" = ${sucursalId}` : Prisma.empty}
+        GROUP BY p.id, p.nombre, DATE(v.fecha)
+        ORDER BY p.nombre, fecha
+      `;
+      
+      tendenciaProductos = await prisma.$queryRaw<Array<{
+        id: string;
+        nombre: string;
+        fecha: Date;
+        cantidad: bigint;
+        ingresos: number;
+      }>>`${tendenciaSQL}`;
+    }
     
     // 5. Estadísticas generales
     const estadisticas = {
@@ -156,8 +185,8 @@ export async function GET(req: NextRequest) {
       unidadesVendidas: topProductos.reduce((sum, p) => sum + (Number(p.cantidad_vendida) || 0), 0)
     };
     
-    // 6. Productos por categoría
-    const ventasPorCategoriaSQL = `
+    // 6. Productos por categoría - CONSULTA CORREGIDA
+    const ventasPorCategoriaSQL = Prisma.sql`
       SELECT 
         c.id,
         c.nombre as categoria,
@@ -169,14 +198,20 @@ export async function GET(req: NextRequest) {
       JOIN "ItemVenta" iv ON p.id = iv."productoId"
       JOIN "Venta" v ON iv."ventaId" = v.id
       WHERE v.fecha >= ${inicio} AND v.fecha <= ${fin}
-      ${sucursalId ? `AND v."sucursalId" = '${sucursalId}'` : ''}
+      ${sucursalId ? Prisma.sql`AND v."sucursalId" = ${sucursalId}` : Prisma.empty}
       GROUP BY c.id, c.nombre
       ORDER BY ingresos_totales DESC
     `;
     
-    const ventasPorCategoria = await prisma.$queryRaw`${Prisma.raw(ventasPorCategoriaSQL)}` as any[];
+    const ventasPorCategoria = await prisma.$queryRaw<Array<{
+      id: string;
+      categoria: string;
+      productos_distintos: bigint;
+      unidades_vendidas: bigint;
+      ingresos_totales: number;
+    }>>`${ventasPorCategoriaSQL}`;
     
-    return NextResponse.json({
+    const responseData = {
       periodo: { inicio, fin },
       estadisticas,
       topProductos: topProductos.map(p => ({
@@ -197,19 +232,29 @@ export async function GET(req: NextRequest) {
         stockMinimo: Number(p.stockMinimo),
         stock_actual: Number(p.stock_actual) || 0
       })),
-      tendenciaProductos,
+      tendenciaProductos: tendenciaProductos.map(t => ({
+        ...t,
+        cantidad: Number(t.cantidad),
+        ingresos: Number(t.ingresos)
+      })),
       ventasPorCategoria: ventasPorCategoria.map(c => ({
         ...c,
         productos_distintos: Number(c.productos_distintos),
         unidades_vendidas: Number(c.unidades_vendidas),
         ingresos_totales: Number(c.ingresos_totales)
       }))
-    });
+    };
+
+    console.log(`[REPORTES] ✅ Reporte productos generado - ${estadisticas.totalProductos} productos, ${estadisticas.productosConVentas} con ventas`);
+    
+    return NextResponse.json(responseData);
 
   } catch (error) {
     console.error('Error en reporte de productos:', error);
-    return NextResponse.json({ error: 'Error al generar reporte' }, { status: 500 });
+    
+    return NextResponse.json({ 
+      error: 'Error al generar reporte',
+      details: error instanceof Error ? error.message : 'Error desconocido'
+    }, { status: 500 });
   }
 }
-
-

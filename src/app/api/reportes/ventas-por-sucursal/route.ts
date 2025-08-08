@@ -1,6 +1,4 @@
-
-
-// src/app/api/reportes/ventas-por-sucursal/route.ts
+// src/app/api/reportes/ventas-por-sucursal/route.ts - VERSIÓN CORREGIDA
 import { NextRequest, NextResponse } from 'next/server';
 import { authMiddleware } from '@/server/api/middlewares/auth';
 import { checkPermission } from '@/server/api/middlewares/authorization';
@@ -29,8 +27,10 @@ export async function GET(req: NextRequest) {
     const inicio = startOfDay(new Date(fechaInicio));
     const fin = endOfDay(new Date(fechaFin));
     
-    // Ventas por sucursal
-    const ventasPorSucursalSQL = `
+    console.log(`[REPORTES] Generando reporte ventas por sucursal: ${fechaInicio} a ${fechaFin}`);
+    
+    // Ventas por sucursal - CONSULTA CORREGIDA
+    const ventasPorSucursalSQL = Prisma.sql`
       SELECT 
         ub.id,
         ub.nombre as sucursal,
@@ -50,16 +50,30 @@ export async function GET(req: NextRequest) {
         AND v.fecha >= ${inicio} 
         AND v.fecha <= ${fin}
       WHERE ub.activo = true AND ub.tipo = 'sucursal'
-      ${sucursalId ? `AND ub.id = '${sucursalId}'` : ''}
+      ${sucursalId ? Prisma.sql`AND ub.id = ${sucursalId}` : Prisma.empty}
       GROUP BY ub.id, ub.nombre, ub.direccion, ub.telefono
       HAVING COUNT(v.id) > 0 OR ${!sucursalId}
       ORDER BY ingresos_totales DESC NULLS LAST
     `;
     
-    const ventasPorSucursal = await prisma.$queryRaw`${Prisma.raw(ventasPorSucursalSQL)}` as any[];
+    const ventasPorSucursal = await prisma.$queryRaw<Array<{
+      id: string;
+      sucursal: string;
+      direccion: string | null;
+      telefono: string | null;
+      total_ventas: bigint;
+      ingresos_totales: number;
+      ticket_promedio: number;
+      ventas_facturadas: bigint;
+      monto_facturado: number;
+      vendedores_activos: bigint;
+      dias_con_ventas: bigint;
+      primera_venta: Date | null;
+      ultima_venta: Date | null;
+    }>>`${ventasPorSucursalSQL}`;
     
-    // Comparativa entre sucursales (métricas normalizadas)
-    const comparativaSQL = `
+    // Comparativa entre sucursales (métricas normalizadas) - CONSULTA CORREGIDA
+    const comparativaSQL = Prisma.sql`
       SELECT 
         ub.id,
         ub.nombre as sucursal,
@@ -74,37 +88,120 @@ export async function GET(req: NextRequest) {
         AND ub.tipo = 'sucursal'
         AND v.fecha >= ${inicio} 
         AND v.fecha <= ${fin}
-      ${sucursalId ? `AND ub.id = '${sucursalId}'` : ''}
+      ${sucursalId ? Prisma.sql`AND ub.id = ${sucursalId}` : Prisma.empty}
       GROUP BY ub.id, ub.nombre
       ORDER BY ingresos DESC
     `;
     
-    const comparativa = await prisma.$queryRaw`${Prisma.raw(comparativaSQL)}` as any[];
+    const comparativa = await prisma.$queryRaw<Array<{
+      id: string;
+      sucursal: string;
+      ventas: bigint;
+      ingresos: number;
+      ticket_promedio: number;
+      ventas_promedio_dia: number;
+      porcentaje_facturacion: number;
+    }>>`${comparativaSQL}`;
     
-    // Tendencia temporal por sucursal
-    const tendenciaSQL = `
-      SELECT 
-        ub.id as sucursal_id,
-        ub.nombre as sucursal,
-        DATE_TRUNC('${agruparPor}', v.fecha) as periodo,
-        COUNT(v.id) as ventas_periodo,
-        SUM(v.total) as ingresos_periodo,
-        AVG(v.total) as ticket_promedio_periodo
-      FROM "Ubicacion" ub
-      JOIN "Venta" v ON ub.id = v."sucursalId"
-      WHERE ub.activo = true 
-        AND ub.tipo = 'sucursal'
-        AND v.fecha >= ${inicio} 
-        AND v.fecha <= ${fin}
-      ${sucursalId ? `AND ub.id = '${sucursalId}'` : ''}
-      GROUP BY ub.id, ub.nombre, DATE_TRUNC('${agruparPor}', v.fecha)
-      ORDER BY ub.nombre, periodo
-    `;
+    // Tendencia temporal por sucursal - CONSULTA CORREGIDA CON CONDICIONALES
+    let tendencia: Array<{
+      sucursal_id: string;
+      sucursal: string;
+      periodo: Date;
+      ventas_periodo: bigint;
+      ingresos_periodo: number;
+      ticket_promedio_periodo: number;
+    }> = [];
     
-    const tendencia = await prisma.$queryRaw`${Prisma.raw(tendenciaSQL)}` as any[];
+    if (agruparPor === 'dia') {
+      const tendenciaSQL = Prisma.sql`
+        SELECT 
+          ub.id as sucursal_id,
+          ub.nombre as sucursal,
+          DATE(v.fecha) as periodo,
+          COUNT(v.id) as ventas_periodo,
+          SUM(v.total) as ingresos_periodo,
+          AVG(v.total) as ticket_promedio_periodo
+        FROM "Ubicacion" ub
+        JOIN "Venta" v ON ub.id = v."sucursalId"
+        WHERE ub.activo = true 
+          AND ub.tipo = 'sucursal'
+          AND v.fecha >= ${inicio} 
+          AND v.fecha <= ${fin}
+        ${sucursalId ? Prisma.sql`AND ub.id = ${sucursalId}` : Prisma.empty}
+        GROUP BY ub.id, ub.nombre, DATE(v.fecha)
+        ORDER BY ub.nombre, periodo
+      `;
+      
+      tendencia = await prisma.$queryRaw<Array<{
+        sucursal_id: string;
+        sucursal: string;
+        periodo: Date;
+        ventas_periodo: bigint;
+        ingresos_periodo: number;
+        ticket_promedio_periodo: number;
+      }>>`${tendenciaSQL}`;
+    } else if (agruparPor === 'semana') {
+      const tendenciaSQL = Prisma.sql`
+        SELECT 
+          ub.id as sucursal_id,
+          ub.nombre as sucursal,
+          DATE_TRUNC('week', v.fecha) as periodo,
+          COUNT(v.id) as ventas_periodo,
+          SUM(v.total) as ingresos_periodo,
+          AVG(v.total) as ticket_promedio_periodo
+        FROM "Ubicacion" ub
+        JOIN "Venta" v ON ub.id = v."sucursalId"
+        WHERE ub.activo = true 
+          AND ub.tipo = 'sucursal'
+          AND v.fecha >= ${inicio} 
+          AND v.fecha <= ${fin}
+        ${sucursalId ? Prisma.sql`AND ub.id = ${sucursalId}` : Prisma.empty}
+        GROUP BY ub.id, ub.nombre, DATE_TRUNC('week', v.fecha)
+        ORDER BY ub.nombre, periodo
+      `;
+      
+      tendencia = await prisma.$queryRaw<Array<{
+        sucursal_id: string;
+        sucursal: string;
+        periodo: Date;
+        ventas_periodo: bigint;
+        ingresos_periodo: number;
+        ticket_promedio_periodo: number;
+      }>>`${tendenciaSQL}`;
+    } else {
+      // Default a mes
+      const tendenciaSQL = Prisma.sql`
+        SELECT 
+          ub.id as sucursal_id,
+          ub.nombre as sucursal,
+          DATE_TRUNC('month', v.fecha) as periodo,
+          COUNT(v.id) as ventas_periodo,
+          SUM(v.total) as ingresos_periodo,
+          AVG(v.total) as ticket_promedio_periodo
+        FROM "Ubicacion" ub
+        JOIN "Venta" v ON ub.id = v."sucursalId"
+        WHERE ub.activo = true 
+          AND ub.tipo = 'sucursal'
+          AND v.fecha >= ${inicio} 
+          AND v.fecha <= ${fin}
+        ${sucursalId ? Prisma.sql`AND ub.id = ${sucursalId}` : Prisma.empty}
+        GROUP BY ub.id, ub.nombre, DATE_TRUNC('month', v.fecha)
+        ORDER BY ub.nombre, periodo
+      `;
+      
+      tendencia = await prisma.$queryRaw<Array<{
+        sucursal_id: string;
+        sucursal: string;
+        periodo: Date;
+        ventas_periodo: bigint;
+        ingresos_periodo: number;
+        ticket_promedio_periodo: number;
+      }>>`${tendenciaSQL}`;
+    }
     
-    // Top productos por sucursal
-    const topProductosSucursalSQL = `
+    // Top productos por sucursal - CONSULTA CORREGIDA
+    const topProductosSucursalSQL = Prisma.sql`
       SELECT 
         ub.id as sucursal_id,
         ub.nombre as sucursal,
@@ -120,15 +217,22 @@ export async function GET(req: NextRequest) {
         AND ub.tipo = 'sucursal'
         AND v.fecha >= ${inicio} 
         AND v.fecha <= ${fin}
-      ${sucursalId ? `AND ub.id = '${sucursalId}'` : ''}
+      ${sucursalId ? Prisma.sql`AND ub.id = ${sucursalId}` : Prisma.empty}
       GROUP BY ub.id, ub.nombre, p.nombre
       ORDER BY ub.nombre, ingresos_producto DESC
     `;
     
-    const topProductosSucursal = await prisma.$queryRaw`${Prisma.raw(topProductosSucursalSQL)}` as any[];
+    const topProductosSucursal = await prisma.$queryRaw<Array<{
+      sucursal_id: string;
+      sucursal: string;
+      producto: string;
+      cantidad_vendida: bigint;
+      ingresos_producto: number;
+      rank: bigint;
+    }>>`${topProductosSucursalSQL}`;
     
-    // Performance por vendedor por sucursal
-    const vendedoresSucursalSQL = `
+    // Performance por vendedor por sucursal - CONSULTA CORREGIDA
+    const vendedoresSucursalSQL = Prisma.sql`
       SELECT 
         ub.id as sucursal_id,
         ub.nombre as sucursal,
@@ -144,15 +248,23 @@ export async function GET(req: NextRequest) {
         AND ub.tipo = 'sucursal'
         AND v.fecha >= ${inicio} 
         AND v.fecha <= ${fin}
-      ${sucursalId ? `AND ub.id = '${sucursalId}'` : ''}
+      ${sucursalId ? Prisma.sql`AND ub.id = ${sucursalId}` : Prisma.empty}
       GROUP BY ub.id, ub.nombre, u.id, u.name
       ORDER BY ub.nombre, ingresos DESC
     `;
     
-    const vendedoresSucursal = await prisma.$queryRaw`${Prisma.raw(vendedoresSucursalSQL)}` as any[];
+    const vendedoresSucursal = await prisma.$queryRaw<Array<{
+      sucursal_id: string;
+      sucursal: string;
+      vendedor_id: string;
+      vendedor: string;
+      ventas: bigint;
+      ingresos: number;
+      ticket_promedio: number;
+    }>>`${vendedoresSucursalSQL}`;
     
-    // Análisis de horarios por sucursal
-    const horariosSucursalSQL = `
+    // Análisis de horarios por sucursal - CONSULTA CORREGIDA
+    const horariosSucursalSQL = Prisma.sql`
       SELECT 
         ub.id as sucursal_id,
         ub.nombre as sucursal,
@@ -166,15 +278,22 @@ export async function GET(req: NextRequest) {
         AND ub.tipo = 'sucursal'
         AND v.fecha >= ${inicio} 
         AND v.fecha <= ${fin}
-      ${sucursalId ? `AND ub.id = '${sucursalId}'` : ''}
+      ${sucursalId ? Prisma.sql`AND ub.id = ${sucursalId}` : Prisma.empty}
       GROUP BY ub.id, ub.nombre, EXTRACT(HOUR FROM v.fecha)
       ORDER BY ub.nombre, hora
     `;
     
-    const horariosSucursal = await prisma.$queryRaw`${Prisma.raw(horariosSucursalSQL)}` as any[];
+    const horariosSucursal = await prisma.$queryRaw<Array<{
+      sucursal_id: string;
+      sucursal: string;
+      hora: number;
+      ventas_hora: bigint;
+      ingresos_hora: number;
+      ticket_promedio_hora: number;
+    }>>`${horariosSucursalSQL}`;
     
-    // Medios de pago por sucursal
-    const mediosPagoSucursalSQL = `
+    // Medios de pago por sucursal - CONSULTA CORREGIDA
+    const mediosPagoSucursalSQL = Prisma.sql`
       SELECT 
         ub.id as sucursal_id,
         ub.nombre as sucursal,
@@ -189,12 +308,19 @@ export async function GET(req: NextRequest) {
         AND ub.tipo = 'sucursal'
         AND v.fecha >= ${inicio} 
         AND v.fecha <= ${fin}
-      ${sucursalId ? `AND ub.id = '${sucursalId}'` : ''}
+      ${sucursalId ? Prisma.sql`AND ub.id = ${sucursalId}` : Prisma.empty}
       GROUP BY ub.id, ub.nombre, p."medioPago"
       ORDER BY ub.nombre, monto_total DESC
     `;
     
-    const mediosPagoSucursal = await prisma.$queryRaw`${Prisma.raw(mediosPagoSucursalSQL)}` as any[];
+    const mediosPagoSucursal = await prisma.$queryRaw<Array<{
+      sucursal_id: string;
+      sucursal: string;
+      medioPago: string;
+      transacciones: bigint;
+      monto_total: number;
+      monto_promedio: number;
+    }>>`${mediosPagoSucursalSQL}`;
     
     // Estadísticas generales
     const totalSucursales = ventasPorSucursal.length;
@@ -229,7 +355,7 @@ export async function GET(req: NextRequest) {
       participacion_ingresos: ingresosTotales > 0 ? (Number(sucursal.ingresos) / ingresosTotales * 100).toFixed(1) : '0'
     }));
     
-    return NextResponse.json({
+    const responseData = {
       periodo: { inicio, fin },
       estadisticas,
       ventasPorSucursal: ventasPorSucursal.map(s => ({
@@ -278,10 +404,18 @@ export async function GET(req: NextRequest) {
         monto_total: Number(m.monto_total),
         monto_promedio: Number(m.monto_promedio)
       }))
-    });
+    };
+
+    console.log(`[REPORTES] ✅ Reporte sucursales generado - ${estadisticas.totalSucursales} sucursales, $${estadisticas.ingresosTotales}`);
+    
+    return NextResponse.json(responseData);
 
   } catch (error) {
     console.error('Error en reporte de ventas por sucursal:', error);
-    return NextResponse.json({ error: 'Error al generar reporte' }, { status: 500 });
+    
+    return NextResponse.json({ 
+      error: 'Error al generar reporte',
+      details: error instanceof Error ? error.message : 'Error desconocido'
+    }, { status: 500 });
   }
 }
