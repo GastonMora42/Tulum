@@ -1,4 +1,4 @@
-// src/app/api/reportes/ventas-detallado/route.ts
+// src/app/api/reportes/ventas-detallado/route.ts - VERSIÓN CORREGIDA
 import { NextRequest, NextResponse } from 'next/server';
 import { authMiddleware } from '@/server/api/middlewares/auth';
 import { checkPermission } from '@/server/api/middlewares/authorization';
@@ -27,6 +27,8 @@ export async function GET(req: NextRequest) {
     const inicio = startOfDay(new Date(fechaInicio));
     const fin = endOfDay(new Date(fechaFin));
     
+    console.log(`[REPORTES] Generando reporte ventas detallado: ${fechaInicio} a ${fechaFin}, agrupado por: ${agruparPor}`);
+    
     // Construir filtros
     const whereClause: any = {
       fecha: { gte: inicio, lte: fin }
@@ -36,14 +38,11 @@ export async function GET(req: NextRequest) {
       whereClause.sucursalId = sucursalId;
     }
     
-    // 1. Ventas totales y estadísticas
+    // 1. Ventas totales y estadísticas usando Prisma ORM (más seguro)
     const [
       ventasTotales,
       ventasPorMedioPago,
-      ventasPorUsuario,
-      ventasPorProducto,
-      ventasPorCategoria,
-      ventasPorHora
+      ventasPorUsuario
     ] = await Promise.all([
       // Total general
       prisma.venta.aggregate({
@@ -67,114 +66,193 @@ export async function GET(req: NextRequest) {
         where: whereClause,
         _sum: { total: true },
         _count: true
-      }),
-      
-      // Por producto (top 20)
-      prisma.$queryRaw`
-        SELECT 
-          p.id,
-          p.nombre,
-          SUM(iv.cantidad) as cantidad_vendida,
-          SUM(iv.cantidad * iv."precioUnitario") as total_vendido,
-          COUNT(DISTINCT v.id) as veces_vendido
-        FROM "ItemVenta" iv
-        JOIN "Producto" p ON iv."productoId" = p.id
-        JOIN "Venta" v ON iv."ventaId" = v.id
-        WHERE v.fecha >= ${inicio} AND v.fecha <= ${fin}
-        ${sucursalId ? Prisma.sql`AND v."sucursalId" = ${sucursalId}` : Prisma.empty}
-        GROUP BY p.id, p.nombre
-        ORDER BY total_vendido DESC
-        LIMIT 20
-      `,
-      
-      // Por categoría
-      prisma.$queryRaw`
-        SELECT 
-          c.id,
-          c.nombre,
-          SUM(iv.cantidad) as cantidad_vendida,
-          SUM(iv.cantidad * iv."precioUnitario") as total_vendido
-        FROM "ItemVenta" iv
-        JOIN "Producto" p ON iv."productoId" = p.id
-        JOIN "Categoria" c ON p."categoriaId" = c.id
-        JOIN "Venta" v ON iv."ventaId" = v.id
-        WHERE v.fecha >= ${inicio} AND v.fecha <= ${fin}
-        ${sucursalId ? Prisma.sql`AND v."sucursalId" = ${sucursalId}` : Prisma.empty}
-        GROUP BY c.id, c.nombre
-        ORDER BY total_vendido DESC
-      `,
-      
-      // Por hora del día
-      prisma.$queryRaw`
-        SELECT 
-          EXTRACT(HOUR FROM fecha) as hora,
-          COUNT(*) as cantidad_ventas,
-          SUM(total) as total_vendido
-        FROM "Venta"
-        WHERE fecha >= ${inicio} AND fecha <= ${fin}
-        ${sucursalId ? Prisma.sql`AND "sucursalId" = ${sucursalId}` : Prisma.empty}
-        GROUP BY EXTRACT(HOUR FROM fecha)
-        ORDER BY hora
-      `
+      })
     ]);
-    
-    // 2. Tendencia de ventas por período
-    const ventasPorPeriodo = await prisma.$queryRaw`
+
+    // 2. Top productos - CONSULTA CORREGIDA
+    const ventasPorProducto = await prisma.$queryRaw<Array<{
+      id: string;
+      nombre: string;
+      cantidad_vendida: bigint;
+      total_vendido: number;
+      veces_vendido: bigint;
+    }>>`
       SELECT 
-        DATE_TRUNC(${agruparPor}, fecha) as periodo,
+        p.id,
+        p.nombre,
+        SUM(iv.cantidad) as cantidad_vendida,
+        SUM(iv.cantidad * iv."precioUnitario") as total_vendido,
+        COUNT(DISTINCT v.id) as veces_vendido
+      FROM "ItemVenta" iv
+      JOIN "Producto" p ON iv."productoId" = p.id
+      JOIN "Venta" v ON iv."ventaId" = v.id
+      WHERE v.fecha >= ${inicio} AND v.fecha <= ${fin}
+      ${sucursalId ? Prisma.sql`AND v."sucursalId" = ${sucursalId}` : Prisma.empty}
+      GROUP BY p.id, p.nombre
+      ORDER BY total_vendido DESC
+      LIMIT 20
+    `;
+    
+    // 3. Por categoría - CONSULTA CORREGIDA
+    const ventasPorCategoria = await prisma.$queryRaw<Array<{
+      id: string;
+      nombre: string;
+      cantidad_vendida: bigint;
+      total_vendido: number;
+    }>>`
+      SELECT 
+        c.id,
+        c.nombre,
+        SUM(iv.cantidad) as cantidad_vendida,
+        SUM(iv.cantidad * iv."precioUnitario") as total_vendido
+      FROM "ItemVenta" iv
+      JOIN "Producto" p ON iv."productoId" = p.id
+      JOIN "Categoria" c ON p."categoriaId" = c.id
+      JOIN "Venta" v ON iv."ventaId" = v.id
+      WHERE v.fecha >= ${inicio} AND v.fecha <= ${fin}
+      ${sucursalId ? Prisma.sql`AND v."sucursalId" = ${sucursalId}` : Prisma.empty}
+      GROUP BY c.id, c.nombre
+      ORDER BY total_vendido DESC
+    `;
+    
+    // 4. Por hora del día - CONSULTA CORREGIDA
+    const ventasPorHora = await prisma.$queryRaw<Array<{
+      hora: number;
+      cantidad_ventas: bigint;
+      total_vendido: number;
+    }>>`
+      SELECT 
+        EXTRACT(HOUR FROM fecha) as hora,
         COUNT(*) as cantidad_ventas,
-        SUM(total) as total_vendido,
-        AVG(total) as ticket_promedio
+        SUM(total) as total_vendido
       FROM "Venta"
       WHERE fecha >= ${inicio} AND fecha <= ${fin}
       ${sucursalId ? Prisma.sql`AND "sucursalId" = ${sucursalId}` : Prisma.empty}
-      GROUP BY DATE_TRUNC(${agruparPor}, fecha)
-      ORDER BY periodo
+      GROUP BY EXTRACT(HOUR FROM fecha)
+      ORDER BY hora
     `;
     
-    // 3. Métricas de rendimiento
-    const metricas = {
-      ventasTotales: ventasTotales._sum.total || 0,
-      cantidadVentas: ventasTotales._count,
-      ticketPromedio: ventasTotales._avg.total || 0,
-      descuentosTotales: ventasTotales._sum.descuento || 0,
-      
-      // Día con más ventas
-      mejorDia: await prisma.$queryRaw`
+    // 5. Tendencia de ventas por período - CONSULTA COMPLETAMENTE REESCRITA
+    let ventasPorPeriodo;
+    
+    if (agruparPor === 'dia') {
+      ventasPorPeriodo = await prisma.$queryRaw<Array<{
+        periodo: Date;
+        cantidad_ventas: bigint;
+        total_vendido: number;
+        ticket_promedio: number;
+      }>>`
         SELECT 
-          DATE(fecha) as dia,
-          COUNT(*) as ventas,
-          SUM(total) as total
+          DATE(fecha) as periodo,
+          COUNT(*) as cantidad_ventas,
+          SUM(total) as total_vendido,
+          AVG(total) as ticket_promedio
         FROM "Venta"
         WHERE fecha >= ${inicio} AND fecha <= ${fin}
         ${sucursalId ? Prisma.sql`AND "sucursalId" = ${sucursalId}` : Prisma.empty}
         GROUP BY DATE(fecha)
-        ORDER BY total DESC
-        LIMIT 1
-      `,
-      
-      // Cliente más frecuente
-      clienteFrecuente: await prisma.$queryRaw`
+        ORDER BY periodo
+      `;
+    } else if (agruparPor === 'semana') {
+      ventasPorPeriodo = await prisma.$queryRaw<Array<{
+        periodo: Date;
+        cantidad_ventas: bigint;
+        total_vendido: number;
+        ticket_promedio: number;
+      }>>`
         SELECT 
-          "clienteNombre",
-          COUNT(*) as compras,
-          SUM(total) as total_gastado
+          DATE_TRUNC('week', fecha) as periodo,
+          COUNT(*) as cantidad_ventas,
+          SUM(total) as total_vendido,
+          AVG(total) as ticket_promedio
         FROM "Venta"
         WHERE fecha >= ${inicio} AND fecha <= ${fin}
-        AND "clienteNombre" IS NOT NULL
         ${sucursalId ? Prisma.sql`AND "sucursalId" = ${sucursalId}` : Prisma.empty}
-        GROUP BY "clienteNombre"
-        ORDER BY compras DESC
-        LIMIT 5
-      `
-    };
+        GROUP BY DATE_TRUNC('week', fecha)
+        ORDER BY periodo
+      `;
+    } else if (agruparPor === 'mes') {
+      ventasPorPeriodo = await prisma.$queryRaw<Array<{
+        periodo: Date;
+        cantidad_ventas: bigint;
+        total_vendido: number;
+        ticket_promedio: number;
+      }>>`
+        SELECT 
+          DATE_TRUNC('month', fecha) as periodo,
+          COUNT(*) as cantidad_ventas,
+          SUM(total) as total_vendido,
+          AVG(total) as ticket_promedio
+        FROM "Venta"
+        WHERE fecha >= ${inicio} AND fecha <= ${fin}
+        ${sucursalId ? Prisma.sql`AND "sucursalId" = ${sucursalId}` : Prisma.empty}
+        GROUP BY DATE_TRUNC('month', fecha)
+        ORDER BY periodo
+      `;
+    } else {
+      // Default a día si no es válido
+      ventasPorPeriodo = await prisma.$queryRaw<Array<{
+        periodo: Date;
+        cantidad_ventas: bigint;
+        total_vendido: number;
+        ticket_promedio: number;
+      }>>`
+        SELECT 
+          DATE(fecha) as periodo,
+          COUNT(*) as cantidad_ventas,
+          SUM(total) as total_vendido,
+          AVG(total) as ticket_promedio
+        FROM "Venta"
+        WHERE fecha >= ${inicio} AND fecha <= ${fin}
+        ${sucursalId ? Prisma.sql`AND "sucursalId" = ${sucursalId}` : Prisma.empty}
+        GROUP BY DATE(fecha)
+        ORDER BY periodo
+      `;
+    }
     
-    // 4. Obtener nombres de usuarios para el reporte
+    // 6. Métricas de rendimiento - CONSULTAS SEGURAS
+    const mejorDia = await prisma.$queryRaw<Array<{
+      dia: Date;
+      ventas: bigint;
+      total: number;
+    }>>`
+      SELECT 
+        DATE(fecha) as dia,
+        COUNT(*) as ventas,
+        SUM(total) as total
+      FROM "Venta"
+      WHERE fecha >= ${inicio} AND fecha <= ${fin}
+      ${sucursalId ? Prisma.sql`AND "sucursalId" = ${sucursalId}` : Prisma.empty}
+      GROUP BY DATE(fecha)
+      ORDER BY total DESC
+      LIMIT 1
+    `;
+    
+    const clienteFrecuente = await prisma.$queryRaw<Array<{
+      clienteNombre: string;
+      compras: bigint;
+      total_gastado: number;
+    }>>`
+      SELECT 
+        "clienteNombre",
+        COUNT(*) as compras,
+        SUM(total) as total_gastado
+      FROM "Venta"
+      WHERE fecha >= ${inicio} AND fecha <= ${fin}
+      AND "clienteNombre" IS NOT NULL
+      AND "clienteNombre" != ''
+      ${sucursalId ? Prisma.sql`AND "sucursalId" = ${sucursalId}` : Prisma.empty}
+      GROUP BY "clienteNombre"
+      ORDER BY compras DESC
+      LIMIT 5
+    `;
+    
+    // 7. Obtener nombres de usuarios para el reporte
     const usuarioIds = ventasPorUsuario.map(v => v.usuarioId);
-    const usuarios = await prisma.user.findMany({
+    const usuarios = usuarioIds.length > 0 ? await prisma.user.findMany({
       where: { id: { in: usuarioIds } },
       select: { id: true, name: true, email: true }
-    });
+    }) : [];
     
     const usuariosMap = new Map(usuarios.map(u => [u.id, u]));
     
@@ -183,21 +261,68 @@ export async function GET(req: NextRequest) {
       ...v,
       usuario: usuariosMap.get(v.usuarioId)
     }));
-    
-    return NextResponse.json({
+
+    // 8. Transformar datos para respuesta - CORREGIR TIPOS BIGINT
+    const responseData = {
       periodo: { inicio, fin },
       resumen: {
-        ...metricas,
+        ventasTotales: ventasTotales._sum.total || 0,
+        cantidadVentas: ventasTotales._count,
+        ticketPromedio: ventasTotales._avg.total || 0,
+        descuentosTotales: ventasTotales._sum.descuento || 0,
         mediosPago: ventasPorMedioPago,
         porUsuario: ventasPorUsuarioConNombres,
-        porProducto: ventasPorProducto,
-        porCategoria: ventasPorCategoria,
-        porHora: ventasPorHora
+        porProducto: ventasPorProducto.map(p => ({
+          ...p,
+          cantidad_vendida: Number(p.cantidad_vendida),
+          total_vendido: Number(p.total_vendido),
+          veces_vendido: Number(p.veces_vendido)
+        })),
+        porCategoria: ventasPorCategoria.map(c => ({
+          ...c,
+          cantidad_vendida: Number(c.cantidad_vendida),
+          total_vendido: Number(c.total_vendido)
+        })),
+        porHora: ventasPorHora.map(h => ({
+          ...h,
+          hora: Number(h.hora),
+          cantidad_ventas: Number(h.cantidad_ventas),
+          total_vendido: Number(h.total_vendido)
+        })),
+        mejorDia: mejorDia[0] ? {
+          dia: mejorDia[0].dia,
+          ventas: Number(mejorDia[0].ventas),
+          total: Number(mejorDia[0].total)
+        } : null,
+        clienteFrecuente: clienteFrecuente.map(c => ({
+          ...c,
+          compras: Number(c.compras),
+          total_gastado: Number(c.total_gastado)
+        }))
       },
-      tendencia: ventasPorPeriodo
-    });
+      tendencia: ventasPorPeriodo.map(t => ({
+        ...t,
+        cantidad_ventas: Number(t.cantidad_ventas),
+        total_vendido: Number(t.total_vendido),
+        ticket_promedio: Number(t.ticket_promedio)
+      }))
+    };
+
+    console.log(`[REPORTES] ✅ Reporte generado exitosamente - ${responseData.resumen.cantidadVentas} ventas, $${responseData.resumen.ventasTotales}`);
+    
+    return NextResponse.json(responseData);
   } catch (error) {
     console.error('Error en reporte detallado:', error);
-    return NextResponse.json({ error: 'Error al generar reporte' }, { status: 500 });
+    
+    // Log más detallado del error
+    if (error instanceof Error) {
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
+    }
+    
+    return NextResponse.json({ 
+      error: 'Error al generar reporte',
+      details: error instanceof Error ? error.message : 'Error desconocido'
+    }, { status: 500 });
   }
 }
