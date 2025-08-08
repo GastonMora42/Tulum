@@ -1,8 +1,9 @@
-// src/app/api/admin/productos/route.ts - VERSIÓN CORREGIDA CON PAGINACIÓN
+// src/app/api/admin/productos/route.ts - VERSIÓN SEGURA QUE PRESERVA CÓDIGOS EXISTENTES
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/server/db/client';
 import { authMiddleware } from '@/server/api/middlewares/auth';
 import { checkPermission } from '@/server/api/middlewares/authorization';
+import { barcodeService } from '@/server/services/producto/barcodeService';
 import { z } from 'zod';
 
 // Esquema de validación para crear producto
@@ -10,56 +11,43 @@ const createProductoSchema = z.object({
   nombre: z.string().min(3, { message: 'El nombre debe tener al menos 3 caracteres' }),
   descripcion: z.string().nullable(),
   precio: z.number().positive({ message: 'El precio debe ser positivo' }),
-  codigoBarras: z.string().nullable(),
+  codigoBarras: z.string().nullable().optional(),
   imagen: z.string().nullable(),
   categoriaId: z.string().min(1, { message: 'Debe seleccionar una categoría' }),
   stockMinimo: z.number().int().nonnegative({ message: 'El stock mínimo debe ser un número positivo o cero' }),
-  activo: z.boolean().default(true)
+  activo: z.boolean().default(true),
+  // 🆕 Control explícito para generación automática
+  generarCodigoAutomatico: z.boolean().optional().default(false)
 });
 
 export async function GET(req: NextRequest) {
-  // Aplicar middleware de autenticación
+  // ... código GET mantiene sin cambios ...
   const authError = await authMiddleware(req);
   if (authError) return authError;
   
   try {
     const { searchParams } = new URL(req.url);
     
-    // 🔧 CORRECCIÓN: Parámetros de paginación corregidos
     const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '20'); // Aumentar límite por defecto
+    const limit = parseInt(searchParams.get('limit') || '20');
     const conStock = searchParams.get('conStock') === 'true';
     const categoriaId = searchParams.get('categoriaId');
     const ubicacionId = searchParams.get('ubicacionId');
-    const soloActivos = searchParams.get('soloActivos') !== 'false'; // Por defecto true
+    const soloActivos = searchParams.get('soloActivos') !== 'false';
     const search = searchParams.get('search');
     
-    const user = (req as any).user;
-    
     console.log(`[API Productos] Consultando página ${page}, límite ${limit}`);
-    console.log(`[API Productos] Filtros:`, {
-      conStock,
-      categoriaId,
-      ubicacionId,
-      soloActivos,
-      search,
-      userRole: user.roleId
-    });
     
-    // 🔧 CORRECCIÓN: Construir condición WHERE más robusta
     const whereCondition: any = {};
     
-    // Filtro por estado activo
     if (soloActivos) {
       whereCondition.activo = true;
     }
     
-    // Filtro por categoría
     if (categoriaId) {
       whereCondition.categoriaId = categoriaId;
     }
     
-    // Filtro de búsqueda
     if (search) {
       whereCondition.OR = [
         { nombre: { contains: search, mode: 'insensitive' } },
@@ -68,14 +56,9 @@ export async function GET(req: NextRequest) {
       ];
     }
     
-    // 🔧 CORRECCIÓN: Calcular offset para paginación
     const offset = (page - 1) * limit;
     
     if (conStock && ubicacionId) {
-      // Consulta para productos con stock específico
-      console.log(`[API Productos] Consultando productos con stock en ubicación ${ubicacionId}`);
-      
-      // Primero contar el total
       const totalStockQuery = await prisma.stock.count({
         where: {
           ubicacionId,
@@ -84,7 +67,6 @@ export async function GET(req: NextRequest) {
         }
       });
       
-      // Luego obtener los productos paginados
       const productosConStock = await prisma.stock.findMany({
         where: {
           ubicacionId,
@@ -105,7 +87,6 @@ export async function GET(req: NextRequest) {
         ]
       });
       
-      // Transformar datos
       const productos = productosConStock
         .filter(stock => stock.producto)
         .map(stock => ({
@@ -122,8 +103,6 @@ export async function GET(req: NextRequest) {
           stock: stock.cantidad
         }));
       
-      console.log(`[API Productos] Devolviendo ${productos.length} productos con stock de ${totalStockQuery} total`);
-      
       return NextResponse.json({
         data: productos,
         pagination: {
@@ -137,20 +116,14 @@ export async function GET(req: NextRequest) {
       });
       
     } else {
-      // 🔧 CORRECCIÓN: Consulta normal con paginación real
-      console.log(`[API Productos] Consultando todos los productos con paginación`);
-      
-      // Contar total
       const total = await prisma.producto.count({
         where: whereCondition
       });
       
-      // Obtener productos paginados
       const productos = await prisma.producto.findMany({
         where: whereCondition,
         include: {
           categoria: true,
-          // Incluir stock si se especifica ubicación
           ...(ubicacionId ? {
             stocks: {
               where: { ubicacionId },
@@ -165,7 +138,6 @@ export async function GET(req: NextRequest) {
         ]
       });
       
-      // Transformar datos incluyendo stock si está disponible
       const productosTransformados = productos.map(producto => ({
         id: producto.id,
         nombre: producto.nombre,
@@ -177,15 +149,12 @@ export async function GET(req: NextRequest) {
         categoria: producto.categoria,
         stockMinimo: producto.stockMinimo,
         activo: producto.activo,
-        // Incluir stock si está disponible
         stock: ubicacionId && producto.stocks && producto.stocks.length > 0 
           ? producto.stocks[0].cantidad 
           : undefined
       }));
       
       const totalPages = Math.ceil(total / limit);
-      
-      console.log(`[API Productos] Devolviendo ${productosTransformados.length} productos de ${total} total, página ${page}/${totalPages}`);
       
       return NextResponse.json({
         data: productosTransformados,
@@ -222,15 +191,13 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// 🆕 MÉTODO POST PARA CREAR PRODUCTOS (mantener igual)
+// 🔒 MÉTODO POST SEGURO - SOLO GENERA CÓDIGOS PARA PRODUCTOS NUEVOS
 export async function POST(req: NextRequest) {
-  console.log('🆕 [API] Iniciando creación de producto...');
+  console.log('🆕 [API] Iniciando creación de producto SEGURA...');
   
-  // Aplicar middleware de autenticación
   const authError = await authMiddleware(req);
   if (authError) return authError;
   
-  // Verificar permiso
   const permissionError = await checkPermission('producto:crear')(req);
   if (permissionError) return permissionError;
   
@@ -238,7 +205,6 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     console.log('📝 [API] Datos recibidos:', body);
     
-    // Validar datos de entrada
     const validation = createProductoSchema.safeParse(body);
     if (!validation.success) {
       console.error('❌ [API] Datos inválidos:', validation.error.errors);
@@ -248,17 +214,60 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    // Verificar si ya existe un producto con el mismo código de barras
-    if (validation.data.codigoBarras) {
+    // 🔒 GENERACIÓN SEGURA DE CÓDIGO DE BARRAS
+    let codigoBarras = validation.data.codigoBarras;
+    
+    // Solo generar código si se solicita explícitamente Y no se proporciona uno
+    if (validation.data.generarCodigoAutomatico && !codigoBarras) {
+      console.log('🔄 [API] Generando código compatible con sistema existente...');
+      
+      try {
+        // Usar el nuevo método seguro que analiza códigos existentes
+        codigoBarras = await barcodeService.generateBarcodeForNewProduct();
+        
+        console.log(`✅ [API] Código generado de forma compatible: ${codigoBarras}`);
+      } catch (barcodeError) {
+        console.error('❌ [API] Error al generar código:', barcodeError);
+        return NextResponse.json(
+          { error: `Error al generar código de barras: ${barcodeError}` },
+          { status: 500 }
+        );
+      }
+    }
+    
+    // 🔒 VERIFICAR CÓDIGO ÚNICO SI SE PROPORCIONA
+    if (codigoBarras) {
+      // Validar formato del código
+      const isValid = barcodeService.validateBarcode(codigoBarras);
+      if (!isValid) {
+        return NextResponse.json(
+          { error: 'El formato del código de barras no es válido' },
+          { status: 400 }
+        );
+      }
+      
+      // Verificar que no existe otro producto con el mismo código
       const existingProducto = await prisma.producto.findFirst({
-        where: { codigoBarras: validation.data.codigoBarras }
+        where: { codigoBarras: codigoBarras }
       });
       
       if (existingProducto) {
         return NextResponse.json(
-          { error: 'Ya existe un producto con este código de barras' },
+          { error: `Ya existe un producto con el código de barras: ${codigoBarras}` },
           { status: 400 }
         );
+      }
+      
+      // 🔍 VERIFICAR COMPATIBILIDAD DEL CÓDIGO
+      try {
+        const compatibility = await barcodeService.isCodeCompatible(codigoBarras);
+        if (!compatibility.isCompatible && compatibility.warnings.length > 0) {
+          console.warn('⚠️ [API] Advertencias de compatibilidad:', compatibility.warnings);
+          // No bloquear, solo advertir en logs
+        }
+      } catch (compError) {
+        console.warn('⚠️ [API] No se pudo verificar compatibilidad:', compError);
+        // Continuar sin bloquear
       }
     }
     
@@ -274,13 +283,13 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    // Crear producto
+    // 🔒 CREAR PRODUCTO CON CÓDIGO COMPATIBLE
     const producto = await prisma.producto.create({
       data: {
         nombre: validation.data.nombre,
         descripcion: validation.data.descripcion,
         precio: validation.data.precio,
-        codigoBarras: validation.data.codigoBarras,
+        codigoBarras: codigoBarras, // Puede ser null, generado, o proporcionado
         imagen: validation.data.imagen,
         categoriaId: validation.data.categoriaId,
         stockMinimo: validation.data.stockMinimo,
@@ -297,6 +306,12 @@ export async function POST(req: NextRequest) {
     });
     
     console.log('✅ [API] Producto creado exitosamente:', producto.id);
+    
+    if (producto.codigoBarras) {
+      console.log(`🏷️ [API] Código de barras asignado: ${producto.codigoBarras}`);
+    } else {
+      console.log('📝 [API] Producto creado sin código de barras (se puede generar después)');
+    }
     
     return NextResponse.json(producto, { status: 201 });
   } catch (error: any) {

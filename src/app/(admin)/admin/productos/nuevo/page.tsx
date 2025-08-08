@@ -1,9 +1,9 @@
-// src/app/(admin)/admin/productos/nuevo/page.tsx - VERSIÓN CORREGIDA
+// src/app/(admin)/admin/productos/nuevo/page.tsx - VERSIÓN SEGURA CON COMPATIBILIDAD
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, Package, Save, Loader2, Upload } from 'lucide-react';
+import { ChevronLeft, Package, Save, Loader2, Upload, Zap, Info, Shield, AlertTriangle } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -17,6 +17,22 @@ import { BarcodeGenerator } from '@/components/productos/BardcodeGenerator';
 interface Categoria {
   id: string;
   nombre: string;
+}
+
+interface CompatibilityInfo {
+  systemAnalysis: {
+    totalCodes: number;
+    recommendedFormat: 'NUMERIC' | 'ALPHANUMERIC' | 'MIXED';
+    averageLength: number;
+    commonPrefixes: string[];
+  };
+  recommendations: string[];
+  supportedFormats: string[];
+  statistics: {
+    totalProducts: number;
+    productsWithBarcode: number;
+    productsWithoutBarcode: number;
+  };
 }
 
 // Esquema de validación
@@ -38,6 +54,18 @@ export default function NuevoProductoPage() {
   const [isFetchingCategorias, setIsFetchingCategorias] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  
+  // 🔒 Estados para compatibilidad y seguridad
+  const [isGeneratingBarcode, setIsGeneratingBarcode] = useState(false);
+  const [barcodeGenerated, setBarcodeGenerated] = useState(false);
+  const [compatibilityInfo, setCompatibilityInfo] = useState<CompatibilityInfo | null>(null);
+  const [showCompatibilityInfo, setShowCompatibilityInfo] = useState(false);
+  const [codeCompatibility, setCodeCompatibility] = useState<{
+    isCompatible: boolean;
+    format: string;
+    warnings: string[];
+  } | null>(null);
+  
   const router = useRouter();
 
   const { 
@@ -45,7 +73,9 @@ export default function NuevoProductoPage() {
     handleSubmit, 
     formState: { errors },
     reset,
-    watch
+    watch,
+    setValue,
+    getValues
   } = useForm<ProductoFormData>({
     resolver: zodResolver(productoSchema),
     defaultValues: {
@@ -59,9 +89,87 @@ export default function NuevoProductoPage() {
     }
   });
 
-  // Watch para el código de barras para mostrar preview
   const codigoBarras = watch('codigoBarras');
   const nombre = watch('nombre');
+
+  // 🔍 CARGAR INFORMACIÓN DE COMPATIBILIDAD AL INICIO
+  useEffect(() => {
+    const loadCompatibilityInfo = async () => {
+      try {
+        const response = await authenticatedFetch('/api/admin/productos/generate-barcode');
+        if (response.ok) {
+          const data = await response.json();
+          setCompatibilityInfo(data);
+          console.log('🔍 Información de compatibilidad cargada:', data);
+        }
+      } catch (error) {
+        console.warn('⚠️ No se pudo cargar información de compatibilidad:', error);
+      }
+    };
+
+    loadCompatibilityInfo();
+  }, []);
+
+  // 🆕 FUNCIÓN SEGURA PARA GENERAR CÓDIGO DE BARRAS
+  const generarCodigoBarras = async () => {
+    try {
+      setIsGeneratingBarcode(true);
+      setError(null);
+      
+      const nombreProducto = getValues('nombre');
+      
+      if (!nombreProducto || nombreProducto.trim().length < 3) {
+        setError('Ingresa un nombre de producto antes de generar el código');
+        return;
+      }
+      
+      console.log('🔄 Generando código compatible para:', nombreProducto);
+      
+      const response = await authenticatedFetch('/api/admin/productos/generate-barcode', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          productName: nombreProducto,
+          forceFormat: null // Usar formato recomendado automáticamente
+        })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Error del servidor' }));
+        throw new Error(errorData.error || 'Error al generar código de barras');
+      }
+      
+      const data = await response.json();
+      console.log('✅ Código generado:', data);
+      
+      // Establecer el código en el formulario
+      setValue('codigoBarras', data.codigoBarras);
+      setBarcodeGenerated(true);
+      setCodeCompatibility(data.compatibility);
+      
+      // Mostrar información de compatibilidad
+      let message = `Código generado: ${data.codigoBarras}\n`;
+      message += `Formato: ${data.compatibility.format}\n`;
+      
+      if (data.compatibility.warnings && data.compatibility.warnings.length > 0) {
+        message += `\nAdvertencias:\n${data.compatibility.warnings.join('\n')}`;
+      }
+      
+      if (data.systemInfo?.recommendedFormat) {
+        message += `\nFormato del sistema: ${data.systemInfo.recommendedFormat}`;
+      }
+      
+      alert(message);
+      
+    } catch (err: any) {
+      console.error('❌ Error al generar código:', err);
+      setError(err.message || 'Error al generar código de barras');
+    } finally {
+      setIsGeneratingBarcode(false);
+    }
+  };
 
   // Cargar categorías
   useEffect(() => {
@@ -99,21 +207,22 @@ export default function NuevoProductoPage() {
       setIsLoading(true);
       setError(null);
       
-      // 🔧 CORREGIR: Preparar datos correctamente
+      // 🔒 PREPARAR DATOS DE FORMA SEGURA
       const productoData = {
         nombre: data.nombre,
         descripcion: data.descripcion || null,
         precio: Number(data.precio),
-        codigoBarras: data.codigoBarras || null,
+        codigoBarras: data.codigoBarras || null, // Puede ser null
         categoriaId: data.categoriaId,
         stockMinimo: Number(data.stockMinimo),
         activo: data.activo,
-        imagen: imageUrl || null
+        imagen: imageUrl || null,
+        // 🔒 SOLO generar automáticamente si NO hay código Y se generó con el botón
+        generarCodigoAutomatico: barcodeGenerated && !!data.codigoBarras
       };
       
       console.log('💾 Enviando datos para nuevo producto:', productoData);
       
-      // 🔧 CORREGIR: Añadir headers explícitamente
       const response = await authenticatedFetch('/api/admin/productos', {
         method: 'POST',
         headers: {
@@ -132,7 +241,6 @@ export default function NuevoProductoPage() {
           errorMessage = errorData.error || errorMessage;
           console.error('❌ Error del servidor:', errorData);
         } catch (parseError) {
-          // Si no se puede parsear el JSON, obtener el texto
           const errorText = await response.text();
           console.error('❌ Respuesta no JSON:', errorText);
           errorMessage = `Error ${response.status}: Respuesta inválida del servidor`;
@@ -145,7 +253,12 @@ export default function NuevoProductoPage() {
       console.log('✅ Producto creado exitosamente:', nuevoProducto);
       
       // Mostrar mensaje de éxito
-      alert('Producto creado correctamente');
+      let successMessage = 'Producto creado correctamente';
+      if (nuevoProducto.codigoBarras) {
+        successMessage += `\nCódigo de barras: ${nuevoProducto.codigoBarras}`;
+      }
+      
+      alert(successMessage);
       
       // Redireccionar a la lista de productos
       router.push('/admin/productos');
@@ -165,15 +278,68 @@ export default function NuevoProductoPage() {
             <Package className="h-6 w-6 text-indigo-600 mr-2" />
             <h1 className="text-2xl font-bold text-black">Nuevo Producto</h1>
           </div>
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-black bg-white hover:bg-gray-50"
-          >
-            <ChevronLeft className="h-4 w-4 mr-1" />
-            Volver
-          </button>
+          <div className="flex items-center gap-2">
+            {/* 🔍 BOTÓN DE INFORMACIÓN DE COMPATIBILIDAD */}
+            {compatibilityInfo && (
+              <button
+                type="button"
+                onClick={() => setShowCompatibilityInfo(!showCompatibilityInfo)}
+                className="inline-flex items-center px-3 py-2 border border-blue-300 shadow-sm text-sm leading-4 font-medium rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100"
+              >
+                <Info className="h-4 w-4 mr-1" />
+                Sistema
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => router.back()}
+              className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-black bg-white hover:bg-gray-50"
+            >
+              <ChevronLeft className="h-4 w-4 mr-1" />
+              Volver
+            </button>
+          </div>
         </div>
+
+        {/* 🔍 PANEL DE INFORMACIÓN DE COMPATIBILIDAD */}
+        {showCompatibilityInfo && compatibilityInfo && (
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex items-start">
+              <Shield className="h-5 w-5 text-blue-500 mt-0.5 mr-2 flex-shrink-0" />
+              <div className="flex-1">
+                <h3 className="text-sm font-medium text-blue-800 mb-2">
+                  Información de Compatibilidad del Sistema
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <p className="text-blue-700">
+                      <strong>Productos totales:</strong> {compatibilityInfo.statistics.totalProducts}
+                    </p>
+                    <p className="text-blue-700">
+                      <strong>Con código de barras:</strong> {compatibilityInfo.statistics.productsWithBarcode}
+                    </p>
+                    <p className="text-blue-700">
+                      <strong>Formato recomendado:</strong> {compatibilityInfo.systemAnalysis.recommendedFormat}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-blue-700">
+                      <strong>Formatos soportados:</strong> {compatibilityInfo.supportedFormats.join(', ')}
+                    </p>
+                    <p className="text-blue-700">
+                      <strong>Longitud promedio:</strong> {compatibilityInfo.systemAnalysis.averageLength} caracteres
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-2">
+                  <p className="text-xs text-blue-600">
+                    💡 Los códigos se generan automáticamente en formato compatible con tu sistema
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="bg-white shadow overflow-hidden sm:rounded-lg p-6">
           {error && (
@@ -276,16 +442,71 @@ export default function NuevoProductoPage() {
                   )}
                 </div>
 
-                <div>
+                {/* 🔒 SECCIÓN DE CÓDIGO DE BARRAS SEGURA */}
+                <div className="md:col-span-2">
                   <label htmlFor="codigoBarras" className="block text-sm font-medium text-gray-700 mb-1">
                     Código de Barras
+                    {compatibilityInfo && (
+                      <span className="ml-2 text-xs text-gray-500">
+                        (Formato recomendado: {compatibilityInfo.systemAnalysis.recommendedFormat})
+                      </span>
+                    )}
                   </label>
-                  <input
-                    id="codigoBarras"
-                    type="text"
-                    {...register('codigoBarras')}
-                    className="block w-full py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      id="codigoBarras"
+                      type="text"
+                      {...register('codigoBarras')}
+                      placeholder="Código personalizado o genera automáticamente"
+                      className="flex-1 py-2 px-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={generarCodigoBarras}
+                      disabled={isGeneratingBarcode}
+                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isGeneratingBarcode ? (
+                        <>
+                          <Loader2 className="animate-spin h-4 w-4 mr-2" /> 
+                          Generando...
+                        </>
+                      ) : (
+                        <>
+                          <Zap className="h-4 w-4 mr-2" />
+                          Generar Compatible
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  
+                  {/* 🔍 INFORMACIÓN DE COMPATIBILIDAD DEL CÓDIGO */}
+                  {barcodeGenerated && codeCompatibility && (
+                    <div className="mt-2">
+                      {codeCompatibility.isCompatible ? (
+                        <p className="text-sm text-green-600 flex items-center">
+                          <Shield className="h-4 w-4 mr-1" />
+                          ✅ Código compatible ({codeCompatibility.format})
+                        </p>
+                      ) : (
+                        <div className="text-sm text-orange-600">
+                          <p className="flex items-center">
+                            <AlertTriangle className="h-4 w-4 mr-1" />
+                            ⚠️ Código generado con advertencias:
+                          </p>
+                          <ul className="mt-1 ml-5 list-disc">
+                            {codeCompatibility.warnings.map((warning, index) => (
+                              <li key={index} className="text-xs">{warning}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  <div className="mt-1 text-xs text-gray-500">
+                    💡 Los códigos se generan automáticamente en formato compatible con lectores estándar
+                  </div>
                 </div>
 
                 <div>
@@ -320,14 +541,16 @@ export default function NuevoProductoPage() {
                 />
               </div>
 
-              {/* 🆕 Preview del código de barras si existe */}
+              {/* 🔍 Preview del código de barras mejorado */}
               {codigoBarras && codigoBarras.trim() && (
-                <div className="mt-4 pt-4 border-t">
-                  <h3 className="text-lg font-medium">Vista Previa del Código de Barras</h3>
-                  <BarcodeGenerator 
-                    value={codigoBarras.trim()} 
-                    productName={nombre || 'Nuevo Producto'} 
-                  />
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <h3 className="text-lg font-medium text-gray-900 mb-3">Vista Previa del Código de Barras</h3>
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <BarcodeGenerator 
+                      value={codigoBarras.trim()} 
+                      productName={nombre || 'Nuevo Producto'} 
+                    />
+                  </div>
                 </div>
               )}
 
@@ -343,20 +566,20 @@ export default function NuevoProductoPage() {
                 </label>
               </div>
 
-              <div className="flex justify-end pt-4">
+              <div className="flex justify-end pt-4 border-t border-gray-200">
                   <button
                     type="submit"
                     disabled={isLoading}
-                    className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isLoading ? (
                       <>
-                        <Loader2 className="animate-spin h-4 w-4 mr-2" /> 
+                        <Loader2 className="animate-spin h-5 w-5 mr-2" /> 
                         Creando producto...
                       </>
                     ) : (
                       <>
-                        <Save className="h-4 w-4 mr-2" />
+                        <Save className="h-5 w-5 mr-2" />
                         Guardar producto
                       </>
                     )}

@@ -1,3 +1,4 @@
+// src/app/(admin)/admin/productos/imprimir-codigos/page.tsx - FILTRO DE CATEGORÍAS CORREGIDO
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -34,9 +35,15 @@ interface Producto {
   activo?: boolean;
 }
 
+// 🔧 INTERFAZ CORREGIDA PARA CATEGORÍAS
+interface Categoria {
+  id: string;
+  nombre: string;
+}
+
 interface FilterState {
   searchTerm: string;
-  selectedCategory: string;
+  selectedCategory: string; // 🔧 CORRECCIÓN: Ahora almacena el ID, no el nombre
   activeOnly: boolean;
 }
 
@@ -57,7 +64,8 @@ export default function ImprimirCodigosPage() {
 
   // --- Estados para filtros simplificados ---
   const [filters, setFilters] = useState<FilterState>(INITIAL_FILTERS);
-  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
+  // 🔧 CORRECCIÓN: Cambiar a array de objetos Categoria
+  const [availableCategories, setAvailableCategories] = useState<Categoria[]>([]);
 
   // --- Estados para paginación ---
   const [currentPage, setCurrentPage] = useState(1);
@@ -68,18 +76,31 @@ export default function ImprimirCodigosPage() {
   // --- Estados para UI ---
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
-  // --- Función para cargar categorías ---
+  // 🔧 FUNCIÓN CORREGIDA PARA CARGAR CATEGORÍAS
   const fetchCategorias = useCallback(async () => {
     try {
+      console.log('🏷️ Cargando categorías para filtro...');
+      
       const response = await authenticatedFetch('/api/admin/categorias');
       if (response.ok) {
         const data = await response.json();
+        console.log('📊 Categorías recibidas:', data);
+        
         if (Array.isArray(data)) {
-          setAvailableCategories(['', ...data.map(cat => cat.nombre || cat.id)]);
+          // 🔧 CORRECCIÓN: Almacenar objetos completos de categoría
+          setAvailableCategories(data);
+          console.log(`✅ ${data.length} categorías cargadas correctamente`);
+        } else {
+          console.warn('⚠️ Formato de categorías inesperado:', data);
+          setAvailableCategories([]);
         }
+      } else {
+        console.error('❌ Error al cargar categorías:', response.status);
+        setAvailableCategories([]);
       }
     } catch (error) {
-      console.error('Error al cargar categorías:', error);
+      console.error('❌ Error al cargar categorías:', error);
+      setAvailableCategories([]);
     }
   }, []);
 
@@ -87,6 +108,7 @@ export default function ImprimirCodigosPage() {
   useEffect(() => {
     fetchCategorias();
   }, [fetchCategorias]);
+
   const fetchProductos = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -103,8 +125,10 @@ export default function ImprimirCodigosPage() {
         queryParams.append('search', filters.searchTerm.trim());
       }
 
+      // 🔧 CORRECCIÓN: Usar el ID de categoría seleccionada
       if (filters.selectedCategory) {
         queryParams.append('categoriaId', filters.selectedCategory);
+        console.log(`🏷️ Filtrando por categoría ID: ${filters.selectedCategory}`);
       }
 
       if (filters.activeOnly) {
@@ -168,6 +192,7 @@ export default function ImprimirCodigosPage() {
   };
 
   const updateFilter = (key: keyof FilterState, value: any) => {
+    console.log(`🔄 Actualizando filtro ${key}:`, value);
     setFilters(prev => ({ ...prev, [key]: value }));
     setCurrentPage(1);
   };
@@ -307,7 +332,7 @@ export default function ImprimirCodigosPage() {
           </button>
         </div>
 
-        {/* Panel de Filtros Simplificado */}
+        {/* 🔧 PANEL DE FILTROS CORREGIDO */}
         <div className="bg-white rounded-lg shadow-sm border p-4">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-4">
@@ -322,14 +347,21 @@ export default function ImprimirCodigosPage() {
                 />
               </div>
 
+              {/* 🔧 SELECT DE CATEGORÍAS CORREGIDO */}
               <select
                 value={filters.selectedCategory}
-                onChange={(e) => updateFilter('selectedCategory', e.target.value)}
+                onChange={(e) => {
+                  const selectedValue = e.target.value;
+                  console.log('🏷️ Categoría seleccionada:', selectedValue);
+                  updateFilter('selectedCategory', selectedValue);
+                }}
                 className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
               >
                 <option value="">Todas las categorías</option>
-                {availableCategories.map(cat => (
-                  cat && <option key={cat} value={cat}>{cat}</option>
+                {availableCategories.map(categoria => (
+                  <option key={categoria.id} value={categoria.id}>
+                    {categoria.nombre}
+                  </option>
                 ))}
               </select>
 
@@ -369,6 +401,45 @@ export default function ImprimirCodigosPage() {
               </button>
             </div>
           </div>
+
+          {/* 🆕 MOSTRAR FILTROS ACTIVOS */}
+          {(filters.searchTerm || filters.selectedCategory || !filters.activeOnly) && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {filters.searchTerm && (
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  Búsqueda: "{filters.searchTerm}"
+                  <button 
+                    onClick={() => updateFilter('searchTerm', '')}
+                    className="ml-1 text-blue-600 hover:text-blue-800"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )}
+              {filters.selectedCategory && (
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                  Categoría: {availableCategories.find(c => c.id === filters.selectedCategory)?.nombre}
+                  <button 
+                    onClick={() => updateFilter('selectedCategory', '')}
+                    className="ml-1 text-green-600 hover:text-green-800"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )}
+              {!filters.activeOnly && (
+                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                  Incluyendo inactivos
+                  <button 
+                    onClick={() => updateFilter('activeOnly', true)}
+                    className="ml-1 text-gray-600 hover:text-gray-800"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Error Display */}
@@ -397,6 +468,12 @@ export default function ImprimirCodigosPage() {
                   <p className="text-sm text-gray-500">
                     {totalProducts} productos encontrados • Página {currentPage} de {totalPages}
                   </p>
+                  {/* 🆕 Mostrar información de filtros aplicados */}
+                  {filters.selectedCategory && (
+                    <p className="text-xs text-indigo-600">
+                      📂 Filtrando por: {availableCategories.find(c => c.id === filters.selectedCategory)?.nombre}
+                    </p>
+                  )}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button
