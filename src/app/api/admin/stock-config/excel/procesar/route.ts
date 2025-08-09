@@ -1,12 +1,18 @@
-// src/app/api/admin/stock-config/excel/procesar-async/route.ts
+// src/app/api/admin/stock-config/excel/procesar/route.ts - SIN TRANSACCIONES COMPLEJAS
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/server/db/client';
 import { authMiddleware } from '@/server/api/middlewares/auth';
 import { checkPermission } from '@/server/api/middlewares/authorization';
 import * as XLSX from 'xlsx';
 
-// 🚀 PROCESAMIENTO ASÍNCRONO PARA ARCHIVOS GRANDES
+// ⚡ CONFIGURACIÓN SIMPLE Y EFECTIVA
+const MAX_PROCESSING_TIME = 18000; // 18 segundos
+const SIMPLE_BATCH_SIZE = 5; // Lotes muy pequeños
+const MAX_ROWS = 500;
+
 export async function POST(req: NextRequest) {
+  const startTime = Date.now();
+  
   const authError = await authMiddleware(req);
   if (authError) return authError;
 
@@ -28,75 +34,47 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    console.log(`[EXCEL-ASYNC] 🚀 Iniciando procesamiento asíncrono: ${file.name}`);
+    console.log(`[EXCEL-SIMPLE] ⚡ Iniciando procesamiento simple: ${file.name}`);
 
-    // Validar archivo rápidamente
+    // ✅ VALIDACIONES BÁSICAS
+    if (file.size > 3 * 1024 * 1024) {
+      return NextResponse.json(
+        { error: 'Archivo demasiado grande (máximo 3MB)' },
+        { status: 400 }
+      );
+    }
+
+    const sucursal = await prisma.ubicacion.findUnique({
+      where: { id: sucursalId }
+    });
+
+    if (!sucursal) {
+      return NextResponse.json(
+        { error: 'Sucursal no encontrada' },
+        { status: 404 }
+      );
+    }
+
+    // ✅ PROCESAR EXCEL
     const buffer = Buffer.from(await file.arrayBuffer());
     const workbook = XLSX.read(buffer, { type: 'buffer' });
     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
     const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
-    
-    const dataRows = jsonData.slice(1).filter(row => row && row.length > 0);
 
-    // ✅ CREAR REGISTRO INMEDIATAMENTE
-    const cargaMasiva = await prisma.cargaMasivaStock.create({
-      data: {
-        nombre: `Carga Async: ${file.name}`,
-        descripcion: `Procesamiento asíncrono de ${dataRows.length} items`,
-        sucursalId,
-        usuarioId: user.id,
-        totalItems: dataRows.length,
-        estado: 'en_cola', // Estado especial para async
-        archivoNombre: file.name
-      }
-    });
+    if (jsonData.length < 2) {
+      return NextResponse.json(
+        { error: 'El archivo no contiene datos' },
+        { status: 400 }
+      );
+    }
 
-    // ✅ RESPUESTA INMEDIATA CON ID DE SEGUIMIENTO
-    const response = NextResponse.json({
-      success: true,
-      mensaje: `Archivo en cola de procesamiento`,
-      cargaId: cargaMasiva.id,
-      totalItems: dataRows.length,
-      estimatedTime: Math.ceil(dataRows.length / 10), // Estimación en segundos
-      pollUrl: `/api/admin/stock-config/excel/status/${cargaMasiva.id}`
-    });
+    if (jsonData.length > MAX_ROWS) {
+      return NextResponse.json(
+        { error: `Máximo ${MAX_ROWS} filas permitidas` },
+        { status: 400 }
+      );
+    }
 
-    // 🔥 PROCESAR EN BACKGROUND (NO AWAIT)
-    procesarEnBackground(cargaMasiva.id, buffer, sucursalId, modo, user.id);
-
-    return response;
-
-  } catch (error) {
-    console.error('[EXCEL-ASYNC] ❌ Error:', error);
-    return NextResponse.json(
-      { error: 'Error al procesar archivo' },
-      { status: 500 }
-    );
-  }
-}
-
-// 🔥 FUNCIÓN DE PROCESAMIENTO EN BACKGROUND
-async function procesarEnBackground(
-  cargaId: string,
-  buffer: Buffer,
-  sucursalId: string,
-  modo: string,
-  usuarioId: string
-) {
-  try {
-    console.log(`[EXCEL-BG] 🔄 Iniciando procesamiento background para carga ${cargaId}`);
-
-    // Actualizar estado
-    await prisma.cargaMasivaStock.update({
-      where: { id: cargaId },
-      data: { estado: 'procesando' }
-    });
-
-    // Procesar archivo
-    const workbook = XLSX.read(buffer, { type: 'buffer' });
-    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-    const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as any[][];
-    
     const headers = jsonData[0] as string[];
     const dataRows = jsonData.slice(1).filter(row => row && row.length > 0);
 
@@ -105,245 +83,378 @@ async function procesarEnBackground(
       nuevoStock: headers.findIndex(h => h && h.toString().trim() === 'Nuevo Stock')
     };
 
-    // Preparar items válidos
-    const itemsValidos = [];
-    for (let i = 0; i < dataRows.length; i++) {
-      const row = dataRows[i];
-      const productoId = row[columnIndices.id]?.toString().trim();
-      const nuevoStockStr = row[columnIndices.nuevoStock]?.toString().trim();
+    if (columnIndices.id === -1 || columnIndices.nuevoStock === -1) {
+      return NextResponse.json(
+        { error: 'Faltan columnas: ID, Nuevo Stock' },
+        { status: 400 }
+      );
+    }
+
+    console.log(`[EXCEL-SIMPLE] 📊 Procesando ${dataRows.length} filas`);
+
+    // ✅ CREAR REGISTRO DE CARGA
+    const cargaMasiva = await prisma.cargaMasivaStock.create({
+      data: {
+        nombre: `Carga Simple: ${file.name}`,
+        descripcion: `Procesamiento sin transacciones complejas`,
+        sucursalId,
+        usuarioId: user.id,
+        totalItems: dataRows.length,
+        estado: 'procesando',
+        archivoNombre: file.name
+      }
+    });
+
+    console.log(`[EXCEL-SIMPLE] 📝 Carga creada: ${cargaMasiva.id}`);
+
+    // ✅ 🚀 PROCESAMIENTO SIMPLE - SIN TRANSACCIONES COMPLEJAS
+    let itemsProcesados = 0;
+    let itemsErrores = 0;
+    const resultados = [];
+
+    // Dividir en lotes pequeños
+    const batches = [];
+    for (let i = 0; i < dataRows.length; i += SIMPLE_BATCH_SIZE) {
+      batches.push(dataRows.slice(i, i + SIMPLE_BATCH_SIZE));
+    }
+
+    console.log(`[EXCEL-SIMPLE] 🔀 Procesando ${batches.length} lotes de ${SIMPLE_BATCH_SIZE} items`);
+
+    // Procesar cada lote
+    for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+      const batch = batches[batchIndex];
       
-      if (productoId && nuevoStockStr) {
-        const nuevoStock = parseFloat(nuevoStockStr);
-        if (!isNaN(nuevoStock) && nuevoStock >= 0) {
-          itemsValidos.push({
-            fila: i + 2,
-            productoId,
-            nuevoStock
+      // ⏱️ CONTROL DE TIEMPO
+      if (Date.now() - startTime > MAX_PROCESSING_TIME) {
+        console.log(`[EXCEL-SIMPLE] ⏰ Timeout alcanzado en lote ${batchIndex + 1}`);
+        break;
+      }
+
+      console.log(`[EXCEL-SIMPLE] 🔄 Procesando lote ${batchIndex + 1}/${batches.length}`);
+
+      // 🎯 PROCESAR CADA ITEM DEL LOTE INDIVIDUALMENTE
+      for (let itemIndex = 0; itemIndex < batch.length; itemIndex++) {
+        const row = batch[itemIndex];
+        const globalIndex = batchIndex * SIMPLE_BATCH_SIZE + itemIndex;
+        const filaNumero = globalIndex + 2;
+
+        try {
+          const resultado = await procesarItemSimple(
+            row,
+            filaNumero,
+            columnIndices,
+            sucursalId,
+            modo,
+            user.id,
+            cargaMasiva.id,
+            file.name
+          );
+
+          if (resultado.success) {
+            itemsProcesados++;
+            resultados.push({
+              fila: filaNumero,
+              producto: resultado.data.producto,
+              stockAnterior: resultado.data.stockAnterior,
+              stockNuevo: resultado.data.stockFinal,
+              diferencia: resultado.data.diferencia,
+              estado: 'procesado'
+            });
+
+            if (itemsProcesados % 10 === 0) {
+              console.log(`[EXCEL-SIMPLE] ✅ Procesados: ${itemsProcesados}/${dataRows.length}`);
+            }
+          } else {
+            itemsErrores++;
+            resultados.push({
+              fila: filaNumero,
+              estado: 'error',
+              error: resultado.error
+            });
+          }
+
+        } catch (error) {
+          itemsErrores++;
+          console.error(`[EXCEL-SIMPLE] ❌ Error fila ${filaNumero}:`, error);
+          
+          resultados.push({
+            fila: filaNumero,
+            estado: 'error',
+            error: error instanceof Error ? error.message : 'Error desconocido'
           });
         }
+
+        // Pequeña pausa cada 10 items para no sobrecargar
+        if ((globalIndex + 1) % 10 === 0) {
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
       }
-    }
 
-    console.log(`[EXCEL-BG] 📊 Items válidos: ${itemsValidos.length}`);
-
-    // Procesar en lotes pequeños con delays
-    let procesados = 0;
-    let errores = 0;
-    const LOTE_SIZE = 10;
-    const DELAY_BETWEEN_BATCHES = 100; // 100ms entre lotes
-
-    for (let i = 0; i < itemsValidos.length; i += LOTE_SIZE) {
-      const lote = itemsValidos.slice(i, i + LOTE_SIZE);
-      
+      // Actualizar progreso cada lote
       try {
-        const resultado = await procesarLoteBackground(lote, sucursalId, modo, usuarioId, cargaId);
-        procesados += resultado.procesados;
-        errores += resultado.errores;
-
-        // Actualizar progreso
         await prisma.cargaMasivaStock.update({
-          where: { id: cargaId },
+          where: { id: cargaMasiva.id },
           data: {
-            itemsProcesados: procesados,
-            itemsErrores: errores
+            itemsProcesados,
+            itemsErrores
           }
         });
-
-        console.log(`[EXCEL-BG] ✅ Lote ${Math.floor(i/LOTE_SIZE) + 1}: ${resultado.procesados} procesados`);
-
-        // Pequeño delay para no sobrecargar la BD
-        if (i + LOTE_SIZE < itemsValidos.length) {
-          await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_BATCHES));
-        }
-
-      } catch (loteError) {
-        console.error(`[EXCEL-BG] ❌ Error en lote:`, loteError);
-        errores += lote.length;
+      } catch (updateError) {
+        console.warn(`[EXCEL-SIMPLE] ⚠️ Error actualizando progreso:`, updateError);
       }
     }
 
-    // Finalizar
-    await prisma.cargaMasivaStock.update({
-      where: { id: cargaId },
+    console.log(`[EXCEL-SIMPLE] 📊 Completado: ${itemsProcesados} procesados, ${itemsErrores} errores`);
+
+    // ✅ FINALIZAR CARGA
+    const tiempoProcesamiento = Math.round((Date.now() - startTime) / 1000);
+    
+    const cargaFinalizada = await prisma.cargaMasivaStock.update({
+      where: { id: cargaMasiva.id },
       data: {
-        estado: errores === 0 ? 'completado' : 'completado_con_errores',
-        itemsProcesados: procesados,
-        itemsErrores: errores,
+        estado: itemsErrores === 0 ? 'completado' : 'completado_con_errores',
+        itemsProcesados,
+        itemsErrores,
         fechaFin: new Date()
+      },
+      include: {
+        sucursal: true,
+        usuario: { select: { name: true, email: true } }
       }
     });
 
-    console.log(`[EXCEL-BG] 🏁 Completado: ${procesados} procesados, ${errores} errores`);
+    const resumen = {
+      totalItems: dataRows.length,
+      itemsProcesados,
+      itemsErrores,
+      porcentajeExito: Math.round((itemsProcesados / dataRows.length) * 100),
+      tiempoProcesamiento
+    };
+
+    console.log(`[EXCEL-SIMPLE] 🏁 Finalizado en ${tiempoProcesamiento}s:`, resumen);
+
+    return NextResponse.json({
+      success: true,
+      mensaje: `Procesamiento completado: ${itemsProcesados}/${dataRows.length} productos actualizados`,
+      carga: cargaFinalizada,
+      resumen,
+      resultados: resultados.slice(0, 30),
+      detalles: {
+        archivo: file.name,
+        sucursal: sucursal.nombre,
+        modo,
+        optimizacion: 'operaciones-atomicas'
+      }
+    });
 
   } catch (error) {
-    console.error(`[EXCEL-BG] ❌ Error general:`, error);
-    
-    await prisma.cargaMasivaStock.update({
-      where: { id: cargaId },
-      data: {
-        estado: 'error',
-        fechaFin: new Date()
-      }
-    });
+    console.error('[EXCEL-SIMPLE] ❌ Error general:', error);
+    return NextResponse.json(
+      { 
+        error: 'Error procesando archivo',
+        details: error instanceof Error ? error.message : 'Error desconocido'
+      },
+      { status: 500 }
+    );
   }
 }
 
-// Función auxiliar para procesar lotes en background
-async function procesarLoteBackground(
-  items: any[],
+// 🎯 FUNCIÓN SIMPLE - SIN TRANSACCIONES COMPLEJAS
+async function procesarItemSimple(
+  row: any[],
+  filaNumero: number,
+  columnIndices: any,
   sucursalId: string,
   modo: string,
   usuarioId: string,
-  cargaId: string
-) {
-  const productIds = items.map(item => item.productoId);
+  cargaId: string,
+  fileName: string
+): Promise<{ success: boolean; data?: any; error?: string }> {
   
-  const [productos, stocks] = await Promise.all([
-    prisma.producto.findMany({
-      where: { id: { in: productIds }, activo: true },
-      select: { id: true, nombre: true, codigoBarras: true }
-    }),
-    prisma.stock.findMany({
-      where: { 
-        productoId: { in: productIds },
-        ubicacionId: sucursalId 
-      }
-    })
-  ]);
-
-  const productosMap = new Map(productos.map(p => [p.id, p]));
-  const stocksMap = new Map(stocks.map(s => [s.productoId, s]));
-
-  return await prisma.$transaction(async (tx) => {
-    let procesados = 0;
-    let errores = 0;
-
-    const operaciones = [];
-
-    for (const item of items) {
-      try {
-        const producto = productosMap.get(item.productoId);
-        if (!producto) {
-          throw new Error(`Producto no encontrado: ${item.productoId}`);
-        }
-
-        const stockActual = stocksMap.get(item.productoId);
-        const cantidadAnterior = stockActual?.cantidad || 0;
-
-        let cantidadFinal = 0;
-        switch (modo) {
-          case 'incrementar':
-            cantidadFinal = cantidadAnterior + item.nuevoStock;
-            break;
-          case 'establecer':
-            cantidadFinal = item.nuevoStock;
-            break;
-          case 'decrementar':
-            cantidadFinal = Math.max(0, cantidadAnterior - item.nuevoStock);
-            break;
-        }
-
-        // Stock update/create
-        if (stockActual) {
-          operaciones.push(
-            tx.stock.update({
-              where: { id: stockActual.id },
-              data: { cantidad: cantidadFinal, ultimaActualizacion: new Date() }
-            })
-          );
-        } else if (cantidadFinal > 0) {
-          operaciones.push(
-            tx.stock.create({
-              data: {
-                productoId: item.productoId,
-                ubicacionId: sucursalId,
-                cantidad: cantidadFinal,
-                ultimaActualizacion: new Date()
-              }
-            })
-          );
-        }
-
-        // Item de carga
-        operaciones.push(
-          tx.cargaMasivaStockItem.create({
-            data: {
-              cargaId,
-              productoId: item.productoId,
-              codigoBarras: producto.codigoBarras,
-              nombreProducto: producto.nombre,
-              cantidadCargar: item.nuevoStock,
-              cantidadAnterior,
-              cantidadFinal,
-              estado: 'procesado',
-              procesadoEn: new Date()
-            }
-          })
-        );
-
-        procesados++;
-
-      } catch (error) {
-        errores++;
-        operaciones.push(
-          tx.cargaMasivaStockItem.create({
-            data: {
-              cargaId,
-              nombreProducto: `Fila ${item.fila}`,
-              cantidadCargar: 0,
-              estado: 'error',
-              error: error instanceof Error ? error.message.substring(0, 200) : 'Error'
-            }
-          })
-        );
-      }
-    }
-
-    await Promise.all(operaciones);
-    return { procesados, errores };
-  });
-}
-
-// API PARA CONSULTAR ESTADO
-// src/app/api/admin/stock-config/excel/status/[id]/route.ts
-export async function GET(
-  req: NextRequest, 
-  { params }: { params: { id: string } }
-) {
   try {
-    const carga = await prisma.cargaMasivaStock.findUnique({
-      where: { id: params.id },
-      include: {
-        sucursal: { select: { nombre: true } },
-        usuario: { select: { name: true } }
+    // 1. EXTRAER Y VALIDAR DATOS
+    const productoId = row[columnIndices.id]?.toString().trim();
+    const nuevoStockStr = row[columnIndices.nuevoStock]?.toString().trim();
+
+    if (!productoId || !nuevoStockStr) {
+      throw new Error(`Fila ${filaNumero}: ID o Stock vacío`);
+    }
+
+    const nuevoStock = parseFloat(nuevoStockStr);
+    if (isNaN(nuevoStock) || nuevoStock < 0) {
+      throw new Error(`Fila ${filaNumero}: Stock inválido (${nuevoStockStr})`);
+    }
+
+    // 2. VERIFICAR PRODUCTO
+    const producto = await prisma.producto.findFirst({
+      where: { 
+        id: productoId, 
+        activo: true 
+      },
+      select: { 
+        id: true, 
+        nombre: true, 
+        codigoBarras: true 
       }
     });
 
-    if (!carga) {
-      return NextResponse.json({ error: 'Carga no encontrada' }, { status: 404 });
+    if (!producto) {
+      throw new Error(`Fila ${filaNumero}: Producto no encontrado - ${productoId}`);
     }
 
-    const progreso = carga.totalItems > 0 
-      ? Math.round(((carga.itemsProcesados + carga.itemsErrores) / carga.totalItems) * 100)
-      : 0;
-
-    return NextResponse.json({
-      id: carga.id,
-      estado: carga.estado,
-      progreso,
-      itemsProcesados: carga.itemsProcesados,
-      itemsErrores: carga.itemsErrores,
-      totalItems: carga.totalItems,
-      porcentajeExito: carga.itemsProcesados > 0 
-        ? Math.round((carga.itemsProcesados / (carga.itemsProcesados + carga.itemsErrores)) * 100) 
-        : 0,
-      fechaInicio: carga.fechaInicio,
-      fechaFin: carga.fechaFin,
-      estimatedTimeRemaining: carga.estado === 'procesando' 
-        ? Math.max(0, Math.ceil((carga.totalItems - carga.itemsProcesados - carga.itemsErrores) * 0.5))
-        : 0
+    // 3. OBTENER STOCK ACTUAL
+    const stockActual = await prisma.stock.findFirst({
+      where: {
+        productoId: producto.id,
+        ubicacionId: sucursalId
+      }
     });
+
+    const cantidadAnterior = stockActual?.cantidad || 0;
+
+    // 4. CALCULAR NUEVA CANTIDAD
+    let cantidadFinal = 0;
+    let diferencia = 0;
+
+    switch (modo) {
+      case 'incrementar':
+        cantidadFinal = cantidadAnterior + nuevoStock;
+        diferencia = nuevoStock;
+        break;
+      case 'establecer':
+        cantidadFinal = nuevoStock;
+        diferencia = nuevoStock - cantidadAnterior;
+        break;
+      case 'decrementar':
+        cantidadFinal = Math.max(0, cantidadAnterior - nuevoStock);
+        diferencia = -(Math.min(cantidadAnterior, nuevoStock));
+        break;
+      default:
+        throw new Error(`Modo inválido: ${modo}`);
+    }
+
+    // 5. 🎯 OPERACIONES ATÓMICAS SIMPLES (SIN TRANSACCIONES COMPLEJAS)
+    
+    let stockFinalReal = cantidadFinal;
+
+    // A. ACTUALIZAR O CREAR STOCK
+    if (stockActual) {
+      // Actualizar stock existente
+      const stockActualizado = await prisma.stock.update({
+        where: { id: stockActual.id },
+        data: {
+          cantidad: cantidadFinal,
+          ultimaActualizacion: new Date(),
+          version: { increment: 1 }
+        }
+      });
+      stockFinalReal = stockActualizado.cantidad;
+    } else if (cantidadFinal > 0) {
+      // Crear stock nuevo
+      const stockNuevo = await prisma.stock.create({
+        data: {
+          productoId: producto.id,
+          ubicacionId: sucursalId,
+          cantidad: cantidadFinal,
+          ultimaActualizacion: new Date()
+        }
+      });
+      stockFinalReal = stockNuevo.cantidad;
+    }
+
+    // B. CREAR MOVIMIENTO DE STOCK (SI HAY CAMBIO)
+    if (diferencia !== 0) {
+      try {
+        // Obtener el stock actualizado para el movimiento
+        const stockParaMovimiento = await prisma.stock.findFirst({
+          where: {
+            productoId: producto.id,
+            ubicacionId: sucursalId
+          }
+        });
+
+        if (stockParaMovimiento) {
+          await prisma.movimientoStock.create({
+            data: {
+              stockId: stockParaMovimiento.id,
+              tipoMovimiento: diferencia > 0 ? 'entrada' : 'salida',
+              cantidad: Math.abs(diferencia),
+              motivo: `Carga Excel: ${fileName} - Fila ${filaNumero}`,
+              usuarioId: usuarioId,
+              fecha: new Date()
+            }
+          });
+        }
+      } catch (movError) {
+        console.warn(`[EXCEL-SIMPLE] ⚠️ Error creando movimiento para ${producto.nombre}:`, movError);
+        // No fallar por esto, el stock ya se actualizó
+      }
+    }
+
+    // C. REGISTRAR ITEM DE CARGA
+    try {
+      await prisma.cargaMasivaStockItem.create({
+        data: {
+          cargaId: cargaId,
+          productoId: producto.id,
+          codigoBarras: producto.codigoBarras,
+          nombreProducto: producto.nombre,
+          cantidadCargar: nuevoStock,
+          cantidadAnterior: cantidadAnterior,
+          cantidadFinal: stockFinalReal,
+          estado: 'procesado',
+          procesadoEn: new Date()
+        }
+      });
+    } catch (itemError) {
+      console.warn(`[EXCEL-SIMPLE] ⚠️ Error registrando item para ${producto.nombre}:`, itemError);
+      // No fallar por esto, el stock ya se actualizó
+    }
+
+    // 6. VERIFICAR STOCK FINAL
+    const verificacion = await prisma.stock.findFirst({
+      where: {
+        productoId: producto.id,
+        ubicacionId: sucursalId
+      }
+    });
+
+    const stockFinalVerificado = verificacion?.cantidad || 0;
+
+    return {
+      success: true,
+      data: {
+        producto: {
+          id: producto.id,
+          nombre: producto.nombre,
+          codigoBarras: producto.codigoBarras
+        },
+        stockAnterior: cantidadAnterior,
+        stockFinal: stockFinalVerificado,
+        diferencia: stockFinalVerificado - cantidadAnterior,
+        modoAplicado: modo
+      }
+    };
+
   } catch (error) {
-    return NextResponse.json({ error: 'Error consultando estado' }, { status: 500 });
+    // MANEJAR ERROR CREANDO REGISTRO
+    try {
+      await prisma.cargaMasivaStockItem.create({
+        data: {
+          cargaId: cargaId,
+          nombreProducto: `Error Fila ${filaNumero}`,
+          cantidadCargar: 0,
+          estado: 'error',
+          error: error instanceof Error ? error.message.substring(0, 300) : 'Error desconocido'
+        }
+      });
+    } catch (errorRegError) {
+      console.warn(`[EXCEL-SIMPLE] ⚠️ Error registrando error:`, errorRegError);
+    }
+
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Error desconocido'
+    };
   }
 }
