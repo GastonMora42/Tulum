@@ -1,4 +1,4 @@
-// src/app/api/admin/stock-config/dashboard/route.ts - CORREGIDO CON CATEGORÍAS
+// src/app/api/admin/stock-config/dashboard/route.ts - VERSIÓN FINAL CORREGIDA
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/server/db/client';
 import { authMiddleware } from '@/server/api/middlewares/auth';
@@ -15,7 +15,9 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const sucursalId = searchParams.get('sucursalId');
 
-    // ✅ CORREGIDO: Obtener configuraciones con categorías incluidas
+    console.log(`[Dashboard API] 🚀 Generando dashboard para sucursal: ${sucursalId || 'todas'}`);
+
+    // ✅ PASO 1: Obtener configuraciones explícitas CON categorías
     const configs = await prisma.stockConfigSucursal.findMany({
       where: {
         activo: true,
@@ -24,14 +26,27 @@ export async function GET(req: NextRequest) {
       include: {
         producto: {
           include: {
-            categoria: true // ✅ INCLUIR CATEGORÍA
+            categoria: {
+              select: {
+                id: true,
+                nombre: true
+              }
+            }
           }
         },
-        sucursal: true
+        sucursal: {
+          select: {
+            id: true,
+            nombre: true,
+            tipo: true
+          }
+        }
       }
     });
 
-    // Obtener stocks actuales para todas las configuraciones
+    console.log(`[Dashboard API] ✅ Configuraciones encontradas: ${configs.length}`);
+
+    // ✅ PASO 2: Obtener stocks actuales para configuraciones existentes
     const stocksActuales = await prisma.stock.findMany({
       where: {
         productoId: { in: configs.map(c => c.productoId) },
@@ -39,15 +54,15 @@ export async function GET(req: NextRequest) {
       }
     });
 
-    // Crear mapa de stocks actuales para acceso rápido
+    // Crear mapa de stocks para acceso rápido
     const stockMap = new Map();
     stocksActuales.forEach(stock => {
       const key = `${stock.productoId}-${stock.ubicacionId}`;
       stockMap.set(key, stock.cantidad);
     });
 
-    // ✅ CORREGIDO: Calcular estadísticas por configuración con categorías
-    const analisisStock = configs.map(config => {
+    // ✅ PASO 3: Calcular análisis para productos CON configuración
+    const analisisConConfig = configs.map(config => {
       const key = `${config.productoId}-${config.sucursalId}`;
       const cantidadActual = stockMap.get(key) || 0;
       
@@ -56,7 +71,7 @@ export async function GET(req: NextRequest) {
       
       // Determinar estado
       let estado = 'normal';
-      let prioridad = 0;
+      let prioridad = 1;
       
       if (cantidadActual <= config.stockMinimo) {
         estado = 'critico';
@@ -67,9 +82,6 @@ export async function GET(req: NextRequest) {
       } else if (cantidadActual > config.stockMaximo) {
         estado = 'exceso';
         prioridad = 2;
-      } else {
-        estado = 'normal';
-        prioridad = 1;
       }
 
       return {
@@ -78,11 +90,8 @@ export async function GET(req: NextRequest) {
           id: config.producto.id,
           nombre: config.producto.nombre,
           codigoBarras: config.producto.codigoBarras,
-          categoriaId: config.producto.categoriaId, // ✅ AGREGAR categoriaId
-          categoria: config.producto.categoria ? { // ✅ AGREGAR categoría completa
-            id: config.producto.categoria.id,
-            nombre: config.producto.categoria.nombre
-          } : null
+          categoriaId: config.producto.categoriaId,
+          categoria: config.producto.categoria // ✅ GARANTIZAR que siempre existe
         },
         sucursal: {
           id: config.sucursal.id,
@@ -100,7 +109,7 @@ export async function GET(req: NextRequest) {
         porcentajeUso: Math.round(porcentajeUso),
         estado,
         prioridad,
-        tieneConfiguracion: true, // ✅ AGREGAR flag
+        tieneConfiguracion: true,
         acciones: {
           necesitaReposicion: cantidadActual <= config.puntoReposicion,
           puedeCargar: cantidadActual < config.stockMaximo,
@@ -111,7 +120,7 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    // ✅ NUEVO: Obtener productos con stock pero sin configuración (para completar el dashboard)
+    // ✅ PASO 4: Obtener productos con stock SIN configuración
     const stocksSinConfig = await prisma.stock.findMany({
       where: {
         ...(sucursalId ? { ubicacionId: sucursalId } : {}),
@@ -127,92 +136,112 @@ export async function GET(req: NextRequest) {
       include: {
         producto: {
           include: {
-            categoria: true // ✅ INCLUIR CATEGORÍA también aquí
+            categoria: {
+              select: {
+                id: true,
+                nombre: true
+              }
+            }
           }
         },
-        ubicacion: true
+        ubicacion: {
+          select: {
+            id: true,
+            nombre: true,
+            tipo: true
+          }
+        }
       }
     });
 
-    // ✅ NUEVO: Agregar productos sin configuración al análisis
-    const analisisSinConfig = stocksSinConfig.map(stock => {
-      const producto = stock.producto!;
-      const stockActual = stock.cantidad;
-      
-      // Valores por defecto para productos sin configuración
-      const stockMinimo = Math.max(producto.stockMinimo, 1);
-      const stockMaximo = Math.max(stockActual * 3, stockMinimo * 5, 10);
-      const puntoReposicion = Math.ceil(stockMinimo * 1.5);
-      
-      // Determinar estado con configuración por defecto
-      let estado = 'normal';
-      let prioridad = 0;
-      
-      if (stockActual <= stockMinimo) {
-        estado = 'critico';
-        prioridad = 4;
-      } else if (stockActual <= puntoReposicion) {
-        estado = 'bajo';
-        prioridad = 3;
-      } else if (stockActual > stockMaximo) {
-        estado = 'exceso';
-        prioridad = 2;
-      } else {
-        estado = 'normal';
-        prioridad = 1;
-      }
+    console.log(`[Dashboard API] ✅ Productos sin configuración: ${stocksSinConfig.length}`);
 
-      const diferencia = stockMaximo - stockActual;
-      const porcentajeUso = stockMaximo > 0 ? (stockActual / stockMaximo) * 100 : 0;
-
-      return {
-        id: `sin-config-${stock.id}`,
-        producto: {
-          id: producto.id,
-          nombre: producto.nombre,
-          codigoBarras: producto.codigoBarras,
-          categoriaId: producto.categoriaId, // ✅ INCLUIR categoriaId
-          categoria: producto.categoria ? { // ✅ INCLUIR categoría
-            id: producto.categoria.id,
-            nombre: producto.categoria.nombre
-          } : null
-        },
-        sucursal: {
-          id: stock.ubicacion.id,
-          nombre: stock.ubicacion.nombre,
-          tipo: stock.ubicacion.tipo
-        },
-        configuracion: {
+    // ✅ PASO 5: Analizar productos SIN configuración
+    const analisisSinConfig = stocksSinConfig
+      .filter(stock => stock.producto) // Filtrar productos válidos
+      .map((stock) => {
+        const producto = stock.producto!;
+        const stockActual = stock.cantidad;
+        
+        // Valores por defecto inteligentes
+        const stockMinimo = Math.max(producto.stockMinimo || 1, 1);
+        const stockMaximo = Math.max(stockActual * 3, stockMinimo * 5, 10);
+        const puntoReposicion = Math.ceil(stockMinimo * 1.5);
+        
+        const configuracionPorDefecto = {
           stockMaximo,
           stockMinimo,
           puntoReposicion
-        },
-        stockActual,
-        diferencia,
-        diferenciaPorcentual: stockMaximo > 0 ? Math.round((diferencia / stockMaximo) * 100) : 0,
-        porcentajeUso: Math.round(porcentajeUso),
-        estado,
-        prioridad,
-        tieneConfiguracion: false, // ✅ MARCAR como sin configuración
-        requiereConfiguracion: true, // ✅ FLAG adicional
-        acciones: {
-          necesitaReposicion: stockActual <= puntoReposicion,
-          puedeCargar: stockActual < stockMaximo,
-          cantidadSugerida: Math.max(0, stockMaximo - stockActual),
-          tieneExceso: stockActual > stockMaximo,
-          excesoActual: Math.max(0, stockActual - stockMaximo)
+        };
+        
+        // Calcular estado con configuración por defecto
+        const diferencia = stockMaximo - stockActual;
+        const porcentajeUso = stockMaximo > 0 ? (stockActual / stockMaximo) * 100 : 0;
+        
+        let estado = 'normal';
+        let prioridad = 1;
+        
+        if (stockActual <= stockMinimo) {
+          estado = 'critico';
+          prioridad = 4;
+        } else if (stockActual <= puntoReposicion) {
+          estado = 'bajo';
+          prioridad = 3;
+        } else if (stockActual > stockMaximo) {
+          estado = 'exceso';
+          prioridad = 2;
         }
-      };
-    });
 
-    // ✅ CORREGIDO: Combinar análisis y ordenar alfabéticamente por nombre de producto
-    const analisisCompleto = [...analisisStock, ...analisisSinConfig]
-      .sort((a, b) => a.producto.nombre.localeCompare(b.producto.nombre, 'es', { sensitivity: 'base' }));
+        return {
+          id: `sin-config-${stock.id}`,
+          producto: {
+            id: producto.id,
+            nombre: producto.nombre,
+            codigoBarras: producto.codigoBarras,
+            categoriaId: producto.categoriaId,
+            categoria: producto.categoria // ✅ INCLUIR categoría (puede ser null)
+          },
+          sucursal: {
+            id: stock.ubicacion.id,
+            nombre: stock.ubicacion.nombre,
+            tipo: stock.ubicacion.tipo
+          },
+          configuracion: configuracionPorDefecto,
+          stockActual,
+          diferencia,
+          diferenciaPorcentual: stockMaximo > 0 ? Math.round((diferencia / stockMaximo) * 100) : 0,
+          porcentajeUso: Math.round(porcentajeUso),
+          estado,
+          prioridad,
+          tieneConfiguracion: false,
+          requiereConfiguracion: true,
+          acciones: {
+            necesitaReposicion: stockActual <= puntoReposicion,
+            puedeCargar: stockActual < stockMaximo,
+            cantidadSugerida: Math.max(0, stockMaximo - stockActual),
+            tieneExceso: stockActual > stockMaximo,
+            excesoActual: Math.max(0, stockActual - stockMaximo)
+          }
+        };
+      });
 
-    // Estadísticas generales
+    // ✅ PASO 6: COMBINAR Y ORDENAR ALFABÉTICAMENTE
+    const analisisCompleto = [...analisisConConfig, ...analisisSinConfig]
+      .sort((a, b) => {
+        // Ordenamiento alfabético mejorado A-Z
+        return a.producto.nombre.localeCompare(b.producto.nombre, 'es', {
+          sensitivity: 'base',
+          numeric: true,
+          caseFirst: 'lower'
+        });
+      });
+
+    console.log(`[Dashboard API] ✅ Análisis completo: ${analisisCompleto.length} productos (${analisisConConfig.length} con config + ${analisisSinConfig.length} sin config) - Ordenados A-Z`);
+
+    // ✅ PASO 7: Calcular estadísticas
     const estadisticas = {
       total: analisisCompleto.length,
-      conConfiguracion: analisisStock.length,
+      conConfiguracion: analisisConConfig.length,
       sinConfiguracion: analisisSinConfig.length,
       criticos: analisisCompleto.filter(a => a.estado === 'critico').length,
       bajos: analisisCompleto.filter(a => a.estado === 'bajo').length,
@@ -222,7 +251,7 @@ export async function GET(req: NextRequest) {
       conExceso: analisisCompleto.filter(a => a.acciones.tieneExceso).length
     };
 
-    // Resumen por sucursal
+    // ✅ PASO 8: Resumen por sucursal
     const resumenSucursales = analisisCompleto.reduce((acc, item) => {
       const sucursalId = item.sucursal.id;
       
@@ -233,41 +262,62 @@ export async function GET(req: NextRequest) {
           criticos: 0,
           bajos: 0,
           normales: 0,
-          excesos: 0
+          excesos: 0,
+          conConfiguracion: 0,
+          sinConfiguracion: 0
         };
       }
 
       acc[sucursalId].total++;
       acc[sucursalId][item.estado + 's']++;
+      
+      if (item.tieneConfiguracion) {
+        acc[sucursalId].conConfiguracion++;
+      } else {
+        acc[sucursalId].sinConfiguracion++;
+      }
 
       return acc;
     }, {} as Record<string, any>);
 
-    // Top productos con mayor déficit (ordenados alfabéticamente también)
+    // ✅ PASO 9: Top productos (mantener orden después de análisis)
     const topDeficit = analisisCompleto
       .filter(a => a.diferencia > 0)
-      .sort((a, b) => b.diferencia - a.diferencia)
+      .sort((a, b) => {
+        const deficitDiff = b.diferencia - a.diferencia;
+        return deficitDiff !== 0 ? deficitDiff : a.producto.nombre.localeCompare(b.producto.nombre, 'es');
+      })
       .slice(0, 10);
-
-    // Top productos con mayor exceso (ordenados alfabéticamente también)
+      
     const topExceso = analisisCompleto
       .filter(a => a.acciones.tieneExceso)
-      .sort((a, b) => b.acciones.excesoActual - a.acciones.excesoActual)
+      .sort((a, b) => {
+        const excesoDiff = b.acciones.excesoActual - a.acciones.excesoActual;
+        return excesoDiff !== 0 ? excesoDiff : a.producto.nombre.localeCompare(b.producto.nombre, 'es');
+      })
       .slice(0, 10);
 
-    console.log(`[Dashboard] ✅ Dashboard generado: ${analisisCompleto.length} productos (${analisisStock.length} con config, ${analisisSinConfig.length} sin config)`);
-
-    return NextResponse.json({
+    // ✅ RESPUESTA FINAL
+    const response = {
       estadisticas,
       resumenSucursales: Object.values(resumenSucursales),
       analisisCompleto,
       topDeficit,
       topExceso,
       ultimaActualizacion: new Date()
+    };
+
+    console.log(`[Dashboard API] 🏁 Dashboard generado exitosamente:`, {
+      totalProductos: estadisticas.total,
+      conCategoria: analisisCompleto.filter(a => a.producto.categoria).length,
+      sinCategoria: analisisCompleto.filter(a => !a.producto.categoria).length,
+      categorias: [...new Set(analisisCompleto.map(a => a.producto.categoria?.nombre).filter(Boolean))].slice(0, 5)
     });
 
+    return NextResponse.json(response);
+
   } catch (error) {
-    console.error('Error al generar dashboard de stock:', error);
+    console.error('[Dashboard API] ❌ Error al generar dashboard:', error);
     return NextResponse.json(
       { error: 'Error al generar dashboard de stock' },
       { status: 500 }

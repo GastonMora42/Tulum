@@ -1,8 +1,8 @@
-// src/hooks/useStockSucursales.ts - VERSIÓN CORREGIDA
+// src/hooks/useStockSucursal.ts - INTERFACES CORREGIDAS CON CATEGORÍAS
 import { useState, useEffect, useCallback } from 'react';
 import { authenticatedFetch } from '@/hooks/useAuth';
 
-// ✅ INTERFACES CORREGIDAS Y AMPLIADAS
+// ✅ INTERFACES CORREGIDAS CON CATEGORÍA
 export interface StockConfig {
   id: string;
   productoId: string;
@@ -15,6 +15,11 @@ export interface StockConfig {
     id: string;
     nombre: string;
     codigoBarras?: string;
+    categoriaId?: string; // ✅ AGREGADO
+    categoria?: {         // ✅ AGREGADO
+      id: string;
+      nombre: string;
+    };
   };
   sucursal: {
     id: string;
@@ -54,6 +59,11 @@ export interface DashboardData {
       id: string;
       nombre: string;
       codigoBarras?: string;
+      categoriaId?: string; // ✅ AGREGADO
+      categoria?: {         // ✅ AGREGADO
+        id: string;
+        nombre: string;
+      };
     };
     sucursal: {
       id: string;
@@ -100,6 +110,10 @@ export interface AlertaStock {
   createdAt: Date;
   producto: {
     nombre: string;
+    categoria?: {     // ✅ AGREGADO
+      id: string;
+      nombre: string;
+    };
   };
   sucursal: {
     nombre: string;
@@ -137,7 +151,7 @@ export interface CargaManualResponse {
       id: string;
       nombre: string;
       codigoBarras?: string;
-      categoria?: string;
+      categoria?: string; // ✅ MEJORADO para incluir nombre de categoría
     };
     sucursal: {
       id: string;
@@ -183,6 +197,10 @@ export interface HistorialCargaManual {
     id: string;
     nombre: string;
     codigoBarras?: string;
+    categoria?: {     // ✅ AGREGADO
+      id: string;
+      nombre: string;
+    };
   };
   sucursal: {
     id: string;
@@ -203,13 +221,12 @@ export interface ExcelPlantillaResponse {
   fileName?: string;
 }
 
-// ✅ INTERFAZ CORREGIDA - AGREGADA tiempoProcesamiento
 export interface ExcelProcesoResponse {
   success: boolean;
   mensaje: string;
   carga: any;
   resumen: {
-    tiempoProcesamiento: string; // ✅ AGREGADA ESTA PROPIEDAD
+    tiempoProcesamiento: string;
     totalItems: number;
     itemsProcesados: number;
     itemsErrores: number;
@@ -224,7 +241,6 @@ export interface ExcelProcesoResponse {
   };
 }
 
-// ✅ NUEVA INTERFAZ PARA VALIDACIÓN DE ARCHIVOS
 export interface ValidacionArchivoExcel {
   valido: boolean;
   errores: string[];
@@ -236,7 +252,6 @@ export interface ValidacionArchivoExcel {
   };
 }
 
-// ✅ NUEVA INTERFAZ PARA CONFIGURACIÓN
 export interface ConfiguracionHook {
   limits: {
     maxFileSize: number;
@@ -255,7 +270,7 @@ export function useStockSucursales() {
   const [alertas, setAlertas] = useState<AlertaStock[]>([]);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
-  // ✅ CONFIGURACIÓN POR DEFECTO
+  // Configuración por defecto
   const [config] = useState<ConfiguracionHook>({
     limits: {
       maxFileSize: 5 * 1024 * 1024, // 5MB
@@ -538,9 +553,8 @@ export function useStockSucursales() {
     }
   }, []);
 
-  // 🆕 ============= FUNCIONALIDADES DE EXCEL CORREGIDAS =============
+  // ============= FUNCIONALIDADES DE EXCEL =============
   
-  // ✅ NUEVA FUNCIÓN: Validar archivo Excel antes de procesarlo
   const validarArchivoPrevio = useCallback((file: File): ValidacionArchivoExcel => {
     console.log(`[Hook] Validando archivo: ${file.name}`);
     
@@ -856,7 +870,7 @@ export function useStockSucursales() {
     configs,
     alertas,
     lastUpdate,
-    config, // ✅ EXPORTAR CONFIGURACIÓN
+    config,
     
     // Configuraciones
     loadConfigs,
@@ -874,8 +888,8 @@ export function useStockSucursales() {
     cargarStockRapido,
     loadHistorialCargaManual,
     
-    // 🆕 Funcionalidades Excel CORREGIDAS
-    validarArchivoPrevio, // ✅ FUNCIÓN AGREGADA
+    // Funcionalidades Excel
+    validarArchivoPrevio,
     descargarPlantillaExcel,
     procesarArchivoExcel,
     

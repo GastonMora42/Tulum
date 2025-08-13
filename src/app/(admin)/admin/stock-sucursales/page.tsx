@@ -1,4 +1,4 @@
-// src/app/(admin)/admin/stock-sucursales/page.tsx - CORREGIDO FILTROS Y ORDENAMIENTO
+// src/app/(admin)/admin/stock-sucursales/page.tsx - VERSIÓN COMPLETA CON TODOS LOS MODALES
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -65,8 +65,8 @@ interface AnalisisItem {
     id: string;
     nombre: string;
     codigoBarras?: string;
-    categoriaId?: string; // ✅ AGREGAR
-    categoria?: {         // ✅ AGREGAR
+    categoriaId?: string;
+    categoria?: {
       id: string;
       nombre: string;
     };
@@ -160,12 +160,12 @@ export default function StockSucursalesMejorado() {
     config
   } = useStockSucursales();
 
-  // ✅ SIMPLIFICADO: Solo necesitamos sucursales y categorías
+  // Estados básicos
   const [sucursales, setSucursales] = useState<Sucursal[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [sucursalSeleccionada, setSucursalSeleccionada] = useState<string>('');
   
-  // Estados de filtros
+  // ✅ CORREGIDO: Estados de filtros simplificados
   const [statusFilter, setStatusFilter] = useState('todos');
   const [searchTerm, setSearchTerm] = useState('');
   const [categoriaFilter, setCategoriaFilter] = useState('todas');
@@ -233,15 +233,37 @@ export default function StockSucursalesMejorado() {
         }
       }
 
-      // ✅ CORREGIDO: Cargar categorías desde el endpoint correcto
-      const categoriasResponse = await authenticatedFetch('/api/admin/categorias');
-      if (categoriasResponse.ok) {
-        const categoriasData = await categoriasResponse.json();
-        // Asegurar que tenemos un array
-        const categoriasArray = Array.isArray(categoriasData) ? categoriasData : 
-                               Array.isArray(categoriasData.data) ? categoriasData.data : [];
-        setCategorias(categoriasArray);
-        console.log(`[StockSucursales] ✅ Categorías cargadas: ${categoriasArray.length}`);
+      // ✅ CORREGIDO: Cargar categorías con manejo de errores
+      try {
+        const categoriasResponse = await authenticatedFetch('/api/admin/categorias');
+        if (categoriasResponse.ok) {
+          const categoriasData = await categoriasResponse.json();
+          // Normalizar datos de categorías independientemente del formato
+          let categoriasArray: Categoria[] = [];
+          
+          if (Array.isArray(categoriasData)) {
+            categoriasArray = categoriasData;
+          } else if (categoriasData.data && Array.isArray(categoriasData.data)) {
+            categoriasArray = categoriasData.data;
+          } else if (categoriasData.categorias && Array.isArray(categoriasData.categorias)) {
+            categoriasArray = categoriasData.categorias;
+          }
+          
+          // Asegurar que cada categoría tenga las propiedades necesarias
+          const categoriasNormalizadas = categoriasArray.map(cat => ({
+            id: cat.id,
+            nombre: cat.nombre,
+            imagen: cat.imagen || undefined
+          }));
+          
+          setCategorias(categoriasNormalizadas);
+          console.log(`[StockSucursales] ✅ Categorías cargadas: ${categoriasNormalizadas.length}`, categoriasNormalizadas);
+        } else {
+          console.error('Error en respuesta de categorías:', categoriasResponse.status);
+        }
+      } catch (categoriasError) {
+        console.error('Error cargando categorías:', categoriasError);
+        setCategorias([]);
       }
 
       loadDashboard();
@@ -267,40 +289,94 @@ export default function StockSucursalesMejorado() {
     setTimeout(() => setShowAlert({ show: false, message: '', type: 'success' }), 5000);
   };
 
-  // ✅ CORREGIDO: Filtrado mejorado que usa directamente los datos del dashboard
-  const filteredAnalysis = dashboardData?.analisisCompleto?.filter((item) => {
-    // Filtro por estado
-    if (statusFilter === 'sin_configuracion') {
-      if (item.tieneConfiguracion !== false) return false;
-    } else if (statusFilter !== 'todos') {
-      if (item.estado !== statusFilter) return false;
-    }
-    
-    // Filtro por término de búsqueda
-    if (searchTerm && !item.producto.nombre.toLowerCase().includes(searchTerm.toLowerCase())) {
-      return false;
-    }
-    
-    // Filtro por sucursal
-    if (sucursalSeleccionada && item.sucursal.id !== sucursalSeleccionada) {
-      return false;
+  // ✅ CORREGIDO: Filtrado mejorado y simplificado
+  const filteredAnalysis = React.useMemo(() => {
+    if (!dashboardData?.analisisCompleto || !Array.isArray(dashboardData.analisisCompleto)) {
+      console.log('[StockSucursales] No hay datos de análisis para filtrar');
+      return [];
     }
 
-    // ✅ CORREGIDO: Filtro por categoría usando datos del dashboard directamente
-    if (categoriaFilter !== 'todas') {
-      // Usar directamente la información de categoría del dashboard
-      if (!item.producto.categoria || item.producto.categoria.id !== categoriaFilter) {
+    console.log(`[StockSucursales] 🔍 Iniciando filtrado:`, {
+      totalItems: dashboardData.analisisCompleto.length,
+      statusFilter,
+      searchTerm,
+      categoriaFilter,
+      sucursalSeleccionada
+    });
+
+    let filtered = dashboardData.analisisCompleto.filter((item) => {
+      // 1. Filtro por estado
+      if (statusFilter === 'sin_configuracion') {
+        if (item.tieneConfiguracion !== false) {
+          return false;
+        }
+      } else if (statusFilter !== 'todos') {
+        if (item.estado !== statusFilter) {
+          return false;
+        }
+      }
+      
+      // 2. Filtro por término de búsqueda (nombre de producto)
+      if (searchTerm.trim()) {
+        const searchLower = searchTerm.toLowerCase().trim();
+        const nombreMatches = item.producto.nombre.toLowerCase().includes(searchLower);
+        const codigoMatches = item.producto.codigoBarras?.toLowerCase().includes(searchLower);
+        
+        if (!nombreMatches && !codigoMatches) {
+          return false;
+        }
+      }
+      
+      // 3. Filtro por sucursal
+      if (sucursalSeleccionada && item.sucursal.id !== sucursalSeleccionada) {
         return false;
       }
-    }
-    
-    return true;
-  })?.sort((a, b) => {
-    // ✅ NUEVO: Ordenamiento alfabético A-Z por nombre de producto
-    return a.producto.nombre.localeCompare(b.producto.nombre, 'es', { sensitivity: 'base' });
-  }) || [];
 
-  // ✅ NUEVO: Función para obtener lista de productos únicos del dashboard (para modales)
+      // 4. ✅ CORREGIDO: Filtro por categoría mejorado
+      if (categoriaFilter !== 'todas') {
+        // Verificar que el producto tenga categoría
+        if (!item.producto.categoria) {
+          console.log(`[StockSucursales] Producto ${item.producto.nombre} sin categoría`);
+          return false;
+        }
+        
+        // Comparar IDs de categoría
+        if (item.producto.categoria.id !== categoriaFilter) {
+          return false;
+        }
+      }
+      
+      return true;
+    });
+
+    // ✅ CORREGIDO: Ordenamiento alfabético A-Z mejorado
+    filtered = filtered.sort((a, b) => {
+      return a.producto.nombre.localeCompare(b.producto.nombre, 'es', { 
+        sensitivity: 'base',
+        numeric: true
+      });
+    });
+
+    console.log(`[StockSucursales] ✅ Filtrado completado:`, {
+      original: dashboardData.analisisCompleto.length,
+      filtered: filtered.length,
+      removed: dashboardData.analisisCompleto.length - filtered.length
+    });
+
+    // Debug: Mostrar categorías encontradas en los datos filtrados
+    if (process.env.NODE_ENV === 'development') {
+      const categoriasEncontradas = new Set(
+        filtered
+          .map(item => item.producto.categoria?.nombre)
+          .filter(Boolean)
+      );
+      console.log(`[StockSucursales] 📊 Categorías en datos filtrados:`, Array.from(categoriasEncontradas));
+    }
+
+    return filtered;
+  }, [dashboardData?.analisisCompleto, statusFilter, searchTerm, categoriaFilter, sucursalSeleccionada]);
+
+  // ✅ FUNCIÓN MEJORADA: Obtener productos únicos del dashboard
   const getProductosFromDashboard = (): Producto[] => {
     if (!dashboardData?.analisisCompleto) return [];
     
@@ -386,7 +462,7 @@ export default function StockSucursalesMejorado() {
     }
   };
 
-  // FUNCIONES PARA EXCEL (mantener igual)
+  // FUNCIONES PARA EXCEL
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -518,7 +594,7 @@ export default function StockSucursalesMejorado() {
 
   // ====================== COMPONENTES ======================
   
-  // Alert (mantener igual)
+  // Alert
   const Alert = () => {
     if (!showAlert.show) return null;
     
@@ -546,7 +622,7 @@ export default function StockSucursalesMejorado() {
     );
   };
 
-  // Estadísticas (mantener igual)
+  // Estadísticas
   const StatsCards = () => (
     <div className="grid grid-cols-2 md:grid-cols-6 gap-3 mb-6">
       {[
@@ -613,7 +689,7 @@ export default function StockSucursalesMejorado() {
     </div>
   );
 
-  // Fila de tabla (mantener igual)
+  // Fila de tabla
   const TableRow = ({ item, index }: { item: AnalisisItem, index: number }) => {
     const statusConfig = getStatusConfig(item.estado);
     const IconComponent = statusConfig.icon;
@@ -632,7 +708,7 @@ export default function StockSucursalesMejorado() {
               {item.producto.codigoBarras && (
                 <div className="text-xs text-gray-500 font-mono">{item.producto.codigoBarras}</div>
               )}
-              {/* ✅ NUEVO: Mostrar categoría en la tabla */}
+              {/* ✅ Mostrar categoría en la tabla */}
               {item.producto.categoria && (
                 <div className="text-xs text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full inline-block mt-1">
                   {item.producto.categoria.nombre}
@@ -831,7 +907,7 @@ export default function StockSucursalesMejorado() {
         {/* Estadísticas */}
         <StatsCards />
 
-        {/* ✅ CORREGIDO: Filtros mejorados */}
+        {/* ✅ FILTROS CORREGIDOS */}
         <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
           <div className="flex items-center mb-4">
             <Filter className="w-5 h-5 text-gray-600 mr-2" />
@@ -856,7 +932,7 @@ export default function StockSucursalesMejorado() {
               </select>
             </div>
 
-            {/* ✅ CORREGIDO: Categoría con debug mejorado */}
+            {/* ✅ CORREGIDO: Categoría con mejor debug */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Categoría 
@@ -865,8 +941,9 @@ export default function StockSucursalesMejorado() {
               <select
                 value={categoriaFilter}
                 onChange={(e) => {
-                  console.log(`[StockSucursales] 🔍 Filtro categoría cambiado a: ${e.target.value}`);
-                  setCategoriaFilter(e.target.value);
+                  const newValue = e.target.value;
+                  console.log(`[StockSucursales] 🔍 Filtro categoría cambiado de "${categoriaFilter}" a "${newValue}"`);
+                  setCategoriaFilter(newValue);
                 }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#eeb077] focus:border-transparent text-sm shadow-sm"
               >
@@ -887,7 +964,10 @@ export default function StockSucursalesMejorado() {
                 <input
                   type="text"
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={(e) => {
+                    console.log(`[StockSucursales] 🔍 Búsqueda cambiada a: "${e.target.value}"`);
+                    setSearchTerm(e.target.value);
+                  }}
                   placeholder="Nombre del producto..."
                   className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#eeb077] focus:border-transparent text-sm shadow-sm"
                 />
@@ -899,7 +979,10 @@ export default function StockSucursalesMejorado() {
               <label className="block text-sm font-medium text-gray-700 mb-2">Estado</label>
               <select
                 value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
+                onChange={(e) => {
+                  console.log(`[StockSucursales] 🔍 Estado cambiado a: "${e.target.value}"`);
+                  setStatusFilter(e.target.value);
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#eeb077] focus:border-transparent text-sm shadow-sm"
               >
                 <option value="todos">Todos los estados</option>
@@ -916,6 +999,7 @@ export default function StockSucursalesMejorado() {
               <label className="block text-sm font-medium text-gray-700 mb-2">&nbsp;</label>
               <button
                 onClick={() => {
+                  console.log('[StockSucursales] 🧹 Limpiando todos los filtros');
                   setSearchTerm('');
                   setStatusFilter('todos');
                   setCategoriaFilter('todas');
@@ -928,15 +1012,17 @@ export default function StockSucursalesMejorado() {
             </div>
           </div>
 
-          {/* ✅ NUEVO: Debug info para desarrollo */}
+          {/* ✅ DEBUG INFO MEJORADO */}
           {process.env.NODE_ENV === 'development' && (
             <div className="mt-4 p-3 bg-blue-50 rounded-lg text-xs">
               <strong>🔧 Debug Info:</strong>
               <br />• Productos en dashboard: {dashboardData?.analisisCompleto?.length || 0}
               <br />• Productos después de filtros: {filteredAnalysis.length}
-              <br />• Categorías cargadas: {categorias.length}
-              <br />• Filtro actual: {categoriaFilter}
-              <br />• Sucursal seleccionada: {sucursalSeleccionada || 'Ninguna'}
+              <br />• Categorías cargadas: {categorias.length} - {categorias.map(c => c.nombre).slice(0, 5).join(', ')}{categorias.length > 5 ? '...' : ''}
+              <br />• Filtro categoría actual: "{categoriaFilter}"
+              <br />• Sucursal seleccionada: {sucursalSeleccionada ? sucursales.find(s => s.id === sucursalSeleccionada)?.nombre : 'Ninguna'}
+              <br />• Filtro búsqueda: "{searchTerm}"
+              <br />• Filtro estado: "{statusFilter}"
             </div>
           )}
         </div>
@@ -965,7 +1051,7 @@ export default function StockSucursalesMejorado() {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="p-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="p-4 text-left text-xs font-medium uppercase tracking-wider">
                     Producto <span className="text-blue-600">(A-Z)</span>
                   </th>
                   <th className="p-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">Sucursal</th>
@@ -1003,9 +1089,17 @@ export default function StockSucursalesMejorado() {
                 <h3 className="text-lg font-medium text-gray-900 mb-2">No se encontraron productos</h3>
                 <p className="text-gray-500">
                   {categoriaFilter !== 'todas' 
-                    ? `No hay productos en la categoría "${categorias.find(c => c.id === categoriaFilter)?.nombre || categoriaFilter}"`
+                    ? `No hay productos en la categoría "${categorias.find(c => c.id === categoriaFilter)?.nombre || categoriaFilter}" con los filtros aplicados`
                     : 'Ajusta los filtros para ver más resultados'}
                 </p>
+                {categoriaFilter !== 'todas' && (
+                  <button
+                    onClick={() => setCategoriaFilter('todas')}
+                    className="mt-4 px-4 py-2 bg-blue-500 text-white rounded-lg text-sm hover:bg-blue-600"
+                  >
+                    Ver todas las categorías
+                  </button>
+                )}
               </div>
             )}
             
@@ -1020,8 +1114,374 @@ export default function StockSucursalesMejorado() {
           </div>
         </div>
 
-        {/* MODALES (Excel, Configuración, Carga Manual, Historial) - mantener igual que el código original */}
-        {/* ... todos los modales existentes ... */}
+        {/* 🆕 MODAL DE EXCEL COMPLETO (AGREGADO) */}
+        {showExcelModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl p-6 max-w-3xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-semibold text-gray-900 flex items-center">
+                  <FileSpreadsheet className="w-6 h-6 mr-2 text-green-600" />
+                  Gestión Masiva por Excel
+                  {isProcessingExcel && <span className="ml-2 text-blue-600 text-sm">(Procesando...)</span>}
+                </h3>
+                <button 
+                  onClick={() => {
+                    if (!isProcessingExcel) {
+                      setShowExcelModal(false);
+                      setExcelFile(null);
+                      setExcelValidation(null);
+                      if (fileInputRef.current) fileInputRef.current.value = '';
+                    }
+                  }}
+                  disabled={isProcessingExcel}
+                  className="text-gray-400 hover:text-gray-600 disabled:opacity-50"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              
+              {/* Indicador de progreso */}
+              {isProcessingExcel && (
+                <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="flex items-center mb-3">
+                    <Loader2 className="w-5 h-5 text-blue-600 animate-spin mr-2" />
+                    <span className="text-sm font-medium text-blue-800">Procesando archivo Excel...</span>
+                  </div>
+                  <div className="w-full bg-blue-200 rounded-full h-3">
+                    <div className="bg-blue-600 h-3 rounded-full animate-pulse" style={{ width: '65%' }}></div>
+                  </div>
+                  <div className="mt-2 text-xs text-blue-600 space-y-1">
+                    <p>• Validando estructura del archivo</p>
+                    <p>• Procesando productos en lotes</p>
+                    <p>• Actualizando stock en base de datos</p>
+                    <p className="font-medium">Esto puede tardar hasta {config?.timeouts?.excel ? Math.round(config.timeouts.excel / 1000) : 45} segundos</p>
+                  </div>
+                </div>
+              )}
+              
+              <div className="space-y-6">
+                {/* PASO 1: DESCARGAR PLANTILLA */}
+                <div className="p-5 bg-blue-50 rounded-xl border border-blue-200">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h4 className="font-semibold text-blue-900 mb-2 flex items-center">
+                        <Download className="w-5 h-5 mr-2" />
+                        Paso 1: Descargar Plantilla
+                      </h4>
+                      <p className="text-sm text-blue-700 mb-2">
+                        Descarga la plantilla con todos los productos y su stock actual
+                      </p>
+                      <div className="text-xs text-blue-600 space-y-1">
+                        <p>• Incluye hasta {config?.limits?.maxRows || 200} productos más utilizados</p>
+                        <p>• Stock actual de la sucursal seleccionada</p>
+                        <p>• Plantilla pre-configurada para editar fácilmente</p>
+                      </div>
+                    </div>
+                    {!sucursalSeleccionada && (
+                      <span className="text-xs bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full">
+                        Seleccione sucursal
+                      </span>
+                    )}
+                  </div>
+                  
+                  <button
+                    onClick={handleDescargarPlantilla}
+                    disabled={loadingAction || !sucursalSeleccionada || isProcessingExcel}
+                    className="w-full inline-flex items-center justify-center px-4 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                  >
+                    {loadingAction ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Generando plantilla...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-4 h-4 mr-2" />
+                        Descargar Plantilla Excel
+                      </>
+                    )}
+                  </button>
+                  
+                  {!sucursalSeleccionada && (
+                    <p className="text-xs text-red-600 mt-2 flex items-center">
+                      <AlertTriangle className="w-3 h-3 mr-1" />
+                      Primero seleccione una sucursal en los filtros de arriba
+                    </p>
+                  )}
+                </div>
+
+                {/* PASO 2: SUBIR ARCHIVO */}
+                <div className="p-5 bg-green-50 rounded-xl border border-green-200">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h4 className="font-semibold text-green-900 mb-2 flex items-center">
+                        <Upload className="w-5 h-5 mr-2" />
+                        Paso 2: Subir Archivo Modificado
+                      </h4>
+                      <p className="text-sm text-green-700 mb-2">
+                        Modifica los valores de "Nuevo Stock" y sube el archivo
+                      </p>
+                      <div className="text-xs text-green-600 space-y-1">
+                        <p>• Solo modifique la columna "Nuevo Stock"</p>
+                        <p>• Use números enteros positivos (ej: 0, 10, 25)</p>
+                        <p>• Máximo {config?.limits?.maxFileSize ? Math.round(config.limits.maxFileSize / 1024 / 1024) : 5}MB y {config?.limits?.maxRows || 200} filas</p>
+                      </div>
+                    </div>
+                    <div className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded">
+                      Límites: {config?.limits?.maxFileSize ? Math.round(config.limits.maxFileSize / 1024 / 1024) : 5}MB, {config?.limits?.maxRows || 200} filas
+                    </div>
+                  </div>
+                  
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    accept=".xlsx,.xls"
+                    onChange={handleFileSelect}
+                    disabled={isProcessingExcel}
+                    className="w-full text-sm text-gray-500 file:mr-4 file:py-3 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-green-100 file:text-green-700 hover:file:bg-green-200 disabled:opacity-50 transition-all"
+                  />
+                  
+                  {/* Validación del archivo */}
+                  {excelValidation && (
+                    <div className="mt-3 p-3 rounded-lg border">
+                      {excelValidation.valido ? (
+                        <div className="bg-green-50 border-green-200">
+                          <div className="flex items-center text-green-800 mb-2">
+                            <CheckCircle className="w-4 h-4 mr-2" />
+                            <span className="font-medium">Archivo válido</span>
+                          </div>
+                          {excelValidation.advertencias.length > 0 && (
+                            <div className="text-xs text-green-700 space-y-1">
+                              {excelValidation.advertencias.map((adv, i) => (
+                                <p key={i}>⚠️ {adv}</p>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="bg-red-50 border-red-200">
+                          <div className="flex items-center text-red-800 mb-2">
+                            <AlertTriangle className="w-4 h-4 mr-2" />
+                            <span className="font-medium">Archivo inválido</span>
+                          </div>
+                          <div className="text-xs text-red-700 space-y-1">
+                            {excelValidation.errores.map((error, i) => (
+                              <p key={i}>❌ {error}</p>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {excelFile && excelValidation?.valido && (
+                    <div className="mt-4 p-4 bg-white rounded-lg border border-green-200">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <p className="text-sm font-medium text-gray-700 flex items-center">
+                            <FileSpreadsheet className="w-4 h-4 mr-2 text-green-600" />
+                            {excelFile.name}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            Tamaño: {(excelFile.size / 1024).toFixed(1)} KB
+                          </p>
+                        </div>
+                        {!isProcessingExcel && (
+                          <button
+                            onClick={() => {
+                              setExcelFile(null);
+                              setExcelValidation(null);
+                              if (fileInputRef.current) fileInputRef.current.value = '';
+                            }}
+                            className="text-red-500 hover:text-red-700 p-1 rounded"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                      
+                      {/* Modo de procesamiento */}
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Modo de actualización:</label>
+                        <select 
+                          value={modoExcel} 
+                          onChange={(e) => setModoExcel(e.target.value as any)}
+                          disabled={isProcessingExcel}
+                          className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 disabled:opacity-50 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        >
+                          <option value="establecer">📝 Establecer stock (reemplazar valores actuales)</option>
+                          <option value="incrementar">➕ Incrementar stock (sumar a valores actuales)</option>
+                          <option value="decrementar">➖ Decrementar stock (restar de valores actuales)</option>
+                        </select>
+                      </div>
+                      
+                      <button
+                        onClick={handleProcesarExcel}
+                        disabled={isProcessingExcel || !sucursalSeleccionada}
+                        className="w-full inline-flex items-center justify-center px-4 py-3 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                      >
+                        {isProcessingExcel ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            Procesando... (puede tardar hasta {config?.timeouts?.excel ? Math.round(config.timeouts.excel / 1000) : 45}s)
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-4 h-4 mr-2" />
+                            Procesar Archivo Excel
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* INSTRUCCIONES DETALLADAS */}
+                <div className="p-5 bg-yellow-50 rounded-xl border border-yellow-200">
+                  <h4 className="font-semibold text-yellow-900 mb-3 flex items-center">
+                    <Info className="w-5 h-5 mr-2" />
+                    Instrucciones Detalladas
+                  </h4>
+                  <div className="grid md:grid-cols-2 gap-4 text-sm text-yellow-800">
+                    <div>
+                      <h5 className="font-medium mb-2">✅ Lo que SÍ debe hacer:</h5>
+                      <ul className="space-y-1 list-disc list-inside">
+                        <li>Modificar solo la columna "Nuevo Stock"</li>
+                        <li>Usar números enteros positivos</li>
+                        <li>Guardar como archivo Excel (.xlsx)</li>
+                        <li>Verificar los datos antes de subir</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <h5 className="font-medium mb-2">❌ Lo que NO debe hacer:</h5>
+                      <ul className="space-y-1 list-disc list-inside">
+                        <li>Modificar ID, Código de Barras, Nombre</li>
+                        <li>Dejar celdas vacías en "Nuevo Stock"</li>
+                        <li>Usar números negativos o decimales</li>
+                        <li>Cambiar el formato del archivo</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                {/* LIMITACIONES TÉCNICAS */}
+                <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
+                  <h4 className="font-medium text-gray-700 mb-3 text-sm flex items-center">
+                    <AlertCircle className="w-4 h-4 mr-2" />
+                    Limitaciones Técnicas
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs text-gray-600">
+                    <div className="bg-white p-3 rounded-lg">
+                      <div className="font-medium text-gray-700 mb-1">Tamaño máximo:</div>
+                      <div>{config?.limits?.maxFileSize ? Math.round(config.limits.maxFileSize / 1024 / 1024) : 5}MB por archivo</div>
+                    </div>
+                    <div className="bg-white p-3 rounded-lg">
+                      <div className="font-medium text-gray-700 mb-1">Filas recomendadas:</div>
+                      <div>Máximo {config?.limits?.maxRows || 200} productos</div>
+                    </div>
+                    <div className="bg-white p-3 rounded-lg">
+                      <div className="font-medium text-gray-700 mb-1">Tiempo límite:</div>
+                      <div>{config?.timeouts?.excel ? Math.round(config.timeouts.excel / 1000) : 45} segundos máximo</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex justify-end mt-6 pt-4 border-t border-gray-200">
+                <button
+                  onClick={() => {
+                    if (!isProcessingExcel) {
+                      setShowExcelModal(false);
+                      setExcelFile(null);
+                      setExcelValidation(null);
+                      if (fileInputRef.current) fileInputRef.current.value = '';
+                    }
+                  }}
+                  disabled={isProcessingExcel}
+                  className="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg font-medium hover:bg-gray-300 transition-colors disabled:opacity-50"
+                >
+                  {isProcessingExcel ? 'Procesando...' : 'Cerrar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 🆕 MODAL DE HISTORIAL COMPLETO (AGREGADO) */}
+        {showHistorialModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl p-6 max-w-6xl w-full max-h-[80vh] overflow-hidden shadow-2xl">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                  <FileText className="w-5 h-5 mr-2" />
+                  Historial de Movimientos de Stock
+                </h3>
+                <button
+                  onClick={() => setShowHistorialModal(false)}
+                  className="p-1 hover:bg-gray-100 rounded"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="overflow-auto max-h-96">
+                {historialData.length > 0 ? (
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 sticky top-0">
+                      <tr>
+                        <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase">Fecha</th>
+                        <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase">Producto</th>
+                        <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase">Sucursal</th>
+                        <th className="p-3 text-center text-xs font-medium text-gray-500 uppercase">Movimiento</th>
+                        <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase">Usuario</th>
+                        <th className="p-3 text-left text-xs font-medium text-gray-500 uppercase">Motivo</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {historialData.map((movimiento, index) => (
+                        <tr key={movimiento.id} className="hover:bg-gray-50">
+                          <td className="p-3 text-xs">
+                            {new Date(movimiento.fecha).toLocaleString()}
+                          </td>
+                          <td className="p-3">
+                            <div className="font-medium text-sm">{movimiento.producto?.nombre || 'N/A'}</div>
+                            {movimiento.producto?.codigoBarras && (
+                              <div className="text-xs text-gray-500 font-mono">{movimiento.producto.codigoBarras}</div>
+                            )}
+                          </td>
+                          <td className="p-3 text-sm">{movimiento.sucursal.nombre}</td>
+                          <td className="p-3 text-center">
+                            <div className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                              movimiento.tipoMovimiento === 'entrada' 
+                                ? 'bg-green-100 text-green-800' 
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {movimiento.tipoMovimiento === 'entrada' ? (
+                                <Plus className="w-3 h-3 mr-1" />
+                              ) : (
+                                <Minus className="w-3 h-3 mr-1" />
+                              )}
+                              {movimiento.tipoMovimiento === 'entrada' ? '+' : '-'}{movimiento.cantidad}
+                            </div>
+                            <div className="text-xs text-gray-500 mt-1">Final: {movimiento.stockResultante}</div>
+                          </td>
+                          <td className="p-3 text-sm">{movimiento.usuario?.nombre || 'Sistema'}</td>
+                          <td className="p-3 text-xs text-gray-600">{movimiento.motivo}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="text-center py-12">
+                    <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Sin historial</h3>
+                    <p className="text-gray-500">No hay movimientos registrados para esta sucursal</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Modal de Configuración */}
         {showConfigModal && (
@@ -1108,7 +1568,6 @@ export default function StockSucursalesMejorado() {
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#eeb077] focus:border-transparent"
                   >
                     <option value="">Seleccionar producto...</option>
-                    {/* ✅ USAR productos del dashboard */}
                     {getProductosFromDashboard().map((producto) => (
                       <option key={producto.id} value={producto.id}>
                         {producto.nombre} {producto.codigoBarras ? `(${producto.codigoBarras})` : ''}
@@ -1222,8 +1681,6 @@ export default function StockSucursalesMejorado() {
             </div>
           </div>
         )}
-
-        {/* Resto de modales (Excel, Historial) mantener igual... */}
 
       </div>
     </div>
