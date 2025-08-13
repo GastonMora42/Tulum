@@ -1,8 +1,7 @@
-// src/hooks/usePrint.ts - VERSIÓN ACTUALIZADA PARA FUKUN
+// src/hooks/usePrint.ts - VERSIÓN CORREGIDA Y MEJORADA
 import { useState, useEffect, useCallback } from 'react';
-import { printManager } from '@/services/print/integratedPrintManager';
 
-export interface PrintStatus {
+interface PrintStatus {
   isInitialized: boolean;
   isLoading: boolean;
   availablePrinters: Array<{
@@ -22,76 +21,106 @@ export interface PrintStatus {
 export function usePrint() {
   const [status, setStatus] = useState<PrintStatus>({
     isInitialized: false,
-    isLoading: true,
+    isLoading: false,
     availablePrinters: [],
     queueStatus: { pending: 0, processing: false }
   });
+  
+  const [currentPrinter, setCurrentPrinter] = useState<string | null>(null);
 
-  // Inicializar automáticamente al montar el componente
+  // Inicializar sistema de impresión al montar
   useEffect(() => {
-    let mounted = true;
-
-    const initializePrintSystem = async () => {
-      try {
-        console.log('🖨️ Inicializando sistema de impresión Fukun...');
-        
-        const result = await printManager.initialize();
-        
-        if (mounted) {
-          const printerStatus = printManager.getPrinterStatus();
-          
-          setStatus({
-            isInitialized: result.success,
-            isLoading: false,
-            availablePrinters: printerStatus.printers,
-            queueStatus: { pending: 0, processing: false },
-            lastError: result.success ? undefined : result.message
-          });
-          
-          console.log(result.success ? '✅ Sistema inicializado' : '⚠️ Inicialización parcial');
-        }
-      } catch (error) {
-        console.error('❌ Error inicializando sistema:', error);
-        
-        if (mounted) {
-          setStatus(prev => ({
-            ...prev,
-            isLoading: false,
-            lastError: error instanceof Error ? error.message : 'Error desconocido'
-          }));
-        }
-      }
-    };
-
     initializePrintSystem();
-
-    return () => {
-      mounted = false;
-    };
   }, []);
 
-  // Imprimir factura - FUNCIÓN PRINCIPAL
+  const initializePrintSystem = useCallback(async () => {
+    try {
+      setStatus(prev => ({ ...prev, isLoading: true }));
+      
+      console.log('🖨️ [usePrint] Inicializando sistema de impresión...');
+      
+      // Importar dinámicamente el servicio de impresión
+      const { printManager } = await import('@/services/print/integratedPrintManager');
+      
+      const result = await printManager.initialize();
+      
+      if (result.success) {
+        const printerStatus = printManager.getPrinterStatus();
+        
+        setStatus({
+          isInitialized: true,
+          isLoading: false,
+          availablePrinters: printerStatus.printers.map(p => ({
+            id: p.id,
+            name: p.name,
+            type: p.type,
+            isDefault: p.isDefault,
+            isConnected: p.isConnected
+          })),
+          queueStatus: { pending: 0, processing: false }
+        });
+        
+        // Establecer impresora actual
+        const defaultPrinter = printerStatus.printers.find(p => p.isDefault);
+        if (defaultPrinter) {
+          setCurrentPrinter(defaultPrinter.name);
+        }
+        
+        console.log('✅ [usePrint] Sistema inicializado correctamente');
+      } else {
+        setStatus(prev => ({
+          ...prev,
+          isInitialized: false,
+          isLoading: false,
+          lastError: result.message
+        }));
+        
+        console.warn('⚠️ [usePrint] Inicialización parcial:', result.message);
+      }
+      
+    } catch (error) {
+      console.error('❌ [usePrint] Error inicializando:', error);
+      setStatus(prev => ({
+        ...prev,
+        isInitialized: false,
+        isLoading: false,
+        lastError: error instanceof Error ? error.message : 'Error desconocido'
+      }));
+    }
+  }, []);
+
   const printFactura = useCallback(async (
     facturaId: string, 
-    options: { auto?: boolean; printerName?: string; copies?: number } = {}
+    options: { 
+      auto?: boolean; 
+      printerName?: string; 
+      copies?: number 
+    } = {}
   ) => {
     try {
-      console.log(`🖨️ Imprimiendo factura ${facturaId}...`);
+      console.log(`🖨️ [usePrint] Imprimiendo factura ${facturaId}...`);
+      
       setStatus(prev => ({ ...prev, lastError: undefined }));
       
+      // Importar dinámicamente el servicio
+      const { printManager } = await import('@/services/print/integratedPrintManager');
+      
       const result = await printManager.printFactura(facturaId, {
-        auto: options.auto,
-        copies: options.copies
+        auto: options.auto || false,
+        copies: options.copies || 1
       });
       
-      if (!result.success) {
+      if (!result.success && result.message) {
         setStatus(prev => ({ ...prev, lastError: result.message }));
       }
       
       return result;
+      
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
       setStatus(prev => ({ ...prev, lastError: errorMessage }));
+      
+      console.error('❌ [usePrint] Error:', error);
       
       return {
         success: false,
@@ -100,11 +129,11 @@ export function usePrint() {
     }
   }, []);
 
-  // Test de impresión
   const testPrint = useCallback(async () => {
-    console.log('🧪 Ejecutando test de impresión...');
-    
     try {
+      console.log('🧪 [usePrint] Ejecutando test...');
+      
+      const { printManager } = await import('@/services/print/integratedPrintManager');
       const result = await printManager.testPrint();
       
       if (!result.success) {
@@ -112,6 +141,7 @@ export function usePrint() {
       }
       
       return result;
+      
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Error en test';
       setStatus(prev => ({ ...prev, lastError: errorMessage }));
@@ -123,26 +153,39 @@ export function usePrint() {
     }
   }, []);
 
-  // Configurar impresora - REEMPLAZA autodetección
   const setupPrinter = useCallback(async () => {
     try {
-      console.log('🔧 Configurando impresora Fukun...');
+      console.log('🔧 [usePrint] Configurando impresora...');
       
+      const { printManager } = await import('@/services/print/integratedPrintManager');
       const result = await printManager.setupPrinter();
       
       if (result.success) {
-        // Actualizar estado con nueva configuración
+        // Actualizar estado
         const printerStatus = printManager.getPrinterStatus();
         setStatus(prev => ({
           ...prev,
-          availablePrinters: printerStatus.printers,
+          availablePrinters: printerStatus.printers.map(p => ({
+            id: p.id,
+            name: p.name,
+            type: p.type,
+            isDefault: p.isDefault,
+            isConnected: p.isConnected
+          })),
           lastError: undefined
         }));
+        
+        // Actualizar impresora actual
+        const defaultPrinter = printerStatus.printers.find(p => p.isDefault);
+        if (defaultPrinter) {
+          setCurrentPrinter(defaultPrinter.name);
+        }
       } else {
         setStatus(prev => ({ ...prev, lastError: result.message }));
       }
       
       return result;
+      
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Error configurando';
       setStatus(prev => ({ ...prev, lastError: errorMessage }));
@@ -154,19 +197,26 @@ export function usePrint() {
     }
   }, []);
 
-  // Verificar conexión
   const checkConnection = useCallback(async () => {
     try {
+      const { printManager } = await import('@/services/print/integratedPrintManager');
       const result = await printManager.checkConnection();
       
       // Actualizar estado de conexión
       const printerStatus = printManager.getPrinterStatus();
       setStatus(prev => ({
         ...prev,
-        availablePrinters: printerStatus.printers
+        availablePrinters: printerStatus.printers.map(p => ({
+          id: p.id,
+          name: p.name,
+          type: p.type,
+          isDefault: p.isDefault,
+          isConnected: p.isConnected
+        }))
       }));
       
       return result;
+      
     } catch (error) {
       return {
         success: false,
@@ -175,11 +225,11 @@ export function usePrint() {
     }
   }, []);
 
-  // Abrir cajón de dinero
   const openCashDrawer = useCallback(async () => {
     try {
-      console.log('💰 Abriendo cajón de dinero...');
+      console.log('💰 [usePrint] Abriendo cajón...');
       
+      const { printManager } = await import('@/services/print/integratedPrintManager');
       const result = await printManager.openCashDrawer();
       
       if (!result.success) {
@@ -187,6 +237,7 @@ export function usePrint() {
       }
       
       return result;
+      
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Error abriendo cajón';
       setStatus(prev => ({ ...prev, lastError: errorMessage }));
@@ -198,52 +249,46 @@ export function usePrint() {
     }
   }, []);
 
-  // Reimprimir factura (alias de printFactura)
+  // Funciones de compatibilidad
   const reprintFactura = useCallback(async (facturaId: string, printerName?: string) => {
-    console.log(`🔄 Reimprimiendo factura ${facturaId}...`);
+    console.log(`🔄 [usePrint] Reimprimiendo factura ${facturaId}...`);
     return await printFactura(facturaId, { auto: false, printerName });
   }, [printFactura]);
 
-  // Actualizar lista de impresoras
   const refreshPrinters = useCallback(async () => {
     try {
-      // Verificar estado actual
       await checkConnection();
-      
-      console.log('🔄 Lista de impresoras actualizada');
+      console.log('🔄 [usePrint] Lista de impresoras actualizada');
     } catch (error) {
-      console.error('Error actualizando impresoras:', error);
+      console.error('❌ [usePrint] Error actualizando impresoras:', error);
     }
   }, [checkConnection]);
 
-  // Función de compatibilidad - detectar impresoras (ahora simplificada)
   const detectPrinters = useCallback(async () => {
     try {
-      console.log('🔍 Detectando impresoras...');
+      console.log('🔍 [usePrint] Detectando impresoras...');
       
-      const result = await printManager.setupPrinter();
+      const result = await setupPrinter();
       
       return result.success ? [
         {
-          id: 'fukun-main',
-          name: 'Fukun 80 POS',
+          id: 'detected-printer',
+          name: 'Impresora Detectada',
           type: 'thermal',
           detected: true
         }
       ] : [];
     } catch (error) {
-      console.error('Error detectando impresoras:', error);
+      console.error('❌ [usePrint] Error detectando impresoras:', error);
       return [];
     }
-  }, []);
+  }, [setupPrinter]);
 
-  // Función de compatibilidad - agregar impresora (simplificada)
   const addPrinter = useCallback(async (config: any) => {
     try {
-      console.log('➕ Agregando impresora:', config.name);
+      console.log('➕ [usePrint] Agregando impresora:', config.name);
       
-      // Para Fukun, solo necesitamos configurar la conexión
-      const result = await printManager.setupPrinter();
+      const result = await setupPrinter();
       
       if (result.success) {
         await refreshPrinters();
@@ -251,14 +296,22 @@ export function usePrint() {
       
       return result.success;
     } catch (error) {
-      console.error('Error agregando impresora:', error);
+      console.error('❌ [usePrint] Error agregando impresora:', error);
       return false;
     }
-  }, [refreshPrinters]);
+  }, [setupPrinter, refreshPrinters]);
+
+  const getStatus = useCallback(() => {
+    return {
+      ...status,
+      currentPrinter
+    };
+  }, [status, currentPrinter]);
 
   return {
-    // Estados
+    // Estados principales
     ...status,
+    currentPrinter,
     
     // Funciones principales
     printFactura,
@@ -268,12 +321,13 @@ export function usePrint() {
     openCashDrawer,
     checkConnection,
     
-    // Funciones de compatibilidad (mantienen la API existente)
+    // Funciones de gestión
     addPrinter,
     refreshPrinters,
     detectPrinters,
     
-    // Información adicional
-    getStatus: () => printManager.getPrinterStatus()
+    // Funciones auxiliares
+    initializePrintSystem,
+    getStatus
   };
 }

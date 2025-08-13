@@ -1,4 +1,4 @@
-// src/components/pdv/FacturasTable.tsx (completado)
+// src/components/pdv/FacturasTable.tsx - VERSIÓN MEJORADA
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
@@ -9,10 +9,13 @@ import {
   CheckCircle, 
   Clock, 
   Filter,
-  FileText
+  FileText,
+  Eye,
+  Printer,
+  Download,
+  ExternalLink
 } from 'lucide-react';
 import { authenticatedFetch } from '@/hooks/useAuth';
-import { Button, Input, Alert, Spinner, Select } from '@/components/ui'
 
 interface Factura {
   id: string;
@@ -40,7 +43,14 @@ interface FacturasTableProps {
   refreshKey?: number;
 }
 
-export default function FacturasTable({ sucursalId }: FacturasTableProps) {
+export default function FacturasTable({ 
+  sucursalId, 
+  onViewFactura, 
+  onRetryFactura, 
+  refreshKey 
+}: FacturasTableProps) {
+  const router = useRouter();
+  
   const [facturas, setFacturas] = useState<Factura[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +66,9 @@ export default function FacturasTable({ sucursalId }: FacturasTableProps) {
   });
   const [mostrarFiltros, setMostrarFiltros] = useState(false);
   
-  const router = useRouter();
+  useEffect(() => {
+    fetchFacturas();
+  }, [page, sucursalId, refreshKey]);
   
   const fetchFacturas = async () => {
     try {
@@ -93,16 +105,37 @@ export default function FacturasTable({ sucursalId }: FacturasTableProps) {
     }
   };
   
-  useEffect(() => {
-    fetchFacturas();
-  }, [page, sucursalId]);
-  
   const handleVerDetalle = (facturaId: string) => {
+    // Navegar a la página de detalle
     router.push(`/pdv/facturas/${facturaId}`);
   };
   
   const handleVerPdf = (facturaId: string) => {
     window.open(`/api/pdv/facturas/${facturaId}/pdf`, '_blank');
+  };
+
+  const handleReimprimir = async (facturaId: string) => {
+    try {
+      // Importar dinámicamente el hook de impresión
+      const { printManager } = await import('@/services/print/integratedPrintManager');
+      
+      const result = await printManager.printFactura(facturaId, {
+        auto: false,
+        copies: 1
+      });
+      
+      if (result.success) {
+        alert('✅ Factura enviada a impresora');
+      } else {
+        alert(`❌ Error: ${result.message}`);
+        // Fallback a PDF
+        handleVerPdf(facturaId);
+      }
+    } catch (error) {
+      console.error('Error reimprimiendo:', error);
+      alert('❌ Error de impresión. Se abrirá PDF como alternativa.');
+      handleVerPdf(facturaId);
+    }
   };
   
   const handleFiltrar = (e: React.FormEvent) => {
@@ -150,92 +183,139 @@ export default function FacturasTable({ sucursalId }: FacturasTableProps) {
     }
   };
   
+  const formatNumeroFactura = (puntoVenta: number, numeroFactura: number) => {
+    return `${String(puntoVenta).padStart(5, '0')}-${String(numeroFactura).padStart(8, '0')}`;
+  };
+
+  if (error) {
+    return (
+      <div className="bg-white rounded-lg shadow-sm border p-6">
+        <div className="text-center">
+          <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Error al cargar facturas</h3>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button
+            onClick={fetchFacturas}
+            className="px-4 py-2 bg-[#311716] text-white rounded-md hover:bg-[#462625]"
+          >
+            <RefreshCw size={16} className="inline mr-2" />
+            Reintentar
+          </button>
+        </div>
+      </div>
+    );
+  }
+  
   return (
-    <div className="bg-white rounded-lg shadow overflow-hidden">
-      <div className="flex justify-between items-center p-4 border-b">
-        <h2 className="text-lg font-semibold text-gray-800">Facturas Electrónicas</h2>
-        <div className="flex space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
+    <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+      {/* Header con acciones */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 border-b bg-gray-50">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-800">Facturas Electrónicas</h2>
+          <p className="text-sm text-gray-600 mt-1">
+            {total > 0 ? `${total} facturas encontradas` : 'No hay facturas'}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2 mt-3 sm:mt-0">
+          <button
             onClick={() => setMostrarFiltros(!mostrarFiltros)}
-            leftIcon={<Filter size={16} />}
+            className={`px-3 py-2 text-sm border rounded-md transition-colors ${
+              mostrarFiltros 
+                ? 'bg-[#311716] text-white border-[#311716]' 
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+            }`}
           >
+            <Filter size={16} className="inline mr-1" />
             Filtros
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
+          </button>
+          <button
             onClick={() => fetchFacturas()}
-            leftIcon={<RefreshCw size={16} />}
-            isLoading={loading}
+            disabled={loading}
+            className="px-3 py-2 text-sm bg-white text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50"
           >
+            <RefreshCw size={16} className={`inline mr-1 ${loading ? 'animate-spin' : ''}`} />
             Actualizar
-          </Button>
+          </button>
         </div>
       </div>
       
+      {/* Panel de filtros */}
       {mostrarFiltros && (
         <div className="p-4 bg-gray-50 border-b">
-          <form onSubmit={handleFiltrar} className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <form onSubmit={handleFiltrar} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
-              <Input
+              <label className="block text-sm font-medium text-gray-700 mb-1">Desde</label>
+              <input
                 type="date"
-                label="Desde"
                 value={filtros.desde}
-                onChange={(e: { target: { value: any; }; }) => setFiltros({...filtros, desde: e.target.value})}
+                onChange={(e) => setFiltros({...filtros, desde: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#311716] focus:border-transparent"
               />
             </div>
             <div>
-              <Input
+              <label className="block text-sm font-medium text-gray-700 mb-1">Hasta</label>
+              <input
                 type="date"
-                label="Hasta"
                 value={filtros.hasta}
-                onChange={(e: { target: { value: any; }; }) => setFiltros({...filtros, hasta: e.target.value})}
+                onChange={(e) => setFiltros({...filtros, hasta: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#311716] focus:border-transparent"
               />
             </div>
             <div>
-              <Select
-                label="Estado"
+              <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
+              <select
                 value={filtros.estado}
-                onChange={(e: { target: { value: any; }; }) => setFiltros({...filtros, estado: e.target.value})}
+                onChange={(e) => setFiltros({...filtros, estado: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#311716] focus:border-transparent"
               >
                 <option value="">Todos</option>
                 <option value="completada">Completada</option>
                 <option value="procesando">Procesando</option>
+                <option value="pendiente">Pendiente</option>
                 <option value="error">Error</option>
-              </Select>
+              </select>
             </div>
             <div>
-              <Input
-                label="Buscar"
-                placeholder="Cliente, número..."
-                value={filtros.search}
-                onChange={(e: { target: { value: any; }; }) => setFiltros({...filtros, search: e.target.value})}
-                leftIcon={<Search size={16} />}
-              />
+              <label className="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Cliente, número..."
+                  value={filtros.search}
+                  onChange={(e) => setFiltros({...filtros, search: e.target.value})}
+                  className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-2 focus:ring-[#311716] focus:border-transparent"
+                />
+                <Search size={16} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              </div>
             </div>
-            <div className="md:col-span-4 flex justify-end space-x-2">
-              <Button type="button" variant="outline" onClick={handleLimpiarFiltros}>
+            
+            {/* Botones de filtro */}
+            <div className="lg:col-span-4 flex justify-end space-x-2 pt-2">
+              <button
+                type="button"
+                onClick={handleLimpiarFiltros}
+                className="px-4 py-2 text-sm border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+              >
                 Limpiar
-              </Button>
-              <Button type="submit" variant="primary">
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-2 text-sm bg-[#311716] text-white rounded-md hover:bg-[#462625]"
+              >
                 Aplicar filtros
-              </Button>
+              </button>
             </div>
           </form>
         </div>
       )}
       
-      {error && (
-        <Alert variant="error" className="m-4">
-          {error}
-        </Alert>
-      )}
-      
+      {/* Tabla de facturas */}
       {loading && facturas.length === 0 ? (
         <div className="flex justify-center items-center h-64">
-          <Spinner size="lg" />
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#311716] mx-auto mb-2"></div>
+            <p className="text-gray-600">Cargando facturas...</p>
+          </div>
         </div>
       ) : (
         <div className="overflow-x-auto">
@@ -243,10 +323,7 @@ export default function FacturasTable({ sucursalId }: FacturasTableProps) {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Tipo
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Número
+                  Comprobante
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Fecha
@@ -254,10 +331,10 @@ export default function FacturasTable({ sucursalId }: FacturasTableProps) {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Cliente
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Total
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Estado
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -268,58 +345,129 @@ export default function FacturasTable({ sucursalId }: FacturasTableProps) {
             <tbody className="bg-white divide-y divide-gray-200">
               {facturas.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
-                    No se encontraron facturas
+                  <td colSpan={6} className="px-6 py-12 text-center">
+                    <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No hay facturas</h3>
+                    <p className="text-gray-600">
+                      {filtros.desde || filtros.hasta || filtros.estado || filtros.search
+                        ? 'No se encontraron facturas con los filtros aplicados'
+                        : 'Aún no se han generado facturas en esta sucursal'
+                      }
+                    </p>
+                    {(filtros.desde || filtros.hasta || filtros.estado || filtros.search) && (
+                      <button
+                        onClick={handleLimpiarFiltros}
+                        className="mt-3 px-4 py-2 text-sm bg-[#311716] text-white rounded-md hover:bg-[#462625]"
+                      >
+                        Limpiar filtros
+                      </button>
+                    )}
                   </td>
                 </tr>
               ) : (
                 facturas.map((factura) => (
-                  <tr key={factura.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      Factura {factura.tipoComprobante}
+                  <tr key={factura.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div>
+                        <div className="text-sm font-medium text-gray-900">
+                          Factura {factura.tipoComprobante}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {formatNumeroFactura(factura.puntoVenta, factura.numeroFactura)}
+                        </div>
+                        {factura.cae && (
+                          <div className="text-xs text-gray-400">
+                            CAE: {factura.cae.substring(0, 8)}...
+                          </div>
+                        )}
+                      </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {String(factura.puntoVenta).padStart(5, '0')}-
-                      {String(factura.numeroFactura).padStart(8, '0')}
+                    
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {format(new Date(factura.fechaEmision), 'dd/MM/yyyy')}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {format(new Date(factura.fechaEmision), 'HH:mm')}
+                      </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {format(new Date(factura.fechaEmision), 'dd/MM/yyyy')}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {factura.venta.clienteNombre || 'Consumidor Final'}
+                    
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-900">
+                        {factura.venta.clienteNombre || 'Consumidor Final'}
+                      </div>
                       {factura.venta.clienteCuit && (
-                        <span className="block text-xs text-gray-400">
+                        <div className="text-sm text-gray-500">
                           {factura.venta.clienteCuit}
-                        </span>
+                        </div>
                       )}
+                      <div className="text-xs text-gray-400">
+                        por {factura.usuario}
+                      </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      ${factura.venta.total.toFixed(2)}
+                    
+                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <div className="text-sm font-medium text-gray-900">
+                        ${factura.venta.total.toFixed(2)}
+                      </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
                       {getEstadoTag(factura.estado)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    
+                    <td className="px-6 py-4 whitespace-nowrap text-right">
                       <div className="flex justify-end space-x-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
+                        {/* Botón Ver Detalle */}
+                        <button
                           onClick={() => handleVerDetalle(factura.id)}
-                          disabled={factura.estado === 'error'}
+                          className="p-2 text-gray-400 hover:text-[#311716] hover:bg-gray-100 rounded-md transition-colors"
+                          title="Ver detalle"
                         >
-                          Ver
-                        </Button>
+                          <Eye size={16} />
+                        </button>
+                        
+                        {/* Botón Ver PDF - solo si está completada */}
                         {factura.estado === 'completada' && (
-                            <Button
-  variant="outline"
-  size="sm"
-  onClick={() => handleVerPdf(factura.id)}
-  leftIcon={<FileText size={16} />} // Cambiar FilePdf por FileText
->
-  PDF
-</Button>
+                          <button
+                            onClick={() => handleVerPdf(factura.id)}
+                            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                            title="Ver PDF"
+                          >
+                            <FileText size={16} />
+                          </button>
                         )}
                         
+                        {/* Botón Reimprimir - solo si está completada */}
+                        {factura.estado === 'completada' && (
+                          <button
+                            onClick={() => handleReimprimir(factura.id)}
+                            className="p-2 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-md transition-colors"
+                            title="Reimprimir"
+                          >
+                            <Printer size={16} />
+                          </button>
+                        )}
+                        
+                        {/* Botón Reintentar - solo si hay error */}
+                        {factura.estado === 'error' && onRetryFactura && (
+                          <button
+                            onClick={() => onRetryFactura(factura.id)}
+                            className="p-2 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-md transition-colors"
+                            title="Reintentar"
+                          >
+                            <RefreshCw size={16} />
+                          </button>
+                        )}
+                        
+                        {/* Botón Abrir en nueva pestaña */}
+                        <button
+                          onClick={() => window.open(`/pdv/facturas/${factura.id}`, '_blank')}
+                          className="p-2 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-md transition-colors"
+                          title="Abrir en nueva pestaña"
+                        >
+                          <ExternalLink size={16} />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -330,31 +478,70 @@ export default function FacturasTable({ sucursalId }: FacturasTableProps) {
         </div>
       )}
       
+      {/* Paginación */}
       {totalPages > 1 && (
-        <div className="px-6 py-4 flex items-center justify-between border-t">
-          <div className="text-sm text-gray-500">
-            Mostrando {facturas.length} de {total} facturas
+        <div className="px-6 py-4 flex items-center justify-between border-t bg-gray-50">
+          <div className="text-sm text-gray-700">
+            Mostrando <span className="font-medium">{(page - 1) * limit + 1}</span> a{' '}
+            <span className="font-medium">
+              {Math.min(page * limit, total)}
+            </span>{' '}
+            de <span className="font-medium">{total}</span> facturas
           </div>
-          <div className="flex space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
+          
+          <div className="flex items-center space-x-2">
+            <button
               onClick={() => setPage(Math.max(1, page - 1))}
               disabled={page === 1 || loading}
+              className="px-3 py-2 text-sm border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Anterior
-            </Button>
-            <span className="text-sm flex items-center px-3 bg-gray-50 rounded">
-              {page} de {totalPages}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
+            </button>
+            
+            <div className="flex items-center space-x-1">
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                const pageNum = i + 1;
+                const isCurrentPage = pageNum === page;
+                
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setPage(pageNum)}
+                    className={`px-3 py-2 text-sm rounded-md transition-colors ${
+                      isCurrentPage
+                        ? 'bg-[#311716] text-white'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+              
+              {totalPages > 5 && (
+                <>
+                  {page < totalPages - 2 && <span className="text-gray-500">...</span>}
+                  <button
+                    onClick={() => setPage(totalPages)}
+                    className={`px-3 py-2 text-sm rounded-md transition-colors ${
+                      totalPages === page
+                        ? 'bg-[#311716] text-white'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    {totalPages}
+                  </button>
+                </>
+              )}
+            </div>
+            
+            <button
               onClick={() => setPage(Math.min(totalPages, page + 1))}
               disabled={page >= totalPages || loading}
+              className="px-3 py-2 text-sm border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Siguiente
-            </Button>
+            </button>
           </div>
         </div>
       )}
