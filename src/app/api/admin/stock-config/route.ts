@@ -11,6 +11,7 @@ export async function GET(req: NextRequest) {
   const permError = await checkPermission('admin')(req);
   if (permError) return permError;
 
+  
   try {
     const { searchParams } = new URL(req.url);
     const sucursalId = searchParams.get('sucursalId');

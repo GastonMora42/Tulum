@@ -1,4 +1,4 @@
-// src/server/services/stock/stockSucursalService.ts - VERSIÓN CORREGIDA
+// src/server/services/stock/stockSucursalService.ts - CORREGIDO CON CATEGORÍAS
 import prisma from '@/server/db/client';
 import { stockService } from './stockService';
 
@@ -60,7 +60,11 @@ class StockSucursalService {
         creadoPor: usuarioId
       },
       include: {
-        producto: true,
+        producto: {
+          include: {
+            categoria: true // ✅ INCLUIR CATEGORÍA
+          }
+        },
         sucursal: true,
         usuario: {
           select: { name: true, email: true }
@@ -74,7 +78,6 @@ class StockSucursalService {
     return config;
   }
 
-  // 🆕 NUEVO: Crear configuración automática básica
   async crearConfiguracionAutomatica(productoId: string, sucursalId: string, usuarioId: string, stockActual: number = 0) {
     console.log(`[StockSucursal] Creando configuración automática para producto ${productoId} en sucursal ${sucursalId}`);
     
@@ -93,7 +96,10 @@ class StockSucursalService {
       
       // Obtener información del producto para calcular valores por defecto
       const producto = await prisma.producto.findUnique({
-        where: { id: productoId }
+        where: { id: productoId },
+        include: {
+          categoria: true // ✅ INCLUIR CATEGORÍA
+        }
       });
       
       if (!producto) {
@@ -102,7 +108,7 @@ class StockSucursalService {
       
       // Calcular valores por defecto inteligentes
       const stockMinimo = Math.max(producto.stockMinimo, 1);
-      const stockMaximo = Math.max(stockActual * 3, stockMinimo * 5, 10); // Al menos 3x el stock actual o 5x el mínimo
+      const stockMaximo = Math.max(stockActual * 3, stockMinimo * 5, 10);
       const puntoReposicion = Math.ceil(stockMinimo * 1.5);
       
       const config = await prisma.stockConfigSucursal.create({
@@ -116,7 +122,11 @@ class StockSucursalService {
           activo: true
         },
         include: {
-          producto: true,
+          producto: {
+            include: {
+              categoria: true // ✅ INCLUIR CATEGORÍA
+            }
+          },
           sucursal: true,
           usuario: {
             select: { name: true, email: true }
@@ -144,7 +154,11 @@ class StockSucursalService {
     const configs = await prisma.stockConfigSucursal.findMany({
       where,
       include: {
-        producto: true,
+        producto: {
+          include: {
+            categoria: true // ✅ INCLUIR CATEGORÍA
+          }
+        },
         sucursal: true,
         usuario: {
           select: { name: true, email: true }
@@ -205,30 +219,34 @@ class StockSucursalService {
   
   // =================== ANÁLISIS Y DASHBOARD MEJORADO ===================
   
-  // 🔧 CORRECCIÓN: Dashboard mejorado que incluye productos sin configuración
+  // ✅ CORREGIDO: Dashboard mejorado que incluye categorías y ordenamiento
   async generarDashboard(sucursalId?: string) {
     console.log(`[StockSucursal] Generando dashboard mejorado para sucursal: ${sucursalId || 'todas'}`);
     
     const where: any = { activo: true };
     if (sucursalId) where.sucursalId = sucursalId;
     
-    // 1. Obtener productos con configuración explícita
+    // 1. Obtener productos con configuración explícita (✅ CON CATEGORÍAS)
     const configs = await prisma.stockConfigSucursal.findMany({
       where,
       include: {
-        producto: true,
+        producto: {
+          include: {
+            categoria: true // ✅ INCLUIR CATEGORÍA
+          }
+        },
         sucursal: true
       }
     });
     
     console.log(`[StockSucursal] Encontradas ${configs.length} configuraciones explícitas`);
     
-    // 2. 🆕 NUEVO: Obtener productos con stock pero sin configuración
+    // 2. Obtener productos con stock pero sin configuración (✅ CON CATEGORÍAS)
     const stocksSinConfig = await prisma.stock.findMany({
       where: {
         ...(sucursalId ? { ubicacionId: sucursalId } : {}),
         productoId: { not: null },
-        cantidad: { gt: 0 }, // Solo mostrar productos con stock > 0
+        cantidad: { gt: 0 },
         // Excluir productos que ya tienen configuración
         NOT: {
           productoId: {
@@ -237,14 +255,18 @@ class StockSucursalService {
         }
       },
       include: {
-        producto: true,
+        producto: {
+          include: {
+            categoria: true // ✅ INCLUIR CATEGORÍA
+          }
+        },
         ubicacion: true
       }
     });
     
     console.log(`[StockSucursal] Encontrados ${stocksSinConfig.length} productos con stock sin configuración`);
     
-    // 3. Analizar productos con configuración
+    // 3. Analizar productos con configuración (✅ CON CATEGORÍAS)
     const analisisConConfig = await Promise.all(configs.map(async (config) => {
       const stats = await this.calcularEstadisticasStock(config.productoId, config.sucursalId, config);
       
@@ -253,7 +275,12 @@ class StockSucursalService {
         producto: {
           id: config.producto.id,
           nombre: config.producto.nombre,
-          codigoBarras: config.producto.codigoBarras
+          codigoBarras: config.producto.codigoBarras,
+          categoriaId: config.producto.categoriaId, // ✅ INCLUIR categoriaId
+          categoria: config.producto.categoria ? { // ✅ INCLUIR categoría
+            id: config.producto.categoria.id,
+            nombre: config.producto.categoria.nombre
+          } : null
         },
         sucursal: {
           id: config.sucursal.id,
@@ -270,14 +297,14 @@ class StockSucursalService {
       };
     }));
     
-    // 4. 🆕 NUEVO: Analizar productos sin configuración con valores por defecto
+    // 4. Analizar productos sin configuración (✅ CON CATEGORÍAS)
     const analisisSinConfig = stocksSinConfig.map((stock) => {
       const stockActual = stock.cantidad;
       const producto = stock.producto!;
       
       // Usar valores por defecto basados en el stockMinimo del producto
       const stockMinimo = Math.max(producto.stockMinimo, 1);
-      const stockMaximo = stockMinimo * 5; // Por defecto 5x el mínimo
+      const stockMaximo = stockMinimo * 5;
       const puntoReposicion = Math.ceil(stockMinimo * 1.5);
       
       const configuracionPorDefecto = {
@@ -290,11 +317,16 @@ class StockSucursalService {
       const stats = this.calcularEstadisticasStockDirecto(stockActual, configuracionPorDefecto);
       
       return {
-        id: `sin-config-${stock.id}`, // ID temporal
+        id: `sin-config-${stock.id}`,
         producto: {
           id: producto.id,
           nombre: producto.nombre,
-          codigoBarras: producto.codigoBarras
+          codigoBarras: producto.codigoBarras,
+          categoriaId: producto.categoriaId, // ✅ INCLUIR categoriaId
+          categoria: producto.categoria ? { // ✅ INCLUIR categoría
+            id: producto.categoria.id,
+            nombre: producto.categoria.nombre
+          } : null
         },
         sucursal: {
           id: stock.ubicacion.id,
@@ -302,18 +334,17 @@ class StockSucursalService {
           tipo: stock.ubicacion.tipo
         },
         configuracion: configuracionPorDefecto,
-        tieneConfiguracion: false, // Marcar como sin configuración
+        tieneConfiguracion: false,
         ...stats,
-        // Agregar flag para identificar que necesita configuración
         requiereConfiguracion: true
       };
     });
     
-    // 5. Combinar ambos análisis
+    // 5. ✅ CORREGIDO: Combinar análisis y ordenar alfabéticamente
     const analisisCompleto = [...analisisConConfig, ...analisisSinConfig]
-      .sort((a, b) => b.prioridad - a.prioridad);
+      .sort((a, b) => a.producto.nombre.localeCompare(b.producto.nombre, 'es', { sensitivity: 'base' }));
     
-    console.log(`[StockSucursal] Dashboard generado: ${analisisConConfig.length} con config + ${analisisSinConfig.length} sin config = ${analisisCompleto.length} total`);
+    console.log(`[StockSucursal] Dashboard generado: ${analisisConConfig.length} con config + ${analisisSinConfig.length} sin config = ${analisisCompleto.length} total (ordenado A-Z)`);
     
     // 6. Calcular estadísticas generales
     const estadisticas = {
@@ -331,15 +362,23 @@ class StockSucursalService {
     // 7. Resumen por sucursal
     const resumenSucursales = this.agruparPorSucursal(analisisCompleto);
     
-    // 8. Top productos
+    // 8. Top productos (también ordenados alfabéticamente después de ordenar por valor)
     const topDeficit = analisisCompleto
       .filter(a => a.diferencia > 0)
-      .sort((a, b) => b.diferencia - a.diferencia)
+      .sort((a, b) => {
+        // Primero por déficit, luego alfabéticamente
+        const deficitDiff = b.diferencia - a.diferencia;
+        return deficitDiff !== 0 ? deficitDiff : a.producto.nombre.localeCompare(b.producto.nombre, 'es');
+      })
       .slice(0, 10);
       
     const topExceso = analisisCompleto
       .filter(a => a.acciones.tieneExceso)
-      .sort((a, b) => b.acciones.excesoActual - a.acciones.excesoActual)
+      .sort((a, b) => {
+        // Primero por exceso, luego alfabéticamente
+        const excesoDiff = b.acciones.excesoActual - a.acciones.excesoActual;
+        return excesoDiff !== 0 ? excesoDiff : a.producto.nombre.localeCompare(b.producto.nombre, 'es');
+      })
       .slice(0, 10);
     
     return {
@@ -364,7 +403,6 @@ class StockSucursalService {
     return this.calcularEstadisticasStockDirecto(cantidadActual, config);
   }
   
-  // 🆕 NUEVO: Función auxiliar para calcular estadísticas sin consulta a BD
   private calcularEstadisticasStockDirecto(cantidadActual: number, config: any) {
     const diferencia = config.stockMaximo - cantidadActual;
     const porcentajeUso = config.stockMaximo > 0 ? (cantidadActual / config.stockMaximo) * 100 : 0;
@@ -433,7 +471,6 @@ class StockSucursalService {
   
   // =================== CARGA MASIVA MEJORADA ===================
   
-  // 🔧 CORRECCIÓN: Procesar carga masiva con creación automática de configuración
   async procesarCargaMasiva(data: BulkLoadData, usuarioId: string) {
     console.log(`[StockSucursal] Iniciando carga masiva: ${data.nombre} con ${data.items.length} items`);
     
@@ -463,7 +500,7 @@ class StockSucursalService {
         if (resultado.estado === 'procesado') {
           itemsProcesados++;
           
-          // 🆕 NUEVO: Crear configuración automática si no existe
+          // Crear configuración automática si no existe
           try {
             await this.crearConfiguracionAutomatica(
               resultado.producto.id, 
@@ -473,7 +510,6 @@ class StockSucursalService {
             );
           } catch (configError) {
             console.warn(`[StockSucursal] No se pudo crear configuración automática para ${resultado.producto.nombre}:`, configError);
-            // No fallar la carga por esto
           }
         } else {
           itemsErrores++;
@@ -536,16 +572,18 @@ class StockSucursalService {
     sucursalId: string, 
     usuarioId: string
   ) {
-    // Buscar producto (lógica existente mejorada)
+    // Buscar producto (lógica existente mejorada) con categorías
     let producto = null;
     
     if (item.productoId) {
       producto = await prisma.producto.findUnique({ 
-        where: { id: item.productoId, activo: true } 
+        where: { id: item.productoId, activo: true },
+        include: { categoria: true } // ✅ INCLUIR CATEGORÍA
       });
     } else if (item.codigoBarras) {
       producto = await prisma.producto.findFirst({
-        where: { codigoBarras: item.codigoBarras, activo: true }
+        where: { codigoBarras: item.codigoBarras, activo: true },
+        include: { categoria: true } // ✅ INCLUIR CATEGORÍA
       });
     } else if (item.nombreProducto) {
       // Búsqueda más inteligente por nombre
@@ -556,7 +594,8 @@ class StockSucursalService {
         where: { 
           nombre: { equals: item.nombreProducto, mode: 'insensitive' },
           activo: true 
-        }
+        },
+        include: { categoria: true } // ✅ INCLUIR CATEGORÍA
       });
       
       // Si no encuentra, búsqueda por términos
@@ -567,7 +606,8 @@ class StockSucursalService {
               nombre: { contains: term, mode: 'insensitive' }
             })),
             activo: true 
-          }
+          },
+          include: { categoria: true } // ✅ INCLUIR CATEGORÍA
         });
       }
       
@@ -577,7 +617,8 @@ class StockSucursalService {
           where: { 
             nombre: { contains: item.nombreProducto, mode: 'insensitive' },
             activo: true 
-          }
+          },
+          include: { categoria: true } // ✅ INCLUIR CATEGORÍA
         });
       }
     }
@@ -586,7 +627,7 @@ class StockSucursalService {
       throw new Error(`Producto no encontrado: ${item.productoId || item.codigoBarras || item.nombreProducto}`);
     }
     
-    console.log(`[StockSucursal] ✅ Producto encontrado: ${producto.nombre}`);
+    console.log(`[StockSucursal] ✅ Producto encontrado: ${producto.nombre} (${producto.categoria?.nombre || 'Sin categoría'})`);
     
     // Obtener stock actual
     const stockActual = await prisma.stock.findFirst({
@@ -665,7 +706,8 @@ class StockSucursalService {
       producto: {
         id: producto.id,
         nombre: producto.nombre,
-        codigoBarras: producto.codigoBarras
+        codigoBarras: producto.codigoBarras,
+        categoria: producto.categoria // ✅ INCLUIR CATEGORÍA EN RESPUESTA
       },
       cantidadAnterior,
       cantidadAjuste,
@@ -710,7 +752,12 @@ class StockSucursalService {
       where: {
         productoId_sucursalId: { productoId, sucursalId }
       },
-      include: { producto: true, sucursal: true }
+      include: { 
+        producto: {
+          include: { categoria: true } // ✅ INCLUIR CATEGORÍA
+        }, 
+        sucursal: true 
+      }
     });
     
     if (!config) return;
@@ -785,7 +832,9 @@ class StockSucursalService {
     return await prisma.alertaStock.findMany({
       where,
       include: {
-        producto: true,
+        producto: {
+          include: { categoria: true } // ✅ INCLUIR CATEGORÍA
+        },
         sucursal: true
       },
       orderBy: [
