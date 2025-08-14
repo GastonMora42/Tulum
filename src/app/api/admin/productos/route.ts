@@ -6,7 +6,7 @@ import { checkPermission } from '@/server/api/middlewares/authorization';
 import { barcodeService } from '@/server/services/producto/barcodeService';
 import { z } from 'zod';
 
-// Esquema de validación para crear producto
+// Esquema de validación actualizado con sucursales
 const createProductoSchema = z.object({
   nombre: z.string().min(3, { message: 'El nombre debe tener al menos 3 caracteres' }),
   descripcion: z.string().nullable(),
@@ -16,8 +16,15 @@ const createProductoSchema = z.object({
   categoriaId: z.string().min(1, { message: 'Debe seleccionar una categoría' }),
   stockMinimo: z.number().int().nonnegative({ message: 'El stock mínimo debe ser un número positivo o cero' }),
   activo: z.boolean().default(true),
-  // 🆕 Control explícito para generación automática
-  generarCodigoAutomatico: z.boolean().optional().default(false)
+  generarCodigoAutomatico: z.boolean().optional().default(false),
+  
+  // 🆕 NUEVOS CAMPOS PARA CONFIGURACIÓN AUTOMÁTICA
+  crearConfiguracionStock: z.boolean().optional().default(true),
+  sucursalesConfig: z.array(z.object({
+    sucursalId: z.string(),
+    stockMaximo: z.number().int().nonnegative().default(10),
+    puntoReposicion: z.number().int().nonnegative().optional()
+  })).optional()
 });
 
 export async function GET(req: NextRequest) {
@@ -191,9 +198,11 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// 🔒 MÉTODO POST SEGURO - SOLO GENERA CÓDIGOS PARA PRODUCTOS NUEVOS
+
+
+
 export async function POST(req: NextRequest) {
-  console.log('🆕 [API] Iniciando creación de producto SEGURA...');
+  console.log('🆕 [API] Iniciando creación de producto con configuración automática...');
   
   const authError = await authMiddleware(req);
   if (authError) return authError;
@@ -214,18 +223,14 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    // 🔒 GENERACIÓN SEGURA DE CÓDIGO DE BARRAS
+    // 🔒 GENERACIÓN SEGURA DE CÓDIGO DE BARRAS (mantener igual)
     let codigoBarras = validation.data.codigoBarras;
     
-    // Solo generar código si se solicita explícitamente Y no se proporciona uno
     if (validation.data.generarCodigoAutomatico && !codigoBarras) {
-      console.log('🔄 [API] Generando código compatible con sistema existente...');
-      
+      console.log('🔄 [API] Generando código compatible...');
       try {
-        // Usar el nuevo método seguro que analiza códigos existentes
         codigoBarras = await barcodeService.generateBarcodeForNewProduct();
-        
-        console.log(`✅ [API] Código generado de forma compatible: ${codigoBarras}`);
+        console.log(`✅ [API] Código generado: ${codigoBarras}`);
       } catch (barcodeError) {
         console.error('❌ [API] Error al generar código:', barcodeError);
         return NextResponse.json(
@@ -235,9 +240,8 @@ export async function POST(req: NextRequest) {
       }
     }
     
-    // 🔒 VERIFICAR CÓDIGO ÚNICO SI SE PROPORCIONA
+    // 🔒 VERIFICAR CÓDIGO ÚNICO (mantener igual)
     if (codigoBarras) {
-      // Validar formato del código
       const isValid = barcodeService.validateBarcode(codigoBarras);
       if (!isValid) {
         return NextResponse.json(
@@ -246,7 +250,6 @@ export async function POST(req: NextRequest) {
         );
       }
       
-      // Verificar que no existe otro producto con el mismo código
       const existingProducto = await prisma.producto.findFirst({
         where: { codigoBarras: codigoBarras }
       });
@@ -257,21 +260,9 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
-      
-      // 🔍 VERIFICAR COMPATIBILIDAD DEL CÓDIGO
-      try {
-        const compatibility = await barcodeService.isCodeCompatible(codigoBarras);
-        if (!compatibility.isCompatible && compatibility.warnings.length > 0) {
-          console.warn('⚠️ [API] Advertencias de compatibilidad:', compatibility.warnings);
-          // No bloquear, solo advertir en logs
-        }
-      } catch (compError) {
-        console.warn('⚠️ [API] No se pudo verificar compatibilidad:', compError);
-        // Continuar sin bloquear
-      }
     }
     
-    // Verificar que la categoría existe
+    // Verificar categoría (mantener igual)
     const categoria = await prisma.categoria.findUnique({
       where: { id: validation.data.categoriaId }
     });
@@ -283,13 +274,13 @@ export async function POST(req: NextRequest) {
       );
     }
     
-    // 🔒 CREAR PRODUCTO CON CÓDIGO COMPATIBLE
+    // 🔒 CREAR PRODUCTO (mantener igual)
     const producto = await prisma.producto.create({
       data: {
         nombre: validation.data.nombre,
         descripcion: validation.data.descripcion,
         precio: validation.data.precio,
-        codigoBarras: codigoBarras, // Puede ser null, generado, o proporcionado
+        codigoBarras: codigoBarras,
         imagen: validation.data.imagen,
         categoriaId: validation.data.categoriaId,
         stockMinimo: validation.data.stockMinimo,
@@ -307,13 +298,88 @@ export async function POST(req: NextRequest) {
     
     console.log('✅ [API] Producto creado exitosamente:', producto.id);
     
-    if (producto.codigoBarras) {
-      console.log(`🏷️ [API] Código de barras asignado: ${producto.codigoBarras}`);
-    } else {
-      console.log('📝 [API] Producto creado sin código de barras (se puede generar después)');
+    // 🆕 CREAR CONFIGURACIONES DE STOCK AUTOMÁTICAMENTE
+    let configuracionesCreadas = 0;
+    
+    if (validation.data.crearConfiguracionStock) {
+      console.log('⚙️ [API] Creando configuraciones de stock automáticas...');
+      
+      const user = (req as any).user;
+      let sucursalesParaConfig = validation.data.sucursalesConfig || [];
+      
+      // Si no se especificaron sucursales, obtener todas las activas
+      if (sucursalesParaConfig.length === 0) {
+        console.log('🏢 [API] No se especificaron sucursales, obteniendo todas las activas...');
+        
+        const sucursalesActivas = await prisma.ubicacion.findMany({
+          where: { 
+            tipo: 'sucursal',
+            activo: true 
+          },
+          select: { id: true, nombre: true }
+        });
+        
+        // Configuración por defecto inteligente
+        const stockMaximoPorDefecto = Math.max(validation.data.stockMinimo * 5, 10);
+        
+        sucursalesParaConfig = sucursalesActivas.map(sucursal => ({
+          sucursalId: sucursal.id,
+          stockMaximo: stockMaximoPorDefecto,
+          puntoReposicion: Math.ceil(stockMaximoPorDefecto * 0.3)
+        }));
+        
+        console.log(`📋 [API] Configurando para ${sucursalesParaConfig.length} sucursales activas`);
+      }
+      
+      // Crear configuraciones para cada sucursal
+      for (const configSucursal of sucursalesParaConfig) {
+        try {
+          const stockMaximo = configSucursal.stockMaximo;
+          const stockMinimo = validation.data.stockMinimo;
+          const puntoReposicion = configSucursal.puntoReposicion || Math.ceil(stockMaximo * 0.3);
+          
+          await prisma.stockConfigSucursal.create({
+            data: {
+              productoId: producto.id,
+              sucursalId: configSucursal.sucursalId,
+              stockMaximo,
+              stockMinimo,
+              puntoReposicion,
+              creadoPor: user.id,
+              activo: true
+            }
+          });
+          
+          configuracionesCreadas++;
+          
+        } catch (configError) {
+          console.error(`⚠️ [API] Error creando configuración para sucursal ${configSucursal.sucursalId}:`, configError);
+          // No fallar por errores individuales de configuración
+        }
+      }
+      
+      console.log(`✅ [API] ${configuracionesCreadas} configuraciones de stock creadas`);
     }
     
-    return NextResponse.json(producto, { status: 201 });
+    // 🆕 RESPUESTA MEJORADA CON INFO DE CONFIGURACIONES
+    const response = {
+      ...producto,
+      metadata: {
+        codigoGenerado: !!validation.data.generarCodigoAutomatico && !!codigoBarras,
+        configuracionesStock: configuracionesCreadas,
+        visibleEnStockSucursales: configuracionesCreadas > 0
+      }
+    };
+    
+    console.log('🎉 [API] Producto creado con configuraciones:', {
+      productoId: producto.id,
+      nombre: producto.nombre,
+      configuraciones: configuracionesCreadas,
+      codigoBarras: !!codigoBarras
+    });
+    
+    return NextResponse.json(response, { status: 201 });
+    
   } catch (error: any) {
     console.error('❌ [API] Error al crear producto:', error);
     return NextResponse.json(
